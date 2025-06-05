@@ -41,7 +41,8 @@ Collecting scikit-learn>=1.2 (from -r requirements.txt (line 12))
 
 * Windows users run `setup_env.ps1`.
 * Activation uses `.venv\Scripts\Activate.ps1`.
-* Offline environments can prefetch models using `fetch_models.ps1`.
+* Pass `--prefetch` to `setup_env.ps1` to download models during setup.
+* Offline environments can also run `fetch_models.ps1` separately.
 
 ## 3. Exploring the Code
 
@@ -52,8 +53,9 @@ Collecting scikit-learn>=1.2 (from -r requirements.txt (line 12))
 ## 4. Next Steps
 
 * Complete installation by allowing `setup_env.sh` to finish downloading dependencies.
-* Optionally run `bash fetch_models.sh` to cache models for offline use.
+* Optionally run `bash fetch_models.sh` (or `setup_env.sh --prefetch`) to cache models for offline use.
 * Start exploring with `python speaktome.py -h` to view command line options.
+  Use `--preload_models` for a one-time load of all models if you want to avoid lazy loading delays.
 
 ---
 

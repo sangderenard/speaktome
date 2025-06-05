@@ -3,28 +3,29 @@ import collections
 from typing import Optional, List, TYPE_CHECKING
 
 # Third-party imports
-import matplotlib.pyplot as plt # type: ignore
-import networkx as nx
-from sklearn.decomposition import PCA
 import torch
-from torch_geometric.data import Data as PyGData
-from sentence_transformers import SentenceTransformer
 from transformers import PreTrainedTokenizer
 
+from .lazy_loader import lazy_import
+
 if TYPE_CHECKING:
-    from .beam_search import BeamSearch # For type hinting
-    from .compressed_beam_tree import CompressedBeamTree # For PCAVisualizer type hinting
+    from .beam_search import BeamSearch
+    from .compressed_beam_tree import CompressedBeamTree
+    from torch_geometric.data import Data as PyGData
+    from sentence_transformers import SentenceTransformer
 
 class BeamTreeVisualizer:
     def visualize_subtree(
         self,
-        pyg_data: PyGData,
+        pyg_data: 'PyGData',
         tokenizer: PreTrainedTokenizer,
         beam_search_obj: Optional['BeamSearch'],
         root_pyg_node_id: int,
         title: str = "Beam Subtree",
     ) -> None:
         """Visualizes a subtree of PyGData starting from root_pyg_node_id using NetworkX and Matplotlib."""
+        plt = lazy_import('matplotlib.pyplot')
+        nx = lazy_import('networkx')
         if not pyg_data or pyg_data.num_nodes == 0:
             print("No PyG data to visualize.")
             return
@@ -132,10 +133,12 @@ class BeamTreeVisualizer:
     def visualize_sentence_embeddings(
         self,
         tree: 'CompressedBeamTree',
-        sentence_model: SentenceTransformer,
+        sentence_model: 'SentenceTransformer',
         tokenizer: PreTrainedTokenizer,
         title: str = "Beam Tree Node Sentence Embeddings (PCA)",
     ) -> None:
+        plt = lazy_import('matplotlib.pyplot')
+        PCA = lazy_import('sklearn.decomposition').PCA
         if not tree.nodes:
             print("Tree is empty. Nothing to visualize with PCA plot.")
             return
