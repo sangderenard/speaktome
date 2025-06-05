@@ -15,14 +15,15 @@ custom model path before running the program.
 ## Command Line Usage
 
 The `speaktome` entry point exposes several options. Long flags have short aliases
-for convenience. For example:
+for convenience. By default the program expands once automatically, disables
+retirement, and uses maximum lookahead. For example:
 
 ```
-python speaktome.py -s "Hello" -m 10 -c -a 5
+python speaktome.py -s "Hello" -m 10 -c -a 5 --final_viz
 ```
 
 The above runs the search with seed text "Hello", a maximum depth of 10, enables
-human control, and automatically performs five `expand_any` rounds before
-interactive control resumes. Use `-g N` to let the PyGeoMind model control for `N`
-rounds before handing control back.
+human control, automatically performs five `expand_any` rounds before
+interactive control resumes, and shows the final tree. Use `-g N` to let the
+PyGeoMind model control for `N` rounds before handing control back.
 

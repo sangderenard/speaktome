@@ -12,7 +12,7 @@ from .human_scorer_policy_manager import HumanScorerPolicyManager
 from .beam_search_instruction import BeamSearchInstruction
 # Ensure this import points to the new location of BeamTreeVisualizer
 # Import both visualizers from beam_tree_visualizer.py
-from .beam_tree_visualizer import BeamTreeVisualizer, SentenceEmbeddingPCAVisualizer
+from .beam_tree_visualizer import BeamTreeVisualizer
 from .config import get_sentence_transformer_model
 class PyGGraphController:
     def __init__(self, beam_search: BeamSearch, pygeomind_model: Optional[PyGeoMind] = None, human_in_control: bool = False):
@@ -390,10 +390,11 @@ class PyGGraphController:
                 elif human_choice == "pca":
                     if self.tree and self.tree.nodes:
                         print("\nVisualizing node sentence embeddings (PCA)...")
-                        pca_visualizer = SentenceEmbeddingPCAVisualizer(
-                            self.tree, get_sentence_transformer_model(), self.beam_search.scorer.tokenizer
+                        BeamTreeVisualizer().visualize_sentence_embeddings(
+                            self.tree,
+                            get_sentence_transformer_model(),
+                            self.beam_search.scorer.tokenizer,
                         )
-                        pca_visualizer.visualize()
                     else:
                         print("Tree is empty. Skipping PCA sentence embedding visualization.")
                     continue
