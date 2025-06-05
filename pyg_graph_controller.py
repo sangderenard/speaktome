@@ -342,11 +342,15 @@ class PyGGraphController:
                             beam_idx, tokenizer=self.beam_search.scorer.tokenizer
                         )
                         print("\n--- Beam Trace ---")
+                        if not lineage:
+                            print(f"Beam index {beam_idx} not found.")
                         for i, (tok, score) in enumerate(lineage):
                             decoded = self.beam_search.scorer.tokenizer.decode(
                                 [tok], skip_special_tokens=True
                             )
-                            print(f"{i:02}: Token '{decoded}' (id={tok}) | Score: {score:.4f}")
+                            print(
+                                f"{i:02}: Token '{decoded}' (id={tok}) | Score: {score:.4f}"
+                            )
                     except Exception as e:
                         print(f"Trace failed: {e}")
                     continue
