@@ -497,28 +497,38 @@ class CompressedBeamTree:
         return new_beam_idx
 
 
-    def trace_beam_path(self, beam_idx, tokenizer):
-        """
-        Trace back the path from a beam leaf to the root, printing node info.
-        """
-        path = []
-        current = beam_idx
-        
-        while current is not None:
-            node = self.tree.get_node_by_beam_idx(current)
-            if node is None: break
-            token_id = node.token_id
-            logprob = node.logprob
-            parent = node.parent
-            token_str = tokenizer.decode([token_id], skip_special_tokens=True)
-            path.append((token_str, logprob, current))
-            current = parent
+    def trace_beam_path(self, beam_idx: int, tokenizer: PreTrainedTokenizer) -> List[Tuple[int, float]]:
+        """Trace back a beam path from the given ``beam_idx`` to the root.
 
-        path.reverse()
+        The method prints the decoded tokens and scores for each step and also
+        returns them as ``[(token_id, score), ...]``.  If ``beam_idx`` does not
+        correspond to a valid leaf, an empty list is returned.
+        """
+        path_ids: List[Tuple[int, float]] = []
+
+        if beam_idx not in self.leaf_node_indices:
+            if self.verbose:
+                print(f"[Warning] trace_beam_path: beam_idx {beam_idx} not found.")
+            return path_ids
+
+        node_idx = self.leaf_node_indices[beam_idx]
+        current_idx = node_idx
+        while current_idx is not None:
+            node = self.nodes[current_idx]
+            token_id = int(node.token_tensor.item())
+            score = float(node.score_tensor.item())
+            path_ids.append((token_id, score))
+            current_idx = node.parent_node_idx
+
+        path_ids.reverse()
+
         print("\nTrace of beam path:")
-        for i, (token_str, logprob, bidx) in enumerate(path):
-            print(f"[{i:3}] {token_str:12} score = {logprob:.2f} | beam_idx = {bidx}")
-        print(f"\nPath length: {len(path)} tokens")
+        for i, (tok_id, score) in enumerate(path_ids):
+            tok_str = tokenizer.decode([tok_id], skip_special_tokens=True)
+            print(f"[{i:3}] {tok_str:12} score = {score:.2f}")
+        print(f"\nPath length: {len(path_ids)} tokens")
+
+        return path_ids
     def get_beam_tensors_by_beam_idx(self, beam_idx: int, max_len: int, read_only: bool = False) -> Tuple[torch.Tensor, torch.Tensor, int]:
         if beam_idx not in self.leaf_node_indices:
             device = torch.device("cpu") if read_only else self.device
