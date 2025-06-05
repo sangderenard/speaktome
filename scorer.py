@@ -12,7 +12,13 @@ from . import config
 
 class Scorer:
     def __init__(self):
-        model_path = os.environ.get("GPT2_MODEL_PATH", "gpt2")
+        model_path = os.environ.get("GPT2_MODEL_PATH")
+        if not model_path:
+            local_path = os.path.join(os.path.dirname(__file__), "models", "gpt2")
+            if os.path.isdir(local_path):
+                model_path = local_path
+            else:
+                model_path = "gpt2"
         self.tokenizer = GPT2Tokenizer.from_pretrained(model_path)
         self.tokenizer.pad_token = self.tokenizer.eos_token  # GPT-2 has no pad_token by default
         self.model = (
