@@ -6,9 +6,8 @@ import torch
 from transformers import GPT2LMHeadModel, GPT2Tokenizer
 
 # Local application/library specific imports
-# DEVICE and sentence_transformer_model (SentenceTransformer instance)
-# are now imported from config.py
-from .config import DEVICE, sentence_transformer_model
+# DEVICE and lazy SentenceTransformer access function are imported from config
+from .config import DEVICE, get_sentence_transformer_model
 
 class Scorer:
     def __init__(self):
@@ -41,7 +40,8 @@ class Scorer:
         # beams: [N, L] token tensors
         texts = [tokenizer.decode(b[:l], skip_special_tokens=True)
                 for b, l in zip(beams, lengths)]
-        embeddings = sentence_transformer_model.encode(texts, convert_to_tensor=True, device="cuda", batch_size=128)
+        model = get_sentence_transformer_model()
+        embeddings = model.encode(texts, convert_to_tensor=True, device="cuda", batch_size=128)
         # Self-similarity or against external set
         if existing_embeddings is not None:
             # Similarity to previous (could be active beams, etc.)
