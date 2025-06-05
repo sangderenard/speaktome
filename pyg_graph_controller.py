@@ -1,9 +1,12 @@
 # Standard library imports
-from typing import Optional, List
+from typing import Optional, List, TYPE_CHECKING
 
 # Third-party imports
 import torch
-from torch_geometric.data import Data as PyGData
+
+from .lazy_loader import lazy_import
+if TYPE_CHECKING:
+    from torch_geometric.data import Data as PyGData
 
 # Local application/library specific imports
 from .beam_search import BeamSearch

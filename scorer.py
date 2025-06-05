@@ -3,8 +3,10 @@ from typing import Callable, Dict
 
 # Third-party imports
 import torch
-from transformers import GPT2LMHeadModel, GPT2Tokenizer
 import os
+
+# Defer heavy imports until needed
+from .lazy_loader import lazy_import
 
 # Local application/library specific imports
 # Access configuration dynamically to allow device changes at runtime
@@ -12,20 +14,13 @@ from . import config
 
 class Scorer:
     def __init__(self):
+        self._model = None
+        self._tokenizer = None
         model_path = os.environ.get("GPT2_MODEL_PATH")
         if not model_path:
             local_path = os.path.join(os.path.dirname(__file__), "models", "gpt2")
-            if os.path.isdir(local_path):
-                model_path = local_path
-            else:
-                model_path = "gpt2"
-        self.tokenizer = GPT2Tokenizer.from_pretrained(model_path)
-        self.tokenizer.pad_token = self.tokenizer.eos_token  # GPT-2 has no pad_token by default
-        self.model = (
-            GPT2LMHeadModel.from_pretrained(model_path)
-            .to(config.DEVICE)
-            .eval()
-        )
+            model_path = local_path if os.path.isdir(local_path) else "gpt2"
+        self.model_path = model_path
         self.default_scorer = Scorer.mean_logprob_score
         self.default_k = 5
         self.default_temp = 1.5
@@ -47,6 +42,32 @@ class Scorer:
             "score_bins": self.default_score_bins,
             "lookahead_steps": 1 # Default lookahead steps
         }
+
+    def _ensure_model(self):
+        if self._model is None or self._tokenizer is None:
+            GPT2LMHeadModel = lazy_import('transformers.GPT2LMHeadModel')
+            GPT2Tokenizer = lazy_import('transformers.GPT2Tokenizer')
+            self._tokenizer = GPT2Tokenizer.from_pretrained(self.model_path)
+            self._tokenizer.pad_token = self._tokenizer.eos_token
+            self._model = (
+                GPT2LMHeadModel.from_pretrained(self.model_path)
+                .to(config.DEVICE)
+                .eval()
+            )
+
+    @property
+    def tokenizer(self):
+        self._ensure_model()
+        return self._tokenizer
+
+    @property
+    def model(self):
+        self._ensure_model()
+        return self._model
+
+    def preload_models(self):
+        """Load tokenizer and model immediately."""
+        self._ensure_model()
     @staticmethod
     def cosine_similarity_score(beams, scores, lengths, tokenizer, existing_embeddings=None, threshold=0.92, **kwargs):
         # beams: [N, L] token tensors

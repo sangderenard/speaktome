@@ -1,15 +1,17 @@
 # Standard library imports
-from typing import List, Tuple, Dict, Optional, Any, Callable
+from typing import List, Tuple, Dict, Optional, Any, Callable, TYPE_CHECKING
 import argparse
 
 # Third-party imports
-import matplotlib.pyplot as plt # type: ignore # Used by main, and indirectly by visualizers
 import torch
 import torch.nn.functional as F
-from torch_geometric.data import Data as PyGData
-import torch_geometric.nn as pyg_nn # For PyGeoMind
-from sentence_transformers import SentenceTransformer # For type hinting
 from transformers import PreTrainedTokenizer
+
+from .lazy_loader import lazy_import
+if TYPE_CHECKING:
+    from torch_geometric.data import Data as PyGData
+    import torch_geometric.nn as pyg_nn
+    from sentence_transformers import SentenceTransformer
 
 # Local application/library specific imports
 # Please adjust these import paths if your project structure differs.
@@ -53,6 +55,8 @@ def main(raw_args=None, allow_retry=True):
                         help="Visualize the final beam tree after completion.")
     parser.add_argument('--final_pca', action='store_true', default=False,
                         help="Visualize PCA of sentence embeddings after completion.")
+    parser.add_argument('--preload_models', action='store_true', default=False,
+                        help="Load all models up front to avoid lazy initialization delays.")
     parser.add_argument('seed_text', nargs='*', help='Seed text if not provided via -s')
     args = parser.parse_args(raw_args)
 
@@ -65,6 +69,9 @@ def main(raw_args=None, allow_retry=True):
 
         # 2.1 Instantiate the GPT-based Scorer
         scorer = Scorer()
+        if args.preload_models:
+            scorer.preload_models()
+            config.get_sentence_transformer_model()
 
         # Determine lookahead steps and retirement status based on args
         effective_lookahead_steps = args.lookahead

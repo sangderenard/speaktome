@@ -15,16 +15,16 @@ before attempting any network download.
 ## Environment Setup
 
 Use the included script to create a virtual environment and install
-dependencies:
+dependencies. Pass `--prefetch` if you want to download models during setup:
 
 ```bash
-bash setup_env.sh
+bash setup_env.sh --prefetch  # optional
 ```
 
 On Windows use the PowerShell script:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File setup_env.ps1
+powershell -ExecutionPolicy Bypass -File setup_env.ps1 --prefetch  # optional
 ```
 
 Activate the environment with:
@@ -83,4 +83,6 @@ PyGeoMind model control for `N` rounds before handing control back.
 
 Pass `-x` or `--safe_mode` to force CPU execution when you want to avoid GPU
 usage entirely.
+
+Use `--preload_models` if you prefer to load all models up front rather than on-demand.
 
