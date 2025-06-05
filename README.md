@@ -12,6 +12,21 @@ To avoid network downloads, set the environment variable
 `SENTENCE_TRANSFORMER_MODEL_PATH` to the directory of a pre-downloaded model or a
 custom model path before running the program.
 
+## Environment Setup
+
+Use the included script to create a virtual environment and install
+dependencies:
+
+```bash
+bash setup_env.sh
+```
+
+Activate the environment with:
+
+```bash
+source .venv/bin/activate
+```
+
 ## Command Line Usage
 
 The `speaktome` entry point exposes several options. Long flags have short aliases

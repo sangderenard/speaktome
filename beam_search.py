@@ -7,7 +7,8 @@ import torch.nn.functional as F
 
 # Local application/library specific imports
 # Please adjust these import paths based on your actual project structure.
-from .config import DEVICE, GPU_LIMIT, LENGTH_LIMIT # Assuming these are constants from a config file
+from . import config
+from .config import GPU_LIMIT, LENGTH_LIMIT
 from .beam_graph_operator import BeamGraphOperator
 from .beam_search_instruction import BeamSearchInstruction
 from .meta_beam_manager import MetaBeamManager
@@ -209,7 +210,7 @@ class LookaheadController:
 class BeamSearch:
     def __init__(self, scorer: Scorer, beam_width: int = 5, gpu_limit: int = GPU_LIMIT, 
                  lookahead_steps: int = 1, initial_retirement_enabled: bool = True,
-                 device=DEVICE, verbose=True, max_len=LENGTH_LIMIT, # General params
+                 device=config.DEVICE, verbose=True, max_len=LENGTH_LIMIT, # General params
                  # Lookahead specific initial/default configurations
                  initial_lookahead_rules: Optional[BeamSearchInstruction] = None,
                  initial_aggregate_score_fn: Optional[Callable[[torch.Tensor], torch.Tensor]] = None,
