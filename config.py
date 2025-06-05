@@ -20,9 +20,17 @@ def get_sentence_transformer_model() -> SentenceTransformer:
     """
     global sentence_transformer_model
     if sentence_transformer_model is None:
-        model_name_or_path = os.environ.get(
-            "SENTENCE_TRANSFORMER_MODEL_PATH", "paraphrase-MiniLM-L6-v2"
-        )
+        model_name_or_path = os.environ.get("SENTENCE_TRANSFORMER_MODEL_PATH")
+        if not model_name_or_path:
+            local_path = os.path.join(
+                os.path.dirname(__file__),
+                "models",
+                "paraphrase-MiniLM-L6-v2",
+            )
+            if os.path.isdir(local_path):
+                model_name_or_path = local_path
+            else:
+                model_name_or_path = "paraphrase-MiniLM-L6-v2"
         sentence_transformer_model = SentenceTransformer(
             model_name_or_path, device=DEVICE
         )
