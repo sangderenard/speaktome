@@ -19,8 +19,8 @@ from .pyg_graph_controller import PyGGraphController # Assuming PyGGraphControll
 from .compressed_beam_tree import CompressedBeamTree # CompressedBeamTree is used by SentenceEmbeddingPCAVisualizer
 # Import both visualizers from beam_tree_visualizer.py
 from .beam_tree_visualizer import BeamTreeVisualizer, SentenceEmbeddingPCAVisualizer
-# Import DEVICE and sentence_transformer_model from config
-from .config import DEVICE, sentence_transformer_model, GPU_LIMIT, LENGTH_LIMIT
+# Import DEVICE and lazy SentenceTransformer accessor from config
+from .config import DEVICE, get_sentence_transformer_model, GPU_LIMIT, LENGTH_LIMIT
 
 
 def main():
@@ -136,7 +136,9 @@ def main():
     # Add new visualizer call
     if final_beam_tree_obj and final_beam_tree_obj.nodes:
         print("\nVisualizing node sentence embeddings (PCA)...")
-        pca_visualizer = SentenceEmbeddingPCAVisualizer(final_beam_tree_obj, sentence_transformer_model, scorer.tokenizer)
+        pca_visualizer = SentenceEmbeddingPCAVisualizer(
+            final_beam_tree_obj, get_sentence_transformer_model(), scorer.tokenizer
+        )
         pca_visualizer.visualize()
     else:
         print("Final beam tree is empty. Skipping PCA sentence embedding visualization.")

@@ -13,7 +13,7 @@ from .beam_search_instruction import BeamSearchInstruction
 # Ensure this import points to the new location of BeamTreeVisualizer
 # Import both visualizers from beam_tree_visualizer.py
 from .beam_tree_visualizer import BeamTreeVisualizer, SentenceEmbeddingPCAVisualizer
-from .config import sentence_transformer_model # To pass to the PCA visualizer
+from .config import get_sentence_transformer_model
 class PyGGraphController:
     def __init__(self, beam_search: BeamSearch, pygeomind_model: Optional[PyGeoMind] = None, human_in_control: bool = False):
         self.beam_search = beam_search
@@ -391,7 +391,7 @@ class PyGGraphController:
                     if self.tree and self.tree.nodes:
                         print("\nVisualizing node sentence embeddings (PCA)...")
                         pca_visualizer = SentenceEmbeddingPCAVisualizer(
-                            self.tree, sentence_transformer_model, self.beam_search.scorer.tokenizer
+                            self.tree, get_sentence_transformer_model(), self.beam_search.scorer.tokenizer
                         )
                         pca_visualizer.visualize()
                     else:
