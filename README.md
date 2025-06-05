@@ -86,3 +86,20 @@ usage entirely.
 
 Use `--preload_models` if you prefer to load all models up front rather than on-demand.
 
+### Resetting the Environment
+
+If you ever need to recreate the virtual environment from scratch, run
+`reinstall_env.sh`. This script removes the existing `.venv` directory and then
+invokes `setup_env.sh` with any arguments you pass. It prompts for confirmation
+and defaults to **N** if you simply press Enter.
+
+```bash
+bash reinstall_env.sh --prefetch  # optional
+```
+
+On Windows use the accompanying PowerShell script:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File reinstall_env.ps1 --prefetch
+```
+
