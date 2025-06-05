@@ -4,6 +4,7 @@ from typing import Callable, Dict
 # Third-party imports
 import torch
 from transformers import GPT2LMHeadModel, GPT2Tokenizer
+import os
 
 # Local application/library specific imports
 # Access configuration dynamically to allow device changes at runtime
@@ -11,10 +12,11 @@ from . import config
 
 class Scorer:
     def __init__(self):
-        self.tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
+        model_path = os.environ.get("GPT2_MODEL_PATH", "gpt2")
+        self.tokenizer = GPT2Tokenizer.from_pretrained(model_path)
         self.tokenizer.pad_token = self.tokenizer.eos_token  # GPT-2 has no pad_token by default
         self.model = (
-            GPT2LMHeadModel.from_pretrained("gpt2")
+            GPT2LMHeadModel.from_pretrained(model_path)
             .to(config.DEVICE)
             .eval()
         )
