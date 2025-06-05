@@ -7,7 +7,7 @@ if (-not (Test-Path $modelsDir)) {
     New-Item -ItemType Directory -Path $modelsDir | Out-Null
 }
 
-python - <<'PY'
+@'
 import os
 from transformers import GPT2LMHeadModel, GPT2Tokenizer
 from sentence_transformers import SentenceTransformer
@@ -21,7 +21,7 @@ if not os.path.exists(gpt2_dir):
 st_dir = os.path.join(models_dir, 'paraphrase-MiniLM-L6-v2')
 if not os.path.exists(st_dir):
     SentenceTransformer('paraphrase-MiniLM-L6-v2').save(st_dir)
-PY
+'@ | .\.venv\Scripts\python.exe -
 
 Write-Host "Models downloaded to $modelsDir"
 Write-Host "Set GPT2_MODEL_PATH=$modelsDir\gpt2"
