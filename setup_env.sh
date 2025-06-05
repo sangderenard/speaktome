@@ -9,4 +9,8 @@ source .venv/bin/activate
 pip install --upgrade pip
 pip install -r requirements.txt
 
+if [[ "${1:-}" == "--prefetch" ]]; then
+    bash fetch_models.sh
+fi
+
 echo "Environment setup complete. Activate with 'source .venv/bin/activate'."

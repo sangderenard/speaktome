@@ -1,11 +1,14 @@
 # Standard library imports
 import collections
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, TYPE_CHECKING
 
 # Third-party imports
 import torch
-from torch_geometric.data import Data as PyGData
-import torch_geometric.nn as pyg_nn
+
+from .lazy_loader import lazy_import
+if TYPE_CHECKING:
+    from torch_geometric.data import Data as PyGData
+    import torch_geometric.nn as pyg_nn
 
 # Local application/library specific imports
 from .beam_search_instruction import BeamSearchInstruction
@@ -32,6 +35,8 @@ class PyGeoMind(torch.nn.Module):
 
     def __init__(self, scorer: Scorer, input_dim: int = 768, hidden_dim: int = 512, beam_width: int = 5, **kwargs):
         super().__init__()
+
+        pyg_nn = lazy_import('torch_geometric.nn')
 
         # ══════ Encoder & GNN ══════
         self.encoder       = torch.nn.Linear(input_dim, hidden_dim)
@@ -60,7 +65,7 @@ class PyGeoMind(torch.nn.Module):
         self.human_scorer_policy_manager = HumanScorerPolicyManager(self.scorer)
         
 
-    def _get_leaves_under_internal_node(self, internal_node_pyg_id: int, data: PyGData) -> List[int]:
+    def _get_leaves_under_internal_node(self, internal_node_pyg_id: int, data: 'PyGData') -> List[int]:
         """
         Return a list of all PyG‐node IDs that are leaves in the subtree rooted at `internal_node_pyg_id`.
         Uses a cached adjacency list for efficiency (built once per run() call).
@@ -121,7 +126,7 @@ class PyGeoMind(torch.nn.Module):
 
         return ancestor_ids
 
-    def run(self, data: PyGData, beam_tree: CompressedBeamTree, current_step_id: int = 0) -> List[BeamSearchInstruction]:
+    def run(self, data: 'PyGData', beam_tree: CompressedBeamTree, current_step_id: int = 0) -> List[BeamSearchInstruction]:
         """
         Produce up to K_DEEPEN_LEAVES+1 instructions (one optional BUD + up to K_DEEPEN_LEAVES leaf expansions).
         """
