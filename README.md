@@ -27,6 +27,26 @@ Activate the environment with:
 source .venv/bin/activate
 ```
 
+### Offline Setup
+
+After creating the virtual environment, run the following script to download the
+required models:
+
+```bash
+bash fetch_models.sh
+```
+
+The script stores GPT-2 and the SentenceTransformer model under the `models/`
+directory. Set the following environment variables to use the local copies:
+
+```bash
+export GPT2_MODEL_PATH=models/gpt2
+export SENTENCE_TRANSFORMER_MODEL_PATH=models/paraphrase-MiniLM-L6-v2
+```
+
+Once the models are downloaded you can run the program without further network
+access.
+
 ## Command Line Usage
 
 The `speaktome` entry point exposes several options. Long flags have short aliases
