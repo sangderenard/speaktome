@@ -6,14 +6,18 @@ import torch
 from transformers import GPT2LMHeadModel, GPT2Tokenizer
 
 # Local application/library specific imports
-# DEVICE and lazy SentenceTransformer access function are imported from config
-from .config import DEVICE, get_sentence_transformer_model
+# Access configuration dynamically to allow device changes at runtime
+from . import config
 
 class Scorer:
     def __init__(self):
         self.tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
         self.tokenizer.pad_token = self.tokenizer.eos_token  # GPT-2 has no pad_token by default
-        self.model = GPT2LMHeadModel.from_pretrained("gpt2").to(DEVICE).eval()
+        self.model = (
+            GPT2LMHeadModel.from_pretrained("gpt2")
+            .to(config.DEVICE)
+            .eval()
+        )
         self.default_scorer = Scorer.mean_logprob_score
         self.default_k = 5
         self.default_temp = 1.5
@@ -40,8 +44,13 @@ class Scorer:
         # beams: [N, L] token tensors
         texts = [tokenizer.decode(b[:l], skip_special_tokens=True)
                 for b, l in zip(beams, lengths)]
-        model = get_sentence_transformer_model()
-        embeddings = model.encode(texts, convert_to_tensor=True, device="cuda", batch_size=128)
+        model = config.get_sentence_transformer_model()
+        embeddings = model.encode(
+            texts,
+            convert_to_tensor=True,
+            device=str(config.DEVICE),
+            batch_size=128,
+        )
         # Self-similarity or against external set
         if existing_embeddings is not None:
             # Similarity to previous (could be active beams, etc.)
