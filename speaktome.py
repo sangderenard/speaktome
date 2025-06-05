@@ -47,12 +47,17 @@ def main(raw_args=None, allow_retry=True):
                         help="Run 'expand_any' automatically for N rounds before normal control.")
     parser.add_argument('-g', '--gnn_rounds', type=int, default=0,
                         help="Let PyGeoMind control for N rounds before returning to human/auto mode.")
+    parser.add_argument('-x', '--safe_mode', action='store_true', default=False,
+                        help="Force CPU mode and disable GPU usage.")
     parser.add_argument('--final_viz', action='store_true', default=False,
                         help="Visualize the final beam tree after completion.")
     parser.add_argument('--final_pca', action='store_true', default=False,
                         help="Visualize PCA of sentence embeddings after completion.")
     parser.add_argument('seed_text', nargs='*', help='Seed text if not provided via -s')
     args = parser.parse_args(raw_args)
+
+    if args.safe_mode:
+        config.DEVICE = torch.device("cpu")
 
     def run_once():
         seed_from_flag = args.seed != parser.get_default('seed')

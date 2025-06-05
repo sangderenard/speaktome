@@ -42,3 +42,6 @@ human control, automatically performs five `expand_any` rounds before
 interactive control resumes, and shows the final tree. Use `-g N` to let the
 PyGeoMind model control for `N` rounds before handing control back.
 
+Pass `-x` or `--safe_mode` to force CPU execution when you want to avoid GPU
+usage entirely.
+
