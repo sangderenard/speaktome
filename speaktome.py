@@ -25,14 +25,27 @@ from .config import DEVICE, get_sentence_transformer_model, GPU_LIMIT, LENGTH_LI
 
 def main():
     parser = argparse.ArgumentParser(description="Run Beam Search with optional GNN control.")
-    parser.add_argument('--seed', type=str, default='The signet read: "', help="Seed phrase for beam search.")
-    parser.add_argument('--max_steps', type=int, default=5, help="Maximum steps (depth) for the search.")
-    parser.add_argument('--human_control', action='store_true', default=False, help="Enable human-in-the-loop control (default: autonomous).")
-    parser.add_argument('--lookahead', type=int, default=3, help="Number of lookahead steps for beam search.")
-    parser.add_argument('--easy_mode', action='store_true', default=False, help="Easy mode: full lookahead, no retirement.")
-    parser.add_argument('--full_summary', action='store_true', default=False, help="Print a full summary of all beams after the run.")
-    parser.add_argument('--beam_width', type=int, default=5, help="Beam width for the search.")
-    parser.add_argument('--preferred_scorer', type=str, default=None, choices=list(Scorer.get_available_scoring_functions().keys()), help="Preferred scoring function for default instructions.")
+    parser.add_argument('-s', '--seed', type=str, default='The signet read: "',
+                        help="Seed phrase for beam search.")
+    parser.add_argument('-m', '--max_steps', type=int, default=5,
+                        help="Maximum steps (depth) for the search.")
+    parser.add_argument('-c', '--human_control', action='store_true', default=False,
+                        help="Enable human-in-the-loop control (default: autonomous).")
+    parser.add_argument('-l', '--lookahead', type=int, default=3,
+                        help="Number of lookahead steps for beam search.")
+    parser.add_argument('-e', '--easy_mode', action='store_true', default=False,
+                        help="Easy mode: full lookahead, no retirement.")
+    parser.add_argument('-f', '--full_summary', action='store_true', default=False,
+                        help="Print a full summary of all beams after the run.")
+    parser.add_argument('-w', '--beam_width', type=int, default=5,
+                        help="Beam width for the search.")
+    parser.add_argument('-p', '--preferred_scorer', type=str, default=None,
+                        choices=list(Scorer.get_available_scoring_functions().keys()),
+                        help="Preferred scoring function for default instructions.")
+    parser.add_argument('-a', '--auto_expand', type=int, default=0,
+                        help="Run 'expand_any' automatically for N rounds before normal control.")
+    parser.add_argument('-g', '--gnn_rounds', type=int, default=0,
+                        help="Let PyGeoMind control for N rounds before returning to human/auto mode.")
     args = parser.parse_args()
 
     # 2.1 Instantiate the GPT-based Scorer
@@ -75,6 +88,15 @@ def main():
         pygeomind_model=pygeomind_model,
         human_in_control=args.human_control
     )
+
+    # Apply auto-run settings from CLI arguments
+    if args.gnn_rounds > 0:
+        controller.auto_run_mode = "pygeomind_decide"
+        controller.auto_run_counter = args.gnn_rounds
+        controller.human_in_control = False
+    elif args.auto_expand > 0:
+        controller.auto_run_mode = "expand_any"
+        controller.auto_run_counter = args.auto_expand
 
     # 2.5 Choose fixed hyperparameters for this run:
     # seed_phrase = "The signet read: \"" # From args
