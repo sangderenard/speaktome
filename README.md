@@ -8,9 +8,9 @@ Many features rely on a [SentenceTransformer](https://www.sbert.net/) model. The
 is loaded lazily on first use. By default, the package downloads the
 `paraphrase-MiniLM-L6-v2` model if it is not already available locally.
 
-To avoid network downloads, set the environment variable
-`SENTENCE_TRANSFORMER_MODEL_PATH` to the directory of a pre-downloaded model or a
-custom model path before running the program.
+If the environment variable `SENTENCE_TRANSFORMER_MODEL_PATH` is set its value is
+used. Otherwise the package looks for a local copy under `models/paraphrase-MiniLM-L6-v2`
+before attempting any network download.
 
 ## Environment Setup
 
@@ -55,7 +55,8 @@ powershell -ExecutionPolicy Bypass -File fetch_models.ps1
 ```
 
 The script stores GPT-2 and the SentenceTransformer model under the `models/`
-directory. Set the following environment variables to use the local copies:
+directory. The program automatically checks this location, but you can also set
+the following environment variables to specify custom paths:
 
 ```bash
 export GPT2_MODEL_PATH=models/gpt2
