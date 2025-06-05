@@ -21,10 +21,22 @@ dependencies:
 bash setup_env.sh
 ```
 
+On Windows use the PowerShell script:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File setup_env.ps1
+```
+
 Activate the environment with:
 
 ```bash
 source .venv/bin/activate
+```
+
+On Windows activate with:
+
+```powershell
+.venv\Scripts\Activate.ps1
 ```
 
 ### Offline Setup
@@ -34,6 +46,12 @@ required models:
 
 ```bash
 bash fetch_models.sh
+```
+
+On Windows run:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File fetch_models.ps1
 ```
 
 The script stores GPT-2 and the SentenceTransformer model under the `models/`
