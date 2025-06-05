@@ -61,10 +61,10 @@ This document describes the primary agents and components in the beam search and
 
 ## Visualization and Debugging
 
-### **BeamTreeVisualizer & SentenceEmbeddingPCAVisualizer** (`beam_tree_visualizer.py`)
+### **BeamTreeVisualizer** (`beam_tree_visualizer.py`)
 
 * Visualizes beam search trees using NetworkX and Matplotlib.
-* Provides PCA-based visualization of sentence embeddings for deeper analysis.
+* Includes PCA-based visualization of sentence embeddings for deeper analysis.
 
 ## Configuration and Utility
 
