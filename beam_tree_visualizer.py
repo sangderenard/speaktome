@@ -1,22 +1,29 @@
 # Standard library imports
-import collections # For deque
+import collections
 from typing import Optional, List, TYPE_CHECKING
 
 # Third-party imports
 import matplotlib.pyplot as plt # type: ignore
 import networkx as nx
-from sklearn.decomposition import PCA # For PCA
-import torch # For PCAVisualizer
+from sklearn.decomposition import PCA
+import torch
 from torch_geometric.data import Data as PyGData
-from sentence_transformers import SentenceTransformer # For PCAVisualizer type hinting
-from transformers import PreTrainedTokenizer # For type hinting
+from sentence_transformers import SentenceTransformer
+from transformers import PreTrainedTokenizer
 
 if TYPE_CHECKING:
     from .beam_search import BeamSearch # For type hinting
     from .compressed_beam_tree import CompressedBeamTree # For PCAVisualizer type hinting
 
 class BeamTreeVisualizer:
-    def visualize_subtree(self, pyg_data: PyGData, tokenizer: PreTrainedTokenizer, beam_search_obj: Optional['BeamSearch'], root_pyg_node_id: int, title: str = "Beam Subtree"):
+    def visualize_subtree(
+        self,
+        pyg_data: PyGData,
+        tokenizer: PreTrainedTokenizer,
+        beam_search_obj: Optional['BeamSearch'],
+        root_pyg_node_id: int,
+        title: str = "Beam Subtree",
+    ) -> None:
         """Visualizes a subtree of PyGData starting from root_pyg_node_id using NetworkX and Matplotlib."""
         if not pyg_data or pyg_data.num_nodes == 0:
             print("No PyG data to visualize.")
@@ -112,46 +119,45 @@ class BeamTreeVisualizer:
         else:
             print("NetworkX graph for subtree is empty, skipping visualization.")
 
-class SentenceEmbeddingPCAVisualizer:
-    def __init__(self, tree: 'CompressedBeamTree', sentence_model: SentenceTransformer, tokenizer: PreTrainedTokenizer):
-        self.tree = tree
-        self.sentence_model = sentence_model
-        self.tokenizer = tokenizer
-
-    def _get_token_path_for_node(self, node_idx: int) -> List[int]:
-        tokens_list = []
-        current_node_idx = node_idx
-        # Traverse up to the root
+    def _get_token_path_for_node(self, tree: 'CompressedBeamTree', node_idx: int) -> List[int]:
+        tokens_list: List[int] = []
+        current_node_idx: Optional[int] = node_idx
         while current_node_idx is not None:
-            node = self.tree.nodes[current_node_idx]
-            tokens_list.append(node.token_tensor.item()) # .item() to get Python int
+            node = tree.nodes[current_node_idx]
+            tokens_list.append(node.token_tensor.item())
             current_node_idx = node.parent_node_idx
-        tokens_list.reverse() # Path should be from root to node
+        tokens_list.reverse()
         return tokens_list
 
-    def visualize(self, title: str = "Beam Tree Node Sentence Embeddings (PCA)"):
-        if not self.tree.nodes:
-            print("Tree is empty. Nothing to visualize with SentenceEmbeddingPCAVisualizer.")
+    def visualize_sentence_embeddings(
+        self,
+        tree: 'CompressedBeamTree',
+        sentence_model: SentenceTransformer,
+        tokenizer: PreTrainedTokenizer,
+        title: str = "Beam Tree Node Sentence Embeddings (PCA)",
+    ) -> None:
+        if not tree.nodes:
+            print("Tree is empty. Nothing to visualize with PCA plot.")
             return
 
         path_strings = []
         node_indices_for_plot = [] 
         depths_for_plot = [] # Store depths for coloring
 
-        print(f"Preparing {len(self.tree.nodes)} node paths for sentence embedding...")
-        for i, node_obj in enumerate(self.tree.nodes): # Iterate with node object
-            token_ids = self._get_token_path_for_node(i)
-            path_str = self.tokenizer.decode(token_ids, skip_special_tokens=True) if token_ids else ""
+        print(f"Preparing {len(tree.nodes)} node paths for sentence embedding...")
+        for i, node_obj in enumerate(tree.nodes):
+            token_ids = self._get_token_path_for_node(tree, i)
+            path_str = tokenizer.decode(token_ids, skip_special_tokens=True) if token_ids else ""
             path_strings.append(path_str)
             node_indices_for_plot.append(i)
-            depths_for_plot.append(node_obj.depth) # Store depth
+            depths_for_plot.append(node_obj.depth)
         
         if not path_strings:
             print("No valid path strings generated. Cannot visualize.")
             return
 
         print(f"Embedding {len(path_strings)} path strings using SentenceTransformer...")
-        embeddings = self.sentence_model.encode(path_strings, convert_to_tensor=True, show_progress_bar=True)
+        embeddings = sentence_model.encode(path_strings, convert_to_tensor=True, show_progress_bar=True)
         embeddings_np = embeddings.cpu().numpy() # Ensure embeddings are on CPU for PCA
 
         if embeddings_np.shape[0] < 3:
@@ -184,7 +190,7 @@ class SentenceEmbeddingPCAVisualizer:
             ax.set_xlabel("PCA Component 1"); ax.set_ylabel("PCA Component 2"); ax.set_zlabel("PCA Component 3")
             original_node_idx_to_pca_idx = {orig_idx: pca_idx for pca_idx, orig_idx in enumerate(node_indices_for_plot)}
             for current_original_idx, pca_idx_current in original_node_idx_to_pca_idx.items():
-                parent_original_idx = self.tree.nodes[current_original_idx].parent_node_idx
+                parent_original_idx = tree.nodes[current_original_idx].parent_node_idx
                 if parent_original_idx is not None and parent_original_idx in original_node_idx_to_pca_idx:
                     pca_idx_parent = original_node_idx_to_pca_idx[parent_original_idx]
                     x_coords = [pca_transformed_embeddings[pca_idx_parent, 0], pca_transformed_embeddings[pca_idx_current, 0]]
@@ -197,7 +203,7 @@ class SentenceEmbeddingPCAVisualizer:
             ax.set_xlabel("PCA Component 1"); ax.set_ylabel("PCA Component 2")
             original_node_idx_to_pca_idx = {orig_idx: pca_idx for pca_idx, orig_idx in enumerate(node_indices_for_plot)}
             for current_original_idx, pca_idx_current in original_node_idx_to_pca_idx.items():
-                parent_original_idx = self.tree.nodes[current_original_idx].parent_node_idx
+                parent_original_idx = tree.nodes[current_original_idx].parent_node_idx
                 if parent_original_idx is not None and parent_original_idx in original_node_idx_to_pca_idx:
                     pca_idx_parent = original_node_idx_to_pca_idx[parent_original_idx]
                     x_coords = [pca_transformed_embeddings[pca_idx_parent, 0], pca_transformed_embeddings[pca_idx_current, 0]]

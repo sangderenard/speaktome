@@ -16,9 +16,8 @@ from .beam_search import BeamSearch
 from .scorer import Scorer # Assuming Scorer is in scorer.py
 from .pygeo_mind import PyGeoMind # Assuming PyGeoMind is in pygeomind.py
 from .pyg_graph_controller import PyGGraphController # Assuming PyGGraphController is in pyg_graph_controller.py
-from .compressed_beam_tree import CompressedBeamTree # CompressedBeamTree is used by SentenceEmbeddingPCAVisualizer
-# Import both visualizers from beam_tree_visualizer.py
-from .beam_tree_visualizer import BeamTreeVisualizer, SentenceEmbeddingPCAVisualizer
+from .compressed_beam_tree import CompressedBeamTree
+from .beam_tree_visualizer import BeamTreeVisualizer
 # Import DEVICE and lazy SentenceTransformer accessor from config
 from .config import DEVICE, get_sentence_transformer_model, GPU_LIMIT, LENGTH_LIMIT
 
@@ -31,10 +30,10 @@ def main():
                         help="Maximum steps (depth) for the search.")
     parser.add_argument('-c', '--human_control', action='store_true', default=False,
                         help="Enable human-in-the-loop control (default: autonomous).")
-    parser.add_argument('-l', '--lookahead', type=int, default=3,
+    parser.add_argument('-l', '--lookahead', type=int, default=1024,
                         help="Number of lookahead steps for beam search.")
-    parser.add_argument('-e', '--easy_mode', action='store_true', default=False,
-                        help="Easy mode: full lookahead, no retirement.")
+    parser.add_argument('-e', '--easy_mode', action='store_true', default=True,
+                        help="Disable retirement and use maximum lookahead by default.")
     parser.add_argument('-f', '--full_summary', action='store_true', default=False,
                         help="Print a full summary of all beams after the run.")
     parser.add_argument('-w', '--beam_width', type=int, default=5,
@@ -42,11 +41,19 @@ def main():
     parser.add_argument('-p', '--preferred_scorer', type=str, default=None,
                         choices=list(Scorer.get_available_scoring_functions().keys()),
                         help="Preferred scoring function for default instructions.")
-    parser.add_argument('-a', '--auto_expand', type=int, default=0,
+    parser.add_argument('-a', '--auto_expand', type=int, default=1,
                         help="Run 'expand_any' automatically for N rounds before normal control.")
     parser.add_argument('-g', '--gnn_rounds', type=int, default=0,
                         help="Let PyGeoMind control for N rounds before returning to human/auto mode.")
+    parser.add_argument('--final_viz', action='store_true', default=False,
+                        help="Visualize the final beam tree after completion.")
+    parser.add_argument('--final_pca', action='store_true', default=False,
+                        help="Visualize PCA of sentence embeddings after completion.")
+    parser.add_argument('seed_text', nargs='*', help='Seed text if not provided via -s')
     args = parser.parse_args()
+
+    seed_from_flag = args.seed != parser.get_default('seed')
+    final_seed = args.seed if seed_from_flag else ' '.join(args.seed_text)
 
     # 2.1 Instantiate the GPT-based Scorer
     scorer = Scorer()
@@ -103,7 +110,7 @@ def main():
     # max_steps = 5 # From args
 
     print(f"\n⏳ Starting autonomous NXM search:")
-    print(f"    • Seed              = '{args.seed}'")
+    print(f"    • Seed              = '{final_seed}'")
     print(f"    • max_steps (depth) = {args.max_steps}")
     print(f"    • Human Control     = {args.human_control}")
     print(f"    • Lookahead Steps   = {beam_search.lookahead_steps}") # Use actual value from beam_search
@@ -114,7 +121,7 @@ def main():
 
     # 2.6 Run the controller-loop exactly once
     final_tree = controller.run_loop(
-        seed_text=args.seed,
+        seed_text=final_seed,
         max_steps=args.max_steps
     )
 
@@ -123,7 +130,7 @@ def main():
 
     # Standard visualization
 
-    if final_beam_tree_obj and final_beam_tree_obj.nodes: # Check if the tree is not empty
+    if args.final_viz and final_beam_tree_obj and final_beam_tree_obj.nodes:
         pyg_data = final_beam_tree_obj.get_pyg_data()
         if pyg_data and pyg_data.num_nodes > 0:
             print("\nVisualizing final beam tree...")
@@ -131,14 +138,12 @@ def main():
             visualizer.visualize_subtree(
                 pyg_data,
                 scorer.tokenizer,
-                beam_search, # Pass the beam_search object
-                root_pyg_node_id=0, # Visualize from the root (assuming PyG node 0 is the root)
-                title="Final Beam Tree"
+                beam_search,
+                root_pyg_node_id=0,
+                title="Final Beam Tree",
             )
         else:
             print("Final beam tree is empty or could not be converted to PyG data. Skipping visualization.")
-    else:
-        print("No final beam tree generated. Skipping visualization.")
 
     
     if hasattr(beam_search, "active_leaf_indices"):
@@ -155,15 +160,13 @@ def main():
                 print(f"[{beam_idx:03d}] Score: {score:7.3f} | Status: {status:10} | {text}")
         else:
             print("No beams to summarize.")
-    # Add new visualizer call
-    if final_beam_tree_obj and final_beam_tree_obj.nodes:
+    if args.final_pca and final_beam_tree_obj and final_beam_tree_obj.nodes:
         print("\nVisualizing node sentence embeddings (PCA)...")
-        pca_visualizer = SentenceEmbeddingPCAVisualizer(
-            final_beam_tree_obj, get_sentence_transformer_model(), scorer.tokenizer
+        BeamTreeVisualizer().visualize_sentence_embeddings(
+            final_beam_tree_obj,
+            get_sentence_transformer_model(),
+            scorer.tokenizer,
         )
-        pca_visualizer.visualize()
-    else:
-        print("Final beam tree is empty. Skipping PCA sentence embedding visualization.")
 
     beam_search.shutdown_retirement_manager()
 
