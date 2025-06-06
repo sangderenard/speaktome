@@ -10,9 +10,8 @@ from . import config
 from .config import GPU_LIMIT, LENGTH_LIMIT
 from .beam_graph_operator import BeamGraphOperator
 from .beam_search_instruction import BeamSearchInstruction
-from .meta_beam_manager import MetaBeamManager
-from .beam_retirement_manager import BeamRetirementManager
 from .scorer import Scorer
+from .beam_retirement_manager import BeamRetirementManager
 from .compressed_beam_tree import CompressedBeamTree
 from .tensor_abstraction import (
     AbstractTensorOperations,
@@ -264,7 +263,6 @@ class BeamSearch:
         self.K_DEEPEN_LEAVES       = beam_width  # expand up to this many leaves each GNN pass
 
         # ─── NO MORE STATIC bins_config HERE ───
-        self.meta = None               # will be built when we apply an instruction
 
         self.tree = CompressedBeamTree(device=device, tokenizer=scorer.tokenizer)
         self.graph_op = BeamGraphOperator(self.tree)
@@ -316,7 +314,7 @@ class BeamSearch:
         """
         1) Pull pre_top_k, pre_temp, cull_after
         2) Rebuild bins_config‐dict from instr.score_bins
-        3) Reinstantiate MetaBeamManager
+        3) Initialise scorer-managed bins
         4) Store instr in self.current_instruction
         """
         # 1. Update pre-sampling & cull settings
@@ -340,11 +338,13 @@ class BeamSearch:
                 'params': {'temp': temp}
             }
 
-        # 3. Rebuild MetaBeamManager from scratch
-        self.meta = MetaBeamManager(bins_dict,
-                                    max_len=self.max_len,
-                                    device=self.device,
-                                        cull_after=instr.cull_after) # Use cull_after from instruction
+        # 3. Configure scorer bins from scratch
+        self.scorer.init_bins(
+            bins_dict,
+            max_len=self.max_len,
+            device=self.device,
+            cull_after=instr.cull_after,
+        )
 
         # 4. Remember which instruction we’re using right now
         self.current_instruction = instr
@@ -505,17 +505,17 @@ class BeamSearch:
         if self.current_instruction is None:
             raise RuntimeError("No BeamSearchInstruction applied. Call apply_instruction(...) first.")
 
-        # Use the newly constructed MetaBeamManager
-        self.meta.update(beams, scores, lengths, tokenizer, **kwargs)
+        # Update scorer-managed bins
+        self.scorer.update_bins(beams, scores, lengths, tokenizer, **kwargs)
 
-        bin_names   = list(self.meta.bins.keys())
-        score_matrix= torch.stack([self.meta.bins[name]['scores'] for name in bin_names])
+        bin_names   = list(self.scorer.bins.keys())
+        score_matrix= torch.stack([self.scorer.bins[name]['scores'] for name in bin_names])
         num_candidates = score_matrix.shape[1]
         k = min(self.gpu_limit, num_candidates)
         top_scores, top_idx = torch.topk(score_matrix, k=k, dim=1)
 
         if self.verbose:
-            self.meta.print_bins(tokenizer)
+            self.scorer.print_bins(tokenizer)
 
         return top_idx, score_matrix
 
@@ -642,7 +642,7 @@ class BeamSearch:
             return [], []
 
         # ──────────────────────────────────────────────────────────────────────────────────────────
-        # 6) Now run the FULL MetaBeamManager on these “final lookahead” M candidates
+        # 6) Now run the scorer's full bin selection on these “final lookahead” M candidates
         # ──────────────────────────────────────────────────────────────────────────────────────────
         topk_idx_from_meta, score_matrix_from_meta = self._select_best(
             final_lookahead_tokens,
@@ -658,14 +658,14 @@ class BeamSearch:
         seen_final  = set()
         bin_counts  = [0] * num_bins
         rank_in_bin = 0
-        bin_names   = list(self.meta.bins.keys())
+        bin_names   = list(self.scorer.bins.keys())
 
         while (rank_in_bin < topk_idx_from_meta.size(1)) and any(
-            bin_counts[b] < self.meta.bins[bin_names[b]]['width']
+            bin_counts[b] < self.scorer.bins[bin_names[b]]['width']
             for b in range(num_bins)
         ):
             for b in range(num_bins):
-                if bin_counts[b] >= self.meta.bins[bin_names[b]]['width']:
+                if bin_counts[b] >= self.scorer.bins[bin_names[b]]['width']:
                     continue
                 idx_cand = topk_idx_from_meta[b, rank_in_bin].item()
                 if idx_cand not in seen_final:

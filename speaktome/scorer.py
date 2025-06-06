@@ -13,15 +13,22 @@ from typing import Callable, Dict
 
 import os
 import torch
+import torch.nn.functional as F
+import queue
+
+from .tensor_abstraction import (
+    AbstractTensorOperations,
+    PyTorchTensorOperations,
+)
 
 from .lazy_loader import lazy_import, optional_import
 from . import config
 
 class Scorer:
-    """Lazy GPT-2 scorer with pluggable vectorised heuristics."""
+    """Lazy GPT-2 scorer with pluggable vectorised heuristics and bin management."""
 
-    def __init__(self) -> None:
-        """Initialise defaults and resolve the GPT-2 model path."""
+    def __init__(self, tensor_ops: AbstractTensorOperations | None = None) -> None:
+        """Initialise defaults, tensor operations and resolve the GPT-2 model path."""
 
         self._model = None
         self._tokenizer = None
@@ -32,6 +39,8 @@ class Scorer:
             local_path = os.path.join(root_dir, "models", "gpt2")
             model_path = local_path if os.path.isdir(local_path) else "gpt2"
         self.model_path = model_path
+
+        self.tensor_ops = tensor_ops or PyTorchTensorOperations(default_device=config.DEVICE)
 
         self.default_scorer = Scorer.mean_logprob_score
         self.default_k = 5
@@ -51,6 +60,15 @@ class Scorer:
             "score_bins": self.default_score_bins,
             "lookahead_steps": 1,
         }
+
+        # Meta-beam manager state (initialised when bins are configured)
+        self.bins = {}
+        self.survival_age = {}
+        self.top_beams = {}
+        self.delivery_queue = queue.Queue(maxsize=8)
+        self.max_len = 0
+        self.cull_after = 0
+        self.device = config.DEVICE
 
     def _ensure_model(self) -> None:
         """Load the GPT-2 model and tokenizer on first use."""
@@ -216,3 +234,95 @@ class Scorer:
             diversity_scores[i] = -sim / (batch - 1)
 
         return diversity_scores
+
+
+
+    # ------------------------------------------------------------------
+    # MetaBeamManager functionality has been folded directly into Scorer
+    # ------------------------------------------------------------------
+
+    def init_bins(self, bins_config, max_len, device=None, cull_after=1):
+        """Configure scoring bins using the tensor abstraction layer."""
+        self.device = device or torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.max_len = max_len
+        self.cull_after = cull_after
+        self.top_beams = {}
+        self.delivery_queue = queue.Queue(maxsize=8)
+        self.bins = {}
+        self.survival_age = {}
+        for name, cfg in bins_config.items():
+            N = cfg['width']
+            self.bins[name] = {
+                'fn': cfg['fn'],
+                'params': cfg.get('params', {}),
+                'beams': self.tensor_ops.full((N, max_len), -1, dtype=torch.long, device=self.device),
+                'scores': self.tensor_ops.full((N,), float('-inf'), dtype=torch.float32, device=self.device),
+                'lengths': self.tensor_ops.zeros((N,), dtype=torch.long, device=self.device),
+                'age': self.tensor_ops.zeros((N,), dtype=torch.long, device=self.device),
+                'width': N
+            }
+
+    def update_bins(self, beams, scores, lengths, tokenizer, round_idx=0):
+        """Update all bins with new candidate beams."""
+        for name, bin in self.bins.items():
+            N = bin['beams'].shape[0]
+            bin_scores = self.call_score_fn(bin['fn'], beams, scores, lengths, tokenizer, **bin['params'])
+            pad_n = bin['beams'].shape[1] - beams.shape[1]
+            padded_beams = self.tensor_ops.pad(beams, (0, pad_n)) if pad_n > 0 else beams
+            all_scores = self.tensor_ops.cat([bin['scores'], bin_scores], dim=0)
+            all_beams = self.tensor_ops.cat([bin['beams'], padded_beams], dim=0)
+            all_lengths = self.tensor_ops.cat([bin['lengths'], lengths], dim=0)
+            all_age = self.tensor_ops.cat([bin['age'] + 1, self.tensor_ops.zeros(bin_scores.shape, dtype=torch.long, device=self.device)], dim=0)
+
+            _, top_idx = self.tensor_ops.topk(all_scores, k=N, dim=0)
+            bin['scores'] = all_scores[top_idx]
+            bin['beams'] = all_beams[top_idx]
+            bin['lengths'] = all_lengths[top_idx]
+            bin['age'] = all_age[top_idx]
+
+            if self.cull_after > 0:
+                keep = bin['age'] <= self.cull_after
+                for k in ['scores', 'beams', 'lengths', 'age']:
+                    bin[k] = bin[k][keep]
+                pad_n = N - bin['scores'].shape[0]
+                if pad_n > 0:
+                    bin['scores'] = self.tensor_ops.cat([
+                        bin['scores'],
+                        self.tensor_ops.full((pad_n,), float('-inf'), dtype=torch.float32, device=self.device)
+                    ], dim=0)
+                    bin['beams'] = self.tensor_ops.cat([
+                        bin['beams'],
+                        self.tensor_ops.full((pad_n, self.max_len), -1, dtype=torch.long, device=self.device)
+                    ], dim=0)
+                    bin['lengths'] = self.tensor_ops.cat([
+                        bin['lengths'],
+                        self.tensor_ops.zeros((pad_n,), dtype=torch.long, device=self.device)
+                    ], dim=0)
+                    bin['age'] = self.tensor_ops.cat([
+                        bin['age'],
+                        self.tensor_ops.zeros((pad_n,), dtype=torch.long, device=self.device)
+                    ], dim=0)
+
+    def print_bins(self, tokenizer, max_chars=100):
+        for name, bin in self.bins.items():
+            print(f"\n== {name} ==")
+            for i in range(min(bin['beams'].shape[0], 10)):
+                l = int(bin['lengths'][i].item())
+                score = float(bin['scores'][i].item())
+                if l == 0:
+                    continue
+                tokens = bin['beams'][i, :l].tolist()
+                text = tokenizer.decode(tokens)
+                print(f"[{i}] Score: {score:.2f} | {text}")
+
+    def call_score_fn(self, fn, beams, scores, lengths, tokenizer, **kwargs):
+        core_args = {
+            'beams': beams,
+            'scores': scores,
+            'lengths': lengths,
+            'tokenizer': tokenizer
+        }
+        final_call_args = core_args.copy()
+        final_call_args.update(kwargs)
+        return fn(**final_call_args)
+
