@@ -1,6 +1,10 @@
 """Pure Python implementation of AbstractTensorOperations using lists."""
 from typing import Any, Tuple, Optional, List, Union
-from ...tensor_abstraction import AbstractTensorOperations
+# Import the shared tensor abstraction from the core package. The pure
+# domain lives two packages deep (speaktome.domains.pure), so we need a
+# relative import that climbs back up to the project root before
+# descending into the core utilities.
+from ...core.tensor_abstraction import AbstractTensorOperations
 import math
 
 # Helper function to get shape of nested lists
