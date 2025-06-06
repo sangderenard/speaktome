@@ -2,10 +2,17 @@
 
 $ErrorActionPreference = 'Stop'
 
-$venvPython = '.venv\Scripts\python.exe'
+$scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Definition
+$venvPython = Join-Path $scriptDir '.venv\Scripts\python.exe'
 if (-not (Test-Path $venvPython)) {
     Write-Host 'Virtual environment not found. Run setup_env.ps1 first.'
     exit 1
+}
+
+$actual = & $venvPython -c 'import sys; print(sys.executable)'
+$expected = [IO.Path]::GetFullPath($venvPython)
+if ($actual -ne $expected) {
+    Write-Host "Warning: expected $expected but interpreter reports $actual"
 }
 
 & $venvPython -m speaktome.speaktome @args
