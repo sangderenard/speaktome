@@ -1,0 +1,33 @@
+import os
+import shutil
+from pathlib import Path
+from importlib import reload
+
+import pytest
+
+import todo.validate_guestbook as vg
+SCRIPT = Path('todo/validate_guestbook.py')
+
+
+@pytest.fixture
+def temp_reports(tmp_path, monkeypatch):
+    dst = tmp_path / 'experience_reports'
+    dst.mkdir()
+    (dst / 'template_experience_report.md').write_text('')
+    for i in range(12):
+        fname = dst / f'2025-06-0{i}_v1_Test{i}.md'
+        fname.write_text('x')
+    vg_mod = reload(vg)
+    monkeypatch.setattr(vg_mod, 'REPORTS_DIR', str(dst))
+    monkeypatch.setattr(vg_mod, 'ARCHIVE_DIR', str(dst / 'archive'))
+    monkeypatch.setattr(vg_mod, 'STICKIES_FILE', str(dst / 'stickies.txt'))
+    return dst
+
+
+def test_archives_old_files(temp_reports):
+    vg.validate_and_fix()
+    vg.archive_old_reports()
+    archived_files = sorted(os.listdir(temp_reports / 'archive'))
+    assert len(archived_files) == 2
+
+

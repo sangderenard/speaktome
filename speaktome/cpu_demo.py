@@ -8,6 +8,10 @@ after ``d`` lookahead steps.
 
 import argparse
 from typing import Any, Dict
+
+from . import Faculty
+
+FACULTY_REQUIREMENT = Faculty.NUMPY
 import numpy as np
 
 from .token_vocab import TokenVocabulary
@@ -78,6 +82,8 @@ def main(raw_args=None):
     parser.add_argument('-l', '--lookahead', '--depth', '-d', type=int, dest='lookahead', default=5)
     parser.add_argument('-k', '--beam_width', '--width', '-w', type=int, dest='beam_width', default=3)
     args, unknown = parser.parse_known_args(raw_args)
+
+    print(f"Faculty level: {Faculty.NUMPY.name}")
 
     extras = []
     skip_next = False

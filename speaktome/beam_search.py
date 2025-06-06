@@ -1,8 +1,16 @@
 # Standard library imports
+from __future__ import annotations
 from typing import List, Optional, Set, Tuple, Callable, Dict
 import math
 # Third-party imports
-import torch
+try:
+    import torch
+except ModuleNotFoundError:  # pragma: no cover - optional dependency
+    torch = None  # type: ignore
+
+from . import Faculty
+
+FACULTY_REQUIREMENT = Faculty.TORCH
 
 # Local application/library specific imports
 # Please adjust these import paths based on your actual project structure.
