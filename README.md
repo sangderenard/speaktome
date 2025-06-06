@@ -183,3 +183,26 @@ bash auto_demo.sh --interactive
 ```powershell
 ./auto_demo.ps1 -interactive
 ```
+
+## Testing
+
+Install the development requirements and run `pytest`:
+
+```bash
+pip install -r requirements-dev.txt
+pytest -v
+```
+
+The test suite exercises the command line interface and other helper modules.
+
+## License
+
+SpeakToMe is released under the terms of the [MIT License](LICENSE).
+
+## Contributing
+
+Contributions are welcome! New explorers should read `AGENTS.md` and add an
+experience report under `todo/experience_reports/`. Include any prompts that
+informed your work so future agents can trace the discussion. Use pull requests
+for code changes and feel free to open issues for questions or feature
+requests.

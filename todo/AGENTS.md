@@ -1,6 +1,6 @@
 # User Experience Report Guidelines
 
-This folder contains all user experience reports and supporting files. Use these guidelines when adding new reports.
+This folder contains all user experience reports and supporting files. Use these guidelines when adding new reports. Treat the experience reports as a centralized log of automated instructions and AI-assisted experiments.
 
 ## Naming Convention
 
@@ -27,6 +27,10 @@ Review earlier experiences before starting a new test. Identify unresolved quest
 ## Continuous Collaboration
 
 User experience reports are part of a dynamic feedback loop between developers and testers. Keep the conversation going by clearly stating next steps and open issues. The goal is incremental refinement of the project.
+
+## Prompt History
+
+Include a section in each report that captures verbatim any prompts or scripted instructions that guided the session. This record helps future LLM agents quickly understand the context and thought process behind your experiments.
 
 ## Template
 
