@@ -470,7 +470,7 @@ class PyGGraphController:
         # 1) If the user asked to override beam_width, just change it here
         if beam_width_override is not None:
             self.beam_search.beam_width = beam_width_override
-            # We will rebuild MetaBeamManager when we apply the first instruction, so no static bins_config here.
+            # Bins are rebuilt via the scorer when we apply the first instruction.
 
         # 2) Initialize the beam search
         self.beam_search.initialize_search(seed_text)
