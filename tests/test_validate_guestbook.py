@@ -5,8 +5,8 @@ from importlib import reload
 
 import pytest
 
-import todo.validate_guestbook as vg
-SCRIPT = Path('todo/validate_guestbook.py')
+import AGENTS.validate_guestbook as vg
+SCRIPT = Path('AGENTS/validate_guestbook.py')
 
 
 @pytest.fixture

@@ -13,10 +13,10 @@ Audited the repository to identify stubbed or incomplete methods. Followed proje
 "extend audit by attempting user experience and noting the point of failure"
 
 ## Steps Taken
-1. Read `AGENTS.md` and `todo/AGENTS.md` for instructions.
+1. Read `AGENTS.md` and `AGENTS/GUESTBOOK.md` for instructions.
 2. Searched the codebase for `pass`, `TODO`, and `NotImplementedError`.
 3. Inspected files containing `pass` statements to determine if they are real stubs.
-4. Ran `todo/validate_guestbook.py` to ensure the guestbook is valid.
+4. Ran `AGENTS/validate_guestbook.py` to ensure the guestbook is valid.
 5. Tried `bash run.sh -s "hi" -m 1` but the script aborted because `.venv` was missing.
 6. Executed `python -m speaktome.speaktome hi -m 1` to launch the CPU demo.
 

@@ -1,14 +1,14 @@
 # Contributing to SpeakToMe
 
 Thank you for your interest in contributing! The project maintains a guestbook
-under `todo/experience_reports/` where every visitor can document their
+under `AGENTS/experience_reports/` where every visitor can document their
 exploration. Please read `AGENTS.md` at the repository root before you begin.
 
 ## Workflow
 
 1. Fork the repository and create a branch for your changes.
 2. Add an experience report describing your testing or experiments.
-3. Run `python todo/validate_guestbook.py` to ensure your report name follows
+3. Run `python AGENTS/validate_guestbook.py` to ensure your report name follows
 the required convention.
 4. Run the automated tests with `pytest -v` and ensure they pass.
 5. Open a pull request targeting the `main` branch.

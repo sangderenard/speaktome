@@ -4,7 +4,7 @@ This package implements beam search controllers and utilities for generating tex
 
 ## Project Layout
 
-Source code now lives under `speaktome/` with only helper scripts and documentation in the repository root.  A `testing/` directory contains small inspection scripts used to evaluate components in isolation without any external framework.  For example run `python testing/lookahead_demo.py` to exercise the lookahead controller.
+Source code resides under `speaktome/` with helper scripts and documentation in the repository root. A `testing/` directory contains small inspection scripts used to evaluate components in isolation without any external framework. For example run `python testing/lookahead_demo.py` to exercise the lookahead controller.
 
 ### Faculty Levels
 The project operates at three resource tiers:
@@ -27,7 +27,7 @@ before attempting any network download.
 
 Use the included script to create a virtual environment and install only the
 core dependencies (`numpy` and other light utilities). Heavy libraries such as
-PyTorch and Transformers are now *optional* and live in
+PyTorch and Transformers are *optional* and live in
 `optional_requirements.txt`. Run the script without any flags for the minimal
 setup. Add `--extras` to install the optional packages, and `--prefetch` if you
 want to download models during setup (requires the extras):
@@ -97,7 +97,7 @@ bash run.sh -s "Hello" -m 10 -c -a 5 --final_viz
 
 If PyTorch or Transformers are not installed the program automatically runs the
 CPU demo. Any unsupported options are ignored so you can use the same command
-line regardless of which dependencies are available. The demo now drives the
+line regardless of which dependencies are available. The demo drives the
 LookaheadController using NumPy-only pseudotensors and returns the top ``k``
 results after ``d`` steps. Any extra tokens on the command line become the seed
 text, so `bash run.sh hello` will search starting from ``hello``. The default
@@ -225,7 +225,7 @@ SpeakToMe is released under the terms of the [MIT License](LICENSE).
 ## Contributing
 
 Contributions are welcome! New explorers should read `AGENTS.md` and add an
-experience report under `todo/experience_reports/`. Include any prompts that
+experience report under `AGENTS/experience_reports/`. Include any prompts that
 informed your work so future agents can trace the discussion. Use pull requests
 for code changes and feel free to open issues for questions or feature
 requests.
