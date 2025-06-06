@@ -16,12 +16,8 @@ stub_tx.PreTrainedTokenizer = _DummyTok
 sys.modules.setdefault("transformers", stub_tx)
 
 from speaktome import Faculty, DEFAULT_FACULTY
-from speaktome.tensor_abstraction import (
-    NumPyTensorOperations,
-    PyTorchTensorOperations,
-)
-from speaktome.domains.pure.pure_python_tensor_operations import (
-    PurePythonTensorOperations,
+from speaktome.core.tensor_abstraction import (
+    get_tensor_operations,
 )
 from speaktome.model_abstraction import AbstractModelWrapper
 from speaktome.lookahead_controller import LookaheadController, LookaheadConfig
@@ -41,11 +37,7 @@ class DummyTokenizer:
 
 
 def _choose_ops():
-    if DEFAULT_FACULTY in (Faculty.TORCH, Faculty.PYGEO):
-        return PyTorchTensorOperations()
-    if DEFAULT_FACULTY is Faculty.NUMPY and np is not None:
-        return NumPyTensorOperations()
-    return PurePythonTensorOperations()
+    return get_tensor_operations(DEFAULT_FACULTY)
 
 
 def aggregate(scores):

@@ -35,6 +35,7 @@ STUB_MODULES = [
     ("speaktome.domains.geo.pygeo_mind", "PyGeoMind"),
     ("speaktome.core.scorer", "Scorer"),
     ("speaktome.core.tensor_abstraction", "PyTorchTensorOperations"),
+    ("speaktome.core.tensor_abstraction", "PurePythonTensorOperations"),
 ]
 
 
