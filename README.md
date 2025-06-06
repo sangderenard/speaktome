@@ -2,6 +2,10 @@
 
 This package implements beam search controllers and utilities for generating text.
 
+## Project Layout
+
+Source code now lives under `speaktome/` with only helper scripts and documentation in the repository root.  A `testing/` directory contains small inspection scripts used to evaluate components in isolation without any external framework.  For example run `python testing/lookahead_demo.py` to exercise the lookahead controller.
+
 ## Sentence Transformer Model
 
 Many features rely on a [SentenceTransformer](https://www.sbert.net/) model. The model
