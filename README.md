@@ -86,6 +86,12 @@ usage entirely.
 
 Use `--preload_models` if you prefer to load all models up front rather than on-demand.
 
+### Optional GNN Features
+
+The project includes an experimental controller called **PyGeoMind** built on top of
+PyTorch Geometric. Install `torch_geometric` only if you plan to run the GNN brain.
+Activate it via `--with_gnn` when launching `speaktome.py`.
+
 ### Resetting the Environment
 
 If you ever need to recreate the virtual environment from scratch, run

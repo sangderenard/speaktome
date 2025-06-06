@@ -3,8 +3,12 @@ from typing import List, Tuple, Dict, Optional, Any, Callable, TYPE_CHECKING
 import argparse
 
 # Third-party imports
-import torch
-import torch.nn.functional as F
+try:
+    import torch
+except ModuleNotFoundError as exc:  # pragma: no cover - runtime message only
+    print("PyTorch is not installed. Tensor operations are critical for language models.")
+    print("Installing PyTorch can take some time, but it's worth it. See https://pytorch.org/ for options.")
+    raise
 from transformers import PreTrainedTokenizer
 
 from .lazy_loader import lazy_import
@@ -49,6 +53,8 @@ def main(raw_args=None, allow_retry=True):
                         help="Run 'expand_any' automatically for N rounds before normal control.")
     parser.add_argument('-g', '--gnn_rounds', type=int, default=0,
                         help="Let PyGeoMind control for N rounds before returning to human/auto mode.")
+    parser.add_argument('--with_gnn', action='store_true', default=False,
+                        help="Instantiate the optional PyGeoMind GNN controller (requires torch_geometric).")
     parser.add_argument('-x', '--safe_mode', action='store_true', default=False,
                         help="Force CPU mode and disable GPU usage.")
     parser.add_argument('--final_viz', action='store_true', default=False,
@@ -102,8 +108,13 @@ def main(raw_args=None, allow_retry=True):
             max_len=LENGTH_LIMIT,
         )
 
-        # 2.3 Instantiate your GNN policy network (PyGeoMind)
-        pygeomind_model = PyGeoMind(scorer=scorer, input_dim=3, hidden_dim=128).to(config.DEVICE)
+        pygeomind_model = None
+        if args.with_gnn:
+            try:
+                pygeomind_model = PyGeoMind(scorer=scorer, input_dim=3, hidden_dim=128).to(config.DEVICE)
+            except ModuleNotFoundError:
+                print("torch_geometric is required for the GNN brain. Install it to enable PyGeoMind.")
+                print("Continuing without the GNN controller.")
 
         # 2.4 Wrap everything into the PyGGraphController
         controller = PyGGraphController(
@@ -113,7 +124,7 @@ def main(raw_args=None, allow_retry=True):
         )
 
         # Apply auto-run settings from CLI arguments
-        if args.gnn_rounds > 0:
+        if args.gnn_rounds > 0 and pygeomind_model:
             controller.auto_run_mode = "pygeomind_decide"
             controller.auto_run_counter = args.gnn_rounds
             controller.human_in_control = False
