@@ -18,7 +18,8 @@ class Scorer:
         self._tokenizer = None
         model_path = os.environ.get("GPT2_MODEL_PATH")
         if not model_path:
-            local_path = os.path.join(os.path.dirname(__file__), "models", "gpt2")
+            root_dir = os.path.dirname(os.path.dirname(__file__))
+            local_path = os.path.join(root_dir, "models", "gpt2")
             model_path = local_path if os.path.isdir(local_path) else "gpt2"
         self.model_path = model_path
         self.default_scorer = Scorer.mean_logprob_score
