@@ -19,9 +19,10 @@ before attempting any network download.
 ## Environment Setup
 
 Use the included script to create a virtual environment and install only the
-core dependencies. Optional packages are installed lazily on first use. Pass
-`--extras` to install them up front, and `--prefetch` if you want to download
-models during setup:
+core dependencies (`numpy` and other light utilities). Heavy libraries such as
+PyTorch and Transformers are now *optional* and live in
+`optional_requirements.txt`. Pass `--extras` to install them up front, and
+`--prefetch` if you want to download models during setup:
 
 ```bash
 bash setup_env.sh --prefetch           # minimal install
@@ -49,7 +50,8 @@ On Windows activate with:
 ### Offline Setup
 
 After creating the virtual environment, run the following script to download the
-required models:
+required models **only if you installed the optional dependencies**
+(PyTorch and Transformers):
 
 ```bash
 bash fetch_models.sh
@@ -71,7 +73,8 @@ export SENTENCE_TRANSFORMER_MODEL_PATH=models/paraphrase-MiniLM-L6-v2
 ```
 
 Once the models are downloaded you can run the program without further network
-access.
+access. If you skip this step, the application falls back to the lightweight
+CPU demo mode.
 
 ## Running SpeakToMe
 
@@ -163,7 +166,8 @@ If you prefer to avoid PowerShell, create the environment and run the program fr
 1. `py -3 -m venv .venv`
 2. `.venv\Scripts\activate.bat`
 3. `pip install --upgrade pip`
-4. `pip install -r requirements.txt` (add `optional_requirements.txt` if desired)
+4. `pip install -r requirements.txt`  # installs only NumPy
+   Add `optional_requirements.txt` to get PyTorch and Transformers
 5. Run the program with `run.cmd`:
    `run.cmd -s "Hello" -m 10 -c -a 5 --final_viz`
 
