@@ -1,8 +1,0 @@
-pygame
-torch
-torch-geometric
-pymunk
-pybullet
-matplotlib
-pillow
-numpy

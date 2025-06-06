@@ -18,6 +18,10 @@ import shutil
 from pathlib import Path
 from typing import Iterable, List, Dict
 
+# Determine the script's directory to make default paths relative to it
+SCRIPT_DIRECTORY = Path(__file__).resolve().parent
+DEFAULT_SRC_DIRECTORY = SCRIPT_DIRECTORY / "archive" / "Alpha"
+
 
 def parse_class_names(path: Path) -> List[str]:
     """Return a sorted list of class names defined in `path`."""
@@ -75,10 +79,42 @@ def harvest(src: Path, dest: Path, *, dry_run: bool = False) -> None:
             print(f"Duplicate {path} -> already copied as {original.name}")
             continue
         classes = parse_class_names(path)
-        timestamp = int(path.stat().st_mtime)
-        class_part = "_".join(classes) if classes else "NoClass"
-        new_name = f"{timestamp}_{class_part}.py"
+        timestamp_str = str(int(path.stat().st_mtime))
+        class_list_str = "_".join(classes) if classes else "NoClass"
+
+        # Define a target maximum length for the entire filename component (e.g., "timestamp_classes.py")
+        # NTFS limit is 255. Using 240 as a conservative value to allow for _idx from unique_target.
+        TARGET_MAX_FILENAME_LEN = 240
+
+        # Calculate length of fixed parts: timestamp + "_" + ".py"
+        base_len = len(timestamp_str) + 1 + 3  # 1 for '_', 3 for '.py'
+        max_len_for_processed_class_list = TARGET_MAX_FILENAME_LEN - base_len
+
+        processed_class_list_str: str
+        if max_len_for_processed_class_list <= 0:
+            # This edge case implies timestamp_str is excessively long or TARGET_MAX_FILENAME_LEN is tiny.
+            # Fallback to a short hash of the original class list.
+            processed_class_list_str = hashlib.sha256(class_list_str.encode('utf-8')).hexdigest()[:10]
+        elif len(class_list_str) <= max_len_for_processed_class_list:
+            processed_class_list_str = class_list_str
+        else:
+            # class_list_str is too long, truncate and append a short hash.
+            hash_part = hashlib.sha256(class_list_str.encode('utf-8')).hexdigest()[:8]
+            
+            # Calculate length for the truncated original class list string part.
+            # It must fit: truncated_part + "_" + hash_part
+            len_for_truncated_original = max_len_for_processed_class_list - (1 + len(hash_part)) # 1 for '_'
+
+            if len_for_truncated_original < 1:
+                # Not enough space for even one char of original + '_' + hash.
+                # Use the hash, truncated if necessary to fit max_len_for_processed_class_list.
+                processed_class_list_str = hash_part[:max_len_for_processed_class_list]
+            else:
+                processed_class_list_str = f"{class_list_str[:len_for_truncated_original]}_{hash_part}"
+        
+        new_name = f"{timestamp_str}_{processed_class_list_str}.py"
         target = unique_target(dest, new_name)
+
         print(f"{path} -> {target.name}")
         if not dry_run:
             shutil.copy2(path, target)
@@ -97,8 +133,8 @@ def main(argv: Iterable[str] | None = None) -> None:
     parser.add_argument(
         "--src",
         type=Path,
-        default=Path("training/archive/Alpha"),
-        help="Source directory to scan (default: training/archive/Alpha)",
+        default=DEFAULT_SRC_DIRECTORY,
+        help="Source directory to scan. Defaults to 'archive/Alpha' relative to the script's directory.",
     )
     parser.add_argument(
         "--dry-run",

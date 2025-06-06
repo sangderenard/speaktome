@@ -1,5 +1,0 @@
-pybullet
-pygame
-torch
-torch-geometric
-pymunk
