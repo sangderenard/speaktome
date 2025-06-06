@@ -3,7 +3,6 @@ from typing import List, Optional, Set, Tuple, Callable, Dict
 import math
 # Third-party imports
 import torch
-import torch.nn.functional as F
 
 # Local application/library specific imports
 # Please adjust these import paths based on your actual project structure.
@@ -15,6 +14,14 @@ from .meta_beam_manager import MetaBeamManager
 from .beam_retirement_manager import BeamRetirementManager
 from .scorer import Scorer
 from .compressed_beam_tree import CompressedBeamTree
+from .tensor_abstraction import (
+    AbstractTensorOperations,
+    PyTorchTensorOperations,
+)
+from .model_abstraction import (
+    AbstractModelWrapper,
+    PyTorchModelWrapper,
+)
 
 
 class LookaheadConfig:
@@ -44,13 +51,17 @@ class LookaheadController:
         lookahead_steps: int,
         max_len: int,
         device: torch.device,
-        tokenizer,  # PreTrainedTokenizer
-        config: LookaheadConfig
+        tokenizer,
+        config: LookaheadConfig,
+        tensor_ops: AbstractTensorOperations,
+        model_wrapper: AbstractModelWrapper,
     ):
         self.lookahead_steps = lookahead_steps
         self.max_len = max_len
         self.device = device
         self.tokenizer = tokenizer
+        self.tensor_ops = tensor_ops
+        self.model_wrapper = model_wrapper
 
         # Unpack from config
         self.config = config
@@ -67,7 +78,6 @@ class LookaheadController:
         prefix_scores: torch.FloatTensor,    # [B, prefix_width]
         prefix_lengths: torch.LongTensor,    # [B]
         original_parent_beam_idxs: torch.LongTensor,  # [B]
-        model  # GPT2LMHeadModel
     ) -> Tuple[
         torch.LongTensor,   # final_tokens: [K, final_width]
         torch.FloatTensor,  # final_scores: [K, final_width]
@@ -76,42 +86,42 @@ class LookaheadController:
         torch.LongTensor,   # final_parent_prefix_lengths: [K]
         List[int]           # pruned_original_parent_beam_idxs
     ]:
-        B_initial = prefix_tokens.size(0)
-        initial_prefix_width = prefix_tokens.size(1)
+        B_initial = self.tensor_ops.shape(prefix_tokens)[0]
+        initial_prefix_width = self.tensor_ops.shape(prefix_tokens)[1]
         final_width = min(self.max_len, initial_prefix_width + self.lookahead_steps)
 
         # 1) Initialize current_* tensors by copying prefix into padded buffers
-        current_tokens = torch.full(
+        current_tokens = self.tensor_ops.full(
             (B_initial, final_width),
             self.pad_id,
-            dtype=prefix_tokens.dtype,
-            device=self.device # Use controller's device
+            dtype=self.tensor_ops.get_dtype(prefix_tokens),
+            device=self.device
         )
-        current_scores = torch.zeros(
+        current_scores = self.tensor_ops.zeros(
             (B_initial, final_width),
-            dtype=prefix_scores.dtype,
-            device=self.device # Use controller's device
+            dtype=self.tensor_ops.get_dtype(prefix_scores),
+            device=self.device
         )
         for i in range(B_initial):
-            l = prefix_lengths[i].item()
+            l = self.tensor_ops.item(prefix_lengths[i])
             if l > 0:
-                current_tokens[i, :l] = prefix_tokens[i, :l]
-                current_scores[i, :l] = prefix_scores[i, :l]
-        
-        current_lengths = prefix_lengths.clone().to(self.device)
-        current_parent_beam_idxs = original_parent_beam_idxs.clone().to(self.device)
-        current_parent_prefix_lengths = prefix_lengths.clone().to(self.device)
+                self.tensor_ops.assign_at_indices(current_tokens, i, slice(0, l), prefix_tokens[i, :l])
+                self.tensor_ops.assign_at_indices(current_scores, i, slice(0, l), prefix_scores[i, :l])
+
+        current_lengths = self.tensor_ops.to_device(self.tensor_ops.clone(prefix_lengths), self.device)
+        current_parent_beam_idxs = self.tensor_ops.to_device(self.tensor_ops.clone(original_parent_beam_idxs), self.device)
+        current_parent_prefix_lengths = self.tensor_ops.to_device(self.tensor_ops.clone(prefix_lengths), self.device)
 
         # We'll determine which original parents lose all children at the end
         original_parents_set = set(original_parent_beam_idxs.tolist())
 
         for step in range(self.lookahead_steps):
-            B_cur = current_tokens.size(0)
+            B_cur = self.tensor_ops.shape(current_tokens)[0]
             if B_cur == 0:
                 break
 
             # 2) Determine the effective input width for the language model
-            effective_input_width = int(current_lengths.max().item()) if B_cur > 0 else 0
+            effective_input_width = int(self.tensor_ops.item(self.tensor_ops.max(current_lengths))) if B_cur > 0 else 0
             if effective_input_width == 0 and step == 0 and B_initial > 0:
                 # If all prefixes were empty, force 1 token (e.g. BOS or pad)
                 effective_input_width = 1
@@ -122,23 +132,30 @@ class LookaheadController:
             tokens_for_lm = current_tokens[:, :effective_input_width]
 
             # 4) Build attention mask (non-pad tokens)
-            attention_mask = (tokens_for_lm != self.pad_id).long()
+            attention_mask = self.tensor_ops.long_cast(
+                self.tensor_ops.not_equal(tokens_for_lm, self.pad_id)
+            )
 
             # 5) Get logits from the model
-            with torch.no_grad():
-                outputs = model(input_ids=tokens_for_lm, attention_mask=attention_mask)
-                logits = outputs.logits  # [B_cur, effective_input_width, Vocab]
+            outputs_dict = self.model_wrapper.forward(
+                input_ids=tokens_for_lm, attention_mask=attention_mask
+            )
+            logits = outputs_dict['logits']
 
             # 6) For each sequence, pick the logits at the last generated position
             # Assume every sequence has length >= 1 once seeded, so index = length - 1
-            last_indices = (current_lengths - 1).clamp(min=0) # Ensure indices are non-negative
-            last_logits = logits[torch.arange(B_cur, device=self.device), last_indices]  # [B_cur, V]
+            last_indices = self.tensor_ops.clamp(current_lengths - 1, min_val=0)
+            last_logits = self.tensor_ops.select_by_indices(
+                logits,
+                self.tensor_ops.arange(0, B_cur, device=self.device),
+                last_indices,
+            )
 
             # 7) Temperature-scale and softmax -> logprobs
-            logprobs = F.log_softmax(last_logits / self.temp, dim=-1)
+            logprobs = self.tensor_ops.log_softmax(last_logits / self.temp, dim=-1)
 
             # 8) For each parent, take top self.top_k token candidates
-            topk_scores, topk_indices = torch.topk(logprobs, k=self.top_k, dim=-1)
+            topk_scores, topk_indices = self.tensor_ops.topk(logprobs, k=self.top_k, dim=-1)
             # topk_scores, topk_indices: [B_cur, self.top_k]
 
             # 9) Build the next-generation candidate sets
@@ -147,30 +164,40 @@ class LookaheadController:
             N_total = num_parents * num_children
 
             # Expand parent indices and prefix lengths
-            expanded_parent_idxs = current_parent_beam_idxs.repeat_interleave(num_children)
-            expanded_parent_prefix_lens = current_parent_prefix_lengths.repeat_interleave(num_children)
+            expanded_parent_idxs = self.tensor_ops.repeat_interleave(current_parent_beam_idxs, num_children)
+            expanded_parent_prefix_lens = self.tensor_ops.repeat_interleave(current_parent_prefix_lengths, num_children)
 
             # Repeat current sequences and score buffers
-            next_tokens = current_tokens.repeat_interleave(num_children, dim=0)  # [N_total, final_width]
-            next_scores = current_scores.repeat_interleave(num_children, dim=0)  # [N_total, final_width]
-            next_lengths = current_lengths.repeat_interleave(num_children)       # [N_total]
+            next_tokens = self.tensor_ops.repeat_interleave(current_tokens, num_children, dim=0)
+            next_scores = self.tensor_ops.repeat_interleave(current_scores, num_children, dim=0)
+            next_lengths = self.tensor_ops.repeat_interleave(current_lengths, num_children)
 
             # Row indices (0..N_total-1)
-            row_idx = torch.arange(N_total, device=self.device)
+            row_idx = self.tensor_ops.arange(0, N_total, device=self.device)
             # Column where new token will be placed = parent_length
-            col_idx = next_lengths.clone()
+            col_idx = self.tensor_ops.clone(next_lengths)
 
             # Flatten the topk indices/scores: [N_total]
-            flat_new_ids = topk_indices.view(-1)
-            flat_new_scores = topk_scores.view(-1)
+            flat_new_ids = self.tensor_ops.view_flat(topk_indices)
+            flat_new_scores = self.tensor_ops.view_flat(topk_scores)
 
             # Mask to ensure we don't overflow final_width
             can_append = col_idx < final_width
 
-            next_tokens[row_idx[can_append], col_idx[can_append]] = flat_new_ids[can_append]
-            next_scores[row_idx[can_append], col_idx[can_append]] = flat_new_scores[can_append]
-            next_lengths[can_append] += 1
-            next_lengths.clamp_(max=final_width)
+            self.tensor_ops.assign_at_indices(
+                next_tokens,
+                self.tensor_ops.boolean_mask_select(row_idx, can_append),
+                self.tensor_ops.boolean_mask_select(col_idx, can_append),
+                self.tensor_ops.boolean_mask_select(flat_new_ids, can_append),
+            )
+            self.tensor_ops.assign_at_indices(
+                next_scores,
+                self.tensor_ops.boolean_mask_select(row_idx, can_append),
+                self.tensor_ops.boolean_mask_select(col_idx, can_append),
+                self.tensor_ops.boolean_mask_select(flat_new_scores, can_append),
+            )
+            self.tensor_ops.increment_at_indices(next_lengths, can_append)
+            next_lengths = self.tensor_ops.clamp(next_lengths, max_val=final_width)
 
             # 10) At this point, we have N_total candidate sequences.
             # We now pick *at most* self.top_k overall, based on aggregate_fn.
@@ -178,13 +205,13 @@ class LookaheadController:
             #
             # Compute aggregate scores for each candidate (shape [N_total]).
             # The aggregate_fn consumes the entire next_scores row (logprobs for every token position).
-            candidate_aggregate_scores = self.aggregate_fn(next_scores)  # → [N_total]
+            candidate_aggregate_scores = self.aggregate_fn(next_scores)
 
             # If there are more than top_k candidates, keep only those top_k by aggregate score
             if N_total > self.top_k:
-                _, keep_indices = torch.topk(candidate_aggregate_scores, k=self.top_k)
+                _, keep_indices = self.tensor_ops.topk(candidate_aggregate_scores, k=self.top_k, dim=0)
             else:
-                keep_indices = torch.arange(N_total, device=self.device)
+                keep_indices = self.tensor_ops.arange(0, N_total, device=self.device)
 
             # Filter down to keep_indices
             current_tokens = next_tokens[keep_indices]
@@ -506,20 +533,29 @@ class BeamSearch:
         # Use current_lookahead_aggregate_fn or a default (e.g., RMS, handled by LookaheadController if None)
         # For LookaheadConfig, aggregate_fn is mandatory. Let's define a default RMS here if not provided.
         agg_fn_for_config = self.current_lookahead_aggregate_fn
+        tensor_ops_instance = PyTorchTensorOperations(default_device=self.device)
+        model_wrapper_instance = PyTorchModelWrapper(model)
         if agg_fn_for_config is None:
-            def default_rms_aggregate_fn(score_matrix: torch.Tensor) -> torch.Tensor: # [num_bins, num_cands] -> [num_cands]
-                clamped_score_matrix = torch.clamp(score_matrix, min=-1e9) 
-                return torch.sqrt(torch.mean(clamped_score_matrix.pow(2), dim=0))
+            def default_rms_aggregate_fn(score_matrix: torch.Tensor) -> torch.Tensor:
+                clamped = tensor_ops_instance.clamp(score_matrix, min_val=-1e9)
+                return tensor_ops_instance.sqrt(tensor_ops_instance.mean(tensor_ops_instance.pow(clamped, 2), dim=0))
             agg_fn_for_config = default_rms_aggregate_fn
 
         lookahead_config_obj = LookaheadConfig(
             instruction=lookahead_instr_for_config,
-            lookahead_top_k=self.max_candidates_per_lookahead_step, # from BeamSearch.__init__ or updated
-            lookahead_temp=self.pre_temp, # Use main instruction's pre_temp for lookahead
-            aggregate_fn=agg_fn_for_config
+            lookahead_top_k=self.max_candidates_per_lookahead_step,
+            lookahead_temp=self.pre_temp,
+            aggregate_fn=agg_fn_for_config,
         )
-        # Instantiate LookaheadController
-        lookahead_controller = LookaheadController(self.lookahead_steps, self.max_len, self.device, tokenizer, lookahead_config_obj)
+        lookahead_controller = LookaheadController(
+            self.lookahead_steps,
+            self.max_len,
+            self.device,
+            tokenizer,
+            lookahead_config_obj,
+            tensor_ops_instance,
+            model_wrapper_instance,
+        )
 
         if not active_leaf_beam_indices:
             return [], []
@@ -566,7 +602,6 @@ class BeamSearch:
             prefix_scores=initial_beams_scores,
             prefix_lengths=initial_parent_tree_lengths,
             original_parent_beam_idxs=original_parent_beam_idxs_for_lookahead,
-            model=model
         )
 
         if self.verbose:
