@@ -61,6 +61,20 @@ class PurePythonTensorOperations(AbstractTensorOperations):
     """Educational tensor ops using nested Python lists."""
 
     def __init__(self):
+        # ########## STUB: PurePythonTensorOperations.__init__ ##########
+        # PURPOSE: Placeholder for any future initialization logic needed for
+        #          the pure Python backend.
+        # EXPECTED BEHAVIOR: Should set up attributes or configuration values
+        #          when this backend requires them.
+        # INPUTS: None at present.
+        # OUTPUTS: None.
+        # KEY ASSUMPTIONS/DEPENDENCIES: Currently no dependencies beyond the
+        #          abstract interface.
+        # TODO:
+        #   - Add configurable parameters if performance tuning becomes
+        #     relevant.
+        # NOTES: Implementation intentionally empty.
+        # ###############################################################
         pass
 
     # Creation ops
