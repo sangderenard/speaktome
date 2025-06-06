@@ -14,11 +14,14 @@ before attempting any network download.
 
 ## Environment Setup
 
-Use the included script to create a virtual environment and install
-dependencies. Pass `--prefetch` if you want to download models during setup:
+Use the included script to create a virtual environment and install only the
+core dependencies. Optional packages are installed lazily on first use. Pass
+`--extras` to install them up front, and `--prefetch` if you want to download
+models during setup:
 
 ```bash
-bash setup_env.sh --prefetch  # optional
+bash setup_env.sh --prefetch           # minimal install
+bash setup_env.sh --extras --prefetch  # install optional packages too
 ```
 
 On Windows use the PowerShell script:
@@ -89,8 +92,9 @@ Use `--preload_models` if you prefer to load all models up front rather than on-
 ### Optional GNN Features
 
 The project includes an experimental controller called **PyGeoMind** built on top of
-PyTorch Geometric. Install `torch_geometric` only if you plan to run the GNN brain.
-Activate it via `--with_gnn` when launching `speaktome.py`.
+PyTorch Geometric. The `torch_geometric` package will be installed automatically
+the first time you enable the GNN with `--with_gnn`. Use `--extras` during setup
+if you prefer installing it ahead of time.
 
 ### Resetting the Environment
 
@@ -100,7 +104,8 @@ invokes `setup_env.sh` with any arguments you pass. It prompts for confirmation
 and defaults to **N** if you simply press Enter.
 
 ```bash
-bash reinstall_env.sh --prefetch  # optional
+bash reinstall_env.sh --prefetch  # minimal reinstall
+bash reinstall_env.sh --extras --prefetch  # reinstall with optional packages
 ```
 
 On Windows use the accompanying PowerShell script:

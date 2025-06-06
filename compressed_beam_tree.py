@@ -4,7 +4,7 @@ from typing import Dict, List, Optional, Tuple, Any, TYPE_CHECKING
 # Third-party imports
 import torch
 from transformers import PreTrainedTokenizer # For type hinting
-from .lazy_loader import lazy_import
+from .lazy_loader import lazy_install
 
 if TYPE_CHECKING:
     from torch_geometric.data import Data as PyGData  # pragma: no cover
@@ -350,7 +350,7 @@ class CompressedBeamTree:
         else:
             edge_index_tensor = torch.empty((2, 0), dtype=torch.long, device=self.device)
             
-        pyg_data_mod = lazy_import('torch_geometric.data')
+        pyg_data_mod = lazy_install('torch_geometric.data', 'torch_geometric')
         PyGData = getattr(pyg_data_mod, 'Data')
         data = PyGData(x=x, edge_index=edge_index_tensor)
         
