@@ -139,17 +139,18 @@ if you prefer installing it ahead of time.
 If you ever need to recreate the virtual environment from scratch, run
 `reinstall_env.sh`. This script removes the existing `.venv` directory and then
 invokes `setup_env.sh` with any arguments you pass. It prompts for confirmation
-and defaults to **N** if you simply press Enter.
+by default, but you can supply `-y` (or `--yes`) to skip the prompt for fully
+automated workflows.
 
 ```bash
-bash reinstall_env.sh --prefetch  # minimal reinstall
-bash reinstall_env.sh --extras --prefetch  # reinstall with optional packages
+bash reinstall_env.sh -y --prefetch             # minimal reinstall
+bash reinstall_env.sh -y --extras --prefetch    # reinstall with optional packages
 ```
 
 On Windows use the accompanying PowerShell script:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File reinstall_env.ps1 --prefetch
+powershell -ExecutionPolicy Bypass -File reinstall_env.ps1 -Yes --prefetch
 ```
 
 ### Windows Without PowerShell
@@ -166,3 +167,15 @@ If you prefer to avoid PowerShell, create the environment and run the program fr
    `.venv\Scripts\python.exe -m speaktome.speaktome [args]`
 
 To download models without PowerShell, open Python from the virtual environment and execute the commands shown in `fetch_models.sh`.
+
+### Automated Demo
+
+Use the helper scripts `auto_demo.sh` (Bash) and `auto_demo.ps1` (PowerShell) to reinstall the environment non-interactively and run a few example searches. Pass `--interactive` (or `-interactive` on Windows) to end with a manual test run.
+
+```bash
+bash auto_demo.sh --interactive
+```
+
+```powershell
+./auto_demo.ps1 -interactive
+```
