@@ -27,7 +27,7 @@ def validate_and_fix(interactive: bool = False):
 
     changed = False
     for fname in os.listdir(REPORTS_DIR):
-        if fname == TEMPLATE or not fname.endswith('.md'):
+        if fname in {TEMPLATE, 'AGENTS.md'} or not fname.endswith('.md'):
             continue
         if PATTERN.fullmatch(fname):
             continue
