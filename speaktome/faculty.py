@@ -8,6 +8,7 @@ from enum import Enum, auto
 class Faculty(Enum):
     """Available compute/resource tiers."""
 
+    PURE_PYTHON = auto()  # No third-party numerical libs
     NUMPY = auto()  # Research demo of algorithm
     TORCH = auto()  # Performant production faculty
     PYGEO = auto()  # NN programmable smart search
@@ -26,7 +27,12 @@ def detect_faculty() -> Faculty:
         _ = torch
         return Faculty.TORCH
     except ModuleNotFoundError:
-        return Faculty.NUMPY
+        try:
+            import numpy  # type: ignore
+            _ = numpy
+            return Faculty.NUMPY
+        except ModuleNotFoundError:
+            return Faculty.PURE_PYTHON
 
 
 DEFAULT_FACULTY = detect_faculty()
