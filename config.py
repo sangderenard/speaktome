@@ -1,10 +1,24 @@
 # Third-party imports
 import os
-import torch
+try:
+    import torch  # type: ignore
+    TORCH_AVAILABLE = True
+except ModuleNotFoundError:  # pragma: no cover - runtime path
+    torch = None
+    TORCH_AVAILABLE = False
 from sentence_transformers import SentenceTransformer
 
 # Configuration constants
-DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+if TORCH_AVAILABLE:
+    DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+else:
+    class _DummyDevice:
+        type = "cpu"
+
+        def __str__(self):
+            return "cpu"
+
+    DEVICE = _DummyDevice()
 GPU_LIMIT = 2500
 LENGTH_LIMIT = 1023
 
