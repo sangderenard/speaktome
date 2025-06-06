@@ -1,0 +1,29 @@
+[
+  {
+    "name": "Codex",
+    "entry_point": "codex_agent",
+    "description": "Automated Git assistant handling pull requests.",
+    "created_by": "OpenAI",
+    "tags": ["llm", "automation"],
+    "last_updated": "2025-06-14",
+    "notes": "Default automated agent."
+  },
+  {
+    "name": "Gemini Code Assist",
+    "entry_point": "gemini_assist",
+    "description": "Repository coordination assistant from Google.",
+    "created_by": "Google",
+    "tags": ["llm", "coordination"],
+    "last_updated": "2025-06-07",
+    "notes": "Assists with messaging and organization."
+  },
+  {
+    "name": "GPT-4o",
+    "entry_point": "speaktome_integration",
+    "description": "Initial GPT-4o integration agent.",
+    "created_by": "OpenAI",
+    "tags": ["llm", "welcome"],
+    "last_updated": "2025-06-06",
+    "notes": "Authored initial welcome message."
+  }
+]

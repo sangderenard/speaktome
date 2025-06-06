@@ -1,0 +1,10 @@
+{
+  "name": "Codex",
+  "date_of_identity": "2025-06-14",
+  "nature_of_identity": "llm",
+  "entry_point": "codex_agent",
+  "description": "Automated Git assistant handling pull requests.",
+  "created_by": "OpenAI",
+  "tags": ["automation", "llm"],
+  "notes": "Initial identity record for Codex agent."
+}
