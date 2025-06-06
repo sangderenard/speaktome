@@ -10,6 +10,15 @@ def lazy_import(module_name: str):
 
 
 @lru_cache(maxsize=None)
+def optional_import(module_name: str):
+    """Attempt to import a module, returning ``None`` if it is missing."""
+    try:
+        return importlib.import_module(module_name)
+    except ModuleNotFoundError:
+        return None
+
+
+@lru_cache(maxsize=None)
 def lazy_install(module_name: str, package_name: str | None = None):
     """Import a module, installing it with pip if it's missing."""
     try:

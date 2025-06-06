@@ -3,8 +3,10 @@ from typing import Dict, List, Optional, Tuple, Any, TYPE_CHECKING
 
 # Third-party imports
 import torch
-from transformers import PreTrainedTokenizer # For type hinting
 from .lazy_loader import lazy_install
+
+if TYPE_CHECKING:
+    from transformers import PreTrainedTokenizer  # For type hinting
 
 if TYPE_CHECKING:
     from torch_geometric.data import Data as PyGData  # pragma: no cover
@@ -13,7 +15,7 @@ if TYPE_CHECKING:
 from .beam_tree_node import BeamTreeNode # Assuming BeamTreeNode is in beam_tree_node.py
 
 class CompressedBeamTree:
-    def __init__(self, device='cuda', tokenizer: Optional[PreTrainedTokenizer] = None, operator=None):
+    def __init__(self, device='cuda', tokenizer: Optional['PreTrainedTokenizer'] = None, operator=None):
         self.device = torch.device(device)
         self.operator = operator
         self.nodes: List[BeamTreeNode] = []
@@ -502,7 +504,7 @@ class CompressedBeamTree:
         return new_beam_idx
 
 
-    def trace_beam_path(self, beam_idx: int, tokenizer: PreTrainedTokenizer) -> List[Tuple[int, float]]:
+    def trace_beam_path(self, beam_idx: int, tokenizer: 'PreTrainedTokenizer') -> List[Tuple[int, float]]:
         """Trace back a beam path from the given ``beam_idx`` to the root.
 
         The method prints the decoded tokens and scores for each step and also

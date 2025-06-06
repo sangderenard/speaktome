@@ -10,7 +10,13 @@ except ModuleNotFoundError:  # pragma: no cover - runtime message only
     torch = None
     TORCH_AVAILABLE = False
     print("PyTorch is not installed. Running CPU-only demo mode.")
-from transformers import PreTrainedTokenizer
+try:
+    from transformers import PreTrainedTokenizer
+    TRANSFORMERS_AVAILABLE = True
+except ModuleNotFoundError:  # pragma: no cover - runtime message only
+    PreTrainedTokenizer = None  # type: ignore
+    TRANSFORMERS_AVAILABLE = False
+    print("Transformers is not installed. Running CPU-only demo mode.")
 
 from .lazy_loader import lazy_import
 if TYPE_CHECKING:
@@ -60,7 +66,7 @@ def main(raw_args=None, allow_retry=True):
     parser.add_argument('seed_text', nargs='*', help='Seed text if not provided via -s')
     args = parser.parse_args(raw_args)
 
-    if not TORCH_AVAILABLE:
+    if not TORCH_AVAILABLE or not TRANSFORMERS_AVAILABLE:
         from .cpu_demo import main as cpu_main
         cpu_main(raw_args)
         return

@@ -14,7 +14,7 @@ from typing import Callable, Dict
 import os
 import torch
 
-from .lazy_loader import lazy_import
+from .lazy_loader import lazy_import, optional_import
 from . import config
 
 class Scorer:
@@ -56,8 +56,12 @@ class Scorer:
         """Load the GPT-2 model and tokenizer on first use."""
 
         if self._model is None or self._tokenizer is None:
-            GPT2LMHeadModel = lazy_import("transformers.GPT2LMHeadModel")
-            GPT2Tokenizer = lazy_import("transformers.GPT2Tokenizer")
+            GPT2LMHeadModel = optional_import("transformers.GPT2LMHeadModel")
+            GPT2Tokenizer = optional_import("transformers.GPT2Tokenizer")
+            if GPT2LMHeadModel is None or GPT2Tokenizer is None:
+                raise RuntimeError(
+                    "Transformers is required for the full beam search demo."
+                )
             self._tokenizer = GPT2Tokenizer.from_pretrained(self.model_path)
             self._tokenizer.pad_token = self._tokenizer.eos_token
             self._model = (
