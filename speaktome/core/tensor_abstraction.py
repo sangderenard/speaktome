@@ -326,19 +326,62 @@ class NumPyTensorOperations(AbstractTensorOperations):
         return np.log(softmax)
 
     def topk(self, tensor, k, dim):
-        if dim != -1:
-            raise NotImplementedError("topk only implemented for last dim in numpy backend")
-        indices = np.argsort(tensor, axis=dim)[:, -k:][:, ::-1]
-        values = np.take_along_axis(tensor, indices, axis=dim)
+        # Ensure dim is positive for consistent slicing behavior with argsort
+        if dim < 0:
+            dim = tensor.ndim + dim
+
+        # Get the indices that would sort 'tensor' along 'dim' in ascending order
+        sorted_indices = np.argsort(tensor, axis=dim)
+
+        # Create slices to select the last k elements along 'dim'
+        # These are the indices of the k largest values, but sorted by value ascendingly
+        idx_slice = [slice(None)] * tensor.ndim
+        idx_slice[dim] = slice(tensor.shape[dim] - k, tensor.shape[dim])
+
+        # Get the indices of the k largest values
+        top_k_indices_ascending = sorted_indices[tuple(idx_slice)]
+
+        # Flip them along 'dim' to get them in descending order of value (largest first)
+        top_k_indices = np.flip(top_k_indices_ascending, axis=dim)
+
+        # Use these indices to gather the top k values
+        values = np.take_along_axis(tensor, top_k_indices, axis=dim)
+
         return values, indices
 
     def stack(self, tensors, dim=0):
         return np.stack(tensors, axis=dim)
 
     def pad(self, tensor, pad, value=0.0):
-        if len(pad) % 2 != 0:
-            raise ValueError("pad must have even length")
-        pad_width = [(pad[i], pad[i+1]) for i in range(0, len(pad), 2)]
+        # PyTorch F.pad format: (pad_left, pad_right, pad_top, pad_bottom, ...)
+        # padding is specified for dimensions from last to first.
+        # NumPy np.pad format: ((before_axis_0, after_axis_0), (before_axis_1, after_axis_1), ...)
+        # We need to convert from PyTorch style to NumPy style.
+        if len(pad) % 2 != 0: # Should be an even number of elements
+            raise ValueError("Padding length must be even.")
+        
+        num_dims_to_pad = len(pad) // 2
+        if num_dims_to_pad > tensor.ndim:
+            raise ValueError("Padding tuple length implies padding more dimensions than tensor has.")
+
+        # Create (before, after) pairs from the PyTorch-style pad tuple
+        # PyTorch pad: (last_dim_begin, last_dim_end, second_last_dim_begin, second_last_dim_end, ...)
+        # NumPy pad_width: ((first_dim_begin, first_dim_end), (second_dim_begin, second_dim_end), ...)
+        
+        np_pad_width = []
+        # Fill padding for dimensions not specified in `pad` tuple (typically leading dimensions)
+        for _ in range(tensor.ndim - num_dims_to_pad):
+            np_pad_width.append((0, 0))
+            
+        # Add padding for the dimensions specified in `pad`, in reverse order of pairs
+        for i in range(num_dims_to_pad):
+            # pad elements are (left, right) for each dim, starting from the last dim
+            # So pad[2*i] is left pad for (num_dims_to_pad - 1 - i)-th dim from the end
+            # And pad[2*i+1] is right pad for that dim
+            left_pad = pad[2 * (num_dims_to_pad - 1 - i)]
+            right_pad = pad[2 * (num_dims_to_pad - 1 - i) + 1]
+            np_pad_width.append((left_pad, right_pad))
+        
         return np.pad(tensor, pad_width, constant_values=value)
 
     def cat(self, tensors, dim=0):
@@ -388,4 +431,3 @@ class NumPyTensorOperations(AbstractTensorOperations):
     @property
     def bool_dtype(self):
         return np.bool_
-
