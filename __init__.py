@@ -1,1 +1,0 @@
-# This file makes the 'speaktome' directory a Python package.

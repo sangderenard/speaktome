@@ -36,8 +36,9 @@ def get_sentence_transformer_model() -> SentenceTransformer:
     if sentence_transformer_model is None:
         model_name_or_path = os.environ.get("SENTENCE_TRANSFORMER_MODEL_PATH")
         if not model_name_or_path:
+            root_dir = os.path.dirname(os.path.dirname(__file__))
             local_path = os.path.join(
-                os.path.dirname(__file__),
+                root_dir,
                 "models",
                 "paraphrase-MiniLM-L6-v2",
             )
