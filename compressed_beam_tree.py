@@ -1,10 +1,13 @@
 # Standard library imports
-from typing import Dict, List, Optional, Tuple, Any
+from typing import Dict, List, Optional, Tuple, Any, TYPE_CHECKING
 
 # Third-party imports
 import torch
 from transformers import PreTrainedTokenizer # For type hinting
-from torch_geometric.data import Data as PyGData # For type hinting
+from .lazy_loader import lazy_import
+
+if TYPE_CHECKING:
+    from torch_geometric.data import Data as PyGData  # pragma: no cover
 
 # Local application/library specific imports
 from .beam_tree_node import BeamTreeNode # Assuming BeamTreeNode is in beam_tree_node.py
@@ -311,7 +314,7 @@ class CompressedBeamTree:
             
         return new_leaf_beam_idxs_for_tree
 
-    def get_pyg_data(self) -> Optional[PyGData]:
+    def get_pyg_data(self) -> Optional['PyGData']:
         """
         Constructs and returns a PyTorch Geometric Data object representing the current tree state.
         Node features (x) will be [token_id, score, depth].
@@ -347,6 +350,8 @@ class CompressedBeamTree:
         else:
             edge_index_tensor = torch.empty((2, 0), dtype=torch.long, device=self.device)
             
+        pyg_data_mod = lazy_import('torch_geometric.data')
+        PyGData = getattr(pyg_data_mod, 'Data')
         data = PyGData(x=x, edge_index=edge_index_tensor)
         
         # Add pyg_node_is_leaf and pyg_node_to_beam_idx
