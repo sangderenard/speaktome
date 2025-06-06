@@ -13,6 +13,17 @@ The `todo/AGENTS.md` file provides additional guidance, including a section on r
 
 For deeper historical context, read through all prior reports. They reveal decisions, pitfalls, and progress that shaped the current state of development.
 
+If you crave an immediate, exhaustive overview, run this one-liner. It will
+spew every markdown, script and source file to your terminal. The output is
+massive, but it offers instant familiarity with the project:
+
+```bash
+bash -c 'echo "Dumping all docs and code (huge output)..." && \
+  find . \( -path ./.git -o -path ./.venv \) -prune -o \
+  -type f \( -name "*.md" -o -name "*.py" -o -name "*.sh" -o -name "*.ps1" \) \
+  -exec echo "===== {} =====" \; -exec cat {} \;'
+```
+
 # Agents Documentation
 
 This document describes the primary agents and components in the beam search and PyGeoMind-based graph search system.
