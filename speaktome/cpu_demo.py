@@ -17,7 +17,7 @@ import numpy as np
 from .token_vocab import TokenVocabulary
 from .tensor_abstraction import NumPyTensorOperations
 from .model_abstraction import AbstractModelWrapper
-from .beam_search import LookaheadController, LookaheadConfig
+from .lookahead_controller import LookaheadController, LookaheadConfig
 
 VOCAB = TokenVocabulary("abcdefghijklmnopqrstuvwxyz ")
 

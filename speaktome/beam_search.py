@@ -1,6 +1,6 @@
 # Standard library imports
 from __future__ import annotations
-from typing import List, Optional, Set, Tuple, Callable, Dict
+from typing import List, Optional, Tuple, Callable, Dict, Any
 import math
 # Third-party imports
 try:
@@ -29,217 +29,7 @@ from .model_abstraction import (
     AbstractModelWrapper,
     PyTorchModelWrapper,
 )
-
-
-class LookaheadConfig:
-    """
-    Bundles all lookahead hyperparameters:
-      - instruction: BeamSearchInstruction (contains any custom rules, though prune_fn is removed)
-      - lookahead_top_k: how many candidates to keep *after* each expansion step
-      - lookahead_temp: temperature for softmax during lookahead
-      - aggregate_fn: function mapping [N, width]→[N] to score each candidate
-    """
-    def __init__(
-        self,
-        instruction: BeamSearchInstruction,
-        lookahead_top_k: int,
-        lookahead_temp: float,
-        aggregate_fn: Callable[[torch.Tensor], torch.Tensor]
-    ):
-        self.instruction = instruction
-        self.lookahead_top_k = lookahead_top_k
-        self.lookahead_temp = lookahead_temp
-        self.aggregate_fn = aggregate_fn
-
-
-class LookaheadController:
-    def __init__(
-        self,
-        lookahead_steps: int,
-        max_len: int,
-        device: torch.device,
-        tokenizer,
-        config: LookaheadConfig,
-        tensor_ops: AbstractTensorOperations,
-        model_wrapper: AbstractModelWrapper,
-    ):
-        self.lookahead_steps = lookahead_steps
-        self.max_len = max_len
-        self.device = device
-        self.tokenizer = tokenizer
-        self.tensor_ops = tensor_ops
-        self.model_wrapper = model_wrapper
-
-        # Unpack from config
-        self.config = config
-        self.top_k = config.lookahead_top_k
-        self.temp = config.lookahead_temp
-        self.aggregate_fn = config.aggregate_fn
-
-        # pad token ID fallback
-        self.pad_id = tokenizer.pad_token_id if tokenizer.pad_token_id is not None else 0
-
-    def run(
-        self,
-        prefix_tokens: torch.LongTensor,     # [B, prefix_width]
-        prefix_scores: torch.FloatTensor,    # [B, prefix_width]
-        prefix_lengths: torch.LongTensor,    # [B]
-        original_parent_beam_idxs: torch.LongTensor,  # [B]
-    ) -> Tuple[
-        torch.LongTensor,   # final_tokens: [K, final_width]
-        torch.FloatTensor,  # final_scores: [K, final_width]
-        torch.LongTensor,   # final_lengths: [K]
-        torch.LongTensor,   # final_parent_beam_idxs: [K]
-        torch.LongTensor,   # final_parent_prefix_lengths: [K]
-        List[int]           # pruned_original_parent_beam_idxs
-    ]:
-        B_initial = self.tensor_ops.shape(prefix_tokens)[0]
-        initial_prefix_width = self.tensor_ops.shape(prefix_tokens)[1]
-        final_width = min(self.max_len, initial_prefix_width + self.lookahead_steps)
-
-        # 1) Initialize current_* tensors by copying prefix into padded buffers
-        current_tokens = self.tensor_ops.full(
-            (B_initial, final_width),
-            self.pad_id,
-            dtype=self.tensor_ops.get_dtype(prefix_tokens),
-            device=self.device
-        )
-        current_scores = self.tensor_ops.zeros(
-            (B_initial, final_width),
-            dtype=self.tensor_ops.get_dtype(prefix_scores),
-            device=self.device
-        )
-        for i in range(B_initial):
-            l = self.tensor_ops.item(prefix_lengths[i])
-            if l > 0:
-                self.tensor_ops.assign_at_indices(current_tokens, i, slice(0, l), prefix_tokens[i, :l])
-                self.tensor_ops.assign_at_indices(current_scores, i, slice(0, l), prefix_scores[i, :l])
-
-        current_lengths = self.tensor_ops.to_device(self.tensor_ops.clone(prefix_lengths), self.device)
-        current_parent_beam_idxs = self.tensor_ops.to_device(self.tensor_ops.clone(original_parent_beam_idxs), self.device)
-        current_parent_prefix_lengths = self.tensor_ops.to_device(self.tensor_ops.clone(prefix_lengths), self.device)
-
-        # We'll determine which original parents lose all children at the end
-        original_parents_set = set(original_parent_beam_idxs.tolist())
-
-        for step in range(self.lookahead_steps):
-            B_cur = self.tensor_ops.shape(current_tokens)[0]
-            if B_cur == 0:
-                break
-
-            # 2) Determine the effective input width for the language model
-            effective_input_width = int(self.tensor_ops.item(self.tensor_ops.max(current_lengths))) if B_cur > 0 else 0
-            if effective_input_width == 0 and step == 0 and B_initial > 0:
-                # If all prefixes were empty, force 1 token (e.g. BOS or pad)
-                effective_input_width = 1
-            if B_cur > 0:
-                effective_input_width = max(1, effective_input_width)
-
-            # 3) Slice tokens_for_lm
-            tokens_for_lm = current_tokens[:, :effective_input_width]
-
-            # 4) Build attention mask (non-pad tokens)
-            attention_mask = self.tensor_ops.long_cast(
-                self.tensor_ops.not_equal(tokens_for_lm, self.pad_id)
-            )
-
-            # 5) Get logits from the model
-            outputs_dict = self.model_wrapper.forward(
-                input_ids=tokens_for_lm, attention_mask=attention_mask
-            )
-            logits = outputs_dict['logits']
-
-            # 6) For each sequence, pick the logits at the last generated position
-            # Assume every sequence has length >= 1 once seeded, so index = length - 1
-            last_indices = self.tensor_ops.clamp(current_lengths - 1, min_val=0)
-            last_logits = self.tensor_ops.select_by_indices(
-                logits,
-                self.tensor_ops.arange(0, B_cur, device=self.device),
-                last_indices,
-            )
-
-            # 7) Temperature-scale and softmax -> logprobs
-            logprobs = self.tensor_ops.log_softmax(last_logits / self.temp, dim=-1)
-
-            # 8) For each parent, take top self.top_k token candidates
-            topk_scores, topk_indices = self.tensor_ops.topk(logprobs, k=self.top_k, dim=-1)
-            # topk_scores, topk_indices: [B_cur, self.top_k]
-
-            # 9) Build the next-generation candidate sets
-            num_parents = B_cur
-            num_children = self.top_k
-            N_total = num_parents * num_children
-
-            # Expand parent indices and prefix lengths
-            expanded_parent_idxs = self.tensor_ops.repeat_interleave(current_parent_beam_idxs, num_children)
-            expanded_parent_prefix_lens = self.tensor_ops.repeat_interleave(current_parent_prefix_lengths, num_children)
-
-            # Repeat current sequences and score buffers
-            next_tokens = self.tensor_ops.repeat_interleave(current_tokens, num_children, dim=0)
-            next_scores = self.tensor_ops.repeat_interleave(current_scores, num_children, dim=0)
-            next_lengths = self.tensor_ops.repeat_interleave(current_lengths, num_children)
-
-            # Row indices (0..N_total-1)
-            row_idx = self.tensor_ops.arange(0, N_total, device=self.device)
-            # Column where new token will be placed = parent_length
-            col_idx = self.tensor_ops.clone(next_lengths)
-
-            # Flatten the topk indices/scores: [N_total]
-            flat_new_ids = self.tensor_ops.view_flat(topk_indices)
-            flat_new_scores = self.tensor_ops.view_flat(topk_scores)
-
-            # Mask to ensure we don't overflow final_width
-            can_append = col_idx < final_width
-
-            self.tensor_ops.assign_at_indices(
-                next_tokens,
-                self.tensor_ops.boolean_mask_select(row_idx, can_append),
-                self.tensor_ops.boolean_mask_select(col_idx, can_append),
-                self.tensor_ops.boolean_mask_select(flat_new_ids, can_append),
-            )
-            self.tensor_ops.assign_at_indices(
-                next_scores,
-                self.tensor_ops.boolean_mask_select(row_idx, can_append),
-                self.tensor_ops.boolean_mask_select(col_idx, can_append),
-                self.tensor_ops.boolean_mask_select(flat_new_scores, can_append),
-            )
-            self.tensor_ops.increment_at_indices(next_lengths, can_append)
-            next_lengths = self.tensor_ops.clamp(next_lengths, max_val=final_width)
-
-            # 10) At this point, we have N_total candidate sequences.
-            # We now pick *at most* self.top_k overall, based on aggregate_fn.
-            # The user asked: "We just apply an aggregate function and top_k"—no pruning function, no bin-sorting.
-            #
-            # Compute aggregate scores for each candidate (shape [N_total]).
-            # The aggregate_fn consumes the entire next_scores row (logprobs for every token position).
-            candidate_aggregate_scores = self.aggregate_fn(next_scores)
-
-            # If there are more than top_k candidates, keep only those top_k by aggregate score
-            if N_total > self.top_k:
-                _, keep_indices = self.tensor_ops.topk(candidate_aggregate_scores, k=self.top_k, dim=0)
-            else:
-                keep_indices = self.tensor_ops.arange(0, N_total, device=self.device)
-
-            # Filter down to keep_indices
-            current_tokens = next_tokens[keep_indices]
-            current_scores = next_scores[keep_indices]
-            current_lengths = next_lengths[keep_indices]
-            current_parent_beam_idxs = expanded_parent_idxs[keep_indices]
-            current_parent_prefix_lengths = expanded_parent_prefix_lens[keep_indices]
-
-        # 11) After finishing all lookahead steps, any original parent whose beam_idx never appears in
-        # current_parent_beam_idxs must be considered "fully pruned" → retirement candidate.
-        final_parents = set(current_parent_beam_idxs.tolist())
-        pruned_original_parents = list(original_parents_set - final_parents)
-
-        return (
-            current_tokens,                # [K, final_width]
-            current_scores,                # [K, final_width]
-            current_lengths,               # [K]
-            current_parent_beam_idxs,      # [K]
-            current_parent_prefix_lengths, # [K]
-            pruned_original_parents        # List[int]
-        )
+from .lookahead_controller import LookaheadConfig, LookaheadController
 
 class BeamSearch:
     def __init__(self, scorer: Scorer, beam_width: int = 5, gpu_limit: int = GPU_LIMIT, 
@@ -247,7 +37,7 @@ class BeamSearch:
                  device=config.DEVICE, verbose=True, max_len=LENGTH_LIMIT, # General params
                  # Lookahead specific initial/default configurations
                  initial_lookahead_rules: Optional[BeamSearchInstruction] = None,
-                 initial_aggregate_score_fn: Optional[Callable[[torch.Tensor], torch.Tensor]] = None,
+                 initial_aggregate_score_fn: Optional[Callable[[Any], Any]] = None,
                  max_candidates_per_lookahead_step: Optional[int] = None # This is lookahead_top_k
     ):
         self.scorer = scorer
@@ -541,7 +331,7 @@ class BeamSearch:
         # Use current_lookahead_aggregate_fn or a default (e.g., RMS, handled by LookaheadController if None)
         # For LookaheadConfig, aggregate_fn is mandatory. Let's define a default RMS here if not provided.
         agg_fn_for_config = self.current_lookahead_aggregate_fn
-        tensor_ops_instance = PyTorchTensorOperations(default_device=self.device)
+        tensor_ops_instance: AbstractTensorOperations = PyTorchTensorOperations(default_device=self.device)
         model_wrapper_instance = PyTorchModelWrapper(model)
         if agg_fn_for_config is None:
             def default_rms_aggregate_fn(score_matrix: torch.Tensor) -> torch.Tensor:

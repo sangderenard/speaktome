@@ -14,7 +14,7 @@ sys.modules.setdefault("transformers", stub_tx)
 
 from speaktome.tensor_abstraction import NumPyTensorOperations
 from speaktome.model_abstraction import AbstractModelWrapper
-from speaktome.beam_search import LookaheadController, LookaheadConfig
+from speaktome.lookahead_controller import LookaheadController, LookaheadConfig
 
 class DummyModel(AbstractModelWrapper):
     def forward(self, input_ids, attention_mask, **kwargs):
