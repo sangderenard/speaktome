@@ -1,11 +1,15 @@
 # Third-party imports
 import os
+
+from .faculty import Faculty, DEFAULT_FACULTY
+
 try:
     import torch  # type: ignore
-    TORCH_AVAILABLE = True
 except ModuleNotFoundError:  # pragma: no cover - runtime path
     torch = None
-    TORCH_AVAILABLE = False
+
+TORCH_AVAILABLE = DEFAULT_FACULTY in (Faculty.TORCH, Faculty.PYGEO)
+PYGEO_AVAILABLE = DEFAULT_FACULTY is Faculty.PYGEO
 
 SentenceTransformer = None
 try:

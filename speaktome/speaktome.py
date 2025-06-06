@@ -3,12 +3,14 @@ from typing import List, Tuple, Dict, Optional, Any, Callable, TYPE_CHECKING
 import argparse
 
 # Third-party imports
+from . import Faculty, DEFAULT_FACULTY
 try:
     import torch
-    TORCH_AVAILABLE = True
 except ModuleNotFoundError:  # pragma: no cover - runtime message only
     torch = None
-    TORCH_AVAILABLE = False
+
+TORCH_AVAILABLE = DEFAULT_FACULTY in (Faculty.TORCH, Faculty.PYGEO)
+if not TORCH_AVAILABLE:
     print("PyTorch is not installed. Running CPU-only demo mode.")
 try:
     from transformers import PreTrainedTokenizer
@@ -65,6 +67,8 @@ def main(raw_args=None, allow_retry=True):
                         help="Load all models up front to avoid lazy initialization delays.")
     parser.add_argument('seed_text', nargs='*', help='Seed text if not provided via -s')
     args = parser.parse_args(raw_args)
+
+    print(f"Faculty level: {DEFAULT_FACULTY.name}")
 
     if not TORCH_AVAILABLE or not TRANSFORMERS_AVAILABLE:
         from .cpu_demo import main as cpu_main
