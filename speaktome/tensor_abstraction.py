@@ -6,7 +6,10 @@ try:
 except ModuleNotFoundError:  # pragma: no cover - optional dependency
     torch = None  # type: ignore
     F = None  # type: ignore
-import numpy as np
+try:
+    import numpy as np
+except ModuleNotFoundError:  # pragma: no cover - optional dependency
+    np = None  # type: ignore
 
 class AbstractTensorOperations(ABC):
     @abstractmethod
