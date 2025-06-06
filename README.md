@@ -69,6 +69,33 @@ export SENTENCE_TRANSFORMER_MODEL_PATH=models/paraphrase-MiniLM-L6-v2
 Once the models are downloaded you can run the program without further network
 access.
 
+## Running SpeakToMe
+
+Use the provided wrapper scripts to ensure the `.venv` interpreter is used
+consistently across platforms. They call Python from the virtual environment
+directly so you don't need to activate it first.
+
+```bash
+bash run.sh -s "Hello" -m 10 -c -a 5 --final_viz
+```
+
+On Windows run either script:
+
+```powershell
+.\run.ps1 -s "Hello" -m 10 -c -a 5 --final_viz
+```
+
+From `cmd.exe`:
+```cmd
+run.cmd -s "Hello" -m 10 -c -a 5 --final_viz
+```
+
+These scripts are equivalent to running:
+
+```bash
+.venv/bin/python -m speaktome.speaktome [args]
+```
+
 ## Command Line Usage
 
 The `speaktome` entry point exposes several options. Long flags have short aliases
@@ -76,7 +103,18 @@ for convenience. By default the program expands once automatically, disables
 retirement, and uses maximum lookahead. For example:
 
 ```
-python speaktome.py -s "Hello" -m 10 -c -a 5 --final_viz
+bash run.sh -s "Hello" -m 10 -c -a 5 --final_viz
+```
+
+On Windows run either script:
+
+```powershell
+.\run.ps1 -s "Hello" -m 10 -c -a 5 --final_viz
+```
+
+From `cmd.exe`:
+```cmd
+run.cmd -s "Hello" -m 10 -c -a 5 --final_viz
 ```
 
 The above runs the search with seed text "Hello", a maximum depth of 10, enables
@@ -114,3 +152,17 @@ On Windows use the accompanying PowerShell script:
 powershell -ExecutionPolicy Bypass -File reinstall_env.ps1 --prefetch
 ```
 
+### Windows Without PowerShell
+If you prefer to avoid PowerShell, create the environment and run the program from `cmd.exe`:
+
+1. `py -3 -m venv .venv`
+2. `.venv\Scripts\activate.bat`
+3. `pip install --upgrade pip`
+4. `pip install -r requirements.txt` (add `optional_requirements.txt` if desired)
+5. Run the program with `run.cmd`:
+   `run.cmd -s "Hello" -m 10 -c -a 5 --final_viz`
+
+   Or manually invoke:
+   `.venv\Scripts\python.exe -m speaktome.speaktome [args]`
+
+To download models without PowerShell, open Python from the virtual environment and execute the commands shown in `fetch_models.sh`.
