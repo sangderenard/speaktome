@@ -7,14 +7,14 @@ import math
 if TYPE_CHECKING:  # pragma: no cover - type hints only
     import torch
 
-from . import Faculty
+from .. import Faculty
 
 FACULTY_REQUIREMENT = Faculty.TORCH
 
 # Local application/library specific imports
 # Please adjust these import paths based on your actual project structure.
-from . import config
-from .config import GPU_LIMIT, LENGTH_LIMIT
+from .. import config
+from ..config import GPU_LIMIT, LENGTH_LIMIT
 from .beam_graph_operator import BeamGraphOperator
 from .beam_search_instruction import BeamSearchInstruction
 from .scorer import Scorer

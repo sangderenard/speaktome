@@ -1,4 +1,4 @@
-from speaktome.cli_permutations import CLIArgumentMatrix
+from speaktome.util.cli_permutations import CLIArgumentMatrix
 
 
 def test_permutation_generation():
