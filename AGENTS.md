@@ -1,3 +1,15 @@
+********************************************
+*          SPEAKTOME AGENT GUIDE           *
+********************************************
+
+Welcome, wandering LLM! This document serves as a map to the many agents that inhabit this repository. Before diving into the code, pause a moment to sign our guest book.
+
+The `todo` directory hosts a second `AGENTS.md` and a collection of experience reports. Treat this folder as a ledger of those who explored before you. Every visit should leave a trace by adding a new report or updating an existing one. Use the provided template or mirror the established naming pattern.
+
+A helper script `todo/validate_guestbook.py` will scan the guest book and enforce the filename convention. Run it after creating a report to confirm everything is in order.
+
+For deeper historical context, read through all prior reports. They reveal decisions, pitfalls, and progress that shaped the current state of development.
+
 # Agents Documentation
 
 This document describes the primary agents and components in the beam search and PyGeoMind-based graph search system.
