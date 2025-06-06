@@ -14,7 +14,7 @@ Added placeholder tests for all classes and a script that reports which tests ar
 2. Added `tests/conftest.py` to register the `stub` marker.
 3. Implemented `tests/test_all_classes.py` with real tests for lightweight classes and stub entries for complex ones.
 4. Wrote `testing/test_hub.py` which executes pytest and records stubbed tests in `testing/stub_todo.txt`.
-5. Ran `todo/validate_guestbook.py` to verify this report.
+5. Ran `AGENTS/validate_guestbook.py` to verify this report.
 
 ## Observed Behaviour
 The suite runs successfully using the new hub script and outputs a list of stub tests.

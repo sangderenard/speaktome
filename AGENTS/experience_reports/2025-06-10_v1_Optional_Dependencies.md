@@ -14,7 +14,7 @@ Testing minimal installation after moving heavy packages to `optional_requiremen
 2. Installed `requirements.txt` only.
 3. Verified `torch` and `transformers` are absent.
 4. Ran `python -m speaktome.speaktome -h` to confirm CPU demo runs.
-5. Executed `python todo/validate_guestbook.py` to ensure filename correctness.
+5. Executed `python AGENTS/validate_guestbook.py` to ensure filename correctness.
 
 ## Observed Behaviour
 - The help message displayed and the CPU demo started without error.
