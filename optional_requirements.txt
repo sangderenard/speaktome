@@ -4,3 +4,8 @@ networkx>=3.1
 scikit-learn>=1.2
 # Optional: required only for the PyGeoMind GNN controller
 torch_geometric>=2.4
+
+# Heavy dependencies needed for the full beam search
+torch>=1.13
+transformers>=4.30
+sentence-transformers>=2.2
