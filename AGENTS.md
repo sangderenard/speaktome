@@ -22,11 +22,11 @@ This document describes the primary agents and components in the beam search and
 * Contains GPT-2 tokenizer and model.
 * Provides default scoring policies and configurable score bins.
 
-### 2. **MetaBeamManager** (`meta_beam_manager.py`)
+### 2. **Scorer Bin Manager**
 
-* Manages beams within scoring bins, handling aging, scoring, and culling.
-* Organizes beams by configurable bins, each with its own scoring function, width, and temperature.
-* Utilizes GPU-optimized tensors.
+* `Scorer` now directly manages beam bins, handling aging, scoring, and culling.
+* Bins are configurable with their own scoring function, width, and temperature.
+* Utilizes the tensor abstraction layer so future backends remain possible.
 
 ### 3. **CompressedBeamTree** (`compressed_beam_tree.py`)
 
@@ -54,7 +54,7 @@ This document describes the primary agents and components in the beam search and
 
 * Performs core beam expansion, scoring, and retirement processes.
 * Incorporates lookahead capability to optimize beam selection.
-* Interfaces with `MetaBeamManager` for scoring and bin management.
+* Interfaces with the `Scorer` bin manager for scoring and bin management.
 
 ### 8. **BeamRetirementManager** (`beam_retirement_manager.py`)
 
