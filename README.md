@@ -21,18 +21,20 @@ before attempting any network download.
 Use the included script to create a virtual environment and install only the
 core dependencies (`numpy` and other light utilities). Heavy libraries such as
 PyTorch and Transformers are now *optional* and live in
-`optional_requirements.txt`. Pass `--extras` to install them up front, and
-`--prefetch` if you want to download models during setup:
+`optional_requirements.txt`. Run the script without any flags for the minimal
+setup. Add `--extras` to install the optional packages, and `--prefetch` if you
+want to download models during setup (requires the extras):
 
 ```bash
-bash setup_env.sh --prefetch           # minimal install
+bash setup_env.sh                      # minimal install
 bash setup_env.sh --extras --prefetch  # install optional packages too
 ```
 
 On Windows use the PowerShell script:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File setup_env.ps1 --prefetch  # optional
+powershell -ExecutionPolicy Bypass -File setup_env.ps1                      # minimal
+powershell -ExecutionPolicy Bypass -File setup_env.ps1 --extras --prefetch  # optional
 ```
 
 Activate the environment with:
@@ -85,6 +87,15 @@ directly so you don't need to activate it first.
 ```bash
 bash run.sh -s "Hello" -m 10 -c -a 5 --final_viz
 ```
+
+If PyTorch or Transformers are not installed the program automatically runs the
+CPU demo. Any unsupported options are ignored so you can use the same command
+line regardless of which dependencies are available. The demo now drives the
+LookaheadController using NumPy-only pseudotensors and returns the top ``k``
+results after ``d`` steps. Any extra tokens on the command line become the seed
+text, so `bash run.sh hello` will search starting from ``hello``. The default
+depth is ``5`` and width is ``3``. Use `-d`/`--depth` to change the number of
+lookahead steps and `-w`/`--width` for the beam width.
 
 On Windows run either script:
 
@@ -150,14 +161,15 @@ by default, but you can supply `-y` (or `--yes`) to skip the prompt for fully
 automated workflows.
 
 ```bash
-bash reinstall_env.sh -y --prefetch             # minimal reinstall
+bash reinstall_env.sh -y               # minimal reinstall
 bash reinstall_env.sh -y --extras --prefetch    # reinstall with optional packages
 ```
 
 On Windows use the accompanying PowerShell script:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File reinstall_env.ps1 -Yes --prefetch
+powershell -ExecutionPolicy Bypass -File reinstall_env.ps1 -Yes                      # minimal
+powershell -ExecutionPolicy Bypass -File reinstall_env.ps1 -Yes --extras --prefetch  # optional
 ```
 
 ### Windows Without PowerShell
