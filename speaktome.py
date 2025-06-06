@@ -5,10 +5,11 @@ import argparse
 # Third-party imports
 try:
     import torch
-except ModuleNotFoundError as exc:  # pragma: no cover - runtime message only
-    print("PyTorch is not installed. Tensor operations are critical for language models.")
-    print("Installing PyTorch can take some time, but it's worth it. See https://pytorch.org/ for options.")
-    raise
+    TORCH_AVAILABLE = True
+except ModuleNotFoundError:  # pragma: no cover - runtime message only
+    torch = None
+    TORCH_AVAILABLE = False
+    print("PyTorch is not installed. Running CPU-only demo mode.")
 from transformers import PreTrainedTokenizer
 
 from .lazy_loader import lazy_import
@@ -19,12 +20,6 @@ if TYPE_CHECKING:
 
 # Local application/library specific imports
 # Please adjust these import paths if your project structure differs.
-from .beam_search import BeamSearch
-from .scorer import Scorer # Assuming Scorer is in scorer.py
-from .pygeo_mind import PyGeoMind # Assuming PyGeoMind is in pygeomind.py
-from .pyg_graph_controller import PyGGraphController # Assuming PyGGraphController is in pyg_graph_controller.py
-from .compressed_beam_tree import CompressedBeamTree
-from .beam_tree_visualizer import BeamTreeVisualizer
 # Import configuration dynamically to allow device changes at runtime
 from . import config
 from .config import get_sentence_transformer_model, GPU_LIMIT, LENGTH_LIMIT
@@ -47,7 +42,6 @@ def main(raw_args=None, allow_retry=True):
     parser.add_argument('-w', '--beam_width', type=int, default=5,
                         help="Beam width for the search.")
     parser.add_argument('-p', '--preferred_scorer', type=str, default=None,
-                        choices=list(Scorer.get_available_scoring_functions().keys()),
                         help="Preferred scoring function for default instructions.")
     parser.add_argument('-a', '--auto_expand', type=int, default=1,
                         help="Run 'expand_any' automatically for N rounds before normal control.")
@@ -66,10 +60,21 @@ def main(raw_args=None, allow_retry=True):
     parser.add_argument('seed_text', nargs='*', help='Seed text if not provided via -s')
     args = parser.parse_args(raw_args)
 
+    if not TORCH_AVAILABLE:
+        from .cpu_demo import main as cpu_main
+        cpu_main(raw_args)
+        return
+
     if args.safe_mode:
         config.DEVICE = torch.device("cpu")
 
     def run_once():
+        from .beam_search import BeamSearch
+        from .scorer import Scorer
+        from .pygeo_mind import PyGeoMind
+        from .pyg_graph_controller import PyGGraphController
+        from .compressed_beam_tree import CompressedBeamTree
+        from .beam_tree_visualizer import BeamTreeVisualizer
         seed_from_flag = args.seed != parser.get_default('seed')
         final_seed = args.seed if seed_from_flag else ' '.join(args.seed_text)
 
