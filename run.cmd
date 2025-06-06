@@ -8,7 +8,10 @@ if not exist "%VENV_PY%" (
 )
 for /f "delims=" %%p in ('"%VENV_PY%" -c "import sys; print(sys.executable)"') do set "ACTUAL_PY=%%p"
 if /I not "%ACTUAL_PY%"=="%VENV_PY%" (
-    echo Warning: expected "%VENV_PY%" but interpreter reports "%ACTUAL_PY%"
+    echo Error: Script must be run with the virtual environment's Python.
+    echo Expected: "%VENV_PY%"
+    echo Found:    "%ACTUAL_PY%"
+    exit /b 1
 )
 "%VENV_PY%" -m speaktome.speaktome %*
 endlocal
