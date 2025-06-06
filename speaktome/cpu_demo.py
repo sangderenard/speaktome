@@ -20,8 +20,7 @@ except ModuleNotFoundError:  # pragma: no cover - optional dependency
     np = None  # type: ignore
 
 from .util.token_vocab import TokenVocabulary
-from .core.tensor_abstraction import NumPyTensorOperations
-from .domains.pure.pure_python_tensor_operations import PurePythonTensorOperations
+from .core.tensor_abstraction import get_tensor_operations
 from .core.model_abstraction import AbstractModelWrapper
 from .core.lookahead_controller import LookaheadController, LookaheadConfig
 
@@ -54,13 +53,17 @@ class RandomModel(AbstractModelWrapper):
 
 def aggregate_mean(scores: Any) -> Any:
     """Aggregate candidate scores using mean over sequence length."""
-    ops = NumPyTensorOperations() if NUMPY_AVAILABLE else PurePythonTensorOperations()
+    ops = get_tensor_operations(
+        Faculty.NUMPY if NUMPY_AVAILABLE else Faculty.PURE_PYTHON
+    )
     return ops.mean(scores, dim=-1)
 
 
 def run_lookahead(prefix: str, lookahead_steps: int = 5, beam_width: int = 3):
     """Execute LookaheadController with a random backend."""
-    ops = NumPyTensorOperations() if NUMPY_AVAILABLE else PurePythonTensorOperations()
+    ops = get_tensor_operations(
+        Faculty.NUMPY if NUMPY_AVAILABLE else Faculty.PURE_PYTHON
+    )
     tokenizer = type("_T", (), {"pad_token_id": 0})()
     config = LookaheadConfig(
         instruction=None,

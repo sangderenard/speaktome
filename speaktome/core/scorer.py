@@ -18,7 +18,7 @@ import queue
 
 from .tensor_abstraction import (
     AbstractTensorOperations,
-    PyTorchTensorOperations,
+    get_tensor_operations,
 )
 
 from ..util.lazy_loader import lazy_import, optional_import
@@ -40,7 +40,7 @@ class Scorer:
             model_path = local_path if os.path.isdir(local_path) else "gpt2"
         self.model_path = model_path
 
-        self.tensor_ops = tensor_ops or PyTorchTensorOperations(default_device=config.DEVICE)
+        self.tensor_ops = tensor_ops or get_tensor_operations()
 
         self.default_scorer = Scorer.mean_logprob_score
         self.default_k = 5
