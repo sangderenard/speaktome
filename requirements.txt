@@ -1,14 +1,11 @@
-# Core deep learning frameworks
-torch>=1.13
-# Optional: required only for the PyGeoMind GNN controller
+# Minimal dependencies for the CPU demo
+numpy>=1.26
+
+# Heavy packages moved to optional_requirements.txt
+# torch>=1.13
+# transformers>=4.30
+# sentence-transformers>=2.2
 # torch_geometric>=2.4
-
-# NLP tooling
-transformers>=4.30
-sentence-transformers>=2.2
-
-# Visualization and analysis
-# These heavy packages will be installed on demand
 # matplotlib>=3.7
 # networkx>=3.1
 # scikit-learn>=1.2
