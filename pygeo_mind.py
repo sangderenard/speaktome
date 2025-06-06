@@ -5,7 +5,7 @@ from typing import Dict, List, Tuple, TYPE_CHECKING
 # Third-party imports
 import torch
 
-from .lazy_loader import lazy_import
+from .lazy_loader import lazy_install
 if TYPE_CHECKING:
     from torch_geometric.data import Data as PyGData
     import torch_geometric.nn as pyg_nn
@@ -36,7 +36,7 @@ class PyGeoMind(torch.nn.Module):
     def __init__(self, scorer: Scorer, input_dim: int = 768, hidden_dim: int = 512, beam_width: int = 5, **kwargs):
         super().__init__()
 
-        pyg_nn = lazy_import('torch_geometric.nn')
+        pyg_nn = lazy_install('torch_geometric.nn', 'torch_geometric')
 
         # ══════ Encoder & GNN ══════
         self.encoder       = torch.nn.Linear(input_dim, hidden_dim)
