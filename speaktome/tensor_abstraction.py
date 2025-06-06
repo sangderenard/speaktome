@@ -1,7 +1,11 @@
 from abc import ABC, abstractmethod
 from typing import Any, Tuple, Optional, List, Union
-import torch
-import torch.nn.functional as F
+try:
+    import torch
+    import torch.nn.functional as F
+except ModuleNotFoundError:  # pragma: no cover - optional dependency
+    torch = None  # type: ignore
+    F = None  # type: ignore
 import numpy as np
 
 class AbstractTensorOperations(ABC):
@@ -121,7 +125,9 @@ class AbstractTensorOperations(ABC):
 
 
 class PyTorchTensorOperations(AbstractTensorOperations):
-    def __init__(self, default_device: Union[str, torch.device] = "cpu"):
+    def __init__(self, default_device: Union[str, "torch.device"] = "cpu"):
+        if torch is None:
+            raise RuntimeError("PyTorch is required for this backend")
         self.default_device = torch.device(default_device)
 
     def full(self, size, fill_value, dtype, device):

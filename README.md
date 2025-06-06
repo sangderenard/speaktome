@@ -6,6 +6,13 @@ This package implements beam search controllers and utilities for generating tex
 
 Source code now lives under `speaktome/` with only helper scripts and documentation in the repository root.  A `testing/` directory contains small inspection scripts used to evaluate components in isolation without any external framework.  For example run `python testing/lookahead_demo.py` to exercise the lookahead controller.
 
+### Faculty Levels
+The project operates at three resource tiers:
+1. **NumPy** – lightweight demo mode.
+2. **Torch** – full production features with PyTorch.
+3. **PyGeo** – advanced graph search via PyTorch Geometric.
+The current level is detected automatically and printed when running the CLI.
+
 ## Sentence Transformer Model
 
 Many features rely on a [SentenceTransformer](https://www.sbert.net/) model. The model
