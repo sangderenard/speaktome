@@ -1,6 +1,11 @@
+from __future__ import annotations
+
 from abc import ABC, abstractmethod
 from typing import Any, Dict
-import torch
+try:
+    import torch
+except ModuleNotFoundError:  # pragma: no cover - optional dependency
+    torch = None  # type: ignore
 
 class AbstractModelWrapper(ABC):
     @abstractmethod
@@ -13,6 +18,8 @@ class AbstractModelWrapper(ABC):
 
 class PyTorchModelWrapper(AbstractModelWrapper):
     def __init__(self, model: torch.nn.Module):
+        if torch is None:
+            raise RuntimeError("PyTorch is required for this wrapper")
         self.model = model
 
     def forward(self, input_ids: torch.Tensor, attention_mask: torch.Tensor, **kwargs) -> Dict[str, torch.Tensor]:

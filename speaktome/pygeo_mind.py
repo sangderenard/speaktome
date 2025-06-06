@@ -5,6 +5,10 @@ from typing import Dict, List, Tuple, TYPE_CHECKING
 # Third-party imports
 import torch
 
+from . import Faculty
+
+FACULTY_REQUIREMENT = Faculty.PYGEO
+
 from .lazy_loader import lazy_install
 if TYPE_CHECKING:
     from torch_geometric.data import Data as PyGData

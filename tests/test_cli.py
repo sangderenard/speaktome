@@ -1,5 +1,6 @@
 import subprocess
 import sys
+import pytest
 
 from speaktome.cli_permutations import CLIArgumentMatrix
 
@@ -15,6 +16,8 @@ def test_help_message():
 
 
 def test_basic_combinations():
+    if not pytest.importorskip('torch', reason='CLI requires torch for full run'):
+        pytest.skip('torch not available')
     matrix = CLIArgumentMatrix()
     matrix.add_option('--max_steps', [1])
     matrix.add_option('--safe_mode', [None])
