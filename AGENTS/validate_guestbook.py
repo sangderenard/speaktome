@@ -13,16 +13,57 @@ def sanitize(name):
     stem = re.sub(r'_+', '_', stem).strip('_')
     return f'0000-00-00_v0_{stem}.md'
 
-def validate_and_fix():
+def validate_and_fix(interactive: bool = False):
+    """Validate filenames in the guestbook folder.
+
+    Parameters
+    ----------
+    interactive : bool, optional
+        If True, prompt the user before fixing invalid filenames and dump the
+        file contents so the user can decide how to proceed.  When False the
+        function behaves like the old implementation and renames files
+        automatically.
+    """
+
     changed = False
     for fname in os.listdir(REPORTS_DIR):
         if fname == TEMPLATE or not fname.endswith('.md'):
             continue
-        if not PATTERN.fullmatch(fname):
-            new_name = sanitize(fname)
-            os.rename(os.path.join(REPORTS_DIR, fname), os.path.join(REPORTS_DIR, new_name))
-            print(f'Renamed {fname} -> {new_name}')
+        if PATTERN.fullmatch(fname):
+            continue
+
+        src = os.path.join(REPORTS_DIR, fname)
+        new_name = sanitize(fname)
+
+        if interactive:
+            with open(src, 'r', encoding='utf-8') as f:
+                content = f.read()
+            print(f"Invalid filename: {fname}")
+            print("----- file contents begin -----")
+            print(content)
+            print("----- file contents end -----")
+            resp = input(
+                f"Rename to {new_name}? [y]/n/d (dump to AGENTS)/s(skip): "
+            ).strip().lower() or 'y'
+
+            if resp.startswith('d'):
+                dest = os.path.join(os.path.dirname(REPORTS_DIR), new_name)
+                os.rename(src, dest)
+                print(f"Moved {fname} -> {dest}")
+                changed = True
+                continue
+            if resp.startswith('s'):
+                print(f"Skipped {fname}")
+                continue
+            if not resp.startswith('n'):
+                os.rename(src, os.path.join(REPORTS_DIR, new_name))
+                print(f"Renamed {fname} -> {new_name}")
+                changed = True
+        else:
+            os.rename(src, os.path.join(REPORTS_DIR, new_name))
+            print(f"Renamed {fname} -> {new_name}")
             changed = True
+
     return changed
 
 
@@ -50,10 +91,18 @@ def archive_old_reports():
                 print(f'Archived {fname}')
 
 if __name__ == '__main__':
+    import argparse
+
+    parser = argparse.ArgumentParser(description='Validate guestbook reports')
+    parser.add_argument('--interactive', action='store_true',
+                        help='Prompt before renaming or moving files')
+    args = parser.parse_args()
+
     if not os.path.isdir(REPORTS_DIR):
         print('reports directory not found')
         raise SystemExit(1)
-    changed = validate_and_fix()
+
+    changed = validate_and_fix(interactive=args.interactive)
     archive_old_reports()
     files = sorted(os.listdir(REPORTS_DIR))
     print('Current files:')

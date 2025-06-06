@@ -76,6 +76,10 @@ class AbstractTensorOperations(ABC):
         pass
 
     @abstractmethod
+    def stack(self, tensors: List[Any], dim: int = 0) -> Any:
+        pass
+
+    @abstractmethod
     def repeat_interleave(self, tensor: Any, repeats: int, dim: Optional[int] = None) -> Any:
         pass
 
@@ -121,6 +125,19 @@ class AbstractTensorOperations(ABC):
 
     @abstractmethod
     def boolean_mask_select(self, tensor: Any, mask: Any) -> Any:
+        pass
+
+    # --- Dtype helpers ---
+    @property
+    @abstractmethod
+    def long_dtype(self) -> Any:
+        """Return the integer dtype used for indices."""
+        pass
+
+    @property
+    @abstractmethod
+    def bool_dtype(self) -> Any:
+        """Return the boolean dtype."""
         pass
 
 
@@ -174,6 +191,9 @@ class PyTorchTensorOperations(AbstractTensorOperations):
     def topk(self, tensor, k, dim):
         return torch.topk(tensor, k=k, dim=dim)
 
+    def stack(self, tensors, dim=0):
+        return torch.stack(tensors, dim=dim)
+
     def pad(self, tensor, pad, value=0.0):
         return F.pad(tensor, pad, value=value)
 
@@ -215,6 +235,15 @@ class PyTorchTensorOperations(AbstractTensorOperations):
 
     def boolean_mask_select(self, tensor, mask):
         return tensor[mask]
+
+    # Dtype helpers
+    @property
+    def long_dtype(self):
+        return torch.long
+
+    @property
+    def bool_dtype(self):
+        return torch.bool
 
 
 class NumPyTensorOperations(AbstractTensorOperations):
@@ -300,6 +329,9 @@ class NumPyTensorOperations(AbstractTensorOperations):
         values = np.take_along_axis(tensor, indices, axis=dim)
         return values, indices
 
+    def stack(self, tensors, dim=0):
+        return np.stack(tensors, axis=dim)
+
     def pad(self, tensor, pad, value=0.0):
         if len(pad) % 2 != 0:
             raise ValueError("pad must have even length")
@@ -344,4 +376,13 @@ class NumPyTensorOperations(AbstractTensorOperations):
 
     def boolean_mask_select(self, tensor, mask):
         return tensor[mask]
+
+    # Dtype helpers
+    @property
+    def long_dtype(self):
+        return np.int64
+
+    @property
+    def bool_dtype(self):
+        return np.bool_
 

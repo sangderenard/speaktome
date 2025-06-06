@@ -1,12 +1,11 @@
 # Standard library imports
 from __future__ import annotations
-from typing import List, Optional, Tuple, Callable, Dict, Any
+from typing import List, Optional, Tuple, Callable, Dict, Any, TYPE_CHECKING
 import math
+
 # Third-party imports
-try:
+if TYPE_CHECKING:  # pragma: no cover - type hints only
     import torch
-except ModuleNotFoundError:  # pragma: no cover - optional dependency
-    torch = None  # type: ignore
 
 from . import Faculty
 
@@ -23,7 +22,6 @@ from .beam_retirement_manager import BeamRetirementManager
 from .compressed_beam_tree import CompressedBeamTree
 from .tensor_abstraction import (
     AbstractTensorOperations,
-    PyTorchTensorOperations,
 )
 from .model_abstraction import (
     AbstractModelWrapper,
@@ -41,6 +39,7 @@ class BeamSearch:
                  max_candidates_per_lookahead_step: Optional[int] = None # This is lookahead_top_k
     ):
         self.scorer = scorer
+        self.tensor_ops: AbstractTensorOperations = scorer.tensor_ops
         self.max_len = max_len
         self.beam_width = beam_width
         self.gpu_limit = gpu_limit
@@ -51,7 +50,7 @@ class BeamSearch:
 
         # Store initial/default lookahead configurations
         self.current_lookahead_rules: Optional[BeamSearchInstruction] = initial_lookahead_rules
-        self.current_lookahead_aggregate_fn: Optional[Callable[[torch.Tensor], torch.Tensor]] = initial_aggregate_score_fn
+        self.current_lookahead_aggregate_fn: Optional[Callable[[Any], Any]] = initial_aggregate_score_fn
         # This will be used as lookahead_top_k in LookaheadConfig
         self.max_candidates_per_lookahead_step = max_candidates_per_lookahead_step if max_candidates_per_lookahead_step is not None else beam_width 
         
@@ -165,7 +164,11 @@ class BeamSearch:
                 # beams: [1, L], scores: [1, L], lengths: [1]
                 current_beam_tokens = tokens[:length].unsqueeze(0)
                 current_beam_scores = scores[:length].unsqueeze(0)
-                current_beam_length_tensor = torch.tensor([length], device=self.device)
+                current_beam_length_tensor = self.tensor_ops.tensor_from_list(
+                    [length],
+                    dtype=self.tensor_ops.long_dtype,
+                    device=self.device,
+                )
 
                 path_score = self.scorer.default_scorer(beams=current_beam_tokens, scores=current_beam_scores, lengths=current_beam_length_tensor, tokenizer=self.scorer.tokenizer).item()
                 path_text = self.scorer.tokenizer.decode(tokens[:length].tolist(), skip_special_tokens=True)
@@ -191,7 +194,11 @@ class BeamSearch:
             if length > 0:
                 current_beam_tokens = tokens[:length].unsqueeze(0)
                 current_beam_scores = scores[:length].unsqueeze(0)
-                current_beam_length_tensor = torch.tensor([length], device=self.device) # Ensure device consistency
+                current_beam_length_tensor = self.tensor_ops.tensor_from_list(
+                    [length],
+                    dtype=self.tensor_ops.long_dtype,
+                    device=self.device,
+                )  # Ensure device consistency
 
                 path_score = self.scorer.default_scorer(beams=current_beam_tokens, scores=current_beam_scores, lengths=current_beam_length_tensor, tokenizer=self.scorer.tokenizer).item()
                 path_text = self.scorer.tokenizer.decode(tokens[:length].tolist(), skip_special_tokens=True)
@@ -307,10 +314,12 @@ class BeamSearch:
         self.scorer.update_bins(beams, scores, lengths, tokenizer, **kwargs)
 
         bin_names   = list(self.scorer.bins.keys())
-        score_matrix= torch.stack([self.scorer.bins[name]['scores'] for name in bin_names])
-        num_candidates = score_matrix.shape[1]
+        score_matrix = self.tensor_ops.stack(
+            [self.scorer.bins[name]['scores'] for name in bin_names], dim=0
+        )
+        num_candidates = self.tensor_ops.shape(score_matrix)[1]
         k = min(self.gpu_limit, num_candidates)
-        top_scores, top_idx = torch.topk(score_matrix, k=k, dim=1)
+        top_scores, top_idx = self.tensor_ops.topk(score_matrix, k=k, dim=1)
 
         if self.verbose:
             self.scorer.print_bins(tokenizer)
@@ -331,12 +340,14 @@ class BeamSearch:
         # Use current_lookahead_aggregate_fn or a default (e.g., RMS, handled by LookaheadController if None)
         # For LookaheadConfig, aggregate_fn is mandatory. Let's define a default RMS here if not provided.
         agg_fn_for_config = self.current_lookahead_aggregate_fn
-        tensor_ops_instance: AbstractTensorOperations = PyTorchTensorOperations(default_device=self.device)
+        tensor_ops_instance: AbstractTensorOperations = self.tensor_ops
         model_wrapper_instance = PyTorchModelWrapper(model)
         if agg_fn_for_config is None:
-            def default_rms_aggregate_fn(score_matrix: torch.Tensor) -> torch.Tensor:
+            def default_rms_aggregate_fn(score_matrix: Any) -> Any:
                 clamped = tensor_ops_instance.clamp(score_matrix, min_val=-1e9)
-                return tensor_ops_instance.sqrt(tensor_ops_instance.mean(tensor_ops_instance.pow(clamped, 2), dim=0))
+                return tensor_ops_instance.sqrt(
+                    tensor_ops_instance.mean(tensor_ops_instance.pow(clamped, 2), dim=0)
+                )
             agg_fn_for_config = default_rms_aggregate_fn
 
         lookahead_config_obj = LookaheadConfig(
@@ -383,8 +394,10 @@ class BeamSearch:
 
         # Keep track of which “beam_idx” (from the tree) each candidate ultimately came from:
         # This is passed to LookaheadController
-        original_parent_beam_idxs_for_lookahead = torch.tensor(
-            active_leaf_beam_indices, dtype=torch.long, device=self.device
+        original_parent_beam_idxs_for_lookahead = self.tensor_ops.tensor_from_list(
+            active_leaf_beam_indices,
+            dtype=self.tensor_ops.long_dtype,
+            device=self.device,
         )
 
         # Run the lookahead process
@@ -472,7 +485,11 @@ class BeamSearch:
                     bin_counts[b] += 1
             rank_in_bin += 1
 
-        final_idx_tensor = torch.tensor(keep_final, dtype=torch.long, device=self.device)
+        final_idx_tensor = self.tensor_ops.tensor_from_list(
+            keep_final,
+            dtype=self.tensor_ops.long_dtype,
+            device=self.device,
+        )
 
         # ──────────────────────────────────────────────────────────────────────────────────────────
         # 7) “Hard‐cut” vs “Retired” logic exactly as before, but now we call
@@ -507,7 +524,11 @@ class BeamSearch:
             # The “retirement enabled” path: we have to pass *all* M lookahead candidates in,
             # then mask out which ones are “kept” vs “retired.”
             # M_from_lookahead is the total number of candidates from lookahead controller
-            mask_keep = torch.zeros(M_from_lookahead, dtype=torch.bool, device=self.device)
+            mask_keep = self.tensor_ops.zeros(
+                (M_from_lookahead,),
+                dtype=self.tensor_ops.bool_dtype,
+                device=self.device,
+            )
             if final_idx_tensor.numel() > 0:
                 mask_keep[final_idx_tensor] = True
 
