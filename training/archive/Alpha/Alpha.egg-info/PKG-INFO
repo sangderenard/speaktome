@@ -1,0 +1,12 @@
+Metadata-Version: 2.1
+Name: Alpha
+Version: 1.0.1
+Summary: A simulation and monitoring program.
+Author: default uuid
+Requires-Python: >=3.8
+License-File: LICENSE
+Requires-Dist: pybullet
+Requires-Dist: pygame
+Requires-Dist: torch
+Requires-Dist: torch-geometric
+Requires-Dist: pymunk

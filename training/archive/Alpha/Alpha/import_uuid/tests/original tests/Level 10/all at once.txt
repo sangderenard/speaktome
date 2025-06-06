@@ -1,0 +1,70 @@
+Table of Contents:
+ThreadManager (Line 31): ThreadManager serves as the central authority for managing t...
+PhysicalObject (Line 192): PhysicalObject is the cornerstone of our simulation framewor...
+CornerstoneShell (Line 396): CornerstoneShell is a specialized subclass of PhysicalObject...
+BuildLaplace (Line 578): Initialize BuildLaplace with required parameters and customi...
+TransformHub (Line 1291): Compute coordinates, partials, normals, and metric tensor in...
+PeriodicLinspace (Line 1578): A class for periodic linspace generation with customizable b...
+GridDomain (Line 1617): Initializes the GridDomain object from the provided U and V ...
+Transform (Line 1946): Transform coordinates using either spatial or metric transfo...
+PolarTransform (Line 2091): 
+ToroidalTransform (Line 2120): 
+SphericalTransform (Line 2154): 
+RectangularTransform (Line 2186): 
+EllipticalTransform (Line 2208): 
+HyperbolicTransform (Line 2236): 
+ParabolicTransform (Line 2260): 
+TemperatureSimulation (Line 2288): Initializes the temperature simulation.Args:Lx (float): Leng...
+WASDForceController (Line 2513): Initialize the WASD force controller.:param body: The Pymunk...
+SceneIntegratorConfigurator (Line 2572): Configure the integrator dynamically based on the integrator...
+SpheroidCameraManager (Line 2633): Initialize the Spheroid Camera Manager with an inner unit sp...
+VertexBufferManager (Line 2951): Initialize the VertexBufferManager with an optional initial ...
+PymunkVertexExtractor (Line 3035): Get the current position and angle of the Pymunk body.:retur...
+
+Appendix:
+
+Lone Functions:
+
+Imports:
+import torch (Line 1)
+import numpy as np (Line 2)
+from scipy.sparse import coo_matrix (Line 3)
+import math (Line 4)
+from typing import Dict, Any, List (Line 6)
+import logging (Line 7)
+import torch (Line 8)
+import pybullet_data (Line 9)
+import pybullet as p (Line 10)
+from torch_geometric.data import Data (Line 11)
+from typing import Dict, Any, List (Line 13)
+import logging (Line 14)
+import torch (Line 15)
+from torch_geometric.data import Data (Line 16)
+import uuid (Line 17)
+import threading (Line 18)
+from collections import deque (Line 19)
+from typing import Dict, Any, List (Line 20)
+import torch (Line 21)
+import logging (Line 22)
+from torch_geometric.data import Data (Line 23)
+import pybullet as p (Line 24)
+import pybullet_data (Line 25)
+import numpy as np (Line 26)
+import torch (Line 1289)
+import random (Line 1290)
+import torch (Line 1575)
+import numpy as np (Line 1576)
+import torch (Line 1614)
+import numpy as np (Line 1615)
+import torch (Line 2089)
+import torch (Line 2284)
+import numpy as np (Line 2285)
+import imageio (Line 2286)
+import mitsuba as mi (Line 2504)
+import numpy as np (Line 2505)
+import pygame (Line 2506)
+import io (Line 2509)
+import pymunk (Line 2510)
+import numpy as np (Line 2511)
+import torch (Line 2512)
+from fs.memoryfs import MemoryFS (Line 2632)

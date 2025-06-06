@@ -1,0 +1,39 @@
+name: "Filesystem Engine"
+description: |
+  A tensor field representation of the filesystem state. 
+  Each file or directory is represented as a vector of float values, 
+  embedding its state while supporting lazy and immediate loading strategies.
+
+parameters:
+  lazy_load: true             # Whether tensor values are loaded lazily
+  default_depth: 1            # Default filesystem depth to load
+
+engine:
+  operator: "filesystem_operator"  # Reference to the logic in filesystem_operator.py
+  function: "standard_node"        # Operates on individual file/directory nodes
+  mode: "tensor"                   # Defines this as a tensor field
+
+fields:
+  - name: "inode_id"
+    description: "Unique identifier for each file or directory node."
+    load: immediate                # Load immediately for graph structure
+  
+  - name: "file_size"
+    description: "File size in bytes (0 for folders)."
+    load: lazy
+
+  - name: "access_time"
+    description: "Last access time as float timestamp."
+    load: lazy
+  
+  - name: "modification_time"
+    description: "Last modification time as float timestamp."
+    load: lazy
+
+  - name: "depth"
+    description: "Hierarchy depth of the file or folder relative to the root."
+    load: immediate
+
+  - name: "type_id"
+    description: "Numerical type encoding (0: Folder, 1: Field, 2: Operator, etc.)."
+    load: immediate

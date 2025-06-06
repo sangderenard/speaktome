@@ -1,0 +1,16 @@
+name: "Redshift Doppler Engine"
+description: |
+  Computes relativistic redshift and blueshift of light waves caused by motion. 
+  Supports the calculation of observed frequency shifts due to relative velocities 
+  between sources and observers, incorporating Lorentz relativistic corrections.
+parameters:
+  base_frequency: 1.0e14           # Default light frequency in Hz (e.g., visible light ~ 10^14 Hz)
+  relative_velocity: 0.0           # Relative velocity (v) between source and observer in m/s
+  speed_of_light: 3.0e8            # Speed of light constant (c) in m/s
+  motion_direction: "approach"     # "approach" (blueshift) or "recede" (redshift)
+engine:
+  operator: "redshift_doppler_operator"  # Reference to the associated operator
+  function: "standard_edge"              # Standard edge-based operator
+  mode: "scalar"                         # Scalar field computation
+  inputs:
+    - "velocity"

@@ -1,0 +1,2 @@
+[console_scripts]
+alpha = Alpha.main:main

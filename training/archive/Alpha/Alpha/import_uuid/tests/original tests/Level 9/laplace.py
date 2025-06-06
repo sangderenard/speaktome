@@ -1,0 +1,1964 @@
+import torch
+import numpy as np
+from scipy.sparse import coo_matrix
+import math
+
+class BuildLaplace:
+    def __init__(self, grid_domain, wave_speed=343, precision=torch.float64, resolution=68,
+                 metric_tensor_func=None, density_func=None, tension_func=None, 
+                 singularity_conditions=None, singularity_dirichlet_func=None, singularity_neumann_func=None, 
+                 boundary_conditions=('dirichlet', 'dirichlet', 'dirichlet', 'dirichlet'), 
+                 artificial_stability=0):
+        """
+        Initialize BuildLaplace with required parameters and customization functions.
+        
+        Args:
+            grid_domain: Object that handles the grid transformations (u, v) -> (x, y).
+            wave_speed: Speed of wave propagation, used to compute local wave numbers.
+            precision: Torch precision type for tensor creation (default: torch.float32).
+            self.resolution: Maximum resolution for dense tensor calculations (default: 128).
+            metric_tensor_func: Function to compute the metric tensor (default: None for Euclidean space).
+            density_func: Function or tensor defining the density over the grid (default: None, assumes 1.0 everywhere).
+            tension_func: Function or tensor defining the tension over the grid (default: None, assumes 1.0 everywhere).
+            singularity_conditions: Conditions at singularities (default: None, assumes no singularities).
+            singularity_dirichlet_func: Function to compute Dirichlet boundary values at singularities (default: None).
+            singularity_neumann_func: Function to compute Neumann boundary values at singularities (default: None).
+            boundary_conditions: Tuple specifying boundary conditions for u and v axes (default: ('dirichlet', 'dirichlet', 'dirichlet', 'dirichlet')).
+            artificial_stability: Small stability term added to metrics (default: 0).
+        """
+        self.grid_domain = grid_domain
+        self.wave_speed = wave_speed
+        self.precision = precision
+        self.resolution = resolution
+        self.metric_tensor_func = metric_tensor_func
+        self.density_func = density_func
+        self.tension_func = tension_func
+        self.singularity_conditions = singularity_conditions
+        self.singularity_dirichlet_func = singularity_dirichlet_func
+        self.singularity_neumann_func = singularity_neumann_func
+        self.boundary_conditions = boundary_conditions
+        self.artificial_stability = artificial_stability
+
+    def build_general_laplace(self, grid_u, grid_v, boundary_conditions=None, singularity_conditions=None, 
+                              singularity_dirichlet_func=None, singularity_neumann_func=None, k=0.0, 
+                              metric_tensor_func=None, density_func=None, tension_func=None, 
+                              device=None, grid_boundaries=(True, True, True, True), artificial_stability=None, f=0):
+        """
+        Builds the Laplacian matrix for a general coordinate system using the provided u and v grids.
+        Handles singularities using custom Dirichlet/Neumann conditions.
+        
+        Args:
+            grid_u: Tensor for the grid in the u direction (non-linear allowed).
+            grid_v: Tensor for the grid in the v direction (non-linear allowed).
+            boundary_conditions: A tuple specifying boundary conditions for u and v axes.
+            singularity_conditions: Either 'dirichlet', 'neumann', or a boolean matrix of the same shape as the grid.
+            singularity_dirichlet_func: Function to compute custom Dirichlet values at singularities.
+            singularity_neumann_func: Function to compute custom Neumann values at singularities.
+            metric_tensor_func: Function to compute the metric tensor (optional, overrides class-level function).
+            density_func: Function or tensor defining the density over the grid (optional, overrides class-level function).
+            tension_func: Function or tensor defining the tension over the grid (optional, overrides class-level function).
+            artificial_stability: Small stability term added to metrics (optional, overrides class-level value).
+            device: The device where the tensor will be created.
+            f: Frequency for calculating local wave numbers (default: 0).
+        
+        Returns:
+            laplacian_tensor: Tensor containing the Laplacian matrix.
+        """
+
+
+        # Conditional reassignments, use method parameters if provided, otherwise use class attributes
+        boundary_conditions = boundary_conditions if boundary_conditions is not None else self.boundary_conditions
+        singularity_conditions = singularity_conditions if singularity_conditions is not None else self.singularity_conditions
+        singularity_dirichlet_func = singularity_dirichlet_func if singularity_dirichlet_func is not None else self.singularity_dirichlet_func
+        singularity_neumann_func = singularity_neumann_func if singularity_neumann_func is not None else self.singularity_neumann_func
+        metric_tensor_func = metric_tensor_func if metric_tensor_func is not None else self.metric_tensor_func
+        density_func = density_func if density_func is not None else self.density_func
+        tension_func = tension_func if tension_func is not None else self.tension_func
+        artificial_stability = artificial_stability if artificial_stability is not None else self.artificial_stability
+
+
+        def default_metric_tensor(u, v, dxdu, dydu, dxdv, dydv):
+            """
+            Default metric tensor for a flat Euclidean space.
+            Args:
+                u, v: Grid coordinates.
+                dxdu, dydu, dxdv, dydv: Partial derivatives, which are not used here for the default metric.
+            Returns:
+                g_ij: A 2x2 matrix representing the metric tensor.
+            """
+            g_uu = 1.0  # Scaling in the u direction
+            g_vv = 1.0  # Scaling in the v direction
+            g_uv = 0.0  # No cross-term between u and v
+            return [[g_uu, g_uv], [g_uv, g_vv]]
+        
+        if metric_tensor_func is None:
+            metric_tensor_func = default_metric_tensor
+
+
+        kept_u_beginning, kept_u_end, kept_v_beginning, kept_v_end = grid_boundaries
+
+        # Apply the transformation function to the grid
+        X, Y = self.grid_domain.transform.transform(grid_u, grid_v)[:2]  # Transform to physical space
+        self.grid_u = grid_u
+        self.grid_v = grid_v
+        N_u = grid_u.shape[0]
+        N_v = grid_v.shape[1]
+
+        dXdu, dYdu, dXdv, dYdv, dZdu, dZdv = self.grid_domain.transform.get_or_compute_partials(grid_u, grid_v)
+
+        unique_u_values = grid_u[:, 0]
+        unique_v_values = grid_v[0,:]
+        final_u_row = wrap_u_row = None
+        final_v_row = wrap_v_row = None
+        # Handle the u-direction (dim=0, radial or x-direction)
+        if boundary_conditions[0] == 'periodic' or boundary_conditions[1] == 'periodic':
+            sum_du = torch.sum(unique_u_values[1:] - unique_u_values[:-1])
+            final_du = (2 * np.pi) - sum_du
+            final_u_value = unique_u_values[-1]
+            final_u_row = torch.full_like(unique_v_values, final_u_value.item())
+            wrap_u_row = torch.full_like(unique_v_values, unique_u_values[0].item())
+
+            # Calculate final dx and dy using the transform function
+            final_X, final_Y = self.grid_domain.transform.transform_metric(final_u_row, unique_v_values)[:2]
+            wrap_X, wrap_Y = self.grid_domain.transform.transform_metric(wrap_u_row, unique_v_values)[:2]
+
+            # Calculate the final differential in x and y directions
+            final_dXdu = (wrap_X - final_X)
+            final_dYdu = (wrap_Y - final_Y)
+
+            #print(f"final x: {final_X}, final_y: {final_Y}, wrap_x: {wrap_X}, wrap_y: {wrap_Y} finaldXdu: {final_dXdu} finaldYdu: {final_dYdu} dXdu: {dXdu}, dYdu: {dYdu}")
+            #print(f"final x: {final_X.shape}, final_y: {final_Y.shape}, wrap_x: {wrap_X.shape}, wrap_y: {wrap_Y.shape} finaldXdu: {final_dXdu.shape} finaldYdu: {final_dYdu.shape}, dXdu: {dXdu.shape}, dYdu: {dYdu.shape}")
+
+            # Append this final differential to dXdu and dYdu
+            # Apply unsqueeze(0) only if the tensors are missing the required first dimension
+            if final_dXdu.dim() == 1:
+                final_dXdu = final_dXdu.unsqueeze(0)
+            if final_dYdu.dim() == 1:
+                final_dYdu = final_dYdu.unsqueeze(0)
+
+            dXdu = torch.cat([dXdu, final_dXdu], dim=0)
+            dYdu = torch.cat([dYdu, final_dYdu], dim=0)
+        else:
+            # For non-periodic u-direction, repeat the last infinitesimal
+            final_dXdu = dXdu[-1:, :].clone()
+            final_dYdu = dYdu[-1:, :].clone()
+            dXdu = torch.cat([dXdu, final_dXdu], dim=0)
+            dYdu = torch.cat([dYdu, final_dYdu], dim=0)
+
+        # Handle the v-direction (dim=1, angular or y-direction)
+        if boundary_conditions[2] == 'periodic' or boundary_conditions[3] == 'periodic':
+            sum_dv = torch.sum(unique_v_values[1:] - unique_v_values[:-1])
+            final_dv = (2 * np.pi) - sum_dv
+            final_v_value = unique_v_values[-1]  # Compute final v-value for wrap-around
+            final_v_row = torch.full_like(unique_u_values, final_v_value.item())  # Create a column with the final v-value
+            wrap_v_row = torch.full_like(unique_u_values, unique_v_values[0].item())
+
+            # Calculate final dx and dy using the transform function
+            final_X, final_Y = self.grid_domain.transform.transform_metric(unique_u_values, final_v_row)[:2]
+            wrap_X, wrap_Y = self.grid_domain.transform.transform_metric(unique_u_values, wrap_v_row)[:2]
+
+            # Calculate the final differential in x and y directions
+            final_dXdv = (wrap_X - final_X)
+            final_dYdv = (wrap_Y - final_Y)
+
+
+            # Apply unsqueeze(0) only if the tensors are missing the required first dimension
+            if final_dXdv.dim() == 1:
+                final_dXdv = final_dXdv.unsqueeze(1)
+            if final_dYdv.dim() == 1:
+                final_dYdv = final_dYdv.unsqueeze(1)
+
+            # Append this final differential to dXdv and dYdv
+            dXdv = torch.cat([dXdv, final_dXdv], dim=1)
+            dYdv = torch.cat([dYdv, final_dYdv], dim=1)
+        else:
+            # For non-periodic v-direction, repeat the last infinitesimal
+            final_dXdv = dXdv[:, -1:]
+            final_dYdv = dYdv[:, -1:]
+            dXdv = torch.cat([dXdv, final_dXdv], dim=1)
+            dYdv = torch.cat([dYdv, final_dYdv], dim=1)
+
+        
+        # Prepare for sparse matrix construction
+        row_indices = []
+        col_indices = []
+        values = []
+        diagonal_entries = {}
+
+        # Precompute the metric tensor (g_ij), its inverse (g_inv), and the determinant (det_g) for the entire grid
+        if metric_tensor_func is not None:
+            # Apply the metric tensor function to the entire grid
+            g_ij, g_inv, det_g = metric_tensor_func(grid_u, grid_v)
+            
+            # Optional: Move these to CPU if you want to access them on the CPU, though it is generally more efficient to keep them on the GPU if working with torch tensors
+            g_ij = g_ij.clone().detach().cpu().numpy()  # Shape: (N_u, N_v, 2, 2)
+            g_inv = g_inv.clone().detach().cpu().numpy()  # Shape: (N_u, N_v, 2, 2)
+            det_g_all = det_g.clone().detach().cpu().numpy()  # Shape: (N_u, N_v)
+
+
+        # Loop through the grid points and compute the Laplacian based on the transformed metrics
+        for i in range(N_u):
+            for j in range(N_v):
+                idx = i * N_v + j
+                diagonal_entries[idx] = diagonal_entries.get(idx, 0)
+
+                dxdu = dydu = dxdv = dydv = 0
+                
+                # For the u-direction (i index)
+                if boundary_conditions[0] == 'periodic':
+                    
+                    dxdu = dXdu[(i - 1) % (N_u), j]
+                    dydu = dYdu[(i - 1) % (N_u), j] 
+                else:
+                    dxdu = dXdu[max(i - 1, 0), j]
+                    dydu = dYdu[max(i - 1, 0), j]
+
+                # For the v-direction (j index)
+                if boundary_conditions[2] == 'periodic':
+                    dxdv = dXdv[i, (j - 1) % (N_v)]
+                    dydv = dYdv[i, (j - 1) % (N_v)]
+                else:
+                    dxdv = dXdv[i, max(j - 1, 0)]
+                    dydv = dYdv[i, max(j - 1, 0)]
+
+
+                u = grid_u[i]
+                v = grid_v[j]
+
+                if metric_tensor_func is not None:
+
+
+
+
+                    #######################################################
+                    #                                                     #
+                    #                    In Memoriam                      #
+                    #                                                     #
+                    #      A faithful friend, a gentle soul,              #
+                    #      Protector and companion, strong and true,      #
+                    #      His watch has ended, yet his spirit remains.   #
+                    #                                                     #
+                    #      He was a watchful guardian,                    #
+                    #      A quiet protector,                             #
+                    #      Who now takes his eternal rest.                #
+                    #                                                     #
+                    #                                                     #
+                    #                        ,     ,                      #
+                    #                        |\---/|                      #
+                    #                       /  , , |                      #
+                    #                  __.-'|  / \ /                      #
+                    #         __ ___.-'        ._O|                       #
+                    #      .-'  '        :      _/                        #
+                    #     / ,    .        .     |                         #
+                    #    :  ;    :        :   _/                          #
+                    #    |  |   .'     __:   /                            #
+                    #    |  :   /'----'| \  |                             #
+                    #    \  |\  |      | /| |                             #
+                    #     '.'| /       || \ |                             #
+                    #     | /|.'       '.l \\_                            #
+                    #     || ||             '-'                           #
+                    #     '-''-'                                          #
+                    #                                                     #
+                    #   ------------------------------------------------  #
+                    #                                                     #
+                    #   I will always love you, Ziggy                     #
+                    #                                                     #
+                    #######################################################
+
+
+
+
+
+                    # Index the precomputed metric tensor components
+                    g_uu = g_ij[i, j, 0, 0]  # g_ij[0, 0] is g_uu
+                    g_uv = g_ij[i, j, 0, 1]  # g_ij[0, 1] is g_uv
+                    g_vu = g_ij[i, j, 1, 0]  # g_ij[1, 0] is g_vu
+                    g_vv = g_ij[i, j, 1, 1]  # g_ij[1, 1] is g_vv
+                    det_g = det_g_all[i, j]      # Determinant of the metric tensor
+
+                    # You can also access the inverse metric if needed
+                    inv_g_uu = g_inv[i, j, 0, 0]
+                    inv_g_vv = g_inv[i, j, 1, 1]
+                    inv_g_uv = g_inv[i, j, 0, 1]
+                else:
+                    # Default metric tensor calculation using partial derivatives
+                    g_uu = dxdu**2 + dydu**2
+                    g_vv = dxdv**2 + dydv**2
+                    g_uv = dxdu * dxdv + dydu * dydv
+                    det_g = g_uu * g_vv - g_uv * g_uv  # For default case, assuming g_uv == g_vu
+
+                    inv_g_uu = g_vv / det_g
+                    inv_g_vv = g_uu / det_g
+                    inv_g_uv = -g_uv / det_g
+
+                # Metric terms for u and v directions
+                metric_u = inv_g_uu + 1e-10 * artificial_stability
+                metric_v = inv_g_vv + 1e-10 * artificial_stability
+
+                # Handle singularities based on the singularity_conditions
+                if metric_u == 0 or metric_v == 0:
+                    if isinstance(singularity_conditions, str):
+                        if singularity_conditions == "dirichlet":
+                            if singularity_dirichlet_func:
+                                diagonal_entries[idx] = singularity_dirichlet_func(i, j)
+                            else:
+                                diagonal_entries[idx] = 1.0  # Default Dirichlet value
+                        elif singularity_conditions == "neumann":
+                            if singularity_neumann_func:
+                                diagonal_entries[idx] = singularity_neumann_func(i, j)
+                            else:
+                                diagonal_entries[idx] = 0.0  # Default Neumann value (symmetric condition)
+                    elif isinstance(singularity_conditions, torch.Tensor):
+                        if singularity_conditions[i, j]:  # True means Dirichlet, False means Neumann
+                            if singularity_dirichlet_func:
+                                diagonal_entries[idx] = singularity_dirichlet_func(i, j)
+                            else:
+                                diagonal_entries[idx] = 1.0
+                        else:
+                            if singularity_neumann_func:
+                                diagonal_entries[idx] = singularity_neumann_func(i, j)
+                            else:
+                                diagonal_entries[idx] = 0.0
+                    continue
+                
+                # Incorporate tension and density if provided
+                if density_func:
+                    density = density_func(i, j) if callable(density_func) else density_func[i, j]
+                else:
+                    density = 1.0  # Default density
+
+                if tension_func:
+                    tension = tension_func(i, j) if callable(tension_func) else tension_func[i, j]
+                else:
+                    tension = 1.0  # Default tension
+
+                # Check for NaN or Inf values in metrics
+                if math.isnan(metric_u):
+                    print(f"NaN found in metric_u at indices i={i}, j={j}")
+                if math.isinf(metric_u):
+                    print(f"Inf found in metric_u at indices i={i}, j={j}")
+                if math.isnan(metric_v):
+                    print(f"NaN found in metric_v at indices i={i}, j={j}")
+                if math.isinf(metric_v):
+                    print(f"Inf found in metric_v at indices i={i}, j={j}")
+                
+                if (i > 0 or not kept_u_beginning) and (i < N_u - 1 or not kept_u_end) and (j > 0 or not kept_v_beginning) and (j < N_v - 1 or not kept_v_end):
+                    laplacian_diag = 2.0 * tension * (1.0 / metric_u + 1.0 / metric_v) / density
+                    if laplacian_diag == 0:
+                        print(f"Zero value for diagonal at {i}, {j}")
+                    if math.isnan(laplacian_diag) or math.isinf(laplacian_diag):
+                        print(f"NaN or Inf found in laplacian_diag at indices i={i}, j={j}")
+                    diagonal_entries[idx] += laplacian_diag
+
+                # Calculate neighbors' indices
+                i_prev = (i - 1) % N_u
+                i_next = (i + 1) % N_u
+                j_prev = (j - 1) % N_v
+                j_next = (j + 1) % N_v
+
+                laplacian_off_diag_u = -inv_g_uu / metric_u
+                laplacian_off_diag_v = -inv_g_vv / metric_u
+                laplacian_cross_uv = -2 * inv_g_uv / det_g
+                
+
+                # Apply boundary conditions for u axis
+                if i == 0 and kept_u_beginning and not ( j == 0 and boundary_conditions[2] == 'periodic' and boundary_conditions[0] == 'periodic'):
+                    if boundary_conditions[0] == "dirichlet":
+                        diagonal_entries[idx] = 1.0
+                    elif boundary_conditions[0] == "neumann":
+                        diagonal_entries[idx] += -1.0 / metric_u
+                        row_indices.append(idx)
+                        col_indices.append((i + 1) * N_v + j)
+                        values.append(1.0 / metric_u)
+                    elif boundary_conditions[0] == "periodic":
+                        diagonal_entries[idx] += 1.0 / metric_u
+                        row_indices.append(idx)
+                        col_indices.append(i_next * N_v + j)
+                        values.append(laplacian_off_diag_u)
+                        row_indices.append(idx)
+                        col_indices.append(i_prev * N_v + j)
+                        values.append(laplacian_off_diag_u)
+                elif i == N_u - 1 and kept_u_end and not ( j == N_v - 1 and boundary_conditions[3] == 'periodic' and boundary_conditions[1] == 'periodic'):
+                    if boundary_conditions[1] == "dirichlet":
+                        diagonal_entries[idx] = 1.0
+                    elif boundary_conditions[1] == "neumann":
+                        diagonal_entries[idx] += -1.0 / metric_u
+                        row_indices.append(idx)
+                        col_indices.append((i - 1) * N_v + j)
+                        values.append(1.0 / metric_u)
+                    elif boundary_conditions[1] == "periodic":
+                        diagonal_entries[idx] += 1.0 / metric_u
+                        row_indices.append(idx)
+                        col_indices.append(i_next * N_v + j)
+                        values.append(laplacian_off_diag_u)
+                        row_indices.append(idx)
+                        col_indices.append(i_prev * N_v + j)
+                        values.append(laplacian_off_diag_u)
+
+                # Apply boundary conditions for v axis
+                if j == 0 and kept_v_beginning and not ( i == 0 and boundary_conditions[0] == 'periodic' and boundary_conditions[2] == 'periodic'):
+                    if boundary_conditions[2] == "dirichlet":
+                        diagonal_entries[idx] = 1.0
+                    elif boundary_conditions[2] == "neumann":
+                        diagonal_entries[idx] += -1.0 / metric_v
+                        row_indices.append(idx)
+                        col_indices.append(i * N_v + j_next)
+                        values.append(1.0 / metric_v)
+                    elif boundary_conditions[2] == "periodic":
+                        diagonal_entries[idx] += 1.0 / metric_v
+                        row_indices.append(idx)
+                        col_indices.append(i * N_v + j_next)
+                        values.append(laplacian_off_diag_v)
+                        row_indices.append(idx)
+                        col_indices.append(i * N_v + j_prev)
+                        values.append(laplacian_off_diag_v)
+                elif j == N_v - 1 and kept_v_end and not ( i == N_u - 1 and boundary_conditions[1] == 'periodic' and boundary_conditions[3] == 'periodic'):
+                    if boundary_conditions[3] == "dirichlet":
+                        diagonal_entries[idx] = 1.0
+                    elif boundary_conditions[3] == "neumann":
+                        diagonal_entries[idx] += -1.0 / metric_v
+                        row_indices.append(idx)
+                        col_indices.append(i * N_v + j_prev)
+                        values.append(1.0 / metric_v)
+                    elif boundary_conditions[3] == "periodic":
+                        diagonal_entries[idx] += 1.0 / metric_v
+                        row_indices.append(idx)
+                        col_indices.append(i * N_v + j_next)
+                        values.append(laplacian_off_diag_v)
+                        row_indices.append(idx)
+                        col_indices.append(i * N_v + j_prev)
+                        values.append(laplacian_off_diag_v)
+
+                # Internal connections based on transformed metric
+                if i > 0 or not kept_u_beginning:
+                    up_value = laplacian_off_diag_u
+                    if math.isnan(up_value) or math.isinf(up_value):
+                        print(f"NaN or Inf found in up_value at indices i={i}, j={j}")
+                    if boundary_conditions[0] == 'periodic' and i == 0:  # Wrap around if at the beginning and periodic
+                        up_idx = (N_u - 1) * N_v + j
+                    else:
+                        up_idx = idx - N_v
+                    row_indices.append(idx)
+                    col_indices.append(up_idx)
+                    values.append(up_value)
+
+                if i < N_u - 1 or not kept_u_end:
+                    down_value = laplacian_off_diag_u
+                    if math.isnan(down_value) or math.isinf(down_value):
+                        print(f"NaN or Inf found in down_value at indices i={i}, j={j}")
+                    if boundary_conditions[1] == 'periodic' and i == N_u - 1:  # Wrap around if at the end and periodic
+                        down_idx = j
+                    else:
+                        down_idx = idx + N_v
+                    row_indices.append(idx)
+                    col_indices.append(down_idx)
+                    values.append(down_value)
+
+                if j > 0 or not kept_v_beginning:
+                    left_value = laplacian_off_diag_v
+                    if math.isnan(left_value):
+                        print(f"NaN found in left_value at indices i={i}, j={j}")
+                    if math.isinf(left_value):
+                        print(f"Inf found in left_value at indices i={i}, j={j}")
+                    if boundary_conditions[2] == 'periodic' and j == 0:  # Wrap around if at the beginning and periodic
+                        left_idx = i * N_v + (N_v - 1)
+                    else:
+                        left_idx = idx - 1
+                    row_indices.append(idx)
+                    col_indices.append(left_idx)
+                    values.append(left_value)
+
+                if j < N_v - 1 or not kept_v_end:
+                    right_value = laplacian_off_diag_v
+                    if math.isnan(right_value):
+                        print(f"NaN found in right_value at indices i={i}, j={j}")
+                    if math.isinf(right_value):
+                        print(f"Inf found in right_value at indices i={i}, j={j}")
+                    if boundary_conditions[3] == 'periodic' and j == N_v - 1:  # Wrap around if at the end and periodic
+                        right_idx = i * N_v
+                    else:
+                        right_idx = idx + 1
+                    row_indices.append(idx)
+                    col_indices.append(right_idx)
+                    values.append(right_value)
+                
+    
+                # Add mixed derivative terms using inv_g_uv for cross u-v terms
+                if inv_g_uv != 0:
+                    # Mixed terms between neighboring points in u and v directions
+                    if i < N_u - 1 and j < N_v - 1:
+                        row_indices.append(idx)
+                        col_indices.append(i_next * N_v + j_prev)
+                        values.append(laplacian_cross_uv)
+                        row_indices.append(idx)
+                        col_indices.append(i_prev * N_v + j_next)
+                        values.append(laplacian_cross_uv)
+
+                # Calculate the local wave number k
+                local_wave_speed = self.wave_speed * math.sqrt(tension / density)
+                local_k = (2 * torch.pi * f) / local_wave_speed
+                # Handle lost corners where both beginnings or both endings are not kept
+                # First corner: top-left corner (i = 0, j = 0)
+                if i == 0 and j == 0 and boundary_conditions[0] == 'periodic' and boundary_conditions[2] == 'periodic':
+                    # Wrap first corner to last (bottom-right corner)
+                    corner_idx = 0  # (i = 0, j = 0)
+                    corner_wrap_idx = (N_u - 1) * N_v + (N_v - 1)  # (i = N_u - 1, j = N_v - 1)
+                    
+                    # Add the off-diagonal connection (corner wrap) using the new metric values
+                    corner_off_diag_value = -(
+                        inv_g_uu / metric_u + inv_g_vv / metric_v + 2 * inv_g_uv / np.sqrt(det_g)
+                    )
+                    row_indices.append(corner_idx)
+                    col_indices.append(corner_wrap_idx)
+                    values.append(corner_off_diag_value)
+
+                    # Set the diagonal value for the corner using the new metric values
+                    corner_diag_value = 2.0 * (
+                        inv_g_uu / metric_u + inv_g_vv / metric_v + 2 * inv_g_uv / np.sqrt(det_g)
+                    )
+                    diagonal_entries[corner_idx] += corner_diag_value
+
+                # Second corner: bottom-right corner (i = N_u - 1, j = N_v - 1)
+                elif i == N_u - 1 and j == N_v - 1 and boundary_conditions[1] == 'periodic' and boundary_conditions[3] == 'periodic':
+                    # Wrap last corner to first (top-left corner)
+                    corner_idx = (N_u - 1) * N_v + (N_v - 1)  # (i = N_u - 1, j = N_v - 1)
+                    corner_wrap_idx = 0  # (i = 0, j = 0)
+
+                    # Add the off-diagonal connection (corner wrap) using the new metric values
+                    corner_off_diag_value = -(
+                        inv_g_uu / metric_u + inv_g_vv / metric_v + 2 * inv_g_uv / np.sqrt(det_g)
+                    )
+                    row_indices.append(corner_idx)
+                    col_indices.append(corner_wrap_idx)
+                    values.append(corner_off_diag_value)
+
+                    # Set the diagonal value for the corner using the new metric values
+                    corner_diag_value = 2.0 * (
+                        inv_g_uu / metric_u + inv_g_vv / metric_v + 2 * inv_g_uv / np.sqrt(det_g)
+                    )
+                    diagonal_entries[corner_idx] += corner_diag_value
+
+
+                # Apply the local k^2 term to the diagonal entry
+                diagonal_entries[idx] += -local_k**2
+
+                if diagonal_entries[idx] == 0:
+                    print(f"zero diagonal at idx: {idx}, metric_u:{metric_u}, metric_v:{metric_v}")
+                    exit()
+
+        # Normalize off-diagonal entries by dividing by diagonal elements
+        for idx, i in enumerate(row_indices):
+            diagonal = diagonal_entries[i]
+            if math.isnan(diagonal) or math.isinf(diagonal):
+                print(f"NaN or Inf found in diagonal entry at index i={i}")
+            if diagonal == 0:
+                print(f"zero diagonal value at i={idx}")
+            else:
+                values[idx] /= diagonal
+                diagonal_entries[i] = 1
+
+        # Add diagonal entries
+        for row, diagonal in diagonal_entries.items():
+            if math.isnan(diagonal) or math.isinf(diagonal):
+                print(f"NaN or Inf found in diagonal entry for row {row}")
+            row_indices.append(row)
+            col_indices.append(row)
+            values.append(1.0)
+
+        # Convert indices and values to tensors
+        row_indices = torch.tensor(row_indices, dtype=torch.long).t()
+        col_indices = torch.tensor(col_indices, dtype=torch.long).t()
+        values = torch.tensor(values, dtype=torch.float32)
+
+        # Build the sparse Laplacian matrix
+        laplacian = coo_matrix(
+            (values.cpu().numpy(), (row_indices.cpu().numpy(), col_indices.cpu().numpy())),
+            shape=(N_u * N_v, N_u * N_v)
+        )
+        # Convert to dense tensor and move to specified device
+        perturbation_mode = False  # Enable perturbation
+        perturbation_seed = 42    # Use a fixed seed for reproducibility, or None for random
+        perturbation_scale = 1e-3  # Small scale for the noise perturbation
+
+        if self.resolution <= 128:
+            laplacian_dense = laplacian.toarray()
+            laplacian_tensor = torch.tensor(laplacian_dense, device=device, dtype=self.precision)
+
+            # Dense perturbation
+            if perturbation_mode:
+                if perturbation_seed is not None:
+                    torch.manual_seed(perturbation_seed)  # Set seed for deterministic behavior
+                # Apply Gaussian noise to dense matrix
+                noise_dense = torch.randn(laplacian_tensor.shape, dtype=self.precision, device=device) * perturbation_scale
+                laplacian_tensor += noise_dense  # Add noise to the dense Laplacian
+
+            # Validate perturbed dense Laplace tensor
+            self.validate_laplace_tensor(laplacian_tensor)
+
+        else:
+            laplacian_tensor = None
+        # Sparse perturbation (always applied independently)
+        # Sparse perturbation (always applied independently)
+        if perturbation_mode:
+            if perturbation_seed is not None:
+                np.random.seed(perturbation_seed)  # Use numpy's random seed for reproducibility
+
+            # Generate noise for the non-zero elements in numpy format
+            noise_sparse = np.random.randn(laplacian.data.shape[0]) * perturbation_scale
+
+            # Apply the noise by creating a new COO matrix with perturbed data
+            laplacian = coo_matrix((laplacian.data + noise_sparse, (laplacian.row, laplacian.col)), 
+                                   shape=laplacian.shape)
+
+        # Validate perturbed sparse Laplace tensor
+        self.validate_laplace_tensor(laplacian)
+
+        return laplacian_tensor, laplacian
+
+
+    import numpy as np
+
+    def validate_laplace_tensor(self, laplace_tensor, check_diagonal=True, check_off_diagonal=True, verbose=True):
+        """
+        Validates a given Laplace tensor for issues such as zero diagonal entries, NaN, Inf, or invalid values.
+        
+        Args:
+            laplace_tensor: The Laplace tensor to validate, which can be sparse (COO) or dense.
+            check_diagonal: Whether to check for invalid or zero diagonal entries (default: True).
+            check_off_diagonal: Whether to check for invalid values in the off-diagonal elements (default: True).
+            verbose: Whether to print detailed error messages (default: True).
+        
+        Returns:
+            valid: Boolean indicating whether the Laplace tensor passed all checks.
+        """
+        valid = True
+
+        # Handle both dense and sparse cases
+        if isinstance(laplace_tensor, torch.Tensor):
+            # Dense matrix case
+            diagonal = torch.diag(laplace_tensor)
+
+            # Check diagonal entries in dense matrix
+            if check_diagonal:
+                if torch.any(diagonal == 0):
+                    valid = False
+                    if verbose:
+                        print(f"Zero diagonal entries detected at indices: {torch.where(diagonal == 0)[0].tolist()}")
+                
+                if torch.any(torch.isnan(diagonal)):
+                    valid = False
+                    if verbose:
+                        print(f"NaN detected in diagonal at indices: {torch.where(torch.isnan(diagonal))[0].tolist()}")
+                
+                if torch.any(torch.isinf(diagonal)):
+                    valid = False
+                    if verbose:
+                        print(f"Inf detected in diagonal at indices: {torch.where(torch.isinf(diagonal))[0].tolist()}")
+
+            # Check off-diagonal entries in dense matrix
+            if check_off_diagonal:
+                off_diagonal = laplace_tensor - torch.diag(torch.diag(laplace_tensor))
+                if torch.any(torch.isnan(off_diagonal)):
+                    valid = False
+                    if verbose:
+                        print(f"NaN detected in off-diagonal at indices: {torch.where(torch.isnan(off_diagonal))}")
+                
+                if torch.any(torch.isinf(off_diagonal)):
+                    valid = False
+                    if verbose:
+                        print(f"Inf detected in off-diagonal at indices: {torch.where(torch.isinf(off_diagonal))}")
+
+        elif isinstance(laplace_tensor, coo_matrix):
+            # Sparse matrix case (COO format)
+
+            # Check diagonal entries in sparse matrix
+            if check_diagonal:
+                diagonal = laplace_tensor.diagonal()
+                if (diagonal == 0).any():
+                    valid = False
+                    if verbose:
+                        zero_indices = [i for i, v in enumerate(diagonal) if v == 0]
+                        print(f"Zero diagonal entries detected at indices: {zero_indices}")
+                if np.isnan(diagonal).any():
+                    valid = False
+                    if verbose:
+                        nan_indices = [i for i, v in enumerate(diagonal) if np.isnan(v)]
+                        print(f"NaN detected in diagonal at indices: {nan_indices}")
+                if np.isinf(diagonal).any():
+                    valid = False
+                    if verbose:
+                        inf_indices = [i for i, v in enumerate(diagonal) if np.isinf(v)]
+                        print(f"Inf detected in diagonal at indices: {inf_indices}")
+
+            # Check off-diagonal entries in sparse matrix
+            if check_off_diagonal:
+                row, col = laplace_tensor.row, laplace_tensor.col
+                data = laplace_tensor.data
+                for idx, (i, j, value) in enumerate(zip(row, col, data)):
+                    if i != j:  # Only check off-diagonal elements
+                        if np.isnan(value):
+                            valid = False
+                            if verbose:
+                                print(f"NaN detected in off-diagonal at indices: ({i}, {j})")
+                        if np.isinf(value):
+                            valid = False
+                            if verbose:
+                                print(f"Inf detected in off-diagonal at indices: ({i}, {j})")
+
+        else:
+            raise TypeError("Unsupported matrix format. Please provide a torch.Tensor or scipy.sparse matrix.")
+
+        if verbose and valid:
+            print("Laplace tensor passed all validation checks.")
+
+        return valid
+
+
+import torch
+import random
+class TransformHub:
+    def __init__(self, uextent, vextent, grid_boundaries):
+        self.uextent = uextent
+        self.vextent = vextent
+        self.grid_boundaries = grid_boundaries
+
+    def calculate_geometry(self, U, V):
+        """
+        Compute coordinates, partials, normals, and metric tensor in one centralized function.
+        
+        Args:
+            U, V (torch.Tensor): Grids for parameter space.
+
+        Returns:
+            dict: Dictionary containing coordinates, partials, normals, and metric tensors.
+        """
+        # Calculate coordinates and partial derivatives
+        X, Y, Z, dX_dU, dY_dU, dZ_dU, dX_dV, dY_dV, dZ_dV, normals = self.compute_partials_and_normals(U, V)
+        
+        # Calculate metric tensor and its components
+        g_ij, g_inv, det_g = self.metric_tensor_func(U, V, dX_dU, dY_dU, dX_dV, dY_dV, dZ_dU, dZ_dV)
+        
+        return {
+            "coordinates": (X, Y, Z),
+            "partials": (dX_dU, dY_dU, dZ_dU, dX_dV, dY_dV, dZ_dV),
+            "normals": normals,
+            "metric": (g_ij, g_inv, det_g),
+            "frobenius_norm": self.compute_frobenius_norm(g_ij)
+        }
+
+    def compute_frobenius_norm(self, g_ij):
+        """
+        Compute the Frobenius norm of the metric tensor.
+
+        Args:
+            g_ij (torch.Tensor): Metric tensor with shape (..., 2, 2) for 2D surfaces.
+
+        Returns:
+            torch.Tensor: Frobenius norm of the metric tensor.
+        """
+        self.frobenius_norm = torch.sqrt(torch.sum(g_ij**2, dim=(-2, -1)))
+        return self.frobenius_norm
+
+    def compute_partials_and_normals(self, U, V, validate_normals=True, diagnostic_mode=False):
+        # Ensure U and V require gradients for autograd
+        U.requires_grad_(True)
+        V.requires_grad_(True)
+
+        # Forward pass: get transformed coordinates
+        X, Y, Z = self.transform_spatial(U, V)
+
+        if diagnostic_mode:
+            print("U Grid:")
+            print(U)
+            print("V Grid:")
+            print("Transformed Coordinates (X, Y, Z):")
+            print("X:", X)
+            print("Y:", Y)
+            print("Z:", Z)
+
+        # Calculate partial derivatives with respect to U
+        dX_dU = torch.autograd.grad(X, U, grad_outputs=torch.ones_like(X), retain_graph=True, allow_unused=True)[0]
+        dY_dU = torch.autograd.grad(Y, U, grad_outputs=torch.ones_like(Y), retain_graph=True, allow_unused=True)[0]
+        dZ_dU = torch.autograd.grad(Z, U, grad_outputs=torch.ones_like(Z), retain_graph=True, allow_unused=True)[0]
+
+        # Calculate partial derivatives with respect to V
+        dX_dV = torch.autograd.grad(X, V, grad_outputs=torch.ones_like(X), retain_graph=True, allow_unused=True)[0]
+        dY_dV = torch.autograd.grad(Y, V, grad_outputs=torch.ones_like(Y), retain_graph=True, allow_unused=True)[0]
+        dZ_dV = torch.autograd.grad(Z, V, grad_outputs=torch.ones_like(Z), retain_graph=True, allow_unused=True)[0]
+
+        target_shape = U.shape
+
+        # Handle None values from autograd
+        dX_dU = dX_dU if dX_dU is not None else torch.zeros(target_shape).to(U.device)
+        dY_dU = dY_dU if dY_dU is not None else torch.zeros(target_shape).to(U.device)
+        dZ_dU = dZ_dU if dZ_dU is not None else torch.zeros(target_shape).to(U.device)
+        dX_dV = dX_dV if dX_dV is not None else torch.zeros(target_shape).to(V.device)
+        dY_dV = dY_dV if dY_dV is not None else torch.zeros(target_shape).to(V.device)
+        dZ_dV = dZ_dV if dZ_dV is not None else torch.zeros(target_shape).to(V.device)
+
+        if diagnostic_mode:
+            print("Partial Derivatives:")
+            print("dX_dU:", dX_dU)
+            print("dY_dU:", dY_dU)
+            print("dZ_dU:", dZ_dU)
+            print("dX_dV:", dX_dV)
+            print("dY_dV:", dY_dV)
+            print("dZ_dV:", dZ_dV)
+
+        # Compute normals as cross-product of partial derivatives
+        normals = torch.stack([
+            dY_dU * dZ_dV - dZ_dU * dY_dV,
+            dZ_dU * dX_dV - dX_dU * dZ_dV,
+            dX_dU * dY_dV - dY_dU * dX_dV
+        ], dim=-1)
+
+        # Compute distances from the origin
+        distances = torch.sqrt(X**2 + Y**2 + Z**2)
+        
+        # Select the top 10% farthest points
+        top_10_percent_threshold = int(0.1 * distances.numel())
+        top_10_percent_indices = torch.topk(distances.flatten(), top_10_percent_threshold).indices
+
+        # Randomly sample 10% of the top 10% farthest points
+        sample_size = max(1, int(0.1 * top_10_percent_threshold))  # Ensure at least one sample
+        sample_indices = random.sample(top_10_percent_indices.tolist(), sample_size)
+
+        # Conduct majority check based on sampled normals
+        outward_votes = 0
+        inward_votes = 0
+        for idx in sample_indices:
+            i, j = divmod(idx, target_shape[1])  # Convert flat index to 2D grid indices
+            farthest_point = torch.tensor([X[i, j], Y[i, j], Z[i, j]], device=U.device, dtype=U.dtype)
+            outward_reference_point = 1.01 * farthest_point  # 1% further outward
+            
+            # Directional check based on the sampled normal and reference point
+            sample_normal = normals[i, j]
+            direction_to_reference = outward_reference_point - farthest_point
+            if torch.dot(sample_normal, direction_to_reference) > 0:
+                outward_votes += 1
+            else:
+                inward_votes += 1
+
+        # Conditionally invert normals based on majority vote
+        if inward_votes > outward_votes:
+            normals = -normals
+
+        # Continue with normalization and validation
+        norm_magnitudes = torch.norm(normals, dim=-1, keepdim=True)
+
+        # Normalize normals, avoid division by zero for zero-magnitude normals
+        normals = torch.where(norm_magnitudes > 1e-16, normals / norm_magnitudes, normals)
+
+        # Identify zero-magnitude normals
+        zero_norm_mask = norm_magnitudes.squeeze() < 1e-16  # Boolean mask for zero-magnitude normals
+
+        if torch.any(zero_norm_mask):
+            count_zero_normals = torch.sum(zero_norm_mask).item()  # Number of zero-magnitude normals
+            print(f"{count_zero_normals} out of {normals.shape[0]*normals.shape[1]} zero-magnitude normals detected.")
+
+            if diagnostic_mode:
+                # Find the indices of the first zero-magnitude normal
+                zero_indices = torch.nonzero(zero_norm_mask, as_tuple=True)
+                first_zero_idx = (zero_indices[0][0].item(), zero_indices[1][0].item())
+
+                print(f"First zero-magnitude normal at index: {first_zero_idx}")
+
+                # Extract the partials contributing to this normal
+                i, j = first_zero_idx
+
+                partials = {
+                    'dX_dU': dX_dU[i, j],
+                    'dY_dU': dY_dU[i, j],
+                    'dZ_dU': dZ_dU[i, j],
+                    'dX_dV': dX_dV[i, j],
+                    'dY_dV': dY_dV[i, j],
+                    'dZ_dV': dZ_dV[i, j]
+                }
+
+                print("Partials at the first zero-magnitude normal:")
+                for name, value in partials.items():
+                    print(f"{name}[{i}, {j}] = {value}")
+
+                # Stop execution until the issue is resolved
+                print("Diagnostics complete. Exiting due to zero-magnitude normal.")
+                exit()
+            else:
+                # Proceed to repair zero-magnitude normals if not in diagnostic mode
+                print("Repairing zero-magnitude normals.")
+
+                # Repair zero-magnitude normals by averaging surrounding normals
+                zero_indices = torch.nonzero(zero_norm_mask, as_tuple=True)
+                for idx in zip(*zero_indices):
+                    # Collect neighboring normals
+                    neighbors = []
+                    for di in [-1, 0, 1]:
+                        for dj in [-1, 0, 1]:
+                            ni, nj = idx[0] + di, idx[1] + dj
+                            if (0 <= ni < target_shape[0] and 0 <= nj < target_shape[1] and (di != 0 or dj != 0)):
+                                neighbor_normal = normals[ni, nj]
+                                neighbor_magnitude = norm_magnitudes[ni, nj]
+                                if neighbor_magnitude > 1e-16:
+                                    neighbors.append(neighbor_normal)
+                    if neighbors:
+                        avg_normal = torch.mean(torch.stack(neighbors), dim=0)
+                        avg_normal_norm = torch.norm(avg_normal)
+                        if avg_normal_norm > 1e-16:
+                            normals[idx[0], idx[1]] = avg_normal / avg_normal_norm  # Normalize average
+                        else:
+                            print(f"Unable to repair normal at index {idx} due to zero magnitude of averaged normal.")
+                    else:
+                        print(f"No valid neighbors to repair normal at index {idx}.")
+
+        if validate_normals:
+            # Validation checks for the final normals
+            if torch.any(torch.isnan(normals)):
+                print("Validation failed: NaN values detected in normals.")
+                exit()
+            if not torch.all(torch.isfinite(normals)):
+                print("Validation failed: Non-finite values detected in normals.")
+                exit()
+            if not torch.allclose(torch.norm(normals, dim=-1), torch.ones_like(norm_magnitudes.squeeze()), atol=1e-5):
+                print("Validation failed: Normals are not unit length within tolerance after normalization.")
+                exit()
+
+            print("Validation passed: Normals are ideal.")
+
+        return X, Y, Z, dX_dU, dY_dU, dZ_dU, dX_dV, dY_dV, dZ_dV, normals
+
+                                            
+
+
+    def get_or_compute_partials(self, U, V, dX_dU=None, dY_dU=None, dX_dV=None, dY_dV=None, dZ_dU=None, dZ_dV=None):
+        """
+        Helper to compute partials if they are not provided.
+        
+        Args:
+            U, V (torch.Tensor): Parameter grids.
+            dX_dU, dY_dU, dX_dV, dY_dV, dZ_dU, dZ_dV (torch.Tensor or None): Optional partials.
+        
+        Returns:
+            Tuple[torch.Tensor]: Partial derivatives.
+        """
+        if all(partial is None for partial in [dX_dU, dY_dU, dX_dV, dY_dV, dZ_dU, dZ_dV]):
+            _, _, _, dX_dU, dY_dU, dZ_dU, dX_dV, dY_dV, dZ_dV, _ = self.compute_partials_and_normals(U, V)
+        return dX_dU, dY_dU, dX_dV, dY_dV, dZ_dU, dZ_dV
+
+    def metric_tensor_func(self, U, V, dX_dU=None, dY_dU=None, dX_dV=None, dY_dV=None, dZ_dU=None, dZ_dV=None):
+        """
+        Enhanced metric tensor function for toroidal geometry, calculated adaptively using partial derivatives.
+        
+        Args:
+            U, V (torch.Tensor): Grids for parameter space.
+            dX_dU, dY_dU, dZ_dU, dX_dV, dY_dV, dZ_dV (torch.Tensor): Optional partial derivatives.
+        
+        Returns:
+            Tuple[torch.Tensor, torch.Tensor, torch.Tensor]: Metric tensor (g_ij), its inverse (g_inv), and determinant (det_g).
+        """
+        # Compute partial derivatives if not provided
+        dX_dU, dY_dU, dX_dV, dY_dV, dZ_dU, dZ_dV = self.get_or_compute_partials(U, V, dX_dU, dY_dU, dX_dV, dY_dV, dZ_dU, dZ_dV)
+        
+        # Calculate metric tensor components directly from partial derivatives
+        g_theta_theta = dX_dU**2 + dY_dU**2 + dZ_dU**2
+        g_phi_phi = dX_dV**2 + dY_dV**2 + dZ_dV**2
+        g_theta_phi = dX_dU * dX_dV + dY_dU * dY_dV + dZ_dU * dZ_dV
+
+        # Construct metric tensor g_ij for the grid
+        g_ij = torch.stack([
+            torch.stack([g_theta_theta, g_theta_phi], dim=-1),
+            torch.stack([g_theta_phi, g_phi_phi], dim=-1)
+        ], dim=-2)
+
+        # Determinant of the metric tensor
+        det_g = g_theta_theta * g_phi_phi - g_theta_phi**2
+
+        # Avoiding zero or near-zero determinant values by clamping
+        det_g = torch.clamp(det_g, min=1e-6)
+
+        # Compute inverse metric tensor g^ij
+        g_inv = torch.stack([
+            torch.stack([g_phi_phi / det_g, -g_theta_phi / det_g], dim=-1),
+            torch.stack([-g_theta_phi / det_g, g_theta_theta / det_g], dim=-1)
+        ], dim=-2)
+
+        return g_ij, g_inv, det_g
+
+    def transform_spatial(self, U, V):
+        raise NotImplementedError("Subclasses must implement the transform_spatial method.")
+
+
+def unpack_values(returned_values, n_desired):
+    """
+    Unpack the returned values and ensure that the output has exactly n_desired elements.
+    If fewer values are returned, fill the remaining with None.
+    If more values are returned, truncate to n_desired elements.
+
+    Args:
+    returned_values: The tuple or list of returned values.
+    n_desired: The number of desired return values.
+
+    Returns:
+    A tuple of length n_desired with values or None.
+    """
+    return (returned_values + (None,) * n_desired)[:n_desired]
+import torch
+import numpy as np
+
+class PeriodicLinspace:
+    def __init__(self, min_density=0.5, max_density=1.5, num_oscillations=1):
+        self.min_density = min_density
+        self.max_density = max_density
+        self.num_oscillations = num_oscillations
+
+    def sin(self, normalized_i):
+        return self._oscillate(torch.sin, normalized_i)
+
+    def cos(self, normalized_i):
+        return self._oscillate(torch.cos, normalized_i)
+
+    def tan(self, normalized_i):
+        density = self._oscillate(torch.tan, normalized_i)
+        return torch.clamp(density, min=self.min_density, max=self.max_density)
+
+    def cot(self, normalized_i):
+        density = self._oscillate(lambda x: 1 / torch.tan(x + 1e-6), normalized_i)
+        return torch.clamp(density, min=self.min_density, max=self.max_density)
+
+    def exp_sin(self, normalized_i):
+        density = self._oscillate(lambda x: torch.exp(torch.sin(x)), normalized_i)
+        return torch.clamp(density, min=self.min_density, max=self.max_density)
+
+    def exp_cos(self, normalized_i):
+        density = self._oscillate(lambda x: torch.exp(torch.cos(x)), normalized_i)
+        return torch.clamp(density, min=self.min_density, max=self.max_density)
+
+    def _oscillate(self, func, normalized_i):
+        phase_shifted_i = 2 * np.pi * self.num_oscillations * normalized_i - np.pi / 2
+        return self.min_density + (self.max_density - self.min_density) * 0.5 * (1 + func(phase_shifted_i))
+
+    def get_density(self, normalized_i, oscillation_type):
+        if not hasattr(self, oscillation_type):
+            raise ValueError(f"Unknown oscillation_type: '{oscillation_type}'.")
+        return getattr(self, oscillation_type)(normalized_i)
+import torch
+import numpy as np
+
+class GridDomain:
+    def __init__(self, U, V, u_mode=None, u_p=1, v_mode=None, v_p=1, Lx=1, Ly=1, grid_boundaries=(True, True, True, True), transform=None, coordinate_system="rectangular"):
+        """
+        Initializes the GridDomain object from the provided U and V meshgrids.
+        It automatically computes resolution, extents, and prepares normalized grids for interpolation.
+        
+        Args:
+            U: Meshgrid representing the first axis (e.g., x, r, theta).
+            V: Meshgrid representing the second axis (e.g., y, phi).
+            grid_boundaries: A tuple (U-start inclusion, U-end inclusion, V-start inclusion, V-end inclusion).
+            Lx: Physical parameter representing the extent in the x direction (if applicable).
+            Ly: Physical parameter representing the extent in the y direction (if applicable).
+        """
+        # Store U and V as the meshgrids that represent the actual domain
+        self.U = U
+        self.V = V
+        self.transform = transform
+        self.vertices = self.transform.transform(U, V)
+
+        self.u_mode = u_mode
+        self.v_mode = v_mode
+
+        self.u_p = u_p
+        self.v_p = v_p
+
+        # Store physical extents
+        self.Lx = Lx
+        self.Ly = Ly
+
+        # Store boundary conditions
+        self.grid_boundaries = grid_boundaries
+        self.coordinate_system = coordinate_system
+
+        # Step 1: Calculate resolution (number of points in U and V directions)
+        self.resolution_u = U.shape[0]  # Number of points along the U axis
+        self.resolution_v = V.shape[1]  # Number of points along the V axis
+
+        # Step 2: Calculate extents (total span of the domain along U and V)
+        self.extent_u = U.max() - U.min()  # Extent along the U axis
+        self.extent_v = V.max() - V.min()  # Extent along the V axis
+
+        # Step 3: Compute normalized U and V for grid_sample interpolation (from -1 to 1)
+        self.normalized_U = self.normalize_grid(self.U, self.extent_u)
+        self.normalized_V = self.normalize_grid(self.V, self.extent_v)
+
+        # Step 4: Create a combined normalized grid for interpolation
+        self.normalized_grid = torch.stack([self.normalized_U, self.normalized_V], dim=-1).unsqueeze(0)
+
+    @staticmethod
+    def generate_grid_domain(coordinate_system, N_u, N_v, u_mode=None, v_mode=None,
+                            device='cpu', precision=torch.float64, **kwargs):
+        """
+        Generates a GridDomain object based on the coordinate system and its parameters.
+        
+        Args:
+            coordinate_system: The coordinate system type (e.g., 'rectangular', 'polar', 'toroidal', etc.).
+            N_u: Number of grid points in the U direction (e.g., x, r, theta).
+            N_v: Number of grid points in the V direction (e.g., y, phi).
+            u_mode: Dictionary of options for generating the grid in the U direction.
+            v_mode: Dictionary of options for generating the grid in the V direction.
+            device: The device to store the tensors on.
+            precision: The precision of the tensors (default: torch.float64).
+            **kwargs: Additional arguments that need to be passed to the transform.
+            
+        Returns:
+            A GridDomain object with the appropriate U, V grids.
+        """
+        
+        # Set default modes if u_mode or v_mode not provided
+        u_mode = u_mode or {'method': 'linear', 'p': 1}
+        v_mode = v_mode or {'method': 'linear', 'p': 1}
+
+        # Combine all the parameters that are common across different transforms
+        transform_params = {
+            'N_u': N_u,
+            'N_v': N_v,
+            'u_mode': u_mode,
+            'v_mode': v_mode,
+            'device': device,
+            'precision': precision,
+            'Lx': kwargs.get('Lx', None),
+            'Ly': kwargs.get('Ly', None)
+        }
+
+        # Update with any additional kwargs that may be provided
+        transform_params.update(kwargs)
+
+        # Create the appropriate Transform instance with all packed parameters
+        transform = Transform.create_transform(coordinate_system, **transform_params)
+
+        U = V = None
+        # Get domain extents and grid boundaries from the Transform
+        (uextent, vextent), grid_boundaries = transform.get_transform_parameters()
+        keep_beginning_u, keep_end_u, keep_beginning_v, keep_end_v = grid_boundaries
+        
+        if getattr(transform, 'autogrid', False):
+            U, V = transform.obtain_autogrid()
+
+        else:
+
+
+
+            # Generate u_grid and v_grid using the u_mode and v_mode dictionaries
+            u_grid, _ = generate_grid(
+                N=N_u, L=uextent, device=device, dtype=precision,
+                keep_end=keep_end_u, **u_mode
+            )
+            v_grid, _ = generate_grid(
+                N=N_v, L=vextent, device=device, dtype=precision,
+                keep_end=keep_end_v, **v_mode
+            )
+
+            # Create U and V meshgrids
+            U, V = torch.meshgrid(u_grid, v_grid, indexing='ij')
+
+        # Create and return the GridDomain
+        return GridDomain(U, V, u_mode=u_mode, v_mode=v_mode,
+                        grid_boundaries=grid_boundaries, transform=transform,
+                        coordinate_system=coordinate_system)
+    def apply_transform(self):
+        return self.transform(self.U, self.V)
+    
+    def get_vertices(self):
+        return self.vertices
+    def return_dense_copy(self, scaling_factor=(2,2), normalize=True):
+        """
+        Returns a higher resolution copy of the grid (U, V) by scaling the resolution.
+        The dense grid will use the same distribution method as the original grid.
+
+        Args:
+            scaling_factor: The factor by which to increase the resolution.
+            normalize: Whether to return the normalized grid.
+
+        Returns:
+            A dense version of U and V (or normalized versions if normalize=True).
+        """
+        
+        # New high-resolution by scaling
+        high_res_u = int(self.resolution_u * scaling_factor[0])
+        high_res_v = int(self.resolution_v * scaling_factor[1])
+
+        # Create high-resolution U and V grids by regenerating the grid using the same method and parameters
+        u_high_res, _ = generate_grid(
+            N=high_res_u,
+            L=self.U.max(),
+            device=self.U.device,  # Keep the device same as the original grid
+            dtype=self.U.dtype,
+            **self.u_mode
+        )
+
+        v_high_res, _ = generate_grid(
+            N=high_res_v,
+            L=self.V.max(),
+            device=self.V.device,
+            dtype=self.V.dtype,
+            **self.v_mode
+        )
+
+        # Create the high-resolution meshgrid
+        U_high_res, V_high_res = torch.meshgrid(u_high_res, v_high_res, indexing='ij')
+
+        # Normalize if required
+        if normalize:
+            U_norm_high = self.normalize_grid(U_high_res, self.extent_u)
+            V_norm_high = self.normalize_grid(V_high_res, self.extent_v)
+            return U_norm_high, V_norm_high
+        else:
+            return U_high_res, V_high_res
+
+
+
+    def normalize_grid(self, grid, extent):
+        """
+        Normalizes the grid values into the range [-1, 1] for use in grid_sample.
+
+        Args:
+            grid: The original meshgrid (U or V).
+            extent: The span (max - min) of the grid.
+        
+        Returns:
+            The normalized grid in the range [-1, 1].
+        """
+        grid_min = grid.min()
+        normalized_grid = (grid - grid_min) / extent.to(grid.device) * 2 - 1  # Normalize to [-1, 1]
+        return normalized_grid
+
+    def summary(self):
+        """
+        Returns a summary of the grid domain, including resolution and extents.
+        
+        Returns:
+            dict: A dictionary containing resolution and extents of the grid.
+        """
+        return {
+            "resolution_u": self.resolution_u,
+            "resolution_v": self.resolution_v,
+            "extent_u": self.extent_u.item(),  # Convert from tensor to Python float
+            "extent_v": self.extent_v.item(),
+            "normalized_U_range": (self.normalized_U.min().item(), self.normalized_U.max().item()),
+            "normalized_V_range": (self.normalized_V.min().item(), self.normalized_V.max().item())
+        }
+    def __getstate__(self):
+        """
+        Prepares the state for serialization. Convert tensors to CPU (to avoid issues with GPU tensors) and
+        store other attributes.
+        """
+        state = self.__dict__.copy()
+        state['U'] = self.U.cpu()  # Ensure tensors are on the CPU for serialization
+        state['V'] = self.V.cpu()
+        state['normalized_U'] = self.normalized_U.cpu()
+        state['normalized_V'] = self.normalized_V.cpu()
+        state['normalized_grid'] = self.normalized_grid.cpu()
+        state['coordinate_system']
+
+        # Serialize any callable objects like transform if needed (could be done through another method or logic)
+        state['transform'] = None  # Set transform to None or serialize it if required
+
+        return state
+    def __setstate__(self, state):
+        """
+        Restores the object state after deserialization. Move tensors back to the appropriate device and
+        regenerate the transform.
+        """
+        # Restore the state dictionary
+        self.__dict__.update(state)
+
+        # Move tensors back to the appropriate device (you can modify the device as needed)
+        self.U = self.U.to('cpu')
+        self.V = self.V.to('cpu')
+        self.normalized_U = self.normalized_U.to('cpu')
+        self.normalized_V = self.normalized_V.to('cpu')
+        self.normalized_grid = self.normalized_grid.to('cpu')
+
+        # Regenerate the transform based on the coordinate system and stored parameters
+        self.transform = self.regenerate_transform()
+
+    def regenerate_transform(self):
+        """
+        Recreates the transform using stored parameters such as the coordinate system, resolution, boundary conditions, etc.
+        This method is called during deserialization to restore the transform.
+        """
+        # Example of how you might regenerate the transform based on the stored parameters
+        transform_params = {
+            'N_u': self.resolution_u,
+            'N_v': self.resolution_v,
+            'u_mode': self.u_mode,
+            'v_mode': self.v_mode,
+            'device': 'cpu',  # Adjust device if needed
+            'precision': self.U.dtype,  # Use the same dtype as the original grid
+            'Lx': self.Lx,
+            'Ly': self.Ly
+        }
+
+        # Call the same logic used during GridDomain initialization
+        transform = Transform.create_transform(self.coordinate_system, **transform_params)
+        return transform
+    
+def generate_grid(N, L, method='linear', p=2.0, min_density=0.5,
+                  max_density=1.5, num_oscillations=1, keep_end=True, periodic=False,
+                  oscillation_type='sin', device='cpu', dtype=torch.float64):
+    """
+    Generates a grid with various spacing methods and calculates infinitesimal values.
+    
+    Parameters are the same as before, with `oscillation_type` specifying
+    the desired periodic pattern if `method` is 'periodic'.
+    """
+    if N < 2:
+        raise ValueError("N must be at least 2.")
+
+    # Generate indices and normalize
+    i = torch.arange(0, N, device=device, dtype=dtype)
+    normalized_i = i / (N - 1 if keep_end else N)
+
+    if method == 'linear':
+        grid = L * normalized_i
+    elif method == 'non_uniform':
+        grid = L * normalized_i ** p
+    elif method == 'inverted':
+        grid = L * (1 - (1 - normalized_i) ** p)
+    elif method == 'periodic':
+        # Use PeriodicLinspace for density modulation
+        periodic_gen = PeriodicLinspace(min_density, max_density, num_oscillations)
+        density = periodic_gen.get_density(normalized_i, oscillation_type)
+        grid = torch.cumsum(density, dim=0)
+        grid = grid / grid[-1] * L  # Normalize to fit within length L
+    elif method == 'dense_extremes':
+        grid = L * 0.5 * (normalized_i ** p + (1 - (1 - normalized_i) ** p))
+    else:
+        raise ValueError(f"Unknown method: {method}. Use 'linear', 'non_uniform', 'inverted', 'periodic', or 'dense_extremes'.")
+
+    # Compute infinitesimal values
+    infinitesimal = torch.zeros(N, device=device, dtype=dtype)
+    infinitesimal[:-1] = grid[1:] - grid[:-1]
+
+    if not keep_end:
+        infinitesimal[-1] = L - grid[-1] + grid[0]  # Wrap-around interval for periodic case
+
+    return grid, infinitesimal
+
+
+def generate_full_meshgrid(N_u, L_u, N_v, L_v, periodic_u=True, periodic_v=True, umethod='dense_extremes', upow=2, vmethod="dense_extremes", vpow=2, device='none', **kwargs):
+    """
+    Generate U, V meshgrids and their corresponding infinitesimal grids U', V', following exact instructions.
+
+    For periodic axes, the last spatial point is removed.
+    For non-periodic axes, the infinitesimal set is extended with a dummy value.
+
+    Parameters:
+    N_u, L_u: Number of points and length of domain for U dimension.
+    N_v, L_v: Number of points and length of domain for V dimension.
+    periodic_u, periodic_v: Whether U and V dimensions are periodic.
+    method: Method for generating grids.
+
+    Returns:
+    U, V: Meshgrid of spatial points with last point removed for periodic axes.
+    U_prime, V_prime: Meshgrid of infinitesimal points (U', V').
+    """
+    
+    # Generate U and V grids
+    U, U_prime = generate_grid(N_u, L_u, method=umethod, p=upow, periodic=periodic_u, keep_end=~periodic_u, device=device, **kwargs)
+    V, V_prime = generate_grid(N_v, L_v, method=vmethod, p=vpow, periodic=periodic_v, keep_end=~periodic_v, device=device, **kwargs)
+    
+    # Create full 2D meshgrid for U and V
+    U_mesh, V_mesh = torch.meshgrid(U, V, indexing='ij')
+    
+    # Create full 2D meshgrid for infinitesimal U' and V'
+    U_prime_mesh, V_prime_mesh = torch.meshgrid(U_prime, V_prime, indexing='ij')
+
+    return U_mesh, V_mesh, U_prime_mesh, V_prime_mesh
+class Transform(TransformHub):
+    def __init__(self, uextent, vextent, grid_boundaries):
+        super().__init__(uextent, vextent, grid_boundaries)
+
+    def get_transform_parameters(self):
+        return (self.uextent, self.vextent), self.grid_boundaries
+
+    def transform(self, U, V, use_metric=False):
+        """
+        Transform coordinates using either spatial or metric transformation.
+
+        Args:
+            U, V (torch.Tensor): Parameter grids.
+            use_metric (bool): Whether to use the metric transformation.
+
+        Returns:
+            tuple: Transformed coordinates or metric data.
+        """
+        self.device = U.device
+        geometry = self.calculate_geometry(U, V)
+        return geometry["metric"] if use_metric else geometry["coordinates"]
+
+    def convert_data_2d_to_3d(self, data_2d, use_metric=False):
+        """
+        Convert 2D parameter data to 3D coordinates and prepare for rendering.
+
+        Args:
+            data_2d (torch.Tensor): Stacked 2D data in U, V parameter space.
+            use_metric (bool): Whether to use the metric transformation.
+
+        Returns:
+            Tuple of vertices, indices, normals, and data for OpenGL rendering.
+        """
+        resolution_u, resolution_v = data_2d.shape[-2], data_2d.shape[-1]
+        # Generate U, V grid
+        U, V = self.create_grid_mesh2(resolution_u, resolution_v)
+
+        # Retrieve geometry (coordinates and optionally metric tensor)
+        geometry_data = self.calculate_geometry(U, V)
+        X, Y, Z = geometry_data["coordinates"]
+
+        # Prepare vertices
+        vertices = self.prepare_mesh_for_rendering(X, Y, Z)
+
+        # Generate indices for triangulation (for OpenGL)
+        indices = self.generate_triangle_indices(resolution_u, resolution_v)
+
+        # Calculate normals for rendering
+        normals = geometry_data["normals"]
+
+        # Flatten data for rendering compatibility
+        if data_2d.ndimension() == 2:
+            data_3d = data_2d.flatten()
+        else:
+            data_3d = torch.stack([data_2d[i].flatten() for i in range(data_2d.shape[0])])
+
+        return vertices, indices, normals, data_3d
+
+    def create_grid_mesh2(self, resolution_u=100, resolution_v=100):
+        if getattr(self, "autogrid", False):
+            return self.obtain_autogrid()
+        else:
+            u_values = torch.linspace(0, self.uextent, resolution_u)
+            v_values = torch.linspace(0, self.vextent, resolution_v)
+            U, V = torch.meshgrid(u_values, v_values, indexing='ij')
+            return U, V
+
+    
+    def create_grid_mesh(self, resolution_u, resolution_v):
+        # Derive periodicity based on endpoint exclusion in grid boundaries
+        periodic_u = not (self.grid_boundaries[0] and self.grid_boundaries[1])  # True if either endpoint is excluded for U
+        periodic_v = not (self.grid_boundaries[2] and self.grid_boundaries[3])  # True if either endpoint is excluded for V
+        
+        # Use generate_full_meshgrid with inferred periodicity
+        U_mesh, V_mesh, U_prime_mesh, V_prime_mesh = generate_full_meshgrid(
+            N_u=resolution_u,
+            L_u=self.uextent,
+            N_v=resolution_v,
+            L_v=self.vextent,
+            periodic_u=periodic_u,
+            periodic_v=periodic_v,
+            device=self.device
+        )
+        return U_mesh, V_mesh
+    def generate_triangle_indices(self, resolution_u, resolution_v):
+        periodic_u = not (self.grid_boundaries[0] and self.grid_boundaries[1])  # True if either endpoint is excluded for U
+        periodic_v = not (self.grid_boundaries[2] and self.grid_boundaries[3])  # True if either endpoint is excluded for V
+        indices = []
+        
+        for u in range(resolution_u - 1):
+            for v in range(resolution_v):
+                # Add two vertices for each triangle strip
+                indices.append(u * resolution_v + v)         # Current vertex
+                indices.append((u + 1) * resolution_v + v)   # Vertex directly below in U direction
+                
+                # Connect the last vertex in v to the first if periodic_v
+                if periodic_v and v == resolution_v - 1:
+                    indices.append(u * resolution_v)              # Wrap to first column in current row
+                    indices.append((u + 1) * resolution_v)        # Wrap to first column in next row
+
+        # Connect the last row back to the first if periodic_u
+        if periodic_u:
+            for v in range(resolution_v):
+                indices.append((resolution_u - 1) * resolution_v + v)   # Last row current column
+                indices.append(v)                                       # First row current column
+                
+                # Handle periodicity in both dimensions at the corner
+                if periodic_v and v == resolution_v - 1:
+                    indices.append((resolution_u - 1) * resolution_v)   # Last row, first column
+                    indices.append(0)                                   # First row, first column
+                    
+        return torch.tensor(indices, dtype=torch.int32)
+
+
+    def prepare_mesh_for_rendering(self, X, Y, Z):
+        X_flat = X.flatten()
+        Y_flat = Y.flatten()
+        Z_flat = Z.flatten()
+        return torch.stack([X_flat, Y_flat, Z_flat], dim=-1)
+
+    @classmethod
+    def create_transform(cls, type_of_transform, **kwargs):
+        #metric_transform = MetricTransform.create_metric_transform(type_of_transform, **kwargs)
+        #if metric_transform is not None:
+        #    return metric_transform
+
+        transform_map = {
+            "rectangular": RectangularTransform,
+            "elliptical": EllipticalTransform,
+            "hyperbolic": HyperbolicTransform,
+            "parabolic": ParabolicTransform,
+            "polar": PolarTransform,
+            "toroidal": ToroidalTransform,
+            "spherical": SphericalTransform
+        }
+
+        if type_of_transform in transform_map:
+            return transform_map[type_of_transform](**kwargs)
+        else:
+            raise ValueError(f"Unsupported transform type '{type_of_transform}'")
+
+
+
+import torch
+
+class PolarTransform(Transform):
+    def __init__(self, Lx, **kwargs):
+        super().__init__(Lx / 2, 2 * torch.pi, (True, True, True, False))
+        self.Lx = Lx
+
+    def get_domain_extents(self):
+        uextent = self.Lx / 2  # Radial extent
+        vextent = 2 * torch.pi  # Theta wraps around
+        grid_boundaries = (True, True, True, False)
+        return uextent, vextent, grid_boundaries
+
+    def transform_metric(self, U=None, V=None):
+        return self.transform_spatial(U, V)
+
+    def transform_spatial(self, U=None, V=None):
+        U = U if U is not None else self.U
+        V = V if V is not None else self.V
+
+        X = U * torch.cos(V)
+        Y = U * torch.sin(V)
+        Z = U * V * 0.0
+        return X, Y, Z
+
+    def evaluate(self, u_coord, v_coord):
+        X = u_coord * torch.cos(v_coord)
+        Y = u_coord * torch.sin(v_coord)
+        return X, Y
+    
+
+class ToroidalTransform(Transform):
+    def __init__(self, Lx, Ly, device = None, **kwargs):
+        super().__init__(2 * torch.pi, 2 * torch.pi, (True, False, True, False))  # Both angles are periodic
+        self.Lx = self.R_major = Lx
+        self.Ly = self.R_minor = Ly
+        self.device=device
+
+    @staticmethod
+    def get_domain_extents():
+        uextent = 2 * torch.pi  # Theta wraps around
+        vextent = 2 * torch.pi  # Phi wraps around
+        grid_boundaries = (True, False, True, False)
+        return uextent, vextent, grid_boundaries
+
+    def transform_spatial(self, U=None, V=None):
+        U = U if U is not None else self.U
+        V = V if V is not None else self.V
+        X = (self.R_major + self.R_minor * torch.cos(U)) * torch.cos(V)
+        Y = (self.R_major + self.R_minor * torch.cos(U)) * torch.sin(V)
+        Z = self.R_minor * torch.sin(U)
+        return X, Y, Z  # Return Z as well for higher dimensionality cases
+
+    def transform_metric(self, U, V):
+        # In toroidal geometry, we need the metric-based transformation
+        return self.transform_spatial(U, V)  # The default toroidal transform already incorporates the necessary structure
+
+    def evaluate(self, u_coord, v_coord):
+        X = (self.R_major + self.R_minor * torch.cos(u_coord)) * torch.cos(v_coord)
+        Y = (self.R_major + self.R_minor * torch.cos(u_coord)) * torch.sin(v_coord)
+        Z = self.R_minor * torch.sin(u_coord)
+        return X, Y, Z
+
+
+
+class SphericalTransform(Transform):
+    def __init__(self, radius=1.0, **kwargs):
+        super().__init__(torch.pi, 2 * torch.pi, (True, True, True, False))  # Theta is from 0 to pi, Phi wraps around
+        self.radius = radius  # The radius of the sphere
+
+    @staticmethod
+    def get_domain_extents():
+        uextent = torch.pi  # Theta extends from 0 to pi
+        vextent = 2 * torch.pi  # Phi wraps around
+        grid_boundaries = (True, True, True, False) 
+        return uextent, vextent, grid_boundaries
+
+    def transform_spatial(self, U=None, V=None):
+        U = U if U is not None else self.U
+        V = V if V is not None else self.V
+        X = self.radius * torch.sin(U) * torch.cos(V)
+        Y = self.radius * torch.sin(U) * torch.sin(V)
+        Z = self.radius * torch.cos(U)
+        return X, Y, Z
+
+    def transform_metric(self, U, V):
+        # For the spherical geometry, the metric-based transformation
+        return self.transform_spatial(U, V)  # Spherical geometry is inherently captured in the spatial transform
+
+    def evaluate(self, u_coord, v_coord):
+        X = self.radius * torch.sin(u_coord) * torch.cos(v_coord)
+        Y = self.radius * torch.sin(u_coord) * torch.sin(v_coord)
+        Z = self.radius * torch.cos(u_coord)
+        return X, Y, Z
+
+
+
+class RectangularTransform(Transform):
+    def __init__(self, Lx, Ly, device='cpu', **kwargs):
+        super().__init__(Lx, Ly, (True, True, True, True))
+        self.device = device
+        self.Lx = Lx
+        self.Ly = Ly
+    
+    def get_domain_extents(self):
+        uextent = self.Lx
+        vextent = self.Ly
+        grid_boundaries = (True, True, True, True)  # Rectangular keeps both U and V ends
+        return uextent, vextent, grid_boundaries
+    
+    def transform_spatial(self, U=None, V=None):
+        U = U if U is not None else self.U
+        V = V if V is not None else self.V
+        Z = U * V * 0
+        return U, V, Z
+
+    def evaluate(self, u_coord, v_coord):
+        return u_coord, v_coord
+
+class EllipticalTransform(Transform):
+    def __init__(self, Lx, Ly, **kwargs):
+        super().__init__(Lx / 2, 2 * torch.pi, (True, True, True, False))  # Polar-like, doesn't keep theta end
+        self.Lx = Lx
+        self.Ly = Ly
+
+    def get_domain_extents(self):
+        uextent = self.Lx / 2
+        vextent = 2 * torch.pi  # Theta wraps around
+        grid_boundaries = (True, True, True, False)
+        return uextent, vextent, grid_boundaries
+
+    def transform_spatial(self, U=None, V=None):
+        U = U if U is not None else self.U
+        V = V if V is not None else self.V
+        X = U * torch.cos(V)
+        Y = U * torch.sin(V) * (self.Lx / self.Ly)
+        Z = U * V * 0
+        return X, Y, Z
+    
+    def transform_metric(self, U=None, V=None):
+        return self.transform_spatial(U, V)[:2]
+
+    def evaluate(self, u_coord, v_coord):
+        X = u_coord * torch.cos(v_coord)
+        Y = u_coord * torch.sin(v_coord) * (self.Lx / self.Ly)
+        return X, Y
+
+class HyperbolicTransform(Transform):
+    def __init__(self, Lx, Ly, **kwargs):
+        super().__init__(Lx, Ly, (True, True, True, True))
+        self.Lx = Lx
+        self.Ly = Ly
+
+    def get_domain_extents(self):
+        uextent = self.Lx
+        vextent = self.Ly
+        grid_boundaries = (True, True, True, True)
+        return uextent, vextent, grid_boundaries
+
+    def transform(self, U=None, V=None):
+        U = U if U is not None else self.U
+        V = V if V is not None else self.V
+        X = torch.cosh(U) * torch.cos(V)
+        Y = torch.sinh(U) * torch.sin(V)
+        return X, Y
+
+    def evaluate(self, u_coord, v_coord):
+        X = torch.cosh(u_coord) * torch.cos(v_coord)
+        Y = torch.sinh(u_coord) * torch.sin(v_coord)
+        return X, Y
+
+class ParabolicTransform(Transform):
+    def __init__(self, Lx, Ly, **kwargs):
+        super().__init__(Lx, Ly, (True, True, True, True))
+        self.Lx = Lx
+        self.Ly = Ly
+
+    def get_domain_extents(self):
+        uextent = self.Lx
+        vextent = self.Ly
+        grid_boundaries = (True, True, True, True)
+        return uextent, vextent, grid_boundaries
+
+    def transform(self, U=None, V=None):
+        U = U if U is not None else self.U
+        V = V if V is not None else self.V
+        X = U * U + V
+        Y = U + V * V
+        return X, Y
+
+    def evaluate(self, u_coord, v_coord):
+        X = u_coord * u_coord + v_coord
+        Y = u_coord + v_coord * v_coord
+        return X, Y
+
+import torch
+import numpy as np
+import imageio
+
+class TemperatureSimulation:
+    def __init__(self, Lx=4, Ly=4, resolution_u=128, resolution_v=128, device='cuda'):
+        """
+        Initializes the temperature simulation.
+
+        Args:
+            Lx (float): Length in the x-direction.
+            Ly (float): Length in the y-direction.
+            resolution_u (int): Grid resolution in the u-direction.
+            resolution_v (int): Grid resolution in the v-direction.
+            device (str): Computation device ('cuda' or 'cpu').
+        """
+        self.Lx = Lx
+        self.Ly = Ly
+        self.resolution_u = resolution_u
+        self.resolution_v = resolution_v
+        self.device = device
+
+        # Initialize RectangularTransform
+        self.transform = RectangularTransform(Lx=self.Lx, Ly=self.Ly, device=self.device)
+
+        # Generate grid
+        self.U, self.V = self.transform.create_grid_mesh(self.resolution_u, self.resolution_v)
+
+        # Compute geometry and metric
+        geometry = self.transform.calculate_geometry(self.U, self.V)
+        self.geometry = geometry
+
+        # Create GridDomain
+        self.grid_domain = GridDomain.generate_grid_domain(
+            coordinate_system='toroidal',
+            N_u=self.resolution_u,
+            N_v=self.resolution_v,
+            Lx=self.Lx,
+            Ly=1,
+            device=self.device
+        )
+
+        # Initialize BuildLaplace and Laplacian tensor
+        self.solver = BuildLaplace(grid_domain=self.grid_domain)
+        self.laplacian_tensor, _ = self.solver.build_general_laplace(
+            grid_u=self.U,
+            grid_v=self.V,
+            metric_tensor_func=self.transform.metric_tensor_func,
+            boundary_conditions=("neumann", "neumann", "neumann", "neumann"),
+            device=self.device
+        )
+
+        # Initialize temperature fields for Red, Green, Blue channels
+        self.T_r = torch.full((self.resolution_u, self.resolution_v), 1300.0, dtype=torch.float64, device=self.device)
+        self.T_g = torch.full((self.resolution_u, self.resolution_v), 1300.0, dtype=torch.float64, device=self.device)
+        self.T_b = torch.full((self.resolution_u, self.resolution_v), 1300.0, dtype=torch.float64, device=self.device)
+
+        # Initialize hotspots at the center
+        center_u, center_v = self.resolution_u // 2, self.resolution_v // 2
+        self.T_r[center_u, center_v] = 5000.0
+        self.T_g[center_u, center_v] = 5000.0
+        self.T_b[center_u, center_v] = 5000.0
+
+        # Simulation parameters
+        self.time_steps = 100
+        self.delta_t = 0.01
+        self.thermal_diffusivity = 0.1
+
+        # Step counter
+        self.current_step = 0
+
+    def apply_gaussian_beam(self, T, center_u, center_v, amplitude, sigma_u, sigma_v):
+        """
+        Applies a Gaussian beam excitation to the temperature field.
+
+        Args:
+            T (torch.Tensor): Temperature field tensor.
+            center_u (int): U-coordinate of the beam center.
+            center_v (int): V-coordinate of the beam center.
+            amplitude (float): Peak temperature increase.
+            sigma_u (float): Standard deviation in the U direction.
+            sigma_v (float): Standard deviation in the V direction.
+        """
+        u = torch.arange(0, self.resolution_u, device=self.device).unsqueeze(1).repeat(1, self.resolution_v)
+        v = torch.arange(0, self.resolution_v, device=self.device).unsqueeze(0).repeat(self.resolution_u, 1)
+        gaussian = amplitude * torch.exp(-(((u - center_u)**2) / (2 * sigma_u**2) + ((v - center_v)**2) / (2 * sigma_v**2)))
+        T += gaussian
+
+    def apply_bombardment(self, T, u, v, radius, intensity):
+        """
+        Applies a bombardment to a temperature field.
+
+        Args:
+            T (torch.Tensor): Temperature field tensor.
+            u (int): U-coordinate of the bombardment center.
+            v (int): V-coordinate of the bombardment center.
+            radius (int): Radius of the affected region.
+            intensity (float): Intensity of the bombardment.
+        """
+        u_min = max(0, u - radius)
+        u_max = min(self.resolution_u, u + radius + 1)
+        v_min = max(0, v - radius)
+        v_max = min(self.resolution_v, v + radius + 1)
+        T[u_min:u_max, v_min:v_max] += intensity
+
+    def update(self):
+        """
+        Advances the simulation by one time step.
+
+        Returns:
+            np.ndarray: Current RGB frame as a (resolution_u, resolution_v, 3) uint8 array.
+        """
+        # Compute geometry and metric if needed (omitted for brevity)
+
+        # Update Red channel
+        laplacian_T_r = self.laplacian_tensor @ self.T_r.flatten()
+        self.T_r += self.delta_t * self.thermal_diffusivity * laplacian_T_r.view(self.resolution_u, self.resolution_v)
+
+        # Update Green channel
+        laplacian_T_g = self.laplacian_tensor @ self.T_g.flatten()
+        self.T_g += self.delta_t * self.thermal_diffusivity * laplacian_T_g.view(self.resolution_u, self.resolution_v)
+
+        # Update Blue channel
+        laplacian_T_b = self.laplacian_tensor @ self.T_b.flatten()
+        self.T_b += self.delta_t * self.thermal_diffusivity * laplacian_T_b.view(self.resolution_u, self.resolution_v)
+
+        # Example: Apply Gaussian beam every step (modify as needed)
+        self.apply_gaussian_beam(self.T_r, self.resolution_u // 2, self.resolution_v // 2, amplitude=1200, sigma_u=6, sigma_v=6)
+        self.apply_gaussian_beam(self.T_g, self.resolution_u // 2, self.resolution_v // 2, amplitude=1200, sigma_u=6, sigma_v=6)
+        self.apply_gaussian_beam(self.T_b, self.resolution_u // 2, self.resolution_v // 2, amplitude=1200, sigma_u=6, sigma_v=6)
+
+        # Example: Apply random bombardment every step (modify as needed)
+        u_rand = np.random.randint(0, self.resolution_u)
+        v_rand = np.random.randint(0, self.resolution_v)
+        bombardment_intensity = 100000.0
+        bombardment_radius = 1
+        self.apply_bombardment(self.T_r, u_rand, v_rand, bombardment_radius, bombardment_intensity)
+        self.apply_bombardment(self.T_g, u_rand, v_rand, bombardment_radius, bombardment_intensity)
+        self.apply_bombardment(self.T_b, u_rand, v_rand, bombardment_radius, bombardment_intensity)
+
+        # Normalize and convert to RGB
+        rgb_frame = self.generate_rgb_frame()
+
+        # Increment step counter
+        self.current_step += 1
+
+        return rgb_frame
+
+    def generate_rgb_frame(self):
+        """
+        Normalizes temperature fields and stacks them into an RGB image.
+
+        Returns:
+            np.ndarray: RGB image as a (resolution_u, resolution_v, 3) uint8 array.
+        """
+        # Normalize each temperature field
+        temp_min_r, temp_max_r = self.T_r.min(), self.T_r.max()
+        temp_min_g, temp_max_g = self.T_g.min(), self.T_g.max()
+        temp_min_b, temp_max_b = self.T_b.min(), self.T_b.max()
+
+        norm_r = (self.T_r - temp_min_r) / (temp_max_r - temp_min_r + 1e-8)
+        norm_g = (self.T_g - temp_min_g) / (temp_max_g - temp_min_g + 1e-8)
+        norm_b = (self.T_b - temp_min_b) / (temp_max_b - temp_min_b + 1e-8)
+
+        # Scale to 0-255 and clamp
+        temp_r = torch.clamp(norm_r * 255, 0, 255).cpu().numpy().astype(np.uint8)
+        temp_g = torch.clamp(norm_g * 255, 0, 255).cpu().numpy().astype(np.uint8)
+        temp_b = torch.clamp(norm_b * 255, 0, 255).cpu().numpy().astype(np.uint8)
+
+        # Stack channels to create an RGB image
+        rgb_image = np.stack((temp_r, temp_g, temp_b), axis=2)
+
+        return rgb_image
+
+    def get_blackbody_spectrum_texture(self, wavelengths=np.linspace(300, 800, 500)):
+        """
+        Generates a blackbody spectrum texture based on the average temperature field.
+
+        Args:
+            wavelengths (np.ndarray): Array of wavelengths in nanometers.
+
+        Returns:
+            np.ndarray: Spectral texture as a (resolution_u, resolution_v, len(wavelengths)) array.
+        """
+        # Average the temperature fields
+        avg_T = (self.T_r + self.T_g + self.T_b) / 3.0  # Shape: (resolution_u, resolution_v)
+        avg_T = avg_T.cpu().numpy()
+
+        # Constants for Planck's Law
+        h = 6.62607015e-34  # Planck's constant (J·s)
+        c = 3.0e8           # Speed of light (m/s)
+        k = 1.380649e-23    # Boltzmann's constant (J/K)
+
+        # Convert wavelengths from nm to meters
+        wavelengths_m = wavelengths * 1e-9  # Shape: (num_wavelengths,)
+
+        # Initialize spectral texture
+        spectral_texture = np.zeros((self.resolution_u, self.resolution_v, len(wavelengths)), dtype=np.float32)
+
+        # Compute spectral radiance for each wavelength and temperature
+        for i, wavelength in enumerate(wavelengths_m):
+            # Avoid division by zero and overflow
+            exponent = (h * c) / (wavelength * k * avg_T)
+            exponent = np.clip(exponent, a_min=None, a_max=700)  # Prevent overflow in exp
+            spectral_radiance = (2.0 * h * c**2) / (wavelength**5 * (np.exp(exponent) - 1.0))
+            spectral_texture[:, :, i] = spectral_radiance
+
+        # Normalize spectral texture
+        spectral_texture /= np.max(spectral_texture)
+
+        return spectral_texture
+
+    def save_blackbody_texture(self, filename, wavelengths=np.linspace(300, 800, 500)):
+        """
+        Saves the blackbody spectrum texture to a file.
+
+        Args:
+            filename (str): Path to save the spectral texture.
+            wavelengths (np.ndarray): Array of wavelengths in nanometers.
+        """
+        spectral_texture = self.get_blackbody_spectrum_texture(wavelengths)
+        np.save(filename, spectral_texture)
+
+import matplotlib.pyplot as plt
+
+# Initialize the simulation
+simulation = TemperatureSimulation()
+
+# Run the simulation for a certain number of steps and collect frames
+num_steps = 1000
+frames = []
+for _ in range(num_steps):
+    frame = simulation.update()
+    frames.append(frame)
+
+# Example: Display the last frame
+plt.imshow(frames[-1])
+plt.title("Final Temperature Texture (RGB)")
+plt.axis('off')
+plt.show()
+
+# Generate and save the blackbody spectrum texture
+simulation.save_blackbody_texture("blackbody_spectrum.npy")
+
+# If you want to visualize the spectral texture at a specific grid point:
+spectral_texture = simulation.get_blackbody_spectrum_texture()
+grid_u, grid_v = simulation.resolution_u // 2, simulation.resolution_v // 2
+spectrum = spectral_texture[grid_u, grid_v, :]
+plt.plot(np.linspace(300, 800, 500), spectrum)
+plt.title(f"Blackbody Spectrum at Grid ({grid_u}, {grid_v})")
+plt.xlabel("Wavelength (nm)")
+plt.ylabel("Normalized Radiance")
+plt.show()

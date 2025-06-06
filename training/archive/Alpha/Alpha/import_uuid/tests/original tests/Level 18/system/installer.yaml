@@ -1,0 +1,41 @@
+installation_directory:
+  - system/backups/reinstall/
+system:
+  - bootloader.py       # Workspace bootloader
+  - graph.py            # Core graph operations
+  - text_interface.py   # Command-line or shell text interface
+  - backup_manager.py   # Backup and restore utility
+  - venv_librarian.py   # Venv management tool
+  - backups/:
+      - active/         # Current active workspace (auto-save)
+      - library/        # Versioned backups
+      - recovery/       # Emergency restore point
+      - reinstall/      # The source for files put in place by the bootloader
+constants:
+  - global_constants.yaml
+fields:
+  scalar:
+    - readme.md         # Description and guidance for scalar fields
+  vector:
+    - readme.md         # Description and guidance for vector fields
+  latent:
+    - readme.md         # Description and guidance for latent fields
+  causal:
+    - readme.md         # Description and guidance for causal fields
+nodes:
+  - pip_node.py         # Node for manual venv modifications via pip
+operators:
+  - laplace-beltrami.py # 3D Laplace-Beltrami builder using the metric tensor
+aesthetics:
+  textures/:
+    - placeholder.txt   # Placeholder for custom textures
+  shaders/:
+    - placeholder.txt   # Placeholder for custom shader chains
+venvs:
+  - default/            # Base system virtual environment
+  - causal_fields/      # Venv for causal fields engines
+  - plugins/            # Venv for external plugins
+  - operators/          # Venv for mathematical operators
+  - user_custom/        # Venv for experimentation
+logs:
+  - readme.md           # Information on log usage

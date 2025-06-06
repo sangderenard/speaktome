@@ -1,0 +1,32 @@
+name: "Relativistic Motion Engine"
+description: |
+  Calculates relativistic linear and angular motion dynamics, including Newtonian motion 
+  as a special case. Supports configurable parameters for mass, moments of inertia, 
+  and full relativistic corrections using Lorentz factors. Includes integrable and 
+  differentiable terms to support extended families of motion derivatives.
+parameters:
+  motion_type: "linear"             # Choose between "linear" or "angular" motion
+  base_mass: 1.0                    # Default mass in kg (for linear motion)
+  base_moment: 1.0                  # Default moment of inertia (for angular motion)
+  velocity_threshold: 0.01          # Fraction of c (speed of light) to enter relativistic mode
+  speed_of_light: 3.0e8             # Speed of light in m/s (c)
+  relativistic_correction: true     # Enable Lorentz factor corrections
+engine:
+  operator: "relativistic_motion_operator"  # Reference to the associated operator
+  function: "standard_edge"                 # Standard edge-based operator
+  mode: "vector"
+  integrable_octaves: 
+    - "velocity"                  # Integrates acceleration into velocity
+    - "position"                  # Integrates velocity into position
+  differentiable_octaves:
+    - "acceleration"              # First derivative of velocity
+    - "jerk"                      # Second derivative of velocity
+    - "snap"                      # Third derivative of velocity
+    - "crackle"                   # Fourth derivative of velocity
+    - "pop"                       # Fifth derivative of velocity
+  special_terms:
+    - "momentum"                  # Linear or angular momentum
+    - "work"                      # Work done through force or torque
+    - "impulse"                   # Change in momentum over time
+
+

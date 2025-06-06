@@ -1,0 +1,15 @@
+name: "Lumen Field Engine"
+description: |
+  Calculates light intensity scalar fields using the inverse square law.
+  Used to simulate radiant light emission from a point source.
+parameters:
+  magnitude: 1.0             # Base luminous flux (in lumens, adjustable scale)
+  falloff_exponent: 2.0       # Inverse square law exponent
+engine:
+  operator: "inverse_square_operator"  # Reference to the associated operator
+  function: "standard_edge"            # Function type
+  mode: "scalar"                       # Scalar field computation
+inputs:
+  - position
+outputs:
+  - temperature

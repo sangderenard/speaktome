@@ -1,0 +1,40 @@
+work_packet:
+  name: "BinaryClassifierWorkPacket"
+  description: "A simple binary classification task for a synthetic dataset."
+  rationale: "Demonstrate minimal integration with the system."
+  notes: "This task uses a small feedforward network for binary classification."
+
+initialization:
+  method: "rand"
+
+itinerary:
+  clock_cycle: 3
+  steps:
+    - step: 0
+      action: "initialize"
+      description: "Initialize the input tensor."
+    - step: 1
+      action: "LayerTraversal"
+      layer: "Classifier"
+      description: "Pass the input through the binary classification layer."
+    - step: 2
+      action: "submission"
+      description: "Submit the tensor for loss calculation."
+
+network:
+  layers:
+    - name: "Classifier"
+      type: "Dense"
+      parameters:
+        input_size: 2
+        output_size: 1
+        activation: "Sigmoid"
+      notes: "This layer outputs a single probability for binary classification."
+
+metadata:
+  tips:
+    - "Ensure input features are scaled to match the network's input size."
+    - "Sigmoid activation is used to produce probabilities."
+  common_errors:
+    - "Mismatch between input tensor shape and network layer dimensions."
+    - "Skipping itinerary steps will lead to tensor rejection."

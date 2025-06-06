@@ -1,0 +1,95 @@
+# Sample Work Packet Configuration
+work_packet:
+  name: "ExampleWorkPacket"  # Required. Unique name for the work packet (max 50 chars).
+  description: "This work packet manages tensor operations for image classification."  # Required. Min 10 chars.
+  rationale: "To demonstrate the lifecycle management of tensors in a neural network."  # Required.
+  notes: "Ensure all tensors adhere to the defined itinerary for proper validation."
+
+# Initialization Settings
+initialization:
+  method: "rand"  # Required. Options: [ones, zeros, rand, texture]
+  texture_path: null  # Optional. Provide if 'texture' is selected.
+
+# Tensor Itinerary
+itinerary:
+  clock_cycle: 7  # Required. Total clock cycles for the itinerary (min 2: init + loss submission).
+  steps:
+    - step: 0
+      action: "initialize"  # System-provided initialization step.
+      description: "System-provided initialization of the tensor."
+    - step: 1
+      action: "LayerTraversal"
+      layer: "LayerA"  # Must match the name in the network definition.
+      description: "Pass tensor through LayerA."
+      notes: "Ensure input features match LayerA's expected shape and type."
+    - step: 2
+      action: "tee"  # Split tensor output into multiple destinations.
+      destinations:
+        - destination: "LayerB"
+          notes: "Send data to LayerB."
+        - destination: "LayerC"
+          notes: "Send data to LayerC."
+      description: "Entangle tensor outputs to LayerB and LayerC."
+      notes: >
+        Tensors teed to multiple destinations must **ALL** return for loss submission or
+        destruction by the Loss Manager. No loss will be released until all teed outputs
+        are accounted for.
+    - step: 3
+      action: "LayerTraversal"
+      layer: "LayerB"
+      description: "Pass tensor through LayerB."
+      notes: "Ensure features align with LayerB's output."
+    - step: 4
+      action: "LayerTraversal"
+      layer: "LayerC"
+      description: "Pass tensor through LayerC."
+      notes: "Ensure features align with LayerC's output."
+    - step: 5
+      action: "user_defined"
+      destination: "CustomOperation"
+      description: "Custom user-defined operation."
+      cost: 1  # Clock step cost of this operation.
+      notes: "A specific user-defined step requiring tensor manipulation."
+    - step: 6
+      action: "submission"
+      description: "Submit tensor for loss calculation."  # Final step.
+      notes: >
+        Loss submission will not proceed unless all teed tensors have also been submitted
+        or destroyed by the Loss Manager. Ensure compliance to avoid rejection.
+
+# Network Definition
+network:
+  layers:
+    - name: "LayerA"  # Name must match itinerary step.
+      type: "Convolution"
+      parameters:
+        kernel_size: 3
+        stride: 1
+        padding: 1
+        activation: "ReLU"  # Options: ReLU, Sigmoid, Tanh, etc.
+      notes: "Feature extraction layer."
+
+    - name: "LayerB"  # Name must match itinerary step.
+      type: "Dense"
+      parameters:
+        units: 128
+        activation: "Sigmoid"
+      notes: "Classification layer."
+
+    - name: "LayerC"
+      type: "Recurrent"
+      parameters:
+        units: 64
+        activation: "Tanh"
+      notes: "For sequential data processing."
+
+# Metadata for Best Practices
+metadata:
+  tips:
+    - "Ensure your itinerary and network layers match exactly by name."
+    - "Custom operations must specify a clock step cost in the itinerary."
+    - "ReLU is ideal for convolution layers; Tanh is better for normalized data."
+  common_errors:
+    - "Mismatched names between itinerary steps and network layers will cause validation failure."
+    - "Skipping itinerary steps results in tensor rejection."
+    - "Failing to define initialization or loss submission invalidates the WorkPacket."
