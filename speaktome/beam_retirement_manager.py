@@ -267,8 +267,25 @@ class BeamRetirementManager:
         return promoted_beam_indices, total_vol
 
     def remove_used(self, used_idxs):
-        # Optionally, you can prune from _bucket using the indices if you want tight memory
-        # For most workloads, it's fine to leave as is: the ready_queue acts as the fast-access pool
+        # ########## STUB: remove_used ##########
+        # PURPOSE: prune retired beams from internal buckets after they
+        #          have been used for expansion.
+        # EXPECTED BEHAVIOR: This should free memory by removing entries in
+        #          ``_bucket`` corresponding to ``used_idxs`` once they are no
+        #          longer needed.
+        # INPUTS: ``used_idxs`` - iterable of beam indices that were popped
+        #         from ``ready_queue`` and processed.
+        # OUTPUTS: None. Side effect is mutating ``_bucket`` to drop old
+        #          entries.
+        # KEY ASSUMPTIONS/DEPENDENCIES: ``ready_queue`` already popped these
+        #          indices. Implementation must hold the internal lock when
+        #          mutating ``_bucket``.
+        # TODO:
+        #   - Implement the actual pruning logic under thread lock.
+        #   - Add tests to verify memory usage reduction.
+        # NOTES: Current workloads keep these entries for simplicity. This stub
+        #        clarifies intent for future optimization.
+        # ###################################################################
         pass
 
     def shutdown(self):
