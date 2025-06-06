@@ -5,10 +5,10 @@ from typing import Dict, List, Optional, Tuple, TYPE_CHECKING
 
 # Third-party imports
 import torch
-from transformers import PreTrainedTokenizer
 
 if TYPE_CHECKING:
-    from .compressed_beam_tree import CompressedBeamTree # For type hinting 'CompressedBeamTree'
+    from transformers import PreTrainedTokenizer
+    from .compressed_beam_tree import CompressedBeamTree  # For type hinting
 
 class BeamRetirementManager:
     """

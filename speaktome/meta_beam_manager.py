@@ -5,7 +5,9 @@ from typing import Any, Callable, Dict, Optional
 # Third-party imports
 import torch
 import torch.nn.functional as F
-from transformers import PreTrainedTokenizer # For type hinting tokenizer
+
+if TYPE_CHECKING:
+    from transformers import PreTrainedTokenizer  # For type hinting
 
 # --- MetaBeamManager ---
 class MetaBeamManager:

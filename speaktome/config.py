@@ -6,7 +6,13 @@ try:
 except ModuleNotFoundError:  # pragma: no cover - runtime path
     torch = None
     TORCH_AVAILABLE = False
-from sentence_transformers import SentenceTransformer
+
+SentenceTransformer = None
+try:
+    from sentence_transformers import SentenceTransformer as _SentenceTransformer
+    SentenceTransformer = _SentenceTransformer
+except ModuleNotFoundError:  # pragma: no cover - optional dependency
+    pass
 
 # Configuration constants
 if TORCH_AVAILABLE:
@@ -33,6 +39,10 @@ def get_sentence_transformer_model() -> SentenceTransformer:
     its value will be used as the model path to avoid network downloads.
     """
     global sentence_transformer_model
+    if SentenceTransformer is None:
+        raise RuntimeError(
+            "SentenceTransformer is required for embedding features."
+        )
     if sentence_transformer_model is None:
         model_name_or_path = os.environ.get("SENTENCE_TRANSFORMER_MODEL_PATH")
         if not model_name_or_path:
