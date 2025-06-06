@@ -4,7 +4,9 @@ from typing import Optional, List, TYPE_CHECKING
 
 # Third-party imports
 import torch
-from transformers import PreTrainedTokenizer
+
+if TYPE_CHECKING:
+    from transformers import PreTrainedTokenizer
 
 from .lazy_loader import lazy_install
 
@@ -18,7 +20,7 @@ class BeamTreeVisualizer:
     def visualize_subtree(
         self,
         pyg_data: 'PyGData',
-        tokenizer: PreTrainedTokenizer,
+        tokenizer: 'PreTrainedTokenizer',
         beam_search_obj: Optional['BeamSearch'],
         root_pyg_node_id: int,
         title: str = "Beam Subtree",
@@ -134,7 +136,7 @@ class BeamTreeVisualizer:
         self,
         tree: 'CompressedBeamTree',
         sentence_model: 'SentenceTransformer',
-        tokenizer: PreTrainedTokenizer,
+        tokenizer: 'PreTrainedTokenizer',
         title: str = "Beam Tree Node Sentence Embeddings (PCA)",
     ) -> None:
         plt = lazy_install('matplotlib.pyplot', 'matplotlib')
