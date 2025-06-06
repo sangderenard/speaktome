@@ -21,7 +21,7 @@ except ModuleNotFoundError:  # pragma: no cover - optional dependency
 
 from .token_vocab import TokenVocabulary
 from .tensor_abstraction import NumPyTensorOperations
-from .pure_python_tensor_operations import PurePythonTensorOperations
+from .domains.pure.pure_python_tensor_operations import PurePythonTensorOperations
 from .model_abstraction import AbstractModelWrapper
 from .lookahead_controller import LookaheadController, LookaheadConfig
 

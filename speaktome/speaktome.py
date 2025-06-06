@@ -81,8 +81,8 @@ def main(raw_args=None, allow_retry=True):
     def run_once():
         from .beam_search import BeamSearch
         from .scorer import Scorer
-        from .pygeo_mind import PyGeoMind
-        from .pyg_graph_controller import PyGGraphController
+        from .domains.geo.pygeo_mind import PyGeoMind
+        from .domains.geo.pyg_graph_controller import PyGGraphController
         from .compressed_beam_tree import CompressedBeamTree
         from .beam_tree_visualizer import BeamTreeVisualizer
         seed_from_flag = args.seed != parser.get_default('seed')
