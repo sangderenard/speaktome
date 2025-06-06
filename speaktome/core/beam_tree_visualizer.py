@@ -8,7 +8,7 @@ import torch
 if TYPE_CHECKING:
     from transformers import PreTrainedTokenizer
 
-from .lazy_loader import lazy_install
+from ..util.lazy_loader import lazy_install
 
 if TYPE_CHECKING:
     from .beam_search import BeamSearch

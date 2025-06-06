@@ -19,11 +19,11 @@ except ModuleNotFoundError:  # pragma: no cover - optional dependency
     NUMPY_AVAILABLE = False
     np = None  # type: ignore
 
-from .token_vocab import TokenVocabulary
-from .tensor_abstraction import NumPyTensorOperations
+from .util.token_vocab import TokenVocabulary
+from .core.tensor_abstraction import NumPyTensorOperations
 from .domains.pure.pure_python_tensor_operations import PurePythonTensorOperations
-from .model_abstraction import AbstractModelWrapper
-from .lookahead_controller import LookaheadController, LookaheadConfig
+from .core.model_abstraction import AbstractModelWrapper
+from .core.lookahead_controller import LookaheadController, LookaheadConfig
 
 VOCAB = TokenVocabulary("abcdefghijklmnopqrstuvwxyz ")
 

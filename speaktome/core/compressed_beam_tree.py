@@ -3,7 +3,7 @@ from typing import Dict, List, Optional, Tuple, Any, TYPE_CHECKING
 
 # Third-party imports
 import torch
-from .lazy_loader import lazy_install
+from ..util.lazy_loader import lazy_install
 
 if TYPE_CHECKING:
     from transformers import PreTrainedTokenizer  # For type hinting

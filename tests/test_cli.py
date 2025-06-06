@@ -2,7 +2,7 @@ import subprocess
 import sys
 import pytest
 
-from speaktome.cli_permutations import CLIArgumentMatrix
+from speaktome.util.cli_permutations import CLIArgumentMatrix
 
 
 def test_help_message():

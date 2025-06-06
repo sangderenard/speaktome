@@ -20,7 +20,7 @@ except ModuleNotFoundError:  # pragma: no cover - runtime message only
     TRANSFORMERS_AVAILABLE = False
     print("Transformers is not installed. Running CPU-only demo mode.")
 
-from .lazy_loader import lazy_import
+from .util.lazy_loader import lazy_import
 if TYPE_CHECKING:
     from torch_geometric.data import Data as PyGData
     import torch_geometric.nn as pyg_nn
@@ -79,12 +79,12 @@ def main(raw_args=None, allow_retry=True):
         config.DEVICE = torch.device("cpu")
 
     def run_once():
-        from .beam_search import BeamSearch
-        from .scorer import Scorer
+        from .core.beam_search import BeamSearch
+        from .core.scorer import Scorer
         from .domains.geo.pygeo_mind import PyGeoMind
         from .domains.geo.pyg_graph_controller import PyGGraphController
-        from .compressed_beam_tree import CompressedBeamTree
-        from .beam_tree_visualizer import BeamTreeVisualizer
+        from .core.compressed_beam_tree import CompressedBeamTree
+        from .core.beam_tree_visualizer import BeamTreeVisualizer
         seed_from_flag = args.seed != parser.get_default('seed')
         final_seed = args.seed if seed_from_flag else ' '.join(args.seed_text)
 

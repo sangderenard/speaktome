@@ -21,7 +21,7 @@ from .tensor_abstraction import (
     PyTorchTensorOperations,
 )
 
-from .lazy_loader import lazy_import, optional_import
+from ..util.lazy_loader import lazy_import, optional_import
 from . import config
 
 class Scorer:

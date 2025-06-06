@@ -4,19 +4,20 @@ from typing import Optional, List, TYPE_CHECKING
 # Third-party imports
 import torch
 
-from .lazy_loader import lazy_import
+from ...util.lazy_loader import lazy_import
 if TYPE_CHECKING:
     from torch_geometric.data import Data as PyGData
 
 # Local application/library specific imports
-from .beam_search import BeamSearch
+from ...core.beam_search import BeamSearch
 from .pygeo_mind import PyGeoMind
-from .human_scorer_policy_manager import HumanScorerPolicyManager
-from .beam_search_instruction import BeamSearchInstruction
+# Local application/library specific imports
+from ...core.human_scorer_policy_manager import HumanScorerPolicyManager
+from ...core.beam_search_instruction import BeamSearchInstruction
 # Ensure this import points to the new location of BeamTreeVisualizer
 # Import both visualizers from beam_tree_visualizer.py
-from .beam_tree_visualizer import BeamTreeVisualizer
-from .config import get_sentence_transformer_model
+from ...core.beam_tree_visualizer import BeamTreeVisualizer
+from ...config import get_sentence_transformer_model
 class PyGGraphController:
     def __init__(self, beam_search: BeamSearch, pygeomind_model: Optional[PyGeoMind] = None, human_in_control: bool = False):
         self.beam_search = beam_search

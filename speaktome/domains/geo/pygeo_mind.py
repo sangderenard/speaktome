@@ -5,20 +5,20 @@ from typing import Dict, List, Tuple, TYPE_CHECKING
 # Third-party imports
 import torch
 
-from . import Faculty
+from ...faculty import Faculty
 
 FACULTY_REQUIREMENT = Faculty.PYGEO
 
-from .lazy_loader import lazy_install
+from ...util.lazy_loader import lazy_install
 if TYPE_CHECKING:
     from torch_geometric.data import Data as PyGData
     import torch_geometric.nn as pyg_nn
 
 # Local application/library specific imports
-from .beam_search_instruction import BeamSearchInstruction
-from .compressed_beam_tree import CompressedBeamTree
-from .human_scorer_policy_manager import HumanScorerPolicyManager
-from .scorer import Scorer
+from ...core.beam_search_instruction import BeamSearchInstruction
+from ...core.compressed_beam_tree import CompressedBeamTree
+from ...core.human_scorer_policy_manager import HumanScorerPolicyManager
+from ...core.scorer import Scorer
 
 
 class PyGeoMind(torch.nn.Module):

@@ -1,6 +1,6 @@
 """Pure Python implementation of AbstractTensorOperations using lists."""
 from typing import Any, Tuple, Optional, List, Union
-from .tensor_abstraction import AbstractTensorOperations
+from ...tensor_abstraction import AbstractTensorOperations
 import math
 
 # Helper function to get shape of nested lists
