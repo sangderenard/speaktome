@@ -58,6 +58,16 @@ class AbstractTensorOperations(ABC):
         pass
 
     @abstractmethod
+    def pad(self, tensor: Any, pad: Tuple[int, ...], value: float = 0) -> Any:
+        """Pad tensor according to `pad` specification."""
+        pass
+
+    @abstractmethod
+    def cat(self, tensors: List[Any], dim: int = 0) -> Any:
+        """Concatenate tensors along `dim`."""
+        pass
+
+    @abstractmethod
     def topk(self, tensor: Any, k: int, dim: int) -> Tuple[Any, Any]:
         pass
 
@@ -157,6 +167,12 @@ class PyTorchTensorOperations(AbstractTensorOperations):
 
     def topk(self, tensor, k, dim):
         return torch.topk(tensor, k=k, dim=dim)
+
+    def pad(self, tensor, pad, value=0.0):
+        return F.pad(tensor, pad, value=value)
+
+    def cat(self, tensors, dim=0):
+        return torch.cat(tensors, dim=dim)
 
     def repeat_interleave(self, tensor, repeats, dim=None):
         return tensor.repeat_interleave(repeats, dim=dim)
@@ -277,6 +293,15 @@ class NumPyTensorOperations(AbstractTensorOperations):
         indices = np.argsort(tensor, axis=dim)[:, -k:][:, ::-1]
         values = np.take_along_axis(tensor, indices, axis=dim)
         return values, indices
+
+    def pad(self, tensor, pad, value=0.0):
+        if len(pad) % 2 != 0:
+            raise ValueError("pad must have even length")
+        pad_width = [(pad[i], pad[i+1]) for i in range(0, len(pad), 2)]
+        return np.pad(tensor, pad_width, constant_values=value)
+
+    def cat(self, tensors, dim=0):
+        return np.concatenate(tensors, axis=dim)
 
     def repeat_interleave(self, tensor, repeats, dim=None):
         return np.repeat(tensor, repeats, axis=dim)
