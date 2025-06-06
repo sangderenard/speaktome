@@ -14,7 +14,7 @@ Implemented guestbook auto-archiving and started a dynamic CLI permutation helpe
 2. Updated `validate_guestbook.py` to rename files, archive old entries, and load stickies.
 3. Added `CLIArgumentMatrix` to generate argument permutations.
 4. Wrote unit tests covering the new helper and guestbook script.
-5. Ran `todo/validate_guestbook.py` and `pytest -q`.
+5. Ran `AGENTS/validate_guestbook.py` and `pytest -q`.
 
 ## Observed Behaviour
 - The script moves excess reports to the archive folder.

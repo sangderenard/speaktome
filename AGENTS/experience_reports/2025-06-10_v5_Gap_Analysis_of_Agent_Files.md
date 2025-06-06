@@ -12,8 +12,8 @@ Explored the repository as a new automated agent to understand agent organizatio
 "Include a section in each report that captures verbatim any prompts or scripted instructions that guided the session."
 
 ## Steps Taken
-1. Read `AGENTS.md` in the repo root and `todo/AGENTS.md` for instructions.
-2. Listed files under `todo/experience_reports` to review past reports.
+1. Read `AGENTS.md` in the repo root and `AGENTS/GUESTBOOK.md` for instructions.
+2. Listed files under `AGENTS/experience_reports` to review past reports.
 3. Examined `testing/lookahead_demo.py` as an example test harness.
 4. Created this experience report using the prescribed template and naming convention.
 5. Will run the `validate_guestbook.py` script to confirm file naming.
