@@ -454,7 +454,25 @@ class CompressedBeamTree:
             # This requires iterating root nodes (parent_node_idx is None)
             # For simplicity, we'll assume new root paths are always new unless a more complex
             # root prefix matching is implemented. The current logic handles extending existing.
-            pass # current_parent_node_idx is None, current_depth is 0
+            # ########## STUB: root_prefix_matching ##########
+            # PURPOSE: Determine whether the provided token sequence matches an
+            #          existing root prefix and attach appropriately.
+            # EXPECTED BEHAVIOR: When implemented, this will allow insertion of
+            #          new paths that share a prefix with existing root nodes
+            #          instead of always creating a new root branch.
+            # INPUTS: ``tokens`` list to insert when ``insert_under_beam_idx`` is
+            #         ``None``.
+            # OUTPUTS: Should return an existing beam index if found, or create
+            #          a new root node otherwise.
+            # KEY ASSUMPTIONS/DEPENDENCIES: Works in tandem with leaf tracking
+            #          and node depth management.
+            # TODO:
+            #   - Implement iteration over current root nodes to check for
+            #     prefix matches.
+            #   - Update tests to cover prefix-matching behavior.
+            # NOTES: Current implementation always assumes a new root path.
+            # ###############################################################
+            pass
 
         # `token_idx_in_snap_to_process` is the index of the first token in `tokens` to create a new node for.
         # `current_parent_node_idx` is the tree node_idx under which the new segment should be attached.
