@@ -1,6 +1,9 @@
 import types
 import sys
-import numpy as np
+try:
+    import numpy as np
+except ModuleNotFoundError:  # pragma: no cover - optional dependency
+    np = None  # type: ignore
 
 # Provide dummy sentence_transformers module so speaktome.config imports succeed
 stub_st = types.ModuleType("sentence_transformers")
@@ -12,7 +15,14 @@ class _DummyTok: pass
 stub_tx.PreTrainedTokenizer = _DummyTok
 sys.modules.setdefault("transformers", stub_tx)
 
-from speaktome.tensor_abstraction import NumPyTensorOperations
+from speaktome import Faculty, DEFAULT_FACULTY
+from speaktome.tensor_abstraction import (
+    NumPyTensorOperations,
+    PyTorchTensorOperations,
+)
+from speaktome.domains.pure.pure_python_tensor_operations import (
+    PurePythonTensorOperations,
+)
 from speaktome.model_abstraction import AbstractModelWrapper
 from speaktome.lookahead_controller import LookaheadController, LookaheadConfig
 
@@ -30,13 +40,21 @@ class DummyTokenizer:
     pad_token_id = 0
 
 
+def _choose_ops():
+    if DEFAULT_FACULTY in (Faculty.TORCH, Faculty.PYGEO):
+        return PyTorchTensorOperations()
+    if DEFAULT_FACULTY is Faculty.NUMPY and np is not None:
+        return NumPyTensorOperations()
+    return PurePythonTensorOperations()
+
+
 def aggregate(scores):
-    ops = NumPyTensorOperations()
+    ops = _choose_ops()
     return ops.mean(scores, dim=-1)
 
 
 def main():
-    ops = NumPyTensorOperations()
+    ops = _choose_ops()
     model = DummyModel()
     tokenizer = DummyTokenizer()
     cfg = LookaheadConfig(
@@ -55,10 +73,16 @@ def main():
         model_wrapper=model,
     )
 
-    prefix_tokens = np.array([[1]], dtype=np.int64)
-    prefix_scores = np.array([[0.0]], dtype=np.float32)
-    prefix_lengths = np.array([1], dtype=np.int64)
-    parent_idx = np.array([0], dtype=np.int64)
+    if isinstance(ops, NumPyTensorOperations) and np is not None:
+        prefix_tokens = np.array([[1]], dtype=np.int64)
+        prefix_scores = np.array([[0.0]], dtype=np.float32)
+        prefix_lengths = np.array([1], dtype=np.int64)
+        parent_idx = np.array([0], dtype=np.int64)
+    else:
+        prefix_tokens = [[1]]
+        prefix_scores = [[0.0]]
+        prefix_lengths = [1]
+        parent_idx = [0]
 
     out = controller.run(prefix_tokens, prefix_scores, prefix_lengths, parent_idx)
     tokens, scores, lengths, parents, parent_lens, pruned = out

@@ -31,8 +31,8 @@ STUB_MODULES = [
     ("speaktome.human_pilot_controller", "HumanPilotController"),
     ("speaktome.human_scorer_policy_manager", "HumanScorerPolicyManager"),
     ("speaktome.model_abstraction", "PyTorchModelWrapper"),
-    ("speaktome.pyg_graph_controller", "PyGGraphController"),
-    ("speaktome.pygeo_mind", "PyGeoMind"),
+    ("speaktome.domains.geo.pyg_graph_controller", "PyGGraphController"),
+    ("speaktome.domains.geo.pygeo_mind", "PyGeoMind"),
     ("speaktome.scorer", "Scorer"),
     ("speaktome.tensor_abstraction", "PyTorchTensorOperations"),
 ]
