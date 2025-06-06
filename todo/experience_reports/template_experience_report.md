@@ -6,6 +6,9 @@
 ## Overview
 Describe the purpose of this run or scenario.
 
+## Prompts
+List any prompts or scripted instructions that guided this session. Quote them verbatim.
+
 ## Steps Taken
 1. Environment setup commands or actions.
 2. Commands executed.
