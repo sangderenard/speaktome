@@ -1,6 +1,6 @@
 # Standard library imports
 import queue as py_queue
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Callable, Dict, Optional, TYPE_CHECKING
 
 # Third-party imports
 import torch
