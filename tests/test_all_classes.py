@@ -1,21 +1,28 @@
 import importlib
+import logging
 import pytest
 
 from speaktome.util.cli_permutations import CLIArgumentMatrix
 from speaktome.util.token_vocab import TokenVocabulary
 
+logger = logging.getLogger(__name__)
+
 
 def test_token_vocabulary_round_trip():
+    logger.info('test_token_vocabulary_round_trip start')
     vocab = TokenVocabulary("ab ")
     ids = vocab.encode("ba")
     assert vocab.decode(ids) == "ba"
+    logger.info('test_token_vocabulary_round_trip end')
 
 
 def test_cli_argument_matrix_basic():
+    logger.info('test_cli_argument_matrix_basic start')
     matrix = CLIArgumentMatrix()
     matrix.add_option("--flag", [1, 2])
     combos = matrix.generate()
     assert ["--flag", "1"] in combos and ["--flag", "2"] in combos
+    logger.info('test_cli_argument_matrix_basic end')
 
 
 # ----- Stub placeholders for complex classes -----
@@ -40,10 +47,10 @@ STUB_MODULES = [
 
 
 @pytest.mark.parametrize("mod_name,cls_name", STUB_MODULES)
-@pytest.mark.stub
-def test_class_stub(mod_name: str, cls_name: str):
-    try:
-        mod = importlib.import_module(mod_name)
-        getattr(mod, cls_name)
-    except ModuleNotFoundError:
-        pytest.skip(f"Optional dependency missing for {cls_name}")
+def test_class_instantiation(mod_name: str, cls_name: str):
+    logger.info(f'test_class_instantiation start for {cls_name}')
+    mod = importlib.import_module(mod_name)
+    cls = getattr(mod, cls_name)
+    logger.info('instantiating %s', cls_name)
+    cls()
+    logger.info('test_class_instantiation end for %s', cls_name)
