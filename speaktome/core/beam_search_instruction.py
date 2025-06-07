@@ -1,6 +1,11 @@
 # Standard library imports
-from typing import Any, Callable, Dict, List, Optional, Tuple
-import torch
+from typing import Any, Callable, Dict, List, Optional, Tuple, TYPE_CHECKING
+try:
+    import torch  # type: ignore
+except ModuleNotFoundError:  # pragma: no cover - optional dependency
+    torch = None  # type: ignore
+if TYPE_CHECKING:  # pragma: no cover - type hints only
+    from torch import Tensor
 # Local application/library specific imports
 from .scorer import Scorer # Assuming Scorer is in scorer.py
 # --- END HEADER ---
@@ -33,7 +38,7 @@ class BeamSearchInstruction:
         lookahead_steps: Optional[int] = None,
         # New: Lookahead-specific scoring configuration
         lookahead_score_bins_config: Optional[Dict[str, Dict[str, Any]]] = None, # e.g. {'lh_bin1': {'fn': callable, 'params': {}}}
-        lookahead_aggregate_fn: Optional[Callable[[torch.Tensor], torch.Tensor]] = None, # Takes [num_bins, num_cands] -> [num_cands]
+        lookahead_aggregate_fn: Optional[Callable[["Tensor"], "Tensor"]] = None, # Takes [num_bins, num_cands] -> [num_cands]
     ):
         self.node_id      = node_id
         self.action       = action
