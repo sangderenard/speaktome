@@ -216,6 +216,11 @@ pip install -r requirements-dev.txt
 pytest -v
 ```
 
+Each test run writes a log to `testing/logs/pytest_<TIMESTAMP>.log` so results
+are preserved across sessions. Older logs are automatically pruned to keep only
+the ten most recent files. `.gitignore` excludes these log files from version
+control.
+
 The test suite exercises the command line interface and other helper modules.
 
 ## License
