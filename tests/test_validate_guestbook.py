@@ -1,5 +1,6 @@
 import os
 import shutil
+import logging
 from pathlib import Path
 from importlib import reload
 
@@ -7,6 +8,8 @@ import pytest
 
 import AGENTS.validate_guestbook as vg
 SCRIPT = Path('AGENTS/validate_guestbook.py')
+
+logger = logging.getLogger(__name__)
 
 
 @pytest.fixture
@@ -25,9 +28,11 @@ def temp_reports(tmp_path, monkeypatch):
 
 
 def test_archives_old_files(temp_reports):
+    logger.info('test_archives_old_files start')
     vg.validate_and_fix()
     vg.archive_old_reports()
     archived_files = sorted(os.listdir(temp_reports / 'archive'))
     assert len(archived_files) == 2
+    logger.info('test_archives_old_files end')
 
 
