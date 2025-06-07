@@ -1,3 +1,5 @@
+"""Tests for the guestbook validation helper."""
+
 import os
 import shutil
 import logging
@@ -27,12 +29,13 @@ def temp_reports(tmp_path, monkeypatch):
     return dst
 
 
-def test_archives_old_files(temp_reports):
-    logger.info('test_archives_old_files start')
+def test_archives_old_files(temp_reports) -> None:
+    """Verify that older reports are moved into ``archive/``."""
+    logger.info("test_archives_old_files start")
     vg.validate_and_fix()
     vg.archive_old_reports()
     archived_files = sorted(os.listdir(temp_reports / 'archive'))
     assert len(archived_files) == 2
-    logger.info('test_archives_old_files end')
+    logger.info("test_archives_old_files end")
 
 

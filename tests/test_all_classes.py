@@ -1,3 +1,9 @@
+"""Smoke tests for miscellaneous modules.
+
+These checks ensure that a few lightweight utilities instantiate correctly and
+that the basic command-line interface functions as expected.
+"""
+
 import importlib
 import logging
 import sys
@@ -6,25 +12,28 @@ import pytest
 
 from speaktome.util.cli_permutations import CLIArgumentMatrix
 from speaktome.util.token_vocab import TokenVocabulary
+from speaktome.faculty import DEFAULT_FACULTY, Faculty
 
 logger = logging.getLogger(__name__)
 
 
 def test_token_vocabulary_round_trip():
-    logger.info('test_token_vocabulary_round_trip start')
+    """Round trip a short string through :class:`TokenVocabulary`."""
+    logger.info("test_token_vocabulary_round_trip start")
     vocab = TokenVocabulary("ab ")
     ids = vocab.encode("ba")
     assert vocab.decode(ids) == "ba"
-    logger.info('test_token_vocabulary_round_trip end')
+    logger.info("test_token_vocabulary_round_trip end")
 
 
 def test_cli_argument_matrix_basic():
-    logger.info('test_cli_argument_matrix_basic start')
+    """Ensure the argument matrix expands options as expected."""
+    logger.info("test_cli_argument_matrix_basic start")
     matrix = CLIArgumentMatrix()
     matrix.add_option("--flag", [1, 2])
     combos = matrix.generate()
     assert ["--flag", "1"] in combos and ["--flag", "2"] in combos
-    logger.info('test_cli_argument_matrix_basic end')
+    logger.info("test_cli_argument_matrix_basic end")
 
 
 # ----- Stub placeholders for complex classes -----
@@ -49,8 +58,12 @@ STUB_MODULES = [
 
 
 @pytest.mark.parametrize("mod_name,cls_name", STUB_MODULES)
-def test_class_instantiation(mod_name: str, cls_name: str):
-    logger.info(f'test_class_instantiation start for {cls_name}')
+def test_class_instantiation(mod_name: str, cls_name: str) -> None:
+    """Import each listed module and instantiate the referenced class."""
+    if DEFAULT_FACULTY is Faculty.PURE_PYTHON:
+        pytest.skip("Optional libraries not installed; skipping class instantiation tests")
+
+    logger.info(f"test_class_instantiation start for {cls_name}")
     try:
         mod = importlib.import_module(mod_name)
     except ModuleNotFoundError as exc:
