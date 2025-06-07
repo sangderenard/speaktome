@@ -8,7 +8,7 @@ set -euo pipefail
 bash setup_env.sh "$@"
 
 # Define the venv Python path (assumes setup_env.sh created it at .venv)
-VENV_PYTHON="./.venv/bin/python"
+VENV_PYTHON="./.venv/scripts/python"
 
 # Fail fast if venv not created
 if [ ! -x "$VENV_PYTHON" ]; then
