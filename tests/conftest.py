@@ -15,16 +15,20 @@ def pytest_configure(config: pytest.Config) -> None:
     for old in logs[:-10]:
         try:
             old.unlink()
-        except OSError:
+        except OSError:  # pragma: no cover
             pass
 
     timestamp = time.strftime("%Y%m%d_%H%M%S")
     log_file = log_dir / f"pytest_{timestamp}.log"
 
+    # Get the root logger and set its level to capture INFO and higher messages
+    root_logger = logging.getLogger()
+    root_logger.setLevel(logging.INFO)
+
     handler = logging.FileHandler(log_file, mode="w")
     formatter = logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s")
     handler.setFormatter(formatter)
-    root_logger = logging.getLogger()
+
     root_logger.addHandler(handler)
     config._speaktome_log_handler = handler
 
