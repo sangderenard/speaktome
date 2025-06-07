@@ -8,6 +8,7 @@ from torch_geometric.data import Data as PyGData # type: ignore[import-untyped] 
 # Local application/library specific imports
 from .beam_search import BeamSearch
 from .beam_search_instruction import BeamSearchInstruction
+# --- END HEADER ---
 
 class HumanPilotController:
     """

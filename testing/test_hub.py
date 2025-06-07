@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import pytest
 from pathlib import Path
+# --- END HEADER ---
 
 
 class StubCollector:

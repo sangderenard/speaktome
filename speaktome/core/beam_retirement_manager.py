@@ -5,6 +5,7 @@ from typing import Dict, List, Optional, Tuple, TYPE_CHECKING
 
 # Third-party imports
 import torch
+# --- END HEADER ---
 
 if TYPE_CHECKING:
     from transformers import PreTrainedTokenizer

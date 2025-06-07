@@ -1,6 +1,7 @@
 import json
 import os
 from datetime import datetime
+# --- END HEADER ---
 
 USERS_DIR = os.path.join(os.path.dirname(__file__), "users")
 
