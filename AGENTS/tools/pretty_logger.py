@@ -1,12 +1,12 @@
-"""
-Pretty logging with contextual headers and markdown formatting.
-"""
-import sys
+"""Pretty logging with contextual headers and markdown formatting."""
+
 import logging
-import inspect
+import sys
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import Optional, List
+from typing import List, Optional
+
+# --- END HEADER ---
 
 @dataclass
 class LogContext:

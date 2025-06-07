@@ -11,9 +11,20 @@ import time
 from pathlib import Path
 import sys
 import os  # For FORCE_ENV
+import importlib.util
+from io import StringIO
 
 # Import faculty components for logging
 from speaktome.faculty import DEFAULT_FACULTY, FORCE_ENV, Faculty
+
+spec = importlib.util.spec_from_file_location(
+    "pretty_logger",
+    Path(__file__).resolve().parents[1] / "AGENTS" / "tools" / "pretty_logger.py",
+)
+pretty_mod = importlib.util.module_from_spec(spec)
+assert spec.loader
+spec.loader.exec_module(pretty_mod)
+PrettyLogger = pretty_mod.PrettyLogger
 # --- END HEADER ---
 
 class StdoutTee:
@@ -60,6 +71,7 @@ def pytest_configure(config: pytest.Config) -> None:
 
     timestamp = time.strftime("%Y%m%d_%H%M%S")
     log_file = log_dir / f"pytest_{timestamp}.log"
+    md_file = log_dir / f"pytest_{timestamp}.md"
 
     root_logger = logging.getLogger()
     # Clear existing handlers to avoid duplicate logging if pytest is run multiple times in one session/process
@@ -76,6 +88,12 @@ def pytest_configure(config: pytest.Config) -> None:
 
     root_logger.addHandler(file_handler)
     config._speaktome_log_handler = file_handler
+
+    pretty_logger = PrettyLogger("pytest-pretty")
+    md_handler = logging.FileHandler(md_file, mode="w", encoding="utf-8")
+    md_handler.setFormatter(logging.Formatter("%(message)s"))
+    pretty_logger.logger.addHandler(md_handler)
+    config._speaktome_pretty_logger = pretty_logger
 
     # --- Enhanced Log Header & Faculty Information ---
     log_header_intro = f"""
@@ -113,24 +131,59 @@ Active Faculty for this Session:
 --------------------------------
 """
     root_logger.info(log_header_intro)
+    with pretty_logger.context("PyTest Session Header"):
+        pretty_logger.info("Test Session Timestamp: " + timestamp)
 
     forced_faculty_env = os.environ.get(FORCE_ENV)
-    if forced_faculty_env:
-        try:
-            # Attempt to use the forced faculty for logging, but DEFAULT_FACULTY reflects actual runtime for tests
-            forced_faculty_val_log = Faculty[forced_faculty_env.upper()]
-            root_logger.info(f"[FACULTY_INFO] Environment variable {FORCE_ENV} is SET to '{forced_faculty_env}'.")
-            root_logger.info(f"[FACULTY_INFO] Tests will attempt to run as if faculty is {forced_faculty_val_log.name}.")
-            root_logger.info(f"[FACULTY_INFO] Actual auto-detected faculty (used by tests unless overridden in code): {DEFAULT_FACULTY.name}.")
-        except KeyError:
-            root_logger.warning(f"[FACULTY_WARNING] Environment variable {FORCE_ENV} is SET to an INVALID value '{forced_faculty_env}'.")
-            root_logger.info(f"[FACULTY_INFO] Using auto-detected faculty for tests: {DEFAULT_FACULTY.name}.")
-    else:
-        root_logger.info(f"[FACULTY_INFO] Environment variable {FORCE_ENV} is NOT set.")
-        root_logger.info(f"[FACULTY_INFO] Using auto-detected faculty for tests: {DEFAULT_FACULTY.name}.")
+    with pretty_logger.context("Faculty Information"):
+        if forced_faculty_env:
+            try:
+                forced_faculty_val_log = Faculty[forced_faculty_env.upper()]
+                msg = (
+                    f"Environment variable {FORCE_ENV} is SET to '{forced_faculty_env}'."
+                )
+                pretty_logger.info(msg)
+                root_logger.info(f"[FACULTY_INFO] {msg}")
+                msg = (
+                    f"Tests will attempt to run as if faculty is {forced_faculty_val_log.name}."
+                )
+                pretty_logger.info(msg)
+                root_logger.info(f"[FACULTY_INFO] {msg}")
+                msg = (
+                    "Actual auto-detected faculty (used by tests unless overridden in code): "
+                    f"{DEFAULT_FACULTY.name}."
+                )
+                pretty_logger.info(msg)
+                root_logger.info(f"[FACULTY_INFO] {msg}")
+            except KeyError:
+                warn_msg = (
+                    f"Environment variable {FORCE_ENV} is SET to an INVALID value '{forced_faculty_env}'."
+                )
+                pretty_logger.info(warn_msg)
+                root_logger.warning(f"[FACULTY_WARNING] {warn_msg}")
+                msg = f"Using auto-detected faculty for tests: {DEFAULT_FACULTY.name}."
+                pretty_logger.info(msg)
+                root_logger.info(f"[FACULTY_INFO] {msg}")
+        else:
+            msg = f"Environment variable {FORCE_ENV} is NOT set."
+            pretty_logger.info(msg)
+            root_logger.info(f"[FACULTY_INFO] {msg}")
+            msg = f"Using auto-detected faculty for tests: {DEFAULT_FACULTY.name}."
+            pretty_logger.info(msg)
+            root_logger.info(f"[FACULTY_INFO] {msg}")
     
     root_logger.info("--------------------------------------------------------------------------------")
     # --- End Enhanced Log Header & Faculty Information ---
+    from dump_headers import dump_headers
+    buf = StringIO()
+    _stdout = sys.stdout
+    sys.stdout = buf
+    dump_headers(Path("speaktome"))
+    dump_headers(Path("AGENTS/tools"))
+    sys.stdout = _stdout
+    with pretty_logger.context("Module Headers"):
+        for line in buf.getvalue().splitlines():
+            pretty_logger.info(line)
 
     # Store original stdout and tee writes to both stdout and the log
     config._original_stdout = sys.stdout
@@ -148,6 +201,12 @@ def pytest_unconfigure(config: pytest.Config) -> None:
         logging.getLogger().removeHandler(handler)
         handler.close()
 
+    p_logger = getattr(config, "_speaktome_pretty_logger", None)
+    if p_logger:
+        for h in p_logger.logger.handlers[:]:
+            p_logger.logger.removeHandler(h)
+            h.close()
+
 
 def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
     """Optionally skip tests marked ``stub``."""
@@ -158,4 +217,17 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
     for item in items:
         if 'stub' in item.keywords:
             item.add_marker(skip_stub)
+
+
+@pytest.fixture(scope="session")
+def pretty_logger(request: pytest.FixtureRequest):
+    """Access the PrettyLogger configured for the session."""
+    return request.config._speaktome_pretty_logger
+
+
+@pytest.fixture(autouse=True)
+def pretty_context(request: pytest.FixtureRequest, pretty_logger):
+    """Wrap each test in a pretty logging context."""
+    with pretty_logger.context(request.node.nodeid):
+        yield
 
