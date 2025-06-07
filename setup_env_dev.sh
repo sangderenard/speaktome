@@ -16,5 +16,15 @@ python AGENTS/tools/stubfinder.py speaktome
 # Display important documentation
 cat AGENTS/AGENT_CONSTITUTION.md
 cat AGENTS.md
+
+# Show contributor credits
+python AGENTS/tools/list_contributors.py
+
+# Show license
 cat LICENSE
+
+# Show coding standards
 cat AGENTS/CODING_STANDARDS.md
+cat AGENTS/CONTRIBUTING.md
+# Show project overview
+cat AGENTS/PROJECT_OVERVIEW.md 
