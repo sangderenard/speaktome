@@ -24,6 +24,7 @@ def test_token_vocabulary_round_trip():
     vocab = TokenVocabulary("ab ")
     ids = vocab.encode("ba")
     assert vocab.decode(ids) == "ba"
+    TokenVocabulary.test()
     logger.info("test_token_vocabulary_round_trip end")
 
 
