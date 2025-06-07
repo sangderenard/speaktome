@@ -1,9 +1,10 @@
 # Standard library imports
 from __future__ import annotations
-from typing import List, Tuple, Callable, Any, Set
+from typing import List, Tuple, Callable, Any, Set, TYPE_CHECKING
 
 # Local application/library specific imports
-from .beam_search_instruction import BeamSearchInstruction # Assuming this is in its own file
+if TYPE_CHECKING:  # pragma: no cover - type hints only
+    from .beam_search_instruction import BeamSearchInstruction
 from .tensor_abstraction import AbstractTensorOperations
 from .model_abstraction import AbstractModelWrapper
 # --- END HEADER ---

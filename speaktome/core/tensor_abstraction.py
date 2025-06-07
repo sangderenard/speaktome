@@ -135,6 +135,18 @@ class AbstractTensorOperations(ABC):
     def boolean_mask_select(self, tensor: Any, mask: Any) -> Any:
         pass
 
+    @abstractmethod
+    def tolist(self, tensor: Any) -> List[Any]:
+        pass
+
+    @abstractmethod
+    def less(self, tensor: Any, value: Any) -> Any:
+        pass
+
+    @abstractmethod
+    def index_select(self, tensor: Any, dim: int, indices: Any) -> Any:
+        pass
+
     # --- Dtype helpers ---
     @property
     @abstractmethod
@@ -244,6 +256,14 @@ class PyTorchTensorOperations(AbstractTensorOperations):
     def boolean_mask_select(self, tensor, mask):
         return tensor[mask]
 
+    def tolist(self, tensor):
+        return tensor.tolist()
+
+    def less(self, tensor, value):
+        return tensor < value
+    def index_select(self, tensor, dim, indices):
+        return torch.index_select(tensor, dim, indices)
+
     # Dtype helpers
     @property
     def long_dtype(self):
@@ -259,6 +279,8 @@ class NumPyTensorOperations(AbstractTensorOperations):
         pass
 
     def _torch_dtype_to_numpy(self, dtype):
+        if torch is None:
+            return dtype
         if dtype == torch.float32:
             return np.float32
         if dtype == torch.int64:
@@ -272,6 +294,8 @@ class NumPyTensorOperations(AbstractTensorOperations):
         return None
 
     def _numpy_dtype_to_torch(self, dtype):
+        if torch is None:
+            return dtype
         if dtype == np.float32:
             return torch.float32
         if dtype == np.float64:
@@ -427,6 +451,15 @@ class NumPyTensorOperations(AbstractTensorOperations):
 
     def boolean_mask_select(self, tensor, mask):
         return tensor[mask]
+
+    def tolist(self, tensor):
+        return tensor.tolist()
+
+    def less(self, tensor, value):
+        return tensor < value
+    def index_select(self, tensor, dim, indices):
+        return np.take(tensor, indices, axis=dim)
+
 
     # Dtype helpers
     @property
@@ -688,6 +721,20 @@ class PurePythonTensorOperations(AbstractTensorOperations):
         if not isinstance(tensor, list) or not isinstance(mask, list) or len(tensor) != len(mask):
             raise NotImplementedError("boolean_mask_select only supports flat lists with boolean mask")
         return [tensor[i] for i in range(len(tensor)) if mask[i]]
+
+    def tolist(self, tensor: Any) -> List[Any]:
+        return self.clone(tensor)
+
+    def less(self, tensor: Any, value: Any) -> Any:
+        if isinstance(tensor, list):
+            return [self.less(item, value) for item in tensor]
+        return tensor < value
+    def index_select(self, tensor: Any, dim: int, indices: Any) -> Any:
+        if dim == 0:
+            return [tensor[i] for i in indices]
+        if dim == 1:
+            return [[row[i] for i in indices] for row in tensor]
+        raise NotImplementedError("index_select only implemented for dim 0 or 1")
 
     # Dtype helpers
     @property
