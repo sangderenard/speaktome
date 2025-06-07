@@ -230,7 +230,9 @@ SpeakToMe is released under the terms of the [MIT License](LICENSE).
 ## Contributing
 
 Contributions are welcome! New explorers should read `AGENTS.md` and add an
-experience report under `AGENTS/experience_reports/`. Include any prompts that
-informed your work so future agents can trace the discussion. Use pull requests
-for code changes and feel free to open issues for questions or feature
-requests.
+experience report under `AGENTS/experience_reports/`. For a high level view of
+the project see `AGENTS/PROJECT_OVERVIEW.md`, and consult
+`AGENTS/CONTRIBUTING.md` for detailed contribution guidelines. Include any
+prompts that informed your work so future agents can trace the discussion. Use
+pull requests for code changes and feel free to open issues for questions or
+feature requests.
