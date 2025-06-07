@@ -15,6 +15,42 @@ import os
 from pathlib import Path
 # --- END HEADER ---
 
+FRIENDLY_GUIDANCE = """
+# A Gentle Guide to Code Headers
+
+Dear fellow explorer,
+
+If the pre-commit hook caught your changes, here's a friendly checklist:
+
+1. Every Python file needs:
+   - A `HEADER` (as docstring or constant)
+   - A `@staticmethod test()` method in each class
+   - A `# --- END HEADER ---` sentinel after imports
+
+2. Example structure:
+   ```python
+   \"\"\"
+   Your class header goes here as a docstring
+   -- or --
+   HEADER = '''Your class header goes here as a constant'''
+   \"\"\"
+
+   import sys
+   import your_modules
+   # --- END HEADER ---  # <- Exactly like this, after imports
+   ```
+
+3. Quick tips:
+   - The sentinel must be exactly `# --- END HEADER ---` (three dashes each side)
+   - Copy-paste the sentinel line to avoid sneaky whitespace issues
+   - Place it after your last import statement
+
+Need to bypass temporarily? Use:
+    SKIP_HEADER_GUARD=1 git commit -m "your message"
+
+For full standards, see the `AGENTS/` directory documentation.
+"""
+
 def get_staged_py_files():
     """Return a list of staged Python files (relative paths)."""
     result = subprocess.run(
@@ -108,6 +144,8 @@ def main():
             failed = True
     if failed:
         print("\nCommit blocked: Please add required HEADER and @staticmethod test() to all classes.")
+        print("\nNeed help? Here's a friendly guide:")
+        print(FRIENDLY_GUIDANCE)
         sys.exit(1)
 
 if __name__ == "__main__":
