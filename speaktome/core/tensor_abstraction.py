@@ -351,7 +351,7 @@ class NumPyTensorOperations(AbstractTensorOperations):
         # Use these indices to gather the top k values
         values = np.take_along_axis(tensor, top_k_indices, axis=dim)
 
-        return values, indices
+        return values, top_k_indices
 
     def stack(self, tensors, dim=0):
         return np.stack(tensors, axis=dim)
@@ -386,7 +386,7 @@ class NumPyTensorOperations(AbstractTensorOperations):
             right_pad = pad[2 * (num_dims_to_pad - 1 - i) + 1]
             np_pad_width.append((left_pad, right_pad))
         
-        return np.pad(tensor, pad_width, constant_values=value)
+        return np.pad(tensor, np_pad_width, constant_values=value)
 
     def cat(self, tensors, dim=0):
         return np.concatenate(tensors, axis=dim)
@@ -473,6 +473,18 @@ class PurePythonTensorOperations(AbstractTensorOperations):
 
     def to_device(self, tensor: Any, device: Any) -> Any:
         return tensor
+
+    def stack(self, tensors: List[Any], dim: int = 0) -> Any:
+        if not tensors:
+            return []
+        if dim == 0:
+            return [self.clone(t) for t in tensors]
+        # verify shapes match
+        ref_shape = _get_shape(tensors[0])
+        for t in tensors:
+            if _get_shape(t) != ref_shape:
+                raise ValueError("All tensors must have the same shape")
+        return [self.stack([t[i] for t in tensors], dim=dim - 1) for i in range(len(tensors[0]))]
 
     def get_device(self, tensor: Any) -> Any:
         return "cpu_pure_python"
@@ -675,6 +687,15 @@ class PurePythonTensorOperations(AbstractTensorOperations):
         if not isinstance(tensor, list) or not isinstance(mask, list) or len(tensor) != len(mask):
             raise NotImplementedError("boolean_mask_select only supports flat lists with boolean mask")
         return [tensor[i] for i in range(len(tensor)) if mask[i]]
+
+    # Dtype helpers
+    @property
+    def long_dtype(self) -> Any:
+        return int
+
+    @property
+    def bool_dtype(self) -> Any:
+        return bool
 
 
 def _get_shape(data):
