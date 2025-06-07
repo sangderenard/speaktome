@@ -4,7 +4,7 @@ This package implements beam search controllers and utilities for generating tex
 
 ## Project Layout
 
-Source code resides under `speaktome/` with helper scripts and documentation in the repository root. A `testing/` directory contains small inspection scripts used to evaluate components in isolation without any external framework. For example run `python testing/lookahead_demo.py` to exercise the lookahead controller.
+Source code resides under `speaktome/` with helper scripts and documentation in the repository root. The `tests/` directory contains the automated pytest suite. The nearby `testing/` folder holds ad-hoc inspection scripts for quick manual experiments—for example run `python testing/lookahead_demo.py` to exercise the lookahead controller.
 
 ### Faculty Levels
 The project operates at three resource tiers:
