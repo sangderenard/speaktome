@@ -2,6 +2,7 @@ import importlib
 import subprocess
 import sys
 from functools import lru_cache
+# --- END HEADER ---
 
 @lru_cache(maxsize=None)
 def lazy_import(module_name: str):

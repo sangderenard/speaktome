@@ -14,6 +14,7 @@ import os  # For FORCE_ENV
 
 # Import faculty components for logging
 from speaktome.faculty import DEFAULT_FACULTY, FORCE_ENV, Faculty
+# --- END HEADER ---
 
 class StdoutTee:
     """Duplicate writes to the original stdout and a logger."""

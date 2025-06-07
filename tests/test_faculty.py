@@ -11,6 +11,7 @@ import sys
 from unittest import mock
 
 from speaktome.faculty import detect_faculty, Faculty, FORCE_ENV, DEFAULT_FACULTY
+# --- END HEADER ---
 
 
 def test_detect_faculty_enum() -> None:

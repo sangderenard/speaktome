@@ -7,6 +7,7 @@ import torch
 
 # Local application/library specific imports
 from .beam_tree_node import BeamTreeNode # Assuming BeamTreeNode is in beam_tree_node.py
+# --- END HEADER ---
 if TYPE_CHECKING:
     from .compressed_beam_tree import CompressedBeamTree # For type hinting 'tree'
 

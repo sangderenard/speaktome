@@ -3,6 +3,7 @@
 import pytest
 import logging
 from speaktome.core.tensor_abstraction import PurePythonTensorOperations
+# --- END HEADER ---
 
 logger = logging.getLogger(__name__)
 

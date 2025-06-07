@@ -31,6 +31,7 @@ if TYPE_CHECKING:
 # Import configuration dynamically to allow device changes at runtime
 from . import config
 from .config import get_sentence_transformer_model, GPU_LIMIT, LENGTH_LIMIT
+# --- END HEADER ---
 
 
 def main(raw_args=None, allow_retry=True):

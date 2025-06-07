@@ -23,6 +23,7 @@ from .tensor_abstraction import (
 
 from ..util.lazy_loader import lazy_import, optional_import
 from .. import config
+# --- END HEADER ---
 
 class Scorer:
     """Lazy GPT-2 scorer with pluggable vectorised heuristics and bin management."""

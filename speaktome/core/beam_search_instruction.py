@@ -3,6 +3,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 import torch
 # Local application/library specific imports
 from .scorer import Scorer # Assuming Scorer is in scorer.py
+# --- END HEADER ---
 
 class BeamSearchInstruction:
     """

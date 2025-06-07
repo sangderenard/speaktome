@@ -28,6 +28,7 @@ from .model_abstraction import (
     PyTorchModelWrapper,
 )
 from .lookahead_controller import LookaheadConfig, LookaheadController
+# --- END HEADER ---
 
 class BeamSearch:
     def __init__(self, scorer: Scorer, beam_width: int = 5, gpu_limit: int = GPU_LIMIT, 

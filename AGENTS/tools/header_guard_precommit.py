@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
-Pre-commit hook: Enforces HEADER and @staticmethod test() presence in all Python classes.
-Blocks commit if any staged .py file is missing these requirements.
+Pre-commit hook: Enforces HEADER, ``@staticmethod test()`` and ``# --- END HEADER ---`` placement.
+Blocks commit if any staged ``.py`` file is missing these requirements.
+Set environment variable ``SKIP_HEADER_GUARD`` to disable.
 
 Prototype author: GitHub Copilot (o3[4.1 sic]), for the SPEAKTOME agent ecosystem.
 License: MIT
@@ -10,7 +11,9 @@ License: MIT
 import sys
 import subprocess
 import ast
+import os
 from pathlib import Path
+# --- END HEADER ---
 
 def get_staged_py_files():
     """Return a list of staged Python files (relative paths)."""
@@ -57,19 +60,51 @@ def check_class_header_and_test(filepath):
                 errors.append((node.lineno, node.name, ", ".join(missing)))
     return errors
 
+
+def check_end_header(filepath: Path) -> list[str]:
+    """Ensure ``# --- END HEADER ---`` appears after the final global import."""
+    sentinel = "# --- END HEADER ---"
+    with open(filepath, encoding="utf-8") as f:
+        lines = f.readlines()
+
+    sentinel_line = next((i + 1 for i, ln in enumerate(lines) if ln.strip() == sentinel), None)
+    if sentinel_line is None:
+        return [f"Missing sentinel '{sentinel}'"]
+
+    try:
+        tree = ast.parse("".join(lines), filename=str(filepath))
+    except Exception as exc:  # pragma: no cover - parse failure
+        return [f"Parse error: {exc}"]
+
+    last_import = 0
+    for node in tree.body:
+        if isinstance(node, (ast.Import, ast.ImportFrom)):
+            last_import = max(last_import, node.end_lineno or node.lineno)
+
+    if sentinel_line <= last_import:
+        return [f"Sentinel before last import (line {last_import})"]
+
+    return []
+
 def main():
+    if os.getenv("SKIP_HEADER_GUARD"):
+        return
     failed = False
     for relpath in get_staged_py_files():
         path = Path(relpath)
         if not path.exists():
             continue
-        errors = check_class_header_and_test(path)
-        for lineno, classname, missing in errors:
+        class_errors = check_class_header_and_test(path)
+        header_errors = check_end_header(path)
+        for lineno, classname, missing in class_errors:
             print(
                 f"[AGENT_ACTIONABLE_ERROR] {relpath}"
                 f"{f':{lineno}' if lineno > 0 else ''} "
                 f"Class '{classname or '?'}' missing: {missing}"
             )
+            failed = True
+        for msg in header_errors:
+            print(f"[AGENT_ACTIONABLE_ERROR] {relpath}: {msg}")
             failed = True
     if failed:
         print("\nCommit blocked: Please add required HEADER and @staticmethod test() to all classes.")

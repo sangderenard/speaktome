@@ -4,6 +4,7 @@ import math
 
 from ..faculty import Faculty, DEFAULT_FACULTY
 from .. import config
+# --- END HEADER ---
 try:
     import torch
     import torch.nn.functional as F

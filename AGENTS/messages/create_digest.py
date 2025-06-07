@@ -10,6 +10,7 @@ footer. The digest is truncated to fit within a single prompt.
 import argparse
 import os
 from typing import List
+# --- END HEADER ---
 
 REPORTS_DIR = os.path.join(os.path.dirname(__file__), '..', 'experience_reports')
 INBOX_DIR = os.path.join(os.path.dirname(__file__), 'inbox')

@@ -23,6 +23,7 @@ from .util.token_vocab import TokenVocabulary
 from .core.tensor_abstraction import get_tensor_operations
 from .core.model_abstraction import AbstractModelWrapper
 from .core.lookahead_controller import LookaheadController, LookaheadConfig
+# --- END HEADER ---
 
 VOCAB = TokenVocabulary("abcdefghijklmnopqrstuvwxyz ")
 

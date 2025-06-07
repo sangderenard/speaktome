@@ -3,6 +3,7 @@ from typing import List, Optional
 
 # Third-party imports
 import torch
+# --- END HEADER ---
 
 class BeamTreeNode:
     def __init__(self, 

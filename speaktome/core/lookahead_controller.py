@@ -6,6 +6,7 @@ from typing import List, Tuple, Callable, Any, Set
 from .beam_search_instruction import BeamSearchInstruction # Assuming this is in its own file
 from .tensor_abstraction import AbstractTensorOperations
 from .model_abstraction import AbstractModelWrapper
+# --- END HEADER ---
 
 
 class LookaheadConfig:

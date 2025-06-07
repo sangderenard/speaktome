@@ -9,6 +9,7 @@ from importlib import reload
 import pytest
 
 import AGENTS.validate_guestbook as vg
+# --- END HEADER ---
 SCRIPT = Path('AGENTS/validate_guestbook.py')
 
 logger = logging.getLogger(__name__)
