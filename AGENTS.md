@@ -24,6 +24,10 @@ bash -c 'echo "Dumping all docs and code (huge output)..." && \
   -exec echo "===== {} =====" \; -exec cat {} \;'
 ```
 
+For a short overview of the repository layout see `AGENTS_FILESYSTEM_MAP.md`.
+Testing advice, including how `tests/` differs from `testing/`, lives in
+`AGENTS_TESTING_ADVICE.md`.
+
 # Agents Documentation
 
 This document describes the primary agents and components in the beam search and PyGeoMind-based graph search system.
