@@ -1,3 +1,5 @@
+"""Unit tests for :mod:`cli_permutations` utilities."""
+
 import logging
 
 from speaktome.util.cli_permutations import CLIArgumentMatrix
@@ -5,7 +7,8 @@ from speaktome.util.cli_permutations import CLIArgumentMatrix
 logger = logging.getLogger(__name__)
 
 
-def test_permutation_generation():
+def test_permutation_generation() -> None:
+    """Enumerate permutations and verify expected combinations."""
     logger.info('test_permutation_generation start')
     matrix = CLIArgumentMatrix()
     matrix.add_option('--flag-a', [None])

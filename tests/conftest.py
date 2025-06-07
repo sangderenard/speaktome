@@ -1,32 +1,47 @@
+"""PyTest configuration with faculty-aware logging.
+
+This configuration file establishes a consistent logging setup for all tests
+and announces the active :class:`~speaktome.faculty.Faculty` tier.  The output
+is written to ``testing/logs`` so future agents may trace prior sessions.
+"""
+
 import pytest
 import logging
 import time
 from pathlib import Path
 import sys
-import os # For FORCE_ENV
+import os  # For FORCE_ENV
 
 # Import faculty components for logging
 from speaktome.faculty import DEFAULT_FACULTY, FORCE_ENV, Faculty
 
-class StreamToLogger:
-    """
-    Fake file-like stream object that redirects writes to a logger instance.
-    """
-    def __init__(self, logger, log_level=logging.INFO):
+class StdoutTee:
+    """Duplicate writes to the original stdout and a logger."""
+
+    def __init__(self, stream, logger, log_level=logging.INFO) -> None:
+        self.stream = stream
         self.logger = logger
         self.log_level = log_level
 
-    def write(self, buf):
+    def write(self, buf: str) -> None:  # pragma: no cover - passthrough
+        self.stream.write(buf)
         for line in buf.rstrip().splitlines():
             self.logger.log(self.log_level, line.rstrip())
 
-    def flush(self):
-        # Our logger logs immediately, so flush is a no-op.
-        pass
+    def flush(self) -> None:  # pragma: no cover - passthrough
+        self.stream.flush()
 
-    def isatty(self):  # pragma: no cover - mimic stdout interface
-        """Return False as this stream is not an interactive tty."""
-        return False
+    def isatty(self) -> bool:  # pragma: no cover - mimic stdout interface
+        return getattr(self.stream, "isatty", lambda: False)()
+
+
+def pytest_addoption(parser: pytest.Parser) -> None:
+    parser.addoption(
+        "--skip-stubs",
+        action="store_true",
+        default=False,
+        help="Skip tests marked with @pytest.mark.stub",
+    )
 
 def pytest_configure(config: pytest.Config) -> None:
     config.addinivalue_line("markers", "stub: placeholder test requiring implementation")
@@ -116,9 +131,9 @@ Active Faculty for this Session:
     root_logger.info("--------------------------------------------------------------------------------")
     # --- End Enhanced Log Header & Faculty Information ---
 
-    # Store original stdout and redirect sys.stdout to our logger
+    # Store original stdout and tee writes to both stdout and the log
     config._original_stdout = sys.stdout
-    sys.stdout = StreamToLogger(root_logger, logging.INFO)
+    sys.stdout = StdoutTee(config._original_stdout, root_logger, logging.INFO)
 
 
 def pytest_unconfigure(config: pytest.Config) -> None:
@@ -131,3 +146,15 @@ def pytest_unconfigure(config: pytest.Config) -> None:
     if handler:
         logging.getLogger().removeHandler(handler)
         handler.close()
+
+
+def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
+    """Optionally skip tests marked ``stub``."""
+    if not config.getoption("--skip-stubs"):
+        return
+
+    skip_stub = pytest.mark.skip(reason="stub skipped via --skip-stubs")
+    for item in items:
+        if 'stub' in item.keywords:
+            item.add_marker(skip_stub)
+
