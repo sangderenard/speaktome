@@ -31,3 +31,12 @@ if [[ $PREFETCH -eq 1 ]]; then
 fi
 
 echo "Environment setup complete. Activate with 'source .venv/bin/activate'."
+echo
+echo "🧑‍💻 Developer Workflow & Testing:"
+echo "  1. After activation (source .venv/bin/activate), run 'pytest -v'"
+echo "  2. Check the latest log in 'testing/logs/pytest_*.log'"
+echo "     The log header explains the testing strategy and faculty system."
+echo "  3. Address the first reported FAILED test or critical ERROR."
+echo "  4. Consult 'testing/stub_todo.txt' for pending stub tests."
+echo "  5. Repeat this cycle until all tests pass and stubs are resolved."
+echo

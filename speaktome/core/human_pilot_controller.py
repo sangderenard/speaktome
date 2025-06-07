@@ -2,10 +2,8 @@
 from typing import List, Optional, TYPE_CHECKING
 
 # Third-party imports
-import torch
-
-if TYPE_CHECKING:
-    from torch_geometric.data import Data as PyGData  # pragma: no cover
+import torch # type: ignore[import-untyped]
+from torch_geometric.data import Data as PyGData # type: ignore[import-untyped] # Moved for runtime availability
 
 # Local application/library specific imports
 from .beam_search import BeamSearch

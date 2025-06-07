@@ -1,14 +1,11 @@
 import subprocess
 import sys
-import logging
-
-logger = logging.getLogger(__name__)
+import pytest
 
 from speaktome.util.cli_permutations import CLIArgumentMatrix
 
 
 def test_help_message():
-    logger.info('test_help_message start')
     result = subprocess.run([
         sys.executable,
         '-m', 'speaktome.speaktome',
@@ -16,11 +13,11 @@ def test_help_message():
     ], capture_output=True, text=True)
     assert result.returncode == 0
     assert 'usage:' in result.stdout.lower()
-    logger.info('test_help_message end')
 
 
 def test_basic_combinations():
-    logger.info('test_basic_combinations start')
+    pytest.importorskip('torch', reason='CLI requires torch for full run')
+    pytest.importorskip('transformers', reason='CLI requires transformers for full run with torch')
     matrix = CLIArgumentMatrix()
     matrix.add_option('--max_steps', [1])
     matrix.add_option('--safe_mode', [None])
@@ -32,6 +29,4 @@ def test_basic_combinations():
             *combo,
             'hi'
         ], capture_output=True, text=True)
-        logger.info('combo %s return code %s', combo, result.returncode)
-        assert result.returncode == 0, f"combo {combo} failed: {result.stderr}"
-    logger.info('test_basic_combinations end')
+        assert result.returncode == 0
