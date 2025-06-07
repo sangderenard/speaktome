@@ -1,3 +1,4 @@
+# --- END HEADER ---
 class TokenVocabulary:
     """Simple token vocabulary wrapper.
 

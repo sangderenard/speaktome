@@ -1,5 +1,6 @@
 import os
 import re
+# --- END HEADER ---
 
 REPORTS_DIR = os.path.join(os.path.dirname(__file__), 'experience_reports')
 TEMPLATE = 'template_experience_report.md'

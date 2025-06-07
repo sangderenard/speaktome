@@ -1,6 +1,7 @@
 """Utility helpers for array operations with optional torch support."""
 
 import numpy as np
+# --- END HEADER ---
 
 try:
     import torch  # type: ignore

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from itertools import product
 from typing import Any, Dict, Iterable, List, Sequence, Tuple
+# --- END HEADER ---
 
 
 class CLIArgumentMatrix:

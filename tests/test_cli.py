@@ -10,6 +10,7 @@ import sys
 import pytest
 
 from speaktome.util.cli_permutations import CLIArgumentMatrix
+# --- END HEADER ---
 
 
 def test_help_message() -> None:

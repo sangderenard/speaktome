@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 from enum import Enum, auto
+# --- END HEADER ---
 
 
 class Faculty(Enum):

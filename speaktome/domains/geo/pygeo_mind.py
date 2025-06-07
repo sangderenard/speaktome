@@ -19,6 +19,7 @@ from ...core.beam_search_instruction import BeamSearchInstruction
 from ...core.compressed_beam_tree import CompressedBeamTree
 from ...core.human_scorer_policy_manager import HumanScorerPolicyManager
 from ...core.scorer import Scorer
+# --- END HEADER ---
 
 
 class PyGeoMind(torch.nn.Module):
