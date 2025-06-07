@@ -21,7 +21,7 @@ for arg in "$@"; do
     esac
 done
 
-pip install -r requirements.txt -r dev-requirements.txt
+pip install -r requirements.txt -r requirements-dev.txt
 if [[ $EXTRAS -eq 1 ]]; then
     pip install -r optional_requirements.txt
 fi
