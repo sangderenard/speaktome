@@ -1,3 +1,4 @@
+"""Token vocabulary helpers for simple encode/decode mappings."""
 # --- END HEADER ---
 class TokenVocabulary:
     """Simple token vocabulary wrapper.
@@ -19,3 +20,10 @@ class TokenVocabulary:
 
     def __len__(self):
         return len(self.tokens)
+
+    @staticmethod
+    def test() -> None:
+        """Run a basic encode/decode self-check."""
+        vocab = TokenVocabulary("ab ")
+        ids = vocab.encode("ba")
+        assert vocab.decode(ids) == "ba"
