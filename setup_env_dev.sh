@@ -4,21 +4,26 @@
 
 set -euo pipefail
 
-# Run the regular setup script with any provided arguments
+# Run the regular setup script (this creates the venv)
 bash setup_env.sh "$@"
 
-# Dump python file headers in markdown form
-python dump_headers.py speaktome --markdown
+# Define the venv Python path (assumes setup_env.sh created it at .venv)
+VENV_PYTHON="./.venv/bin/python"
 
-# Dump stub blocks across the project
-python AGENTS/tools/stubfinder.py speaktome
+# Fail fast if venv not created
+if [ ! -x "$VENV_PYTHON" ]; then
+  echo "Error: Virtual environment Python not found at $VENV_PYTHON"
+  exit 1
+fi
+
+# Run Python commands using the venv's interpreter
+"$VENV_PYTHON" dump_headers.py speaktome --markdown
+"$VENV_PYTHON" AGENTS/tools/stubfinder.py speaktome
+"$VENV_PYTHON" AGENTS/tools/list_contributors.py
 
 # Display important documentation
 cat AGENTS/AGENT_CONSTITUTION.md
 cat AGENTS.md
-
-# Show contributor credits
-python AGENTS/tools/list_contributors.py
 
 # Show license
 cat LICENSE
@@ -26,5 +31,6 @@ cat LICENSE
 # Show coding standards
 cat AGENTS/CODING_STANDARDS.md
 cat AGENTS/CONTRIBUTING.md
+
 # Show project overview
-cat AGENTS/PROJECT_OVERVIEW.md 
+cat AGENTS/PROJECT_OVERVIEW.md
