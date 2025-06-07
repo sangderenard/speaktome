@@ -223,6 +223,14 @@ control.
 
 The test suite exercises the command line interface and other helper modules.
 
+## Changelog
+
+Changes are summarized in `CHANGELOG.md`. We generate entries automatically
+using [standard-version](https://github.com/conventional-changelog/standard-version).
+Run `npm run release` after merging notable commits to bump the version and
+append to the log. Additional YAML snapshots can be stored under `.changes/`
+for future automation.
+
 ## License
 
 SpeakToMe is released under the terms of the [MIT License](LICENSE).
