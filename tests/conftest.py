@@ -21,6 +21,10 @@ class StreamToLogger:
         # Our logger logs immediately, so flush is a no-op.
         pass
 
+    def isatty(self):  # pragma: no cover - mimic stdout interface
+        """Return False as this stream is not an interactive tty."""
+        return False
+
 def pytest_configure(config: pytest.Config) -> None:
     config.addinivalue_line("markers", "stub: placeholder test requiring implementation")
 
