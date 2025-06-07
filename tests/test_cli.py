@@ -33,5 +33,5 @@ def test_basic_combinations():
             'hi'
         ], capture_output=True, text=True)
         logger.info('combo %s return code %s', combo, result.returncode)
-    assert True
+        assert result.returncode == 0, f"combo {combo} failed: {result.stderr}"
     logger.info('test_basic_combinations end')

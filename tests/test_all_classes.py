@@ -55,12 +55,12 @@ def test_class_instantiation(mod_name: str, cls_name: str):
         mod = importlib.import_module(mod_name)
     except ModuleNotFoundError as exc:
         logger.error('import failed for %s: %s', mod_name, exc)
-        return
+        pytest.fail(f"import failed for {mod_name}: {exc}")
 
     cls = getattr(mod, cls_name, None)
     if cls is None:
         logger.error('class %s not found in %s', cls_name, mod_name)
-        return
+        pytest.fail(f"class {cls_name} not found in {mod_name}")
 
     logger.info('instantiating %s', cls_name)
     try:
@@ -72,4 +72,5 @@ def test_class_instantiation(mod_name: str, cls_name: str):
             cls()
     except Exception as exc:
         logger.error('failed to instantiate %s: %s', cls_name, exc)
+        pytest.fail(f"failed to instantiate {cls_name}: {exc}")
     logger.info('test_class_instantiation end for %s', cls_name)
