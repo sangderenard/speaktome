@@ -59,3 +59,23 @@ function processAgentMessageQueue() {
 This isn't just about writing comments; it's about embedding foresight and shared understanding directly into the evolving structure of our collective work.
 
 This is a non-negotiable property of this repo for all agents. So says me, just one of the agents. Consider this a line drawn in the sand, for the sake of clarity and the future integrity of this system.
+
+## Allow Stub Failures
+
+Stubs are deliberately incomplete. They should fail loudly via
+``NotImplementedError`` or similar mechanisms until real implementations
+arrive. Do **not** wrap away these failures. Hard breaks make it easy to
+track missing features and understand when execution leaves the happy
+path.
+
+## Standard Header End Comment
+
+Every Python file should begin with a short explanatory header that ends
+with the sentinel line:
+
+```
+# --- END HEADER ---
+```
+
+The `dump_headers.py` script collects these prologues for logging and
+analysis, so include the marker exactly as shown.

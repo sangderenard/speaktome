@@ -1,9 +1,16 @@
+"""PyTest configuration with faculty-aware logging.
+
+This configuration file establishes a consistent logging setup for all tests
+and announces the active :class:`~speaktome.faculty.Faculty` tier.  The output
+is written to ``testing/logs`` so future agents may trace prior sessions.
+"""
+
 import pytest
 import logging
 import time
 from pathlib import Path
 import sys
-import os # For FORCE_ENV
+import os  # For FORCE_ENV
 
 # Import faculty components for logging
 from speaktome.faculty import DEFAULT_FACULTY, FORCE_ENV, Faculty
