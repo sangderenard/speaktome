@@ -15,7 +15,7 @@ echo "💡 You can explore full agent docs here:"
 echo "  less AGENTS.md"
 echo
 echo "🎬 Running the automated demo (non-interactive):"
-bash auto_demo.sh
+bash auto_demo.sh || echo "⚠️ Automated demo encountered an issue, but setup continues."
 
 echo
 echo "✅ Ready. You can now:"
