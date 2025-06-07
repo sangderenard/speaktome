@@ -1,6 +1,8 @@
-# Python
 __pycache__/
-*.pyc
-
-# Virtual Environment - Recommended to ignore
+*.py[cod]
+*.egg-info/
+*.log
+*.pkl
+dist/
+build/
 .venv/
