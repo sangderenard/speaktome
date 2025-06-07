@@ -1,5 +1,11 @@
 #!/usr/bin/env python3
-"""Format test logs into a compact Markdown digest."""
+"""Format test logs into a compact Markdown digest.
+
+This utility searches a pytest log for tagged messages such as
+``[FACULTY_SKIP]`` or ``[AGENT_ACTIONABLE_ERROR]`` and summarises the
+findings in Markdown.  If a directory is supplied rather than a file it
+selects the most recent ``pytest_*.log`` entry.
+"""
 
 from __future__ import annotations
 
@@ -7,38 +13,56 @@ import re
 import sys
 from pathlib import Path
 
-# ########## STUB: log digest formatter ##########
-# PURPOSE: Parse pytest or script output and summarise important markers.
-# EXPECTED BEHAVIOR: Recognise tags like ``[FACULTY_SKIP]`` and
-# ``[AGENT_ACTIONABLE_ERROR]`` and generate a readable Markdown report.
-# INPUTS: Path to a log file (default ``testing/logs/latest.log``).
-# OUTPUTS: Markdown summary printed to stdout.
-# KEY ASSUMPTIONS/DEPENDENCIES: Log lines contain square bracket tags.
-# TODO:
-#   - Produce per-module and per-class sections.
-#   - Provide summary counts at the top of the digest.
-# NOTES: This initial version only extracts tagged lines without structure.
-# ###########################################################################
+# --- END HEADER ---
 
-DEFAULT_LOG = Path("testing/logs/latest.log")
+DEFAULT_LOG_DIR = Path("testing/logs")
 TAG_RE = re.compile(r"\[(FACULTY_SKIP|AGENT_ACTIONABLE_ERROR|TEST_PASS)\]")
 
 
+def _latest_log_file(log_dir: Path) -> Path | None:
+    """Return the most recent ``pytest_*.log`` file in ``log_dir``."""
+    logs = sorted(log_dir.glob("pytest_*.log"), key=lambda p: p.stat().st_mtime)
+    return logs[-1] if logs else None
+
+
 def format_digest(log_path: Path) -> str:
+    """Return a Markdown summary of tagged log lines."""
+    if log_path.is_dir():
+        latest = _latest_log_file(log_path)
+        if not latest:
+            return "No log file found."
+        log_path = latest
     if not log_path.exists():
         return "No log file found."
-    lines = []
+
+    groups: dict[str, list[str]] = {
+        "FACULTY_SKIP": [],
+        "AGENT_ACTIONABLE_ERROR": [],
+        "TEST_PASS": [],
+    }
+
     for line in log_path.read_text(encoding="utf-8", errors="ignore").splitlines():
-        if TAG_RE.search(line):
-            lines.append(line)
-    md = ["# Test Digest", ""]
-    md.extend(lines)
+        match = TAG_RE.search(line)
+        if match:
+            groups.setdefault(match.group(1), []).append(line.strip())
+
+    summary = [f"{tag}: {len(lines)}" for tag, lines in groups.items()]
+    md = ["# Test Digest", "", f"Source log: `{log_path}`", ""]
+    md.append("## Summary")
+    for s in summary:
+        md.append(f"- {s}")
+    for tag, lines in groups.items():
+        if not lines:
+            continue
+        md.append("")
+        md.append(f"## {tag}")
+        md.extend([f"- {line}" for line in lines])
     return "\n".join(md)
 
 
 def main() -> None:
-    path = Path(sys.argv[1]) if len(sys.argv) > 1 else DEFAULT_LOG
-    print(format_digest(path))
+    target = Path(sys.argv[1]) if len(sys.argv) > 1 else DEFAULT_LOG_DIR
+    print(format_digest(target))
 
 
 if __name__ == "__main__":
