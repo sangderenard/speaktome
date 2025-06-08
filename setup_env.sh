@@ -64,16 +64,7 @@ fi
 if [[ $PREFETCH -eq 1 ]]; then
   safe_run bash fetch_models.sh
 fi
-echo "🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥"
-echo "🔥       REPO PURGE INITIATED        🔥"
-echo "🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥"
-echo
-echo "❄️  Removing ghost references..."
-echo "❄️  Erasing digital scars..."
-echo "❄️  Severing broken LFS chains..."
-echo "❄️  History? Gone. Just code remains."
-echo
-echo "Repository purge complete."
+echo "Environment setup complete."
 echo "✅ Environment ready. Activate with 'source .venv/bin/activate'."
 echo "   • Core  = requirements.txt + dev"
 echo "   • Plot  = matplotlib, networkx, scikit-learn"
