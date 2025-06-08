@@ -23,8 +23,10 @@ class PyGGraphController:
     def __init__(self, beam_search: BeamSearch, pygeomind_model: Optional[PyGeoMind] = None, human_in_control: bool = False):
         self.beam_search = beam_search
         self.tree = beam_search.tree
-        self.human_scorer_policy_manager = HumanScorerPolicyManager(beam_search.scorer) 
-        self.graph_op = beam_search.graph_op # Assuming BeamGraphOperator is already on beam_search.tree
+        self.human_scorer_policy_manager = HumanScorerPolicyManager(beam_search.scorer)
+        self.graph_op = beam_search.graph_op  # Assuming BeamGraphOperator is already on beam_search.tree
+        # Extract tensor operations helper for backend agnostic operations
+        self.tensor_ops = beam_search.tensor_ops
         self.pygeomind_model = pygeomind_model
         self.targeted_pyg_node_for_expansion: Optional[int] = None
         self.human_in_control = human_in_control
@@ -312,12 +314,12 @@ class PyGGraphController:
                                 with torch.no_grad():
                                     outputs = model_for_scoring(input_ids=current_context_ids)
                                     logits = outputs.logits[:, -1, :]
-                                    log_probs = torch.nn.functional.log_softmax(logits, dim=-1)
+                                    log_probs = self.tensor_ops.log_softmax(logits, dim=-1)
 
                                 token_logprob = log_probs[0, next_token_id_item].item()
                                 snapped_tokens_list.append(next_token_id_item)
                                 snapped_scores_list.append(token_logprob)
-                                current_context_ids = torch.cat(
+                                current_context_ids = self.tensor_ops.cat(
                                     [current_context_ids, input_ids_tensor[:, i:i+1]], dim=1
                                 )
 
