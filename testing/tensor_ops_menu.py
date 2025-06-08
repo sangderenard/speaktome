@@ -7,7 +7,7 @@ Allows selecting available backends and running small correctness tests.
 import importlib.util
 from typing import Any, Tuple
 
-from speaktome.core import tensor_abstraction as ta
+from speaktome import tensors as ta
 
 
 def available_backends() -> list[tuple[str, type[ta.AbstractTensorOperations]]]:
@@ -19,7 +19,7 @@ def available_backends() -> list[tuple[str, type[ta.AbstractTensorOperations]]]:
     if importlib.util.find_spec("torch") is not None:
         backends.append(("PyTorch", ta.PyTorchTensorOperations))
     try:
-        from speaktome.core.c_tensor_ops import CTensorOperations
+        from speaktome.tensors.c_backend import CTensorOperations
         backends.append(("CTensor", CTensorOperations))
     except Exception:
         pass

@@ -16,7 +16,7 @@ import torch
 import torch.nn.functional as F
 import queue
 
-from .tensor_abstraction import (
+from ..tensors import (
     AbstractTensorOperations,
     get_tensor_operations,
 )

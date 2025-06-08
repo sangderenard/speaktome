@@ -3,7 +3,7 @@
 import pytest
 import logging
 import importlib.util
-from speaktome.core.tensor_abstraction import (
+from speaktome.tensors import (
     PurePythonTensorOperations,
     PyTorchTensorOperations,
 )

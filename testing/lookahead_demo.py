@@ -16,7 +16,7 @@ stub_tx.PreTrainedTokenizer = _DummyTok
 sys.modules.setdefault("transformers", stub_tx)
 
 from speaktome import Faculty, DEFAULT_FACULTY
-from speaktome.core.tensor_abstraction import (
+from speaktome.tensors import (
     get_tensor_operations,
 )
 from speaktome.model_abstraction import AbstractModelWrapper

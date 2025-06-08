@@ -26,7 +26,7 @@
 ./speaktome/core/lookahead_controller.py
 ./speaktome/core/model_abstraction.py
 ./speaktome/core/scorer.py
-./speaktome/core/tensor_abstraction.py
+./speaktome/tensors/abstraction.py
 ./speaktome/cpu_demo.py
 ./speaktome/domains/__init__.py
 ./speaktome/domains/geo/__init__.py
