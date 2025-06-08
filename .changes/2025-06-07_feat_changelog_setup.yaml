@@ -1,0 +1,6 @@
+date: 2025-06-07
+type: chore
+module: repo
+summary: Add standard-version changelog support
+impact: Adds automated changelog generation
+files: [package.json, CHANGELOG.md]

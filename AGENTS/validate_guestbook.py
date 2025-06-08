@@ -1,0 +1,114 @@
+import os
+import re
+# --- END HEADER ---
+
+REPORTS_DIR = os.path.join(os.path.dirname(__file__), 'experience_reports')
+TEMPLATE = 'template_experience_report.md'
+ARCHIVE_DIR = os.path.join(REPORTS_DIR, 'archive')
+STICKIES_FILE = os.path.join(REPORTS_DIR, 'stickies.txt')
+PATTERN = re.compile(r'\d{4}-\d{2}-\d{2}_v\d+_[A-Za-z0-9_]+\.md')
+
+def sanitize(name):
+    stem = os.path.splitext(name)[0]
+    stem = re.sub(r'[^A-Za-z0-9]+', '_', stem)
+    stem = re.sub(r'_+', '_', stem).strip('_')
+    return f'0000-00-00_v0_{stem}.md'
+
+def validate_and_fix(interactive: bool = False):
+    """Validate filenames in the guestbook folder.
+
+    Parameters
+    ----------
+    interactive : bool, optional
+        If True, prompt the user before fixing invalid filenames and dump the
+        file contents so the user can decide how to proceed.  When False the
+        function behaves like the old implementation and renames files
+        automatically.
+    """
+
+    changed = False
+    for fname in os.listdir(REPORTS_DIR):
+        if fname in {TEMPLATE, 'AGENTS.md'} or not fname.endswith('.md'):
+            continue
+        if PATTERN.fullmatch(fname):
+            continue
+
+        src = os.path.join(REPORTS_DIR, fname)
+        new_name = sanitize(fname)
+
+        if interactive:
+            with open(src, 'r', encoding='utf-8') as f:
+                content = f.read()
+            print(f"Invalid filename: {fname}")
+            print("----- file contents begin -----")
+            print(content)
+            print("----- file contents end -----")
+            resp = input(
+                f"Rename to {new_name}? [y]/n/d (dump to AGENTS)/s(skip): "
+            ).strip().lower() or 'y'
+
+            if resp.startswith('d'):
+                dest = os.path.join(os.path.dirname(REPORTS_DIR), new_name)
+                os.rename(src, dest)
+                print(f"Moved {fname} -> {dest}")
+                changed = True
+                continue
+            if resp.startswith('s'):
+                print(f"Skipped {fname}")
+                continue
+            if not resp.startswith('n'):
+                os.rename(src, os.path.join(REPORTS_DIR, new_name))
+                print(f"Renamed {fname} -> {new_name}")
+                changed = True
+        else:
+            os.rename(src, os.path.join(REPORTS_DIR, new_name))
+            print(f"Renamed {fname} -> {new_name}")
+            changed = True
+
+    return changed
+
+
+def load_stickies():
+    if not os.path.isfile(STICKIES_FILE):
+        return set()
+    with open(STICKIES_FILE, 'r', encoding='utf-8') as f:
+        lines = [ln.strip() for ln in f if ln.strip() and not ln.startswith('#')]
+    return set(lines)
+
+
+def archive_old_reports():
+    os.makedirs(ARCHIVE_DIR, exist_ok=True)
+    stickies = load_stickies()
+    files = [f for f in os.listdir(REPORTS_DIR)
+             if f.endswith('.md') and f not in {TEMPLATE}]
+    files.sort()
+    keep = stickies.union(files[-10:])
+    for fname in files:
+        if fname not in keep:
+            src = os.path.join(REPORTS_DIR, fname)
+            dest = os.path.join(ARCHIVE_DIR, fname)
+            if not os.path.exists(dest):
+                os.rename(src, dest)
+                print(f'Archived {fname}')
+
+if __name__ == '__main__':
+    import argparse
+
+    parser = argparse.ArgumentParser(description='Validate guestbook reports')
+    parser.add_argument('--interactive', action='store_true',
+                        help='Prompt before renaming or moving files')
+    args = parser.parse_args()
+
+    if not os.path.isdir(REPORTS_DIR):
+        print('reports directory not found')
+        raise SystemExit(1)
+
+    changed = validate_and_fix(interactive=args.interactive)
+    archive_old_reports()
+    files = sorted(os.listdir(REPORTS_DIR))
+    print('Current files:')
+    for f in files:
+        print(' -', f)
+    if not changed:
+        print('All filenames conform to pattern.')
+
