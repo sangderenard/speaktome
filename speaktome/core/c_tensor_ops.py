@@ -2,6 +2,8 @@
 
 import os
 import ctypes
+import ctypes.util
+from cffi import FFI
 from typing import Any, Tuple, Optional, List
 
 from .tensor_abstraction import AbstractTensorOperations
@@ -12,33 +14,23 @@ class CTensorOperations(AbstractTensorOperations):
     """Wrap a shared C library via ``ctypes`` for tensor operations."""
 
     def __init__(self, lib_path: Optional[str] = None) -> None:
-        # ########## STUB: CTensorOperations.__init__ ##########
-        # PURPOSE: Placeholder for dynamic loading of a C/C++ shared library
-        #          implementing high-performance tensor routines.
-        # EXPECTED BEHAVIOR: Load the library, configure ``ctypes`` prototypes,
-        #          and expose them through the abstract interface.
-        # INPUTS: Optional ``lib_path`` argument or ``SPEAKTOME_CLIB``
-        #          environment variable indicating the location of the
-        #          compiled shared object.
-        # OUTPUTS: ``self.lib`` attribute referencing ``ctypes.CDLL``.
-        # KEY ASSUMPTIONS/DEPENDENCIES: The shared library provides symbols
-        #          like ``tensor_full`` and ``tensor_zeros`` with compatible
-        #          signatures.
-        # TODO:
-        #   - Define ``ctypes`` argument/return types for each operation.
-        #   - Implement Python fallbacks when symbols are missing.
-        #   - Expand to cover the full ``AbstractTensorOperations`` API.
-        # NOTES: This stub merely stores the resolved path and attempts to load
-        #        the library if present. All tensor methods currently raise
-        #        ``NotImplementedError``.
-        # ###############################################################
+        """Attempt to load ``libm`` for basic math operations."""
+
         self.lib_path = lib_path or os.environ.get("SPEAKTOME_CLIB")
-        self.lib: Optional[ctypes.CDLL] = None
+        if self.lib_path is None:
+            self.lib_path = ctypes.util.find_library("m")
+
+        self.lib = None
+        self.ffi: Optional[FFI] = None
         if self.lib_path:
             try:
-                self.lib = ctypes.CDLL(self.lib_path)
+                self.ffi = FFI()
+                self.ffi.cdef("double sqrt(double x);")
+                self.lib = self.ffi.dlopen(self.lib_path)
             except OSError:
                 self.lib = None
+        if self.lib is None:
+            raise NotImplementedError("C math library could not be loaded")
 
     def full(self, size: Tuple[int, ...], fill_value: Any, dtype: Any, device: Any):
         raise NotImplementedError("full not implemented for CTensorOperations")
@@ -119,16 +111,26 @@ class CTensorOperations(AbstractTensorOperations):
         raise NotImplementedError("pow not implemented for CTensorOperations")
 
     def sqrt(self, tensor: Any) -> Any:
-        raise NotImplementedError("sqrt not implemented for CTensorOperations")
+        if self.lib is None:
+            raise NotImplementedError("C math library not available")
+
+        if isinstance(tensor, (list, tuple)):
+            return [self.lib.sqrt(float(val)) for val in tensor]
+
+        return self.lib.sqrt(float(tensor))
 
     def tensor_from_list(self, data: List[Any], dtype: Any, device: Any) -> Any:
-        raise NotImplementedError("tensor_from_list not implemented for CTensorOperations")
+        array_type = ctypes.c_double * len(data)
+        arr = array_type()
+        for i, v in enumerate(data):
+            arr[i] = float(v)
+        return arr
 
     def boolean_mask_select(self, tensor: Any, mask: Any) -> Any:
         raise NotImplementedError("boolean_mask_select not implemented for CTensorOperations")
 
     def tolist(self, tensor: Any) -> List[Any]:
-        raise NotImplementedError("tolist not implemented for CTensorOperations")
+        return [tensor[i] for i in range(len(tensor))]
 
     def less(self, tensor: Any, value: Any) -> Any:
         raise NotImplementedError("less not implemented for CTensorOperations")
@@ -138,21 +140,19 @@ class CTensorOperations(AbstractTensorOperations):
 
     @property
     def long_dtype(self) -> Any:
-        raise NotImplementedError
+        return ctypes.c_long
 
     @property
     def bool_dtype(self) -> Any:
-        raise NotImplementedError
+        return ctypes.c_bool
 
     @property
     def float_dtype(self) -> Any:
-        raise NotImplementedError
+        return ctypes.c_double
 
     @staticmethod
     def test() -> None:
-        """Ensure the stub raises ``NotImplementedError``."""
-        try:
-            CTensorOperations()
-        except NotImplementedError:
-            return
-        raise AssertionError("CTensorOperations should be a stub")
+        """Simple self-check calling ``sqrt`` from ``libm``."""
+        ops = CTensorOperations()
+        result = ops.sqrt([4.0, 9.0])
+        assert [round(x, 1) for x in result] == [2.0, 3.0]
