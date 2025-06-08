@@ -217,23 +217,33 @@ class Scorer:
     @staticmethod
     def pairwise_diversity_score(beams=None, lengths=None, tokenizer=None, **kwargs):
         """Discourage token overlap across beams using Jaccard distance."""
-
         batch = beams.shape[0]
-        diversity_scores = torch.zeros(batch, device=beams.device)
+        device = beams.device
+        if tokenizer is not None and hasattr(tokenizer, "vocab_size"):
+            vocab_size = tokenizer.vocab_size
+        else:
+            vocab_size = int(beams.max().item()) + 1
 
-        for i in range(batch):
-            s1 = set(beams[i, :lengths[i]].tolist())
-            sim = 0
-            for j in range(batch):
-                if i == j:
-                    continue
-                s2 = set(beams[j, :lengths[j]].tolist())
-                inter = len(s1 & s2)
-                union = len(s1 | s2)
-                if union > 0:
-                    sim += inter / union
-            diversity_scores[i] = -sim / (batch - 1)
+        # Build multi-hot representation for each beam without Python loops
+        row_idx = torch.arange(batch, device=device).unsqueeze(1).expand_as(beams)
+        col_mask = torch.arange(beams.shape[1], device=device).unsqueeze(0) < lengths.unsqueeze(1)
+        rows = row_idx[col_mask]
+        cols = beams[col_mask]
+        one_hot = torch.zeros(batch, vocab_size, device=device, dtype=torch.float32)
+        one_hot.index_put_((rows, cols), torch.ones_like(rows, dtype=torch.float32), accumulate=True)
+        one_hot_bool = one_hot.bool()
 
+        inter = torch.matmul(one_hot_bool.float(), one_hot_bool.t().float())
+        union = (
+            one_hot_bool.sum(dim=1, keepdim=True) +
+            one_hot_bool.sum(dim=1, keepdim=True).t() - inter
+        )
+        sim_matrix = torch.zeros_like(inter)
+        mask_nonzero = union > 0
+        sim_matrix[mask_nonzero] = inter[mask_nonzero] / union[mask_nonzero]
+        sim_matrix.fill_diagonal_(0)
+
+        diversity_scores = -sim_matrix.sum(dim=1) / (batch - 1)
         return diversity_scores
 
 
