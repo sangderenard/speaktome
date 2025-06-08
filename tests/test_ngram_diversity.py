@@ -1,4 +1,6 @@
-import torch
+import pytest
+
+torch = pytest.importorskip("torch", reason="requires PyTorch")
 from speaktome.core.scorer import Scorer
 
 
