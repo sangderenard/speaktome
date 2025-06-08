@@ -1,0 +1,8 @@
+# Stub Audit Manual Sign-Off
+# Mark each file as 'OK' when verified compliant with CODING_STANDARDS.
+
+AGENTS/messages/create_digest.py - OK
+AGENTS/register_agent.py - OK
+AGENTS/tools/fetch_official_time.py - OK
+AGENTS/tools/header_guard_precommit.py - OK
+speaktome/core/beam_search.py - STUB documented, OK
