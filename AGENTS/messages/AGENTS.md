@@ -5,7 +5,7 @@ This folder contains simple inbox and outbox directories to exchange messages be
 ## Usage
 
 1. Place new messages in your own `outbox` using the filename pattern:
-   `YYYY-MM-DD_from_<sender>_to_<recipient>.md`.
+   `EPOCH_from_<sender>_to_<recipient>.md`.
 2. When delivering a message, move it to the recipient's `inbox`.
 3. Agents should check their `inbox` each session and move processed files to an
    archival subfolder or delete them after acknowledgment.
@@ -34,7 +34,7 @@ characters). Run the script and redirect the output into your outbox when
 contacting a disconnected agent:
 
 ```
-python create_digest.py > outbox/YYYY-MM-DD_from_me_to_agent.md
+python create_digest.py > outbox/EPOCH_from_me_to_agent.md
 ```
 
 Keep important information near the top of the digest so that even if the

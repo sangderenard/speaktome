@@ -20,7 +20,7 @@ def prompt(field, default=None, required=False):
 def main():
     print("=== Agent Registration ===")
     name = prompt("Agent name", required=True)
-    date_of_identity = prompt("Date of identity (YYYY-MM-DD)", default=datetime.now().strftime("%Y-%m-%d"))
+    date_of_identity = prompt("Date of identity (epoch seconds)", default=str(int(datetime.utcnow().timestamp())))
     nature_of_identity = prompt("Nature of identity (human/llm/script/hybrid/system_utility)", required=True)
     entry_point = prompt("Entry point (code, script, or description)")
     description = prompt("Description")

@@ -6,5 +6,9 @@
   "PROJECT_OVERVIEW.md": "High-level project overview.",
   "RING_NETWORK_PROTOCOL.md": "Review loop protocol for agent communications.",
   "AGENTS.md": "Open space guidelines for agents working here.",
-  "CONSTRUCTING_BINARY_TOOLS.md": "Guide for building portable binary utilities."
+  "CONSTRUCTING_BINARY_TOOLS.md": "Guide for building portable binary utilities.",
+  "EPOCH_DATE_POLICY.md": "Epoch-based naming convention for new files.",
+  "CODEBASES_AND_ENVIRONMENT.md": "Philosophy and codebase definition.",
+  "PULL_CONFLICT_RESOLUTION.md": "Guidelines for resolving parallel pull requests.",
+  "CODEBASE_REGISTRY.md": "List of independent project folders."
 }

@@ -1,6 +1,6 @@
 # Template User Experience Report
 
-**Date/Version:** YYYY-MM-DD vX
+**Date/Version:** EPOCH vX
 **Title:** Brief descriptive title
 
 ## Overview

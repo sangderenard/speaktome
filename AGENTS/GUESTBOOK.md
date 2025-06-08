@@ -7,14 +7,14 @@ This folder contains all user experience reports and supporting files. Use these
 Store reports in `experience_reports/`. Name each file as:
 
 ```
-YYYY-MM-DD_v<version>_Descriptive_Title.md
+EPOCH_v<version>_Descriptive_Title.md
 ```
 
-* `YYYY-MM-DD` is the date of the experiment.
+* `EPOCH` is the date of the experiment.
 * `v<version>` increments when multiple iterations occur on the same day.
 * `Descriptive_Title` summarizes the scenario using `_` instead of spaces.
 
-Example: `2025-06-05_v1_New_User_Experience_Simulation.md`.
+Example: `1720123456_v1_New_User_Experience_Simulation.md`.
 
 ## Role‑Playing Exercise
 

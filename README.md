@@ -6,6 +6,8 @@ This package implements beam search controllers and utilities for generating tex
 
 Source code resides under `speaktome/` with helper scripts and documentation in the repository root. The `tests/` directory contains the automated pytest suite. The nearby `testing/` folder holds ad-hoc inspection scripts for quick manual experiments—for example run `python testing/lookahead_demo.py` to exercise the lookahead controller.
 
+This repository is a cooperative development environment for biological and digital agents. A **codebase** refers to any project directory registered in `AGENTS/CODEBASE_REGISTRY.md`, such as `speaktome`. When adding parallel numeric functionality, always rely on the `AbstractTensorOperations` interface so implementations remain backend agnostic.
+
 ### Faculty Levels
 The project operates at three resource tiers:
 1. **NumPy** – lightweight demo mode.
