@@ -1,0 +1,9 @@
+{
+  "AGENT_CONSTITUTION.md": "Defines identity principles for agents.",
+  "CODING_STANDARDS.md": "Mandatory code style and stub documentation rules.",
+  "CONTRIBUTING.md": "Contribution guidelines for human and automated agents.",
+  "GUESTBOOK.md": "Experience report instructions and naming conventions.",
+  "PROJECT_OVERVIEW.md": "High-level project overview.",
+  "RING_NETWORK_PROTOCOL.md": "Review loop protocol for agent communications.",
+  "AGENTS.md": "Open space guidelines for agents working here."
+}
