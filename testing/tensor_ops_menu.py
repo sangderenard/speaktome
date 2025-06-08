@@ -56,7 +56,7 @@ def run_test(name: str, ops: ta.AbstractTensorOperations, ref_ops: ta.AbstractTe
     func = _SAMPLE_INPUT[name]
     try:
         expected = func(ref_ops)
-        result = func(ops)
+        result = ops.benchmark(lambda: func(ops))
     except Exception as exc:
         return False, f"error: {exc}"
 
@@ -77,7 +77,8 @@ def choose_backend(backends: list[tuple[str, type[ta.AbstractTensorOperations]]]
     try:
         idx = int(choice) - 1
         _, cls = backends[idx]
-        return cls()
+        timing = input("Track operation time? [y/N]: ").lower().startswith("y")
+        return cls(track_time=timing)
     except Exception:
         print("Invalid choice")
         return None
@@ -107,6 +108,8 @@ def menu() -> None:
             for name in tests:
                 ok, msg = run_test(name, ops, ref_ops)
                 status = "PASS" if ok else f"FAIL ({msg})"
+                if ops.track_time and ops.last_op_time is not None:
+                    status += f" ({ops.last_op_time:.6f}s)"
                 print(f"{name}: {status}")
         elif choice == "2":
             test_name = input("Test name: ")
@@ -115,6 +118,8 @@ def menu() -> None:
                 continue
             ok, msg = run_test(test_name, ops, ref_ops)
             status = "PASS" if ok else f"FAIL ({msg})"
+            if ops.track_time and ops.last_op_time is not None:
+                status += f" ({ops.last_op_time:.6f}s)"
             print(f"{test_name}: {status}")
         elif choice == "3":
             print("Available tests:")

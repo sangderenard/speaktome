@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
-from typing import Any, Tuple, Optional, List, Union
+from typing import Any, Tuple, Optional, List, Union, Callable
 import math
+import time
 
 from ..faculty import Faculty, DEFAULT_FACULTY
 from .. import config
@@ -17,6 +18,20 @@ except ModuleNotFoundError:  # pragma: no cover - optional dependency
     np = None  # type: ignore
 
 class AbstractTensorOperations(ABC):
+    def __init__(self, track_time: bool = False) -> None:
+        """Optional benchmark support for tensor operations."""
+        self.track_time = track_time
+        self.last_op_time: float | None = None
+
+    def benchmark(self, call: "Callable[[], Any]") -> Any:
+        """Run ``call`` and store elapsed time if benchmarking is enabled."""
+        if self.track_time:
+            start = time.process_time()
+            result = call()
+            self.last_op_time = time.process_time() - start
+            return result
+        return call()
+
     @abstractmethod
     def full(self, size: Tuple[int, ...], fill_value: Any, dtype: Any, device: Any):
         pass
@@ -168,7 +183,8 @@ class AbstractTensorOperations(ABC):
 
 
 class PyTorchTensorOperations(AbstractTensorOperations):
-    def __init__(self, default_device: Union[str, "torch.device"] = "cpu"):
+    def __init__(self, default_device: Union[str, "torch.device"] = "cpu", track_time: bool = False):
+        super().__init__(track_time=track_time)
         if torch is None:
             raise RuntimeError("PyTorch is required for this backend")
         self.default_device = torch.device(default_device)
@@ -285,8 +301,8 @@ class PyTorchTensorOperations(AbstractTensorOperations):
 
 
 class NumPyTensorOperations(AbstractTensorOperations):
-    def __init__(self):
-        pass
+    def __init__(self, track_time: bool = False):
+        super().__init__(track_time=track_time)
 
     def _torch_dtype_to_numpy(self, dtype):
         if torch is None:
@@ -504,7 +520,8 @@ class JAXTensorOperations(AbstractTensorOperations):
     # NOTES: This class currently raises ``NotImplementedError`` to
     #        indicate the backend is not yet available.
     # ###############################################################
-    def __init__(self, default_device: str = "cpu") -> None:
+    def __init__(self, default_device: str = "cpu", track_time: bool = False) -> None:
+        super().__init__(track_time=track_time)
         raise NotImplementedError("JAX backend not yet implemented")
 
     @staticmethod
@@ -520,7 +537,8 @@ class JAXTensorOperations(AbstractTensorOperations):
 class PurePythonTensorOperations(AbstractTensorOperations):
     """Educational tensor ops using nested Python lists."""
 
-    def __init__(self):
+    def __init__(self, track_time: bool = False):
+        super().__init__(track_time=track_time)
         # ########## STUB: PurePythonTensorOperations.__init__ ##########
         # PURPOSE: Placeholder for any future initialization logic needed for
         #          the pure Python backend.
@@ -819,17 +837,17 @@ def _flatten(data):
     return [item for sublist in data for item in _flatten(sublist)]
 
 
-def get_tensor_operations(faculty: Faculty | None = None) -> AbstractTensorOperations:
+def get_tensor_operations(faculty: Faculty | None = None, *, track_time: bool = False) -> AbstractTensorOperations:
     """Return a tensor operations backend based on the faculty tier."""
 
     faculty = faculty or DEFAULT_FACULTY
     if faculty in (Faculty.TORCH, Faculty.PYGEO):
-        return PyTorchTensorOperations(default_device=config.DEVICE)
+        return PyTorchTensorOperations(default_device=config.DEVICE, track_time=track_time)
     if faculty is Faculty.NUMPY and np is not None:
-        return NumPyTensorOperations()
+        return NumPyTensorOperations(track_time=track_time)
     if faculty is Faculty.CTENSOR:
         from .c_tensor_ops import CTensorOperations
-        return CTensorOperations()
-    return PurePythonTensorOperations()
+        return CTensorOperations(track_time=track_time)
+    return PurePythonTensorOperations(track_time=track_time)
 
 

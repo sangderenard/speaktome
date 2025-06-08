@@ -13,8 +13,9 @@ from .tensor_abstraction import AbstractTensorOperations
 class CTensorOperations(AbstractTensorOperations):
     """Wrap a shared C library via ``ctypes`` for tensor operations."""
 
-    def __init__(self, lib_path: Optional[str] = None) -> None:
+    def __init__(self, lib_path: Optional[str] = None, track_time: bool = False) -> None:
         """Attempt to load ``libm`` for basic math operations."""
+        super().__init__(track_time=track_time)
 
         self.lib_path = lib_path or os.environ.get("SPEAKTOME_CLIB")
         if self.lib_path is None:
