@@ -35,6 +35,15 @@ ml = [
   "sentence-transformers>=2.2"    # high-level embeddings
   # torch & torch_geometric handled by setup_env.sh for CPU vs GPU installs
 ]
+jax = [
+  "jax[cpu]>=0.4"       # experimental JAX backend
+]
+ctensor = [
+  "cffi>=1.15"          # C backend helpers
+]
+numpy = [
+  "numpy>=1.26"        # standard NumPy backend
+]
 dev = [
   "pytest>=8.0"
 ]
