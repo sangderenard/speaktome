@@ -198,7 +198,7 @@ class Scorer:
     @staticmethod
     def ngram_diversity_score(beams=None, scores=None, lengths=None, tokenizer=None, n: int = 2, penalty: float = -1.0, **kwargs):
         """Penalise repeated n-grams within each beam."""
-
+        
         batch, seq_len = beams.shape
         device = beams.device
 
@@ -224,6 +224,7 @@ class Scorer:
         duplicate_counts = counts - 1
         penalties = torch.zeros(batch, device=device, dtype=torch.float)
         penalties.index_add_(0, unique_pairs[:, 0], duplicate_counts.float() * penalty)
+
         return -penalties
     @staticmethod
     def pairwise_diversity_score(beams=None, lengths=None, tokenizer=None, **kwargs):
