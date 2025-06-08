@@ -1,0 +1,343 @@
+diff --git a/.gitignore b/.gitignore
+index a43345cdea05b20625e62458da43d2fbaebf69e3..f8cf575ef0e368c42d1c89ca24c05b0c0100c5bf 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -1,9 +1,10 @@
+ __pycache__/
+ *.py[cod]
+ *.egg-info/
+ *.log
+ *.pkl
+ dist/
+ build/
+ .venv/
+ node_modules/
++todo/*.stub.md
+diff --git a/AGENTS/experience_reports/2025-06-23_v1_Root_Prefix_Match_Implementation.md b/AGENTS/experience_reports/2025-06-23_v1_Root_Prefix_Match_Implementation.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..1cd36e646b2d548e8d3e8eb40f54a3588f48857f
+--- /dev/null
++++ b/AGENTS/experience_reports/2025-06-23_v1_Root_Prefix_Match_Implementation.md
+@@ -0,0 +1,33 @@
++# Root Prefix Match Implementation
++
++**Date/Version:** 2025-06-23 v1
++**Title:** Implement snap_beam_path root prefix reuse
++
++## Overview
++Implemented the missing logic in `CompressedBeamTree.snap_beam_path` so that
++paths inserted without an explicit parent reuse existing root prefixes. Added a
++unit test covering this behaviour.
++
++## Prompts
++```
++Identify greatest programming need most fit for a human agent, take care of several llm-ready tasks where they may be found
++```
++
++## Steps Taken
++1. Reviewed repository stubs and TODOs.
++2. Implemented prefix matching for root insertions.
++3. Added `tests/test_snap_beam_path.py` verifying prefix reuse.
++4. Ran `pytest -q` to ensure all tests pass.
++
++## Observed Behaviour
++The new test confirms that inserting a path with a shared root does not create
++duplicate nodes. All existing tests continue to pass.
++
++## Lessons Learned
++The project encourages filling stubs when possible. Handling tree prefix reuse
++simplifies deduplication and is easily testable with the pure Python tensor
++backend.
++
++## Next Steps
++Consider additional tests for deeper prefix scenarios and investigate the
++`failed_parent_retirement` stub in `beam_search.py` for future work.
+diff --git "a/AGENTS/experience_reports/Experience Report\357\200\272 Git LFS Lock-In Cau.md" b/AGENTS/experience_reports/archive/0000-00-00_v0_Experience_Report_Git_LFS_Lock_In_Cau.md
+similarity index 100%
+rename from "AGENTS/experience_reports/Experience Report\357\200\272 Git LFS Lock-In Cau.md"
+rename to AGENTS/experience_reports/archive/0000-00-00_v0_Experience_Report_Git_LFS_Lock_In_Cau.md
+diff --git a/AGENTS/experience_reports/human to codex, please rename this by the standard, read it too.md b/AGENTS/experience_reports/archive/0000-00-00_v0_human_to_codex_please_rename_this_by_the_standard_read_it_too.md
+similarity index 100%
+rename from AGENTS/experience_reports/human to codex, please rename this by the standard, read it too.md
+rename to AGENTS/experience_reports/archive/0000-00-00_v0_human_to_codex_please_rename_this_by_the_standard_read_it_too.md
+diff --git a/AGENTS/experience_reports/2025-06-18_v3_Dev_Setup_Script.md b/AGENTS/experience_reports/archive/2025-06-18_v3_Dev_Setup_Script.md
+similarity index 100%
+rename from AGENTS/experience_reports/2025-06-18_v3_Dev_Setup_Script.md
+rename to AGENTS/experience_reports/archive/2025-06-18_v3_Dev_Setup_Script.md
+diff --git a/AGENTS/tools/stubfinder.py b/AGENTS/tools/stubfinder.py
+index 12257c52be13530e975c645ef4f919eb5b2f1d69..b82ea2d4dea2010aa8fbd953fce0f0b4e9def9a2 100644
+--- a/AGENTS/tools/stubfinder.py
++++ b/AGENTS/tools/stubfinder.py
+@@ -1,69 +1,83 @@
+ #!/usr/bin/env python3
+-"""Locate high-visibility stub blocks in Python files.
++"""Locate high‑visibility stub blocks in Python files and export them.
+ 
+ Recursively searches the provided directories for comments containing
+-``STUB:``. Each discovered block is printed with a thin separator and
+-its file location.
++``STUB:``. Each discovered block is written to ``todo`` as a standalone
++``.stub.md`` file so agents can track outstanding work.
+ """
+ 
+ from __future__ import annotations
+ 
+ import argparse
+ import re
+ from pathlib import Path
+ 
+ # --- END HEADER ---
+ 
+ STUB_REGEX = re.compile(r"STUB:")
++DEFAULT_OUTPUT = Path("todo")
+ 
+ 
+ def extract_stubs(path: Path) -> list[tuple[int, list[str]]]:
+     """Return ``(line_number, lines)`` for each stub block in ``path``."""
+     lines = path.read_text(encoding="utf-8").splitlines()
+     stubs = []
+     i = 0
+     while i < len(lines):
+         if STUB_REGEX.search(lines[i]):
+             start = i
+             block = [lines[i]]
+             i += 1
+             while i < len(lines) and lines[i].lstrip().startswith("#"):
+                 block.append(lines[i])
+                 i += 1
+             stubs.append((start + 1, block))
+         else:
+             i += 1
+     return stubs
+ 
+ 
+ def search_paths(paths: list[str]) -> list[tuple[Path, int, list[str]]]:
+     """Gather stub blocks from all ``.py`` files under ``paths``."""
+     results = []
+     for base in paths:
+         for file in Path(base).rglob("*.py"):
+             if any(part in {".git", ".venv"} for part in file.parts):
+                 continue
+             for lineno, block in extract_stubs(file):
+                 results.append((file, lineno, block))
+     return results
+ 
+ 
++def write_stub_files(stubs: list[tuple[Path, int, list[str]]], output: Path) -> None:
++    """Write stub blocks to ``output`` directory, one file per stub."""
++    output.mkdir(exist_ok=True)
++    for existing in output.glob("*.stub.md"):
++        existing.unlink()
++    for file, lineno, block in stubs:
++        rel = file.resolve().relative_to(Path.cwd().resolve())
++        name = str(rel).replace("/", "_").replace("\\", "_")
++        stub_path = output / f"{name}_L{lineno}.stub.md"
++        with stub_path.open("w", encoding="utf-8") as f:
++            f.write(f"# Stub from {rel}:{lineno}\n\n")
++            f.write("\n".join(block))
++        print(f"Stub written to {stub_path}")
++
++
+ def main(argv: list[str] | None = None) -> None:
+     parser = argparse.ArgumentParser(description=__doc__)
+     parser.add_argument(
+         "paths", nargs="*", default=["."], help="directories to search recursively"
+     )
++    parser.add_argument(
++        "--output-dir", "-o", default=DEFAULT_OUTPUT, type=Path,
++        help="directory to store .stub.md files",
++    )
+     args = parser.parse_args(argv)
+ 
+     stubs = search_paths(args.paths)
+-    for file, lineno, block in stubs:
+-        print("-" * 40)
+-        print(f"{file}:{lineno}")
+-        for line in block:
+-            print(line)
+-    if stubs:
+-        print("-" * 40)
++    write_stub_files(stubs, Path(args.output_dir))
+ 
+ 
+ if __name__ == "__main__":
+     main()
+diff --git a/speaktome/core/compressed_beam_tree.py b/speaktome/core/compressed_beam_tree.py
+index 74c316bebf572c5281fabe9890c88af6a855b48d..4cb1f15336fe31ead2fabc17ca667c0e52de9887 100644
+--- a/speaktome/core/compressed_beam_tree.py
++++ b/speaktome/core/compressed_beam_tree.py
+@@ -429,73 +429,88 @@ class CompressedBeamTree:
+                         token_idx_in_snap_to_process = i + 1 # Next token in `tokens` to consider
+                         found_match_for_this_token = True
+                         break # Found match for tokens[i], move to tokens[i+1]
+                 
+                 if not found_match_for_this_token:
+                     # No child of temp_current_node_idx matches tokens[i].
+                     # So, tokens[i:] will be new.
+                     # The parent for tokens[i] is temp_current_node_idx.
+                     current_parent_node_idx = temp_current_node_idx
+                     # current_depth is already set correctly for tokens[i]
+                     break 
+             else: 
+                 # All tokens in the snapped path matched an existing path in the tree.
+                 # temp_current_node_idx is the leaf of this existing path.
+                 # Check if this existing path is already a registered leaf beam.
+                 for b_idx, n_idx in self.leaf_node_indices.items():
+                     if n_idx == temp_current_node_idx:
+                         return b_idx # Path already exists as a leaf
+                 
+                 # Path exists but is internal. Make this internal node a new leaf.
+                 new_beam_idx = self.next_beam_idx
+                 self.next_beam_idx += 1
+                 self.leaf_node_indices[new_beam_idx] = temp_current_node_idx
+                 return new_beam_idx
+         else: # insert_under_beam_idx is None, so this is a new root path
+-            # Check if the root path itself exists
+-            # This requires iterating root nodes (parent_node_idx is None)
+-            # For simplicity, we'll assume new root paths are always new unless a more complex
+-            # root prefix matching is implemented. The current logic handles extending existing.
+-            # ########## STUB: root_prefix_matching ##########
+-            # PURPOSE: Determine whether the provided token sequence matches an
+-            #          existing root prefix and attach appropriately.
+-            # EXPECTED BEHAVIOR: When implemented, this will allow insertion of
+-            #          new paths that share a prefix with existing root nodes
+-            #          instead of always creating a new root branch.
+-            # INPUTS: ``tokens`` list to insert when ``insert_under_beam_idx`` is
+-            #         ``None``.
+-            # OUTPUTS: Should return an existing beam index if found, or create
+-            #          a new root node otherwise.
+-            # KEY ASSUMPTIONS/DEPENDENCIES: Works in tandem with leaf tracking
+-            #          and node depth management.
+-            # TODO:
+-            #   - Implement iteration over current root nodes to check for
+-            #     prefix matches.
+-            #   - Update tests to cover prefix-matching behavior.
+-            # NOTES: Current implementation always assumes a new root path.
+-            # ###############################################################
+-            pass
++            # We may already have one or more root nodes.  Attempt to reuse any
++            # matching prefix so we do not duplicate common segments.
++            for root_idx, node in enumerate(self.nodes):
++                if node.parent_node_idx is not None:
++                    continue
++                if node.token_tensor.item() != tokens[0]:
++                    continue
++
++                current_parent_node_idx = root_idx
++                current_depth = node.depth + 1
++                token_idx_in_snap_to_process = 1
++
++                temp_current_node_idx = root_idx
++                for i in range(1, len(tokens)):
++                    snapped_token_to_match = tokens[i]
++                    found = False
++                    parent_node_obj = self.nodes[temp_current_node_idx]
++                    for child_idx in parent_node_obj.children_node_indices:
++                        child_node = self.nodes[child_idx]
++                        if child_node.token_tensor.item() == snapped_token_to_match:
++                            temp_current_node_idx = child_idx
++                            current_depth = child_node.depth + 1
++                            token_idx_in_snap_to_process = i + 1
++                            found = True
++                            break
++                    if not found:
++                        current_parent_node_idx = temp_current_node_idx
++                        break
++                else:
++                    # Entire sequence already exists in the tree
++                    for b_idx, n_idx in self.leaf_node_indices.items():
++                        if n_idx == temp_current_node_idx:
++                            return b_idx
++                    new_beam_idx = self.next_beam_idx
++                    self.next_beam_idx += 1
++                    self.leaf_node_indices[new_beam_idx] = temp_current_node_idx
++                    return new_beam_idx
++                break
+ 
+         # `token_idx_in_snap_to_process` is the index of the first token in `tokens` to create a new node for.
+         # `current_parent_node_idx` is the tree node_idx under which the new segment should be attached.
+         # `current_depth` is the depth for the first new node.
+ 
+         last_added_node_idx = current_parent_node_idx 
+ 
+         for i in range(token_idx_in_snap_to_process, len(tokens)):
+             token_val = tokens[i]
+             score_val = scores[i]
+             
+             current_pyg_node_id = self.pyg_next_node_id_counter
+             self.pyg_next_node_id_counter += 1
+ 
+             new_node = BeamTreeNode(
+                 token_val, score_val, 
+                 parent_node_idx=last_added_node_idx, 
+                 depth=current_depth, 
+                 device=effective_device,
+                 pyg_node_id=current_pyg_node_id
+             )
+             self.nodes.append(new_node)
+             new_node_idx_in_tree = len(self.nodes) - 1
+             
+             self.node_idx_to_pyg_id[new_node_idx_in_tree] = current_pyg_node_id
+diff --git a/tests/test_snap_beam_path.py b/tests/test_snap_beam_path.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..44ca86c65ad5b4a6c7d7f4a4d694532dbcd5d14b
+--- /dev/null
++++ b/tests/test_snap_beam_path.py
+@@ -0,0 +1,23 @@
++import logging
++import pytest
++
++pytest.importorskip("torch")
++
++from speaktome.core.compressed_beam_tree import CompressedBeamTree
++
++# --- END HEADER ---
++
++logger = logging.getLogger(__name__)
++
++
++def test_snap_beam_path_root_prefix_reuse():
++    """Paths sharing a root prefix should reuse existing nodes."""
++    tree = CompressedBeamTree(device="cpu")
++    tree.snap_beam_path([1, 2, 3], [0.1, 0.2, 0.3])
++    tree.snap_beam_path([5, 6], [0.5, 0.6])
++    tree.snap_beam_path([1, 2, 4], [0.1, 0.2, 0.4])
++
++    root_one = [idx for idx, n in enumerate(tree.nodes) if n.parent_node_idx is None and n.token_tensor.item() == 1]
++    assert len(root_one) == 1
++    child_twos = [idx for idx in tree.nodes[root_one[0]].children_node_indices if tree.nodes[idx].token_tensor.item() == 2]
++    assert len(child_twos) == 1
+diff --git a/todo/AGENTS.md b/todo/AGENTS.md
+index 82cedfb835a789e87c8e3241c96bd564744ef2cb..a7eb51a720648284f626c028f69f37dfb726cebf 100644
+--- a/todo/AGENTS.md
++++ b/todo/AGENTS.md
+@@ -1,3 +1,28 @@
+ # Todo Folder
+ 
+-This folder contains planning notes and other ephemeral files. Check `TODO.md` for current tasks.
++This directory holds open work items and prototypes.
++
++## Stub Tracking
++
++`AGENTS/tools/stubfinder.py` scans the codebase for `STUB:` blocks and writes
++each one here as an individual `.stub.md` file. The filename is based on the
++source path and starting line number.
++
++Running the tool (for example via `setup_env_dev.sh`) first deletes existing
++`.stub.md` files, ensuring results stay current rather than piling up.
++
++`setup_env_dev.sh` invokes this script automatically after environment
++installation, so stubs are captured at startup.
++
++Agents may implement a stub by creating a new file with the same basename but a
++different extension (e.g., `.py`, `.txt`). Please call out any tasks that need
++explicit human judgment or access.
++
++## Prototyping Welcome
++
++Autonomous agents are encouraged to drop experimental drafts or small scripts in
++this folder. Keep filenames expressive and mirror the stub names when
++appropriate so human collaborators can easily cross-reference.
++
++Initialization logs are not automatically ingested by language models. Review
++these files as needed when exploring the repository.
