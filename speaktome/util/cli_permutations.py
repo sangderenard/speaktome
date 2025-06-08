@@ -44,3 +44,16 @@ class CLIArgumentMatrix:
             combos.append(args)
         return combos
 
+    @staticmethod
+    def test() -> None:
+        """Quick sanity check for permutation generation and exclusions."""
+        matrix = CLIArgumentMatrix()
+        matrix.add_option('--flag', [None])
+        matrix.add_option('--num', [1, 2])
+        matrix.exclude('--flag', '--num')
+        combos = matrix.generate()
+        assert ['--flag', '--num', '1'] not in combos
+        assert ['--flag', '--num', '2'] not in combos
+        assert ['--flag'] in combos
+        assert ['--num', '1'] in combos and ['--num', '2'] in combos
+

@@ -24,6 +24,11 @@ class TokenVocabulary:
     @staticmethod
     def test() -> None:
         """Run a basic encode/decode self-check."""
-        vocab = TokenVocabulary("ab ")
-        ids = vocab.encode("ba")
-        assert vocab.decode(ids) == "ba"
+        vocab = TokenVocabulary("abc ")
+        ids = vocab.encode("cabx")
+        # unknown characters are dropped during encoding
+        assert ids == [2, 0, 1]
+        assert vocab.decode(ids) == "cab"
+        # unknown id maps to '?'
+        assert vocab.decode([99]) == "?"
+        assert len(vocab) == 4

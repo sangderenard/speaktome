@@ -745,6 +745,15 @@ class PurePythonTensorOperations(AbstractTensorOperations):
     def bool_dtype(self) -> Any:
         return bool
 
+    @staticmethod
+    def test() -> None:
+        """Quick smoke test for basic operations."""
+        ops = PurePythonTensorOperations()
+        stacked = ops.stack([[1, 2], [3, 4]], dim=0)
+        assert stacked == [[[1, 2], [3, 4]], [[1, 2], [3, 4]]]
+        values, idxs = ops.topk([1, 3, 2, 4], k=2, dim=-1)
+        assert values == [4, 3] and idxs == [3, 1]
+
 
 def _get_shape(data):
     if not isinstance(data, list):
