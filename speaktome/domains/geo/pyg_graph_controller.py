@@ -28,6 +28,7 @@ class PyGGraphController:
         # Extract tensor operations helper for backend agnostic operations
         self.tensor_ops = beam_search.tensor_ops
         self.pygeomind_model = pygeomind_model
+        self.tensor_ops = beam_search.scorer.tensor_ops
         self.targeted_pyg_node_for_expansion: Optional[int] = None
         self.human_in_control = human_in_control
         self.human_chosen_beam_idx_for_expansion: Optional[int] = None

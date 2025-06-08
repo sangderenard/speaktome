@@ -50,6 +50,10 @@ class PyGeoMind(torch.nn.Module):
         self.integrator    = torch.nn.GRU(hidden_dim, hidden_dim, batch_first=True)
         self.policy_head   = torch.nn.Linear(hidden_dim, 1)
 
+        # Use the tensor abstraction provided by the scorer for backend agnostic
+        # operations throughout this module.
+        self.tensor_ops = scorer.tensor_ops
+
         # ══════ Auxin‐inspired hyperparameters ══════
         self.DELTA_GROWTH_GAP      = 0.05       # bud if parent_score > children_sum + Δ
         self.ALPHA_OVERSHOOT_FACTOR = 1.2       # suppress if children_sum > α * parent_score
@@ -160,7 +164,11 @@ class PyGeoMind(torch.nn.Module):
 
         if self.context_state is None:
             # initial hidden state for GRU
-            self.context_state = torch.zeros(1, 1, h.size(1), device=h.device)
+            self.context_state = self.tensor_ops.zeros(
+                (1, 1, h.size(1)),
+                dtype=self.tensor_ops.get_dtype(h),
+                device=h.device,
+            )
         
         batch_in = h.unsqueeze(0)  # shape (1, num_nodes, hidden_dim)
 
@@ -172,7 +180,11 @@ class PyGeoMind(torch.nn.Module):
         hidden_size = self.integrator.hidden_size # Use hidden_size from GRU
         device = batch_in.device
         if self.context_state is None or self.context_state.size(1) != batch_size:
-            self.context_state = torch.zeros(1, batch_size, hidden_size, device=device)
+            self.context_state = self.tensor_ops.zeros(
+                (1, batch_size, hidden_size),
+                dtype=self.tensor_ops.get_dtype(h),
+                device=device,
+            )
 
         next_ctx, _ = self.integrator(batch_in, self.context_state)
         
