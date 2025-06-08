@@ -2,6 +2,7 @@
 - [AGENTS.md](AGENTS.md) - Open space guidelines for agents working here.
 - [AGENT_CONSTITUTION.md](AGENT_CONSTITUTION.md) - Defines identity principles for agents.
 - [CODING_STANDARDS.md](CODING_STANDARDS.md) - Mandatory code style and stub documentation rules.
+- [CONSTRUCTING_BINARY_TOOLS.md](CONSTRUCTING_BINARY_TOOLS.md) - Guide for building portable binary utilities.
 - [CONTRIBUTING.md](CONTRIBUTING.md) - Contribution guidelines for human and automated agents.
 - [GUESTBOOK.md](GUESTBOOK.md) - Experience report instructions and naming conventions.
 - [PROJECT_OVERVIEW.md](PROJECT_OVERVIEW.md) - High-level project overview.
