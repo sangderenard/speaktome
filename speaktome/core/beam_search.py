@@ -63,7 +63,7 @@ class BeamSearch:
         # ─── NO MORE STATIC bins_config HERE ───
 
         self.tree = CompressedBeamTree(device=device, tokenizer=scorer.tokenizer)
-        self.graph_op = BeamGraphOperator(self.tree)
+        self.graph_op = BeamGraphOperator(self.tree, tensor_ops=self.tensor_ops)
  
         # Defaults, but will be overridden by each instruction
         self.pre_top_k  = self.scorer.default_pre_top_k

@@ -3,7 +3,6 @@ import collections
 from typing import Optional, List, TYPE_CHECKING
 
 # Third-party imports
-import torch
 
 if TYPE_CHECKING:
     from transformers import PreTrainedTokenizer
