@@ -6,6 +6,7 @@ import importlib.util
 from speaktome.tensors import (
     PurePythonTensorOperations,
     PyTorchTensorOperations,
+    JAXTensorOperations,
 )
 # --- END HEADER ---
 
@@ -14,6 +15,8 @@ logger = logging.getLogger(__name__)
 BACKENDS = [PurePythonTensorOperations]
 if importlib.util.find_spec("torch") is not None:
     BACKENDS.append(PyTorchTensorOperations)
+if importlib.util.find_spec("jax") is not None:
+    BACKENDS.append(JAXTensorOperations)
 
 
 @pytest.mark.parametrize("backend_cls", BACKENDS)
