@@ -363,6 +363,7 @@ class BeamGraphOperator:
                 parent_node_idx=None,  # We'll wire this after all nodes exist
                 depth=node_entry["depth"],
                 device=self.tree.device,
+                tensor_ops=self.tree.tensor_ops,
             )
             self.tree.nodes.append(node) # type: ignore
             new_idx = len(self.tree.nodes) - 1
