@@ -20,7 +20,7 @@ from .beam_search_instruction import BeamSearchInstruction
 from .scorer import Scorer
 from .beam_retirement_manager import BeamRetirementManager
 from .compressed_beam_tree import CompressedBeamTree
-from .tensor_abstraction import (
+from ..tensors import (
     AbstractTensorOperations,
 )
 from .model_abstraction import (

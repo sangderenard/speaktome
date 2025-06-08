@@ -54,8 +54,8 @@ STUB_MODULES = [
     ("speaktome.domains.geo.pyg_graph_controller", "PyGGraphController"),
     ("speaktome.domains.geo.pygeo_mind", "PyGeoMind"),
     ("speaktome.core.scorer", "Scorer"),
-    ("speaktome.core.tensor_abstraction", "PyTorchTensorOperations"),
-    ("speaktome.core.tensor_abstraction", "PurePythonTensorOperations"),
+    ("speaktome.tensors.torch_backend", "PyTorchTensorOperations"),
+    ("speaktome.tensors.pure_backend", "PurePythonTensorOperations"),
 ]
 
 

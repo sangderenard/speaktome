@@ -11,7 +11,7 @@ quick sanity check when experimenting with alternate implementations.
 
 import time
 from speaktome.faculty import Faculty
-from speaktome.core.tensor_abstraction import get_tensor_operations
+from speaktome.tensors import get_tensor_operations
 
 
 def benchmark_sqrt(faculty: Faculty, reps: int = 1000) -> float:

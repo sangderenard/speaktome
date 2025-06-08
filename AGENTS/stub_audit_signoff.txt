@@ -27,7 +27,7 @@ speaktome/core/human_scorer_policy_manager.py - OK
 speaktome/core/lookahead_controller.py - OK
 speaktome/core/model_abstraction.py - OK
 speaktome/core/scorer.py - OK
-speaktome/core/tensor_abstraction.py - STUB documented, OK
+speaktome/tensors/abstraction.py - STUB documented, OK
 speaktome/cpu_demo.py - OK
 speaktome/domains/__init__.py - OK
 speaktome/domains/geo/__init__.py - OK

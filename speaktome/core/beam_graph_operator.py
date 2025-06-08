@@ -7,7 +7,7 @@ try:
 except ModuleNotFoundError:  # pragma: no cover - optional
     torch = None
 
-from .tensor_abstraction import (
+from ..tensors import (
     AbstractTensorOperations,
     get_tensor_operations,
 )
