@@ -213,6 +213,7 @@ class Scorer:
                 else:
                     ngrams.add(ng)
             penalties[i] = penalty * count
+
         return -penalties
     @staticmethod
     def pairwise_diversity_score(beams=None, lengths=None, tokenizer=None, **kwargs):
