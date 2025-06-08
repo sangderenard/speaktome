@@ -64,6 +64,7 @@ def test_detect_faculty_pygeo() -> None:
     ("NUMPY", Faculty.NUMPY),
     ("TORCH", Faculty.TORCH),
     ("PYGEO", Faculty.PYGEO),
+    ("CTENSOR", Faculty.CTENSOR),
 ])
 def test_detect_faculty_env_override_valid(monkeypatch, faculty_name, expected_faculty) -> None:
     """Respect valid environment overrides regardless of installed packages."""
