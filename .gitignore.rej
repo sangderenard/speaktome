@@ -1,0 +1,12 @@
+diff a/.gitignore b/.gitignore	(rejected hunks)
+@@ -1,9 +1,10 @@
+ __pycache__/
+ *.py[cod]
+ *.egg-info/
+ *.log
+ *.pkl
+ dist/
+ build/
+ .venv/
+ node_modules/
++todo/*.stub.md
