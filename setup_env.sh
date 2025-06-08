@@ -73,13 +73,7 @@ echo "❄️  Erasing digital scars..."
 echo "❄️  Severing broken LFS chains..."
 echo "❄️  History? Gone. Just code remains."
 echo
-echo "🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥"
-echo "🔥       REPO REBIRTH COMPLETE        🔥"
-echo "🔥          A CLEAN BEGINNING          🔥"
-echo "🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥"
-echo
-echo "remove the fire emojis after the purge"
-echo
+echo "Repository purge complete."
 echo "✅ Environment ready. Activate with 'source .venv/bin/activate'."
 echo "   • Core  = requirements.txt + dev"
 echo "   • Plot  = matplotlib, networkx, scikit-learn"

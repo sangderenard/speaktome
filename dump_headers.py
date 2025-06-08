@@ -41,9 +41,10 @@ def collect_class_info(pyfile: Path) -> list[dict[str, object]]:
                 if (
                     isinstance(stmt, ast.Assign)
                     and any(isinstance(t, ast.Name) and t.id == "HEADER" for t in stmt.targets)
-                    and isinstance(stmt.value, ast.Str)
+                    and isinstance(stmt.value, ast.Constant)
+                    and isinstance(stmt.value.value, str)
                 ):
-                    header = stmt.value.s
+                    header = stmt.value.value
                 if isinstance(stmt, ast.FunctionDef) and stmt.name == "test":
                     has_test = any(
                         isinstance(deco, ast.Name) and deco.id == "staticmethod"

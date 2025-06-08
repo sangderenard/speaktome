@@ -28,6 +28,17 @@ For a short overview of the repository layout see `AGENTS_FILESYSTEM_MAP.md`.
 Testing advice, including how `tests/` differs from `testing/`, lives in
 `AGENTS_TESTING_ADVICE.md`.
 
+## Job Selection
+
+Agents unsure what to work on can request a task via the job dispenser:
+
+```bash
+python -m AGENTS.tools.dispense_job
+```
+
+Open the printed file under `AGENTS/job_descriptions/` and follow its steps.
+Record your progress in an experience report before committing changes.
+
 # Agents Documentation
 
 This document describes the primary agents and components in the beam search and PyGeoMind-based graph search system.
