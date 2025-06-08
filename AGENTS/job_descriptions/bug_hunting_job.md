@@ -10,5 +10,6 @@ Steps:
    - File a ticket detailing the bug and current investigation status.
    - Create a stub that documents the bug's nature following the format in `AGENTS/CODING_STANDARDS.md`.
    - Mark especially bad issues for human review.
-5. Eliminate warnings by updating calls or replacing deprecated APIs.
-6. Document each fix or ticket in an experience report and update the CHANGELOG if user facing.
+5. **Do not modify the algorithm.** Never replace a parallel operation with a loop under any circumstances.
+6. Eliminate warnings by updating calls or replacing deprecated APIs.
+7. Document each fix or ticket in an experience report and update the CHANGELOG if user facing.

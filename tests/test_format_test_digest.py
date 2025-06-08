@@ -3,7 +3,7 @@
 import logging
 from pathlib import Path
 
-from format_test_digest import format_digest
+from AGENTS.tools.format_test_digest import format_digest
 
 # --- END HEADER ---
 

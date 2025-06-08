@@ -77,5 +77,5 @@ with the sentinel line:
 # --- END HEADER ---
 ```
 
-The `dump_headers.py` script collects these prologues for logging and
+The `AGENTS/tools/dump_headers.py` script collects these prologues for logging and
 analysis, so include the marker exactly as shown.

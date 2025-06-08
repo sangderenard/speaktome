@@ -462,7 +462,20 @@ class BeamSearch:
             # NOTES: Currently deferred to the main update logic; this stub
             #        tracks the missing dedicated handling.
             # ###################################################################
-            pass
+            failed_parents = [
+                idx for idx in pruned_original_parent_beam_idxs_to_retire
+                if idx in self.tree.leaf_node_indices
+            ]
+            if failed_parents:
+                if self.retirement_enabled:
+                    # Offload failed parents to the retirement manager so they
+                    # do not linger in GPU memory.
+                    self.retire_leaves(failed_parents)
+                else:
+                    # Fast mode: simply mark them as dead ends.
+                    self.dead_end_indices.extend(failed_parents)
+                if self.verbose:
+                    print(f"[Lookahead] Retired {len(failed_parents)} parent beams with no surviving children.")
 
         if final_lookahead_tokens.numel() == 0:
             if self.verbose:
