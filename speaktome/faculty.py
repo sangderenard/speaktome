@@ -14,6 +14,7 @@ class Faculty(Enum):
     NUMPY = auto()  # Research demo of algorithm
     TORCH = auto()  # Performant production faculty
     PYGEO = auto()  # NN programmable smart search
+    CTENSOR = auto()  # Experimental C backend
 
 
 FORCE_ENV = "SPEAKTOME_FACULTY"

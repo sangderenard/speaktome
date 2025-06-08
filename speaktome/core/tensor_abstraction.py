@@ -827,6 +827,9 @@ def get_tensor_operations(faculty: Faculty | None = None) -> AbstractTensorOpera
         return PyTorchTensorOperations(default_device=config.DEVICE)
     if faculty is Faculty.NUMPY and np is not None:
         return NumPyTensorOperations()
+    if faculty is Faculty.CTENSOR:
+        from .c_tensor_ops import CTensorOperations
+        return CTensorOperations()
     return PurePythonTensorOperations()
 
 
