@@ -1,7 +1,14 @@
 # Windows PowerShell script to reinstall the environment for SpeakToMe
 # Removes the .venv directory and runs setup_env.ps1
 
-$ErrorActionPreference = 'Stop'
+$ErrorActionPreference = 'Continue'
+
+function Safe-Run([ScriptBlock]$cmd) {
+    try { & $cmd }
+    catch {
+        Write-Host "Warning: $($_.Exception.Message)"
+    }
+}
 
 param(
     [switch]$Yes
@@ -16,5 +23,5 @@ if (-not $Yes) {
     }
 }
 
-if (Test-Path '.venv') { Remove-Item -Recurse -Force '.venv' }
-powershell -ExecutionPolicy Bypass -File setup_env.ps1 @args
+if (Test-Path '.venv') { Safe-Run { Remove-Item -Recurse -Force '.venv' } }
+Safe-Run { powershell -ExecutionPolicy Bypass -File setup_env.ps1 @args }

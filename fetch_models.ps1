@@ -1,10 +1,17 @@
 # Windows PowerShell script to download GPT-2 and SentenceTransformer models
 
-$ErrorActionPreference = 'Stop'
+$ErrorActionPreference = 'Continue'
+
+function Safe-Run([ScriptBlock]$cmd) {
+    try { & $cmd }
+    catch {
+        Write-Host "Warning: $($_.Exception.Message)"
+    }
+}
 
 $modelsDir = 'models'
 if (-not (Test-Path $modelsDir)) {
-    New-Item -ItemType Directory -Path $modelsDir | Out-Null
+    Safe-Run { New-Item -ItemType Directory -Path $modelsDir | Out-Null }
 }
 
 @'
@@ -21,7 +28,7 @@ if not os.path.exists(gpt2_dir):
 st_dir = os.path.join(models_dir, 'paraphrase-MiniLM-L6-v2')
 if not os.path.exists(st_dir):
     SentenceTransformer('paraphrase-MiniLM-L6-v2').save(st_dir)
-'@ | .\.venv\Scripts\python.exe -
+'@ | Safe-Run { .\.venv\Scripts\python.exe - }
 
 Write-Host "Models downloaded to $modelsDir"
 Write-Host "Set GPT2_MODEL_PATH=$modelsDir\gpt2"

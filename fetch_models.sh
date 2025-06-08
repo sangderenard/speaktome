@@ -1,11 +1,20 @@
 #!/usr/bin/env bash
 # Download GPT-2 and SentenceTransformer models for offline use
-set -euo pipefail
+set -uo pipefail
+
+safe_run() {
+  "$@"
+  local status=$?
+  if [ $status -ne 0 ]; then
+    echo "Warning: command '$*' failed with status $status" >&2
+  fi
+  return 0
+}
 
 MODELS_DIR="models"
-mkdir -p "${MODELS_DIR}"
+safe_run mkdir -p "${MODELS_DIR}"
 
-python <<'PY'
+safe_run python <<'PY'
 import os
 from transformers import GPT2LMHeadModel, GPT2Tokenizer
 from sentence_transformers import SentenceTransformer
