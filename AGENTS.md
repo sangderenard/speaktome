@@ -11,6 +11,10 @@ The `AGENTS/experience_reports` directory hosts its own `AGENTS.md` and a collec
 A helper script `AGENTS/validate_guestbook.py` will scan the guest book and enforce the filename convention. Run it after creating a report to confirm everything is in order.
 The `AGENTS/experience_reports/AGENTS.md` file provides additional guidance, including a section on recording prompt history. Refer to it whenever you add or update a report.
 
+Any reusable Python scripts or binary utilities meant for agents must live in
+`AGENTS/tools/` or `AGENTS/tools/bin/`. Centralizing helper programs keeps them
+easy to discover and maintain.
+
 For deeper historical context, read through all prior reports. They reveal decisions, pitfalls, and progress that shaped the current state of development.
 
 If you crave an immediate, exhaustive overview, run this one-liner. It will
