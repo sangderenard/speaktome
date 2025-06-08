@@ -1,8 +1,9 @@
 {
-  "stub_audit_job.md": 1,
-  "convert_to_tensor_abstraction_job.md": 2,
-  "prototype_stubs_job.md": 3,
-  "parallelize_loops_job.md": 4,
-  "prioritize_stubs_job.md": 5,
-  "check_messages_job.md": 6
+  "bug_hunting_job.md": 1,
+  "stub_audit_job.md": 2,
+  "convert_to_tensor_abstraction_job.md": 3,
+  "prototype_stubs_job.md": 4,
+  "parallelize_loops_job.md": 5,
+  "prioritize_stubs_job.md": 6,
+  "check_messages_job.md": 7
 }
