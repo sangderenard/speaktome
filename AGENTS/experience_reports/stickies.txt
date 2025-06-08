@@ -1,2 +1,3 @@
 2025-06-05_v1_New_User_Experience_Simulation.md
 2025-06-06_v4_CPU_Demo_Fallback_Issue.md
+2025-06-08_v1_Tensor_Abstraction_BeamTreeNode.md

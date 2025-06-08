@@ -160,6 +160,12 @@ class AbstractTensorOperations(ABC):
         """Return the boolean dtype."""
         pass
 
+    @property
+    @abstractmethod
+    def float_dtype(self) -> Any:
+        """Return the default floating point dtype."""
+        pass
+
 
 class PyTorchTensorOperations(AbstractTensorOperations):
     def __init__(self, default_device: Union[str, "torch.device"] = "cpu"):
@@ -272,6 +278,10 @@ class PyTorchTensorOperations(AbstractTensorOperations):
     @property
     def bool_dtype(self):
         return torch.bool
+
+    @property
+    def float_dtype(self):
+        return torch.float32
 
 
 class NumPyTensorOperations(AbstractTensorOperations):
@@ -469,6 +479,10 @@ class NumPyTensorOperations(AbstractTensorOperations):
     @property
     def bool_dtype(self):
         return np.bool_
+
+    @property
+    def float_dtype(self):
+        return np.float32
 
 
 class JAXTensorOperations(AbstractTensorOperations):
@@ -776,6 +790,10 @@ class PurePythonTensorOperations(AbstractTensorOperations):
     @property
     def bool_dtype(self) -> Any:
         return bool
+
+    @property
+    def float_dtype(self) -> Any:
+        return float
 
     @staticmethod
     def test() -> None:
