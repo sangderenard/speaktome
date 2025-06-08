@@ -117,6 +117,21 @@ From `cmd.exe`:
 run.cmd -s "Hello" -m 10 -c -a 5 --final_viz
 ```
 
+## Job Selection
+
+The `AGENTS` directory contains repeatable jobs for agents. To fetch a task at
+random run:
+
+```bash
+python -m AGENTS.tools.dispense_job
+```
+
+For a guided menu that also executes any obvious setup commands, run:
+
+```bash
+python -m AGENTS.tools.select_and_run_job
+```
+
 These scripts are equivalent to running:
 
 ```bash

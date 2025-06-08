@@ -1,6 +1,11 @@
 # Standard library imports
 from typing import List, Optional
 
+try:
+    import torch
+except ModuleNotFoundError:  # pragma: no cover - optional
+    torch = None
+
 from .tensor_abstraction import (
     AbstractTensorOperations,
     get_tensor_operations,
