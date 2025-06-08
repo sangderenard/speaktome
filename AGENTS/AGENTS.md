@@ -1,3 +1,13 @@
+<!-- TOC START -->
+- [AGENTS.md](AGENTS.md) - Open space guidelines for agents working here.
+- [AGENT_CONSTITUTION.md](AGENT_CONSTITUTION.md) - Defines identity principles for agents.
+- [CODING_STANDARDS.md](CODING_STANDARDS.md) - Mandatory code style and stub documentation rules.
+- [CONTRIBUTING.md](CONTRIBUTING.md) - Contribution guidelines for human and automated agents.
+- [GUESTBOOK.md](GUESTBOOK.md) - Experience report instructions and naming conventions.
+- [PROJECT_OVERVIEW.md](PROJECT_OVERVIEW.md) - High-level project overview.
+- [RING_NETWORK_PROTOCOL.md](RING_NETWORK_PROTOCOL.md) - Review loop protocol for agent communications.
+<!-- TOC END -->
+
 # AGENTS Free Territory
 
 This folder is designated as open space for any agents working on this repository.
