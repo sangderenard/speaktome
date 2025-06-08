@@ -15,3 +15,6 @@ Steps:
 5. **Do not modify the algorithm.** Never replace a parallel operation with a loop under any circumstances.
 6. Eliminate warnings by updating calls or replacing deprecated APIs.
 7. Document each fix or ticket in an experience report and update the CHANGELOG if user facing.
+8. If the first test run surfaces **no** warnings or failures, request another job by running
+   `python -m AGENTS.tools.dispense_job`. Keep drawing jobs until one that isn't this
+   bug hunting task appears.
