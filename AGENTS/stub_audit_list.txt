@@ -9,8 +9,8 @@
 ./AGENTS/tools/pretty_logger.py
 ./AGENTS/tools/stubfinder.py
 ./AGENTS/validate_guestbook.py
-./dump_headers.py
-./format_test_digest.py
+./AGENTS/tools/dump_headers.py
+./AGENTS/tools/format_test_digest.py
 ./speaktome/__init__.py
 ./speaktome/config.py
 ./speaktome/core/__init__.py
@@ -39,7 +39,7 @@
 ./speaktome/util/cli_permutations.py
 ./speaktome/util/lazy_loader.py
 ./speaktome/util/token_vocab.py
-./test_all_headers.py
+./AGENTS/tools/test_all_headers.py
 ./testing/lookahead_demo.py
 ./testing/test_hub.py
 ./tests/__init__.py
@@ -54,4 +54,4 @@
 ./tests/test_snap_beam_path.py
 ./tests/test_validate_guestbook.py
 ./tests/test_validate_headers.py
-./validate_headers.py
+./AGENTS/tools/validate_headers.py

@@ -26,20 +26,20 @@ if [ ! -x "$VENV_PYTHON" ]; then
 fi
 
 # Run Python commands using the venv's interpreter
-safe_run "$VENV_PYTHON" dump_headers.py speaktome --markdown
+safe_run "$VENV_PYTHON" AGENTS/tools/dump_headers.py speaktome --markdown
 safe_run "$VENV_PYTHON" AGENTS/tools/stubfinder.py speaktome
 safe_run "$VENV_PYTHON" AGENTS/tools/list_contributors.py
 
 # Display important documentation
-safe_run cat AGENTS/AGENT_CONSTITUTION.md
-safe_run cat AGENTS.md
+safe_run "$VENV_PYTHON" AGENTS/tools/preview_doc.py AGENTS/AGENT_CONSTITUTION.md
+safe_run "$VENV_PYTHON" AGENTS/tools/preview_doc.py AGENTS.md
 
 # Show license
-safe_run cat LICENSE
+safe_run "$VENV_PYTHON" AGENTS/tools/preview_doc.py LICENSE
 
 # Show coding standards
-safe_run cat AGENTS/CODING_STANDARDS.md
-safe_run cat AGENTS/CONTRIBUTING.md
+safe_run "$VENV_PYTHON" AGENTS/tools/preview_doc.py AGENTS/CODING_STANDARDS.md
+safe_run "$VENV_PYTHON" AGENTS/tools/preview_doc.py AGENTS/CONTRIBUTING.md
 
 # Show project overview
-safe_run cat AGENTS/PROJECT_OVERVIEW.md
+safe_run "$VENV_PYTHON" AGENTS/tools/preview_doc.py AGENTS/PROJECT_OVERVIEW.md

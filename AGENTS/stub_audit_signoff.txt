@@ -9,8 +9,8 @@ AGENTS/tools/list_contributors.py - OK
 AGENTS/tools/pretty_logger.py - OK
 AGENTS/tools/stubfinder.py - OK
 AGENTS/validate_guestbook.py - OK
-dump_headers.py - OK
-format_test_digest.py - OK
+AGENTS/tools/dump_headers.py - OK
+AGENTS/tools/format_test_digest.py - OK
 speaktome/__init__.py - OK
 speaktome/config.py - OK
 speaktome/core/__init__.py - OK
@@ -39,7 +39,7 @@ speaktome/util/array_utils.py - OK
 speaktome/util/cli_permutations.py - OK
 speaktome/util/lazy_loader.py - OK
 speaktome/util/token_vocab.py - OK
-test_all_headers.py - STUB documented, OK
+AGENTS/tools/test_all_headers.py - STUB documented, OK
 testing/lookahead_demo.py - OK
 testing/test_hub.py - OK
 tests/__init__.py - OK
@@ -54,4 +54,4 @@ tests/test_retirement_manager.py - OK
 tests/test_snap_beam_path.py - OK
 tests/test_validate_guestbook.py - OK
 tests/test_validate_headers.py - OK
-validate_headers.py - STUB documented, OK
+AGENTS/tools/validate_headers.py - STUB documented, OK
