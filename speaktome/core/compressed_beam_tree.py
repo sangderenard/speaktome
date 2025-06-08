@@ -16,15 +16,22 @@ from .beam_tree_node import BeamTreeNode # Assuming BeamTreeNode is in beam_tree
 # --- END HEADER ---
 
 class CompressedBeamTree:
-    def __init__(self, device='cuda', tokenizer: Optional['PreTrainedTokenizer'] = None, operator=None):
+    def __init__(
+        self,
+        device: str = "cuda",
+        tokenizer: Optional['PreTrainedTokenizer'] = None,
+        operator=None,
+        tensor_ops: AbstractTensorOperations | None = None,
+    ) -> None:
         self.device = torch.device(device)
         self.operator = operator
+        self.tensor_ops = tensor_ops or get_tensor_operations()
         self.nodes: List[BeamTreeNode] = []
         # beam_idx (external ID for a path/leaf) -> node_idx in self.nodes
         self.leaf_node_indices: Dict[int, int] = {}
         self.next_beam_idx = 0
-        self.token_dtype = torch.long
-        self.score_dtype = torch.float32
+        self.token_dtype = self.tensor_ops.long_dtype
+        self.score_dtype = self.tensor_ops.float_dtype
         self.tokenizer = tokenizer # Needed for pad_token_id
         self.verbose = True # Or make it a parameter
 
@@ -42,8 +49,8 @@ class CompressedBeamTree:
     def add_children_to_node(
         self,
         original_node_idx: int,
-        prefix_tokens: List[torch.Tensor],
-        prefix_scores: List[torch.Tensor],
+        prefix_tokens: List[Any],
+        prefix_scores: List[Any],
         num_children: int
     ) -> List[int]:
         """
@@ -71,8 +78,8 @@ class CompressedBeamTree:
         new_leaf_indices: List[int] = []
 
         # 1) Reconstruct the prefix of tokens+scores for that node
-        prefix_tokens: List[torch.Tensor] = []
-        prefix_scores: List[torch.Tensor] = []
+        prefix_tokens: List[Any] = []
+        prefix_scores: List[Any] = []
         cur_idx = original_node_idx
         while cur_idx is not None:
             node = self.nodes[cur_idx]
@@ -108,7 +115,15 @@ class CompressedBeamTree:
             current_pyg_node_id = self.pyg_next_node_id_counter
             self.pyg_next_node_id_counter += 1
 
-            node = BeamTreeNode(token, score, parent_node_idx, depth=i, device=self.device, pyg_node_id=current_pyg_node_id)
+            node = BeamTreeNode(
+                token,
+                score,
+                parent_node_idx,
+                depth=i,
+                device=self.device,
+                pyg_node_id=current_pyg_node_id,
+                tensor_ops=self.tensor_ops,
+            )
             self.nodes.append(node)
             new_node_idx = len(self.nodes) - 1
             self.node_idx_to_pyg_id[new_node_idx] = current_pyg_node_id
@@ -201,7 +216,8 @@ class CompressedBeamTree:
                 parent_node_idx,
                 depth=new_depth,
                 device=self.device,
-                pyg_node_id=current_pyg_node_id
+                pyg_node_id=current_pyg_node_id,
+                tensor_ops=self.tensor_ops,
             )
             self.nodes.append(new_node)
             new_node_idx = len(self.nodes) - 1
@@ -291,9 +307,13 @@ class CompressedBeamTree:
                 self.pyg_next_node_id_counter += 1
 
                 new_node_obj = BeamTreeNode(
-                    token_to_add, score_for_token,
+                    token_to_add,
+                    score_for_token,
                     parent_node_idx=last_added_node_idx_for_this_segment,
-                    depth=new_node_depth, device=self.device, pyg_node_id=current_pyg_node_id
+                    depth=new_node_depth,
+                    device=self.device,
+                    pyg_node_id=current_pyg_node_id,
+                    tensor_ops=self.tensor_ops,
                 )
                 self.nodes.append(new_node_obj)
                 new_node_idx_in_self_nodes = len(self.nodes) - 1
@@ -504,11 +524,13 @@ class CompressedBeamTree:
             self.pyg_next_node_id_counter += 1
 
             new_node = BeamTreeNode(
-                token_val, score_val, 
-                parent_node_idx=last_added_node_idx, 
-                depth=current_depth, 
+                token_val,
+                score_val,
+                parent_node_idx=last_added_node_idx,
+                depth=current_depth,
                 device=effective_device,
-                pyg_node_id=current_pyg_node_id
+                pyg_node_id=current_pyg_node_id,
+                tensor_ops=self.tensor_ops,
             )
             self.nodes.append(new_node)
             new_node_idx_in_tree = len(self.nodes) - 1
