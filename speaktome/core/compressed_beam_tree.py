@@ -12,7 +12,11 @@ if TYPE_CHECKING:
     from torch_geometric.data import Data as PyGData  # pragma: no cover
 
 # Local application/library specific imports
-from .beam_tree_node import BeamTreeNode # Assuming BeamTreeNode is in beam_tree_node.py
+from .beam_tree_node import BeamTreeNode  # Assuming BeamTreeNode is in beam_tree_node.py
+from .tensor_abstraction import (
+    AbstractTensorOperations,
+    get_tensor_operations,
+)
 # --- END HEADER ---
 
 class CompressedBeamTree:

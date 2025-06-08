@@ -40,6 +40,12 @@ Agents unsure what to work on can request a task via the job dispenser:
 python -m AGENTS.tools.dispense_job
 ```
 
+For an interactive menu that also runs any obvious setup commands, use:
+
+```bash
+python -m AGENTS.tools.select_and_run_job
+```
+
 Open the printed file under `AGENTS/job_descriptions/` and follow its steps.
 Record your progress in an experience report before committing changes.
 
