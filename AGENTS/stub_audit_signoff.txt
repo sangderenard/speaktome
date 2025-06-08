@@ -1,0 +1,57 @@
+# Stub Audit Manual Sign-Off
+# Mark each file as 'OK' when verified compliant with CODING_STANDARDS.
+
+AGENTS/messages/create_digest.py - OK
+AGENTS/register_agent.py - OK
+AGENTS/tools/fetch_official_time.py - OK
+AGENTS/tools/header_guard_precommit.py - OK
+AGENTS/tools/list_contributors.py - OK
+AGENTS/tools/pretty_logger.py - OK
+AGENTS/tools/stubfinder.py - OK
+AGENTS/validate_guestbook.py - OK
+AGENTS/tools/dump_headers.py - OK
+AGENTS/tools/format_test_digest.py - OK
+speaktome/__init__.py - OK
+speaktome/config.py - OK
+speaktome/core/__init__.py - OK
+speaktome/core/beam_graph_operator.py - OK
+speaktome/core/beam_retirement_manager.py - OK
+speaktome/core/beam_search.py - STUB documented, OK
+speaktome/core/beam_search_instruction.py - OK
+speaktome/core/beam_tree_node.py - OK
+speaktome/core/beam_tree_visualizer.py - OK
+speaktome/core/compressed_beam_tree.py - OK
+speaktome/core/human_pilot_controller.py - OK
+speaktome/core/human_scorer_policy_manager.py - OK
+speaktome/core/lookahead_controller.py - OK
+speaktome/core/model_abstraction.py - OK
+speaktome/core/scorer.py - OK
+speaktome/core/tensor_abstraction.py - STUB documented, OK
+speaktome/cpu_demo.py - OK
+speaktome/domains/__init__.py - OK
+speaktome/domains/geo/__init__.py - OK
+speaktome/domains/geo/pyg_graph_controller.py - OK
+speaktome/domains/geo/pygeo_mind.py - OK
+speaktome/faculty.py - OK
+speaktome/speaktome.py - OK
+speaktome/util/__init__.py - OK
+speaktome/util/array_utils.py - OK
+speaktome/util/cli_permutations.py - OK
+speaktome/util/lazy_loader.py - OK
+speaktome/util/token_vocab.py - OK
+AGENTS/tools/test_all_headers.py - STUB documented, OK
+testing/lookahead_demo.py - OK
+testing/test_hub.py - OK
+tests/__init__.py - OK
+tests/conftest.py - OK
+tests/test_all_classes.py - OK
+tests/test_cli.py - OK
+tests/test_cli_permutations.py - OK
+tests/test_faculty.py - OK
+tests/test_format_test_digest.py - OK
+tests/test_pure_python_tensor_ops.py - OK
+tests/test_retirement_manager.py - OK
+tests/test_snap_beam_path.py - OK
+tests/test_validate_guestbook.py - OK
+tests/test_validate_headers.py - OK
+AGENTS/tools/validate_headers.py - STUB documented, OK

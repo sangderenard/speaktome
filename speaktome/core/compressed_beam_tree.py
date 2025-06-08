@@ -451,29 +451,44 @@ class CompressedBeamTree:
                 self.leaf_node_indices[new_beam_idx] = temp_current_node_idx
                 return new_beam_idx
         else: # insert_under_beam_idx is None, so this is a new root path
-            # Check if the root path itself exists
-            # This requires iterating root nodes (parent_node_idx is None)
-            # For simplicity, we'll assume new root paths are always new unless a more complex
-            # root prefix matching is implemented. The current logic handles extending existing.
-            # ########## STUB: root_prefix_matching ##########
-            # PURPOSE: Determine whether the provided token sequence matches an
-            #          existing root prefix and attach appropriately.
-            # EXPECTED BEHAVIOR: When implemented, this will allow insertion of
-            #          new paths that share a prefix with existing root nodes
-            #          instead of always creating a new root branch.
-            # INPUTS: ``tokens`` list to insert when ``insert_under_beam_idx`` is
-            #         ``None``.
-            # OUTPUTS: Should return an existing beam index if found, or create
-            #          a new root node otherwise.
-            # KEY ASSUMPTIONS/DEPENDENCIES: Works in tandem with leaf tracking
-            #          and node depth management.
-            # TODO:
-            #   - Implement iteration over current root nodes to check for
-            #     prefix matches.
-            #   - Update tests to cover prefix-matching behavior.
-            # NOTES: Current implementation always assumes a new root path.
-            # ###############################################################
-            pass
+            # We may already have one or more root nodes. Attempt to reuse any
+            # matching prefix so we do not duplicate common segments.
+            for root_idx, node in enumerate(self.nodes):
+                if node.parent_node_idx is not None:
+                    continue
+                if node.token_tensor.item() != tokens[0]:
+                    continue
+
+                current_parent_node_idx = root_idx
+                current_depth = node.depth + 1
+                token_idx_in_snap_to_process = 1
+
+                temp_current_node_idx = root_idx
+                for i in range(1, len(tokens)):
+                    snapped_token_to_match = tokens[i]
+                    found = False
+                    parent_node_obj = self.nodes[temp_current_node_idx]
+                    for child_idx in parent_node_obj.children_node_indices:
+                        child_node = self.nodes[child_idx]
+                        if child_node.token_tensor.item() == snapped_token_to_match:
+                            temp_current_node_idx = child_idx
+                            current_depth = child_node.depth + 1
+                            token_idx_in_snap_to_process = i + 1
+                            found = True
+                            break
+                    if not found:
+                        current_parent_node_idx = temp_current_node_idx
+                        break
+                else:
+                    # Entire sequence already exists in the tree
+                    for b_idx, n_idx in self.leaf_node_indices.items():
+                        if n_idx == temp_current_node_idx:
+                            return b_idx
+                    new_beam_idx = self.next_beam_idx
+                    self.next_beam_idx += 1
+                    self.leaf_node_indices[new_beam_idx] = temp_current_node_idx
+                    return new_beam_idx
+                break
 
         # `token_idx_in_snap_to_process` is the index of the first token in `tokens` to create a new node for.
         # `current_parent_node_idx` is the tree node_idx under which the new segment should be attached.

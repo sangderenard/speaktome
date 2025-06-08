@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-import validate_headers as vh
+import AGENTS.tools.validate_headers as vh
 # --- END HEADER ---
 
 logger = logging.getLogger(__name__)
