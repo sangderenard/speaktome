@@ -5,11 +5,6 @@ from .tensor_abstraction import (
     AbstractTensorOperations,
     get_tensor_operations,
 )
-
-try:  # Optional dependency
-    import torch
-except ModuleNotFoundError:  # pragma: no cover - optional
-    torch = None
 # --- END HEADER ---
 
 class BeamTreeNode:
@@ -31,6 +26,7 @@ class BeamTreeNode:
         self.score_tensor = tensor_ops.tensor_from_list(
             [score], dtype=float_dtype, device=device
         )
+
         self.parent_node_idx = parent_node_idx  # index of parent node in self.nodes list
         self.depth = depth
         self.children_node_indices: List[int] = []

@@ -198,21 +198,33 @@ class Scorer:
     @staticmethod
     def ngram_diversity_score(beams=None, scores=None, lengths=None, tokenizer=None, n: int = 2, penalty: float = -1.0, **kwargs):
         """Penalise repeated n-grams within each beam."""
+        
+        batch, seq_len = beams.shape
+        device = beams.device
 
-        batch = beams.shape[0]
-        penalties = torch.zeros(batch, device=beams.device)
-        for i in range(batch):
-            l = lengths[i].item()
-            tokens = beams[i, :l].tolist()
-            ngrams = set()
-            count = 0
-            for j in range(l - n + 1):
-                ng = tuple(tokens[j:j+n])
-                if ng in ngrams:
-                    count += 1
-                else:
-                    ngrams.add(ng)
-            penalties[i] = penalty * count
+        if seq_len < n:
+            return torch.zeros(batch, device=device)
+
+        base = getattr(tokenizer, "vocab_size", None)
+        if base is None:
+            base = int(beams.max().item()) + 1
+
+        windows = beams.unfold(1, n, 1)
+        valid_counts = (lengths - n + 1).clamp(min=0)
+        max_windows = windows.shape[1]
+
+        mask = torch.arange(max_windows, device=device).unsqueeze(0) < valid_counts.unsqueeze(1)
+        multipliers = (base ** torch.arange(n, device=device)).view(1, 1, -1)
+        hashed = (windows * multipliers).sum(dim=2)
+        rows = torch.arange(batch, device=device).unsqueeze(1).expand(batch, max_windows)[mask]
+        hashed_flat = hashed[mask]
+
+        pairs = torch.stack([rows, hashed_flat], dim=1)
+        unique_pairs, counts = torch.unique(pairs, return_counts=True, dim=0)
+        duplicate_counts = counts - 1
+        penalties = torch.zeros(batch, device=device, dtype=torch.float)
+        penalties.index_add_(0, unique_pairs[:, 0], duplicate_counts.float() * penalty)
+
         return -penalties
     @staticmethod
     def pairwise_diversity_score(beams=None, lengths=None, tokenizer=None, **kwargs):

@@ -160,6 +160,12 @@ class AbstractTensorOperations(ABC):
         """Return the boolean dtype."""
         pass
 
+    @property
+    @abstractmethod
+    def float_dtype(self) -> Any:
+        """Return the default floating point dtype."""
+        pass
+
 
 class PyTorchTensorOperations(AbstractTensorOperations):
     def __init__(self, default_device: Union[str, "torch.device"] = "cpu"):
@@ -272,6 +278,10 @@ class PyTorchTensorOperations(AbstractTensorOperations):
     @property
     def bool_dtype(self):
         return torch.bool
+
+    @property
+    def float_dtype(self):
+        return torch.float32
 
 
 class NumPyTensorOperations(AbstractTensorOperations):
@@ -469,6 +479,42 @@ class NumPyTensorOperations(AbstractTensorOperations):
     @property
     def bool_dtype(self):
         return np.bool_
+
+    @property
+    def float_dtype(self):
+        return np.float32
+
+
+class JAXTensorOperations(AbstractTensorOperations):
+    """Stub backend for future JAX-based tensor operations."""
+
+    # ########## STUB: JAXTensorOperations ##########
+    # PURPOSE: Provide an optional JAX backend mirroring the
+    #          :class:`PyTorchTensorOperations` API.
+    # EXPECTED BEHAVIOR: Implement all tensor operations using
+    #          ``jax.numpy`` with device management for CPU/GPU/TPU.
+    # INPUTS: JAX arrays and standard Python lists.
+    # OUTPUTS: JAX arrays or converted Python data structures.
+    # KEY ASSUMPTIONS/DEPENDENCIES: Requires the ``jax`` package and
+    #          compatible accelerator drivers.
+    # TODO:
+    #   - Implement each method using ``jax.numpy`` equivalents.
+    #   - Handle device placement and data transfer semantics.
+    #   - Integrate this class with :func:`get_tensor_operations`.
+    # NOTES: This class currently raises ``NotImplementedError`` to
+    #        indicate the backend is not yet available.
+    # ###############################################################
+    def __init__(self, default_device: str = "cpu") -> None:
+        raise NotImplementedError("JAX backend not yet implemented")
+
+    @staticmethod
+    def test() -> None:
+        """Demonstrate the current stub behaviour."""
+        try:
+            JAXTensorOperations()
+        except NotImplementedError:
+            return
+        raise AssertionError("JAXTensorOperations should be a stub")
 
 
 class PurePythonTensorOperations(AbstractTensorOperations):
@@ -744,6 +790,10 @@ class PurePythonTensorOperations(AbstractTensorOperations):
     @property
     def bool_dtype(self) -> Any:
         return bool
+
+    @property
+    def float_dtype(self) -> Any:
+        return float
 
     @staticmethod
     def test() -> None:
