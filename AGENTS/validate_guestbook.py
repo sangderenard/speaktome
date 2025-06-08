@@ -6,13 +6,13 @@ REPORTS_DIR = os.path.join(os.path.dirname(__file__), 'experience_reports')
 TEMPLATE = 'template_experience_report.md'
 ARCHIVE_DIR = os.path.join(REPORTS_DIR, 'archive')
 STICKIES_FILE = os.path.join(REPORTS_DIR, 'stickies.txt')
-PATTERN = re.compile(r'\d{4}-\d{2}-\d{2}_v\d+_[A-Za-z0-9_]+\.md')
+PATTERN = re.compile(r'\d{9,}_v\d+_[A-Za-z0-9_]+\.md')
 
 def sanitize(name):
     stem = os.path.splitext(name)[0]
     stem = re.sub(r'[^A-Za-z0-9]+', '_', stem)
     stem = re.sub(r'_+', '_', stem).strip('_')
-    return f'0000-00-00_v0_{stem}.md'
+    return f'0000000000_v0_{stem}.md'
 
 def validate_and_fix(interactive: bool = False):
     """Validate filenames in the guestbook folder.

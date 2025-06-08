@@ -1,9 +1,16 @@
 # Standard library imports
 import json
-from typing import List, Set, Optional, Tuple, Dict, Callable, TYPE_CHECKING, Union
+from typing import List, Set, Optional, Tuple, Dict, Callable, TYPE_CHECKING, Union, Any
 
-# Third-party imports
-import torch
+try:
+    import torch
+except ModuleNotFoundError:  # pragma: no cover - optional
+    torch = None
+
+from .tensor_abstraction import (
+    AbstractTensorOperations,
+    get_tensor_operations,
+)
 
 # Local application/library specific imports
 from .beam_tree_node import BeamTreeNode # Assuming BeamTreeNode is in beam_tree_node.py
@@ -68,12 +75,17 @@ class BeamGraphOperator:
     """
 
 
-    def __init__(self, tree: 'CompressedBeamTree'):
+    def __init__(
+        self,
+        tree: 'CompressedBeamTree',
+        tensor_ops: AbstractTensorOperations | None = None,
+    ) -> None:
         """
         :param tree: The CompressedBeamTree instance to operate on.
         """
         self.tree = tree
         self.tree.set_operator(self)
+        self.tensor_ops = tensor_ops or get_tensor_operations()
 
     # --------- UNIVERSAL NODE MIGRATION ---------
     def move_nodes_to_device(self, node_indices, device: str):
@@ -82,8 +94,8 @@ class BeamGraphOperator:
         """
         for idx in node_indices:
             node = self.tree.nodes[idx]
-            node.token_tensor = node.token_tensor.to(device)
-            node.score_tensor = node.score_tensor.to(device)
+            node.token_tensor = self.tensor_ops.to_device(node.token_tensor, device)
+            node.score_tensor = self.tensor_ops.to_device(node.score_tensor, device)
 
     # --------- TOPOLOGICAL SELECTORS ---------
     def select_leaves(self) -> List[int]:
@@ -149,7 +161,7 @@ class BeamGraphOperator:
         pad_token_id: int = 0,
         device: Optional[Union[str, torch.device]] = None,
         include_unwashed_parents: bool = False
-    ) -> Tuple[torch.Tensor, torch.Tensor, List[List[int]]]:
+    ) -> Tuple[Any, Any, List[List[int]]]:
         """
         Args:
             nodes: list of node objects, each with .token_tensor (1D tensor), .tree_depth (int), .clean (bool), and .parent_node_idx
@@ -163,7 +175,11 @@ class BeamGraphOperator:
             lineage_indices: list of lists, giving for each row the sequence of node indices (leaf first, then its dirty parents)
         """
         if not nodes:
-            return torch.empty((0, 0), dtype=torch.long), torch.empty((0, 0), dtype=torch.bool), []
+            return (
+                self.tensor_ops.zeros((0, 0), dtype=self.tensor_ops.long_dtype, device=device),
+                self.tensor_ops.zeros((0, 0), dtype=self.tensor_ops.bool_dtype, device=device),
+                [],
+            )
 
         if device is None:
             device = nodes[0].token_tensor.device
@@ -197,8 +213,8 @@ class BeamGraphOperator:
         width = (max_depth - min_depth) + max_tok_len
         num_paths = len(nodes)
 
-        data = torch.full((num_paths, width), pad_token_id, dtype=dtype, device=device)
-        mask = torch.zeros((num_paths, width), dtype=torch.bool, device=device)
+        data = self.tensor_ops.full((num_paths, width), pad_token_id, dtype=dtype, device=device)
+        mask = self.tensor_ops.zeros((num_paths, width), dtype=self.tensor_ops.bool_dtype, device=device)
         lineage_indices = []
 
         for i, lineage in enumerate(all_lineages):
@@ -209,10 +225,10 @@ class BeamGraphOperator:
             depths = []
             node_indices = []
             for n in reversed(lineage):  # Ancestor order: root->leaf
-                tokens.append(n.token_tensor.to(device))
+                tokens.append(self.tensor_ops.to_device(n.token_tensor, device))
                 depths.append(n.depth)
                 node_indices.append(self.tree.nodes.index(n)) # type: ignore
-            tokens = torch.cat(tokens, dim=0)
+            tokens = self.tensor_ops.cat(tokens, dim=0)
             d_start = min(depths) - min_depth
             d_end = min(d_start + tokens.shape[0], width)
             tlen = d_end - d_start
@@ -322,8 +338,8 @@ class BeamGraphOperator:
                 # skip if it's already on the target device (just to be safe)
                 if n.token_tensor.device == target_dev:
                     continue
-                n.token_tensor = n.token_tensor.to(target_dev)
-                n.score_tensor = n.score_tensor.to(target_dev)
+                n.token_tensor = self.tensor_ops.to_device(n.token_tensor, target_dev)
+                n.score_tensor = self.tensor_ops.to_device(n.score_tensor, target_dev)
                 seen.add(idx)
 
         return seen
@@ -363,6 +379,7 @@ class BeamGraphOperator:
                 parent_node_idx=None,  # We'll wire this after all nodes exist
                 depth=node_entry["depth"],
                 device=self.tree.device,
+                tensor_ops=self.tree.tensor_ops,
             )
             self.tree.nodes.append(node) # type: ignore
             new_idx = len(self.tree.nodes) - 1

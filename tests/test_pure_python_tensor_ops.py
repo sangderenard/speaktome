@@ -2,16 +2,25 @@
 
 import pytest
 import logging
-from speaktome.core.tensor_abstraction import PurePythonTensorOperations
+import importlib.util
+from speaktome.core.tensor_abstraction import (
+    PurePythonTensorOperations,
+    PyTorchTensorOperations,
+)
 # --- END HEADER ---
 
 logger = logging.getLogger(__name__)
 
+BACKENDS = [PurePythonTensorOperations]
+if importlib.util.find_spec("torch") is not None:
+    BACKENDS.append(PyTorchTensorOperations)
 
-def test_stack_dim0_and_dim1() -> None:
+
+@pytest.mark.parametrize("backend_cls", BACKENDS)
+def test_stack_dim0_and_dim1(backend_cls) -> None:
     """Stack tensors along the first two dimensions."""
     logger.info("test_stack_dim0_and_dim1 start")
-    ops = PurePythonTensorOperations()
+    ops = backend_cls()
     t = [[1, 2], [3, 4]]
     stacked0 = ops.stack([t, t], dim=0)
     assert stacked0 == [[[1, 2], [3, 4]], [[1, 2], [3, 4]]]
@@ -20,10 +29,11 @@ def test_stack_dim0_and_dim1() -> None:
     logger.info('test_stack_dim0_and_dim1 end')
 
 
-def test_pad_2d() -> None:
+@pytest.mark.parametrize("backend_cls", BACKENDS)
+def test_pad_2d(backend_cls) -> None:
     """Pad a 2-D tensor and verify the result."""
     logger.info("test_pad_2d start")
-    ops = PurePythonTensorOperations()
+    ops = backend_cls()
     t = [[1, 2], [3, 4]]
     padded = ops.pad(t, (1, 1, 1, 1), value=0)
     assert padded == [
@@ -35,10 +45,11 @@ def test_pad_2d() -> None:
     logger.info('test_pad_2d end')
 
 
-def test_topk_and_dtypes() -> None:
+@pytest.mark.parametrize("backend_cls", BACKENDS)
+def test_topk_and_dtypes(backend_cls) -> None:
     """Check ``topk`` output and exposed dtypes."""
     logger.info("test_topk_and_dtypes start")
-    ops = PurePythonTensorOperations()
+    ops = backend_cls()
     values, indices = ops.topk([1, 3, 2, 4], k=2, dim=-1)
     assert values == [4, 3]
     assert indices == [3, 1]
