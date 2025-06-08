@@ -6,7 +6,7 @@ import ctypes.util
 from cffi import FFI
 from typing import Any, Tuple, Optional, List
 
-from .tensor_abstraction import AbstractTensorOperations
+from .tensor_abstraction import AbstractTensorOperations, _get_shape, _flatten
 
 # --- END HEADER ---
 
@@ -34,82 +34,168 @@ class CTensorOperations(AbstractTensorOperations):
             raise NotImplementedError("C math library could not be loaded")
 
     def full(self, size: Tuple[int, ...], fill_value: Any, dtype: Any, device: Any):
-        raise NotImplementedError("full not implemented for CTensorOperations")
+        """Create a nested Python list filled with ``fill_value``."""
+        if not size:
+            return fill_value
+        return [self.full(size[1:], fill_value, dtype, device) for _ in range(size[0])]
 
     def zeros(self, size: Tuple[int, ...], dtype: Any, device: Any):
-        raise NotImplementedError("zeros not implemented for CTensorOperations")
+        """Return a tensor of zeros."""
+        return self.full(size, 0, dtype, device)
 
     def clone(self, tensor: Any) -> Any:
-        raise NotImplementedError("clone not implemented for CTensorOperations")
+        """Deep copy the given tensor."""
+        if isinstance(tensor, list):
+            return [self.clone(t) for t in tensor]
+        if hasattr(tensor, "__len__"):
+            return [tensor[i] for i in range(len(tensor))]
+        return tensor
 
     def to_device(self, tensor: Any, device: Any) -> Any:
-        raise NotImplementedError("to_device not implemented for CTensorOperations")
+        """Device management is a no-op for this backend."""
+        return tensor
 
     def get_device(self, tensor: Any) -> Any:
-        raise NotImplementedError("get_device not implemented for CTensorOperations")
+        return "cpu_cffi"
 
     def get_dtype(self, tensor: Any) -> Any:
-        raise NotImplementedError("get_dtype not implemented for CTensorOperations")
+        return self.float_dtype
 
     def item(self, tensor: Any) -> Any:
-        raise NotImplementedError("item not implemented for CTensorOperations")
+        return self.tolist(tensor)[0] if hasattr(tensor, "__len__") else tensor
 
     def max(self, tensor: Any) -> Any:
-        raise NotImplementedError("max not implemented for CTensorOperations")
+        return max(self.tolist(tensor))
 
     def long_cast(self, tensor: Any) -> Any:
-        raise NotImplementedError("long_cast not implemented for CTensorOperations")
+        data = [int(x) for x in self.tolist(tensor)]
+        return self.tensor_from_list(data, self.long_dtype, None)
 
     def not_equal(self, tensor1: Any, tensor2: Any) -> Any:
-        raise NotImplementedError("not_equal not implemented for CTensorOperations")
+        t1 = self.tolist(tensor1)
+        t2 = self.tolist(tensor2)
+        return [a != b for a, b in zip(t1, t2)]
 
     def arange(self, start: int, end: Optional[int] = None, step: int = 1, device: Any = None, dtype: Any = None) -> Any:
-        raise NotImplementedError("arange not implemented for CTensorOperations")
+        if end is None:
+            data = list(range(start))
+        else:
+            data = list(range(start, end, step))
+        return self.tensor_from_list(data, dtype or self.long_dtype, device)
 
     def select_by_indices(self, tensor: Any, indices_dim0: Any, indices_dim1: Any) -> Any:
-        raise NotImplementedError("select_by_indices not implemented for CTensorOperations")
+        """Gather elements from a 2D list based on two index lists."""
+        return [tensor[i][j] for i, j in zip(indices_dim0, indices_dim1)]
 
     def log_softmax(self, tensor: Any, dim: int) -> Any:
-        raise NotImplementedError("log_softmax not implemented for CTensorOperations")
+        import math
+        if dim != -1 and dim != len(_get_shape(tensor)) - 1:
+            raise NotImplementedError("log_softmax only supports last dimension")
+        def _compute(row: List[float]) -> List[float]:
+            m = max(row)
+            exps = [math.exp(x - m) for x in row]
+            s = sum(exps)
+            return [math.log(v / s) for v in exps]
+        if isinstance(tensor[0], list):
+            return [_compute(r) for r in tensor]
+        return _compute(self.tolist(tensor))
 
     def pad(self, tensor: Any, pad: Tuple[int, ...], value: float = 0) -> Any:
-        raise NotImplementedError("pad not implemented for CTensorOperations")
+        if len(pad) != 2:
+            raise NotImplementedError("pad only supports 1D tensors")
+        left, right = pad
+        data = self.tolist(tensor)
+        return [value] * left + data + [value] * right
 
     def cat(self, tensors: List[Any], dim: int = 0) -> Any:
-        raise NotImplementedError("cat not implemented for CTensorOperations")
+        if dim == 0:
+            result = []
+            for t in tensors:
+                result.extend(self.tolist(t))
+            return result
+        if dim == 1:
+            if not all(len(t) == len(tensors[0]) for t in tensors):
+                raise ValueError("Tensors must have same number of rows for dim 1")
+            out = []
+            for i in range(len(tensors[0])):
+                row = []
+                for t in tensors:
+                    row.extend(self.tolist(t[i]))
+                out.append(row)
+            return out
+        raise NotImplementedError("cat only implemented for dim 0 and 1")
 
     def topk(self, tensor: Any, k: int, dim: int) -> Tuple[Any, Any]:
-        raise NotImplementedError("topk not implemented for CTensorOperations")
+        if dim != -1 and dim != len(_get_shape(tensor)) - 1:
+            raise NotImplementedError("topk only supports last dimension")
+        data = self.tolist(tensor)
+        idx = sorted(range(len(data)), key=lambda i: data[i], reverse=True)[:k]
+        values = [data[i] for i in idx]
+        return values, idx
 
     def stack(self, tensors: List[Any], dim: int = 0) -> Any:
-        raise NotImplementedError("stack not implemented for CTensorOperations")
+        if dim == 0:
+            return [self.clone(t) for t in tensors]
+        if dim == 1:
+            ref_shape = _get_shape(self.tolist(tensors[0]))
+            for t in tensors:
+                if _get_shape(self.tolist(t)) != ref_shape:
+                    raise ValueError("All tensors must have the same shape")
+            return [[t[i] for t in tensors] for i in range(len(tensors[0]))]
+        raise NotImplementedError("stack only implemented for dim 0 and 1")
 
     def repeat_interleave(self, tensor: Any, repeats: int, dim: Optional[int] = None) -> Any:
-        raise NotImplementedError("repeat_interleave not implemented for CTensorOperations")
+        data = self.tolist(tensor)
+        if dim is None or dim == 0:
+            result = []
+            for v in data:
+                result.extend([v] * repeats)
+            return result
+        raise NotImplementedError("repeat_interleave only supports dim 0 or None")
 
     def view_flat(self, tensor: Any) -> Any:
-        raise NotImplementedError("view_flat not implemented for CTensorOperations")
+        return _flatten(self.tolist(tensor))
 
     def assign_at_indices(self, tensor_to_modify: Any, indices_dim0: Any, indices_dim1: Any, values_to_assign: Any):
-        raise NotImplementedError("assign_at_indices not implemented for CTensorOperations")
+        for i, j, v in zip(indices_dim0, indices_dim1, values_to_assign):
+            tensor_to_modify[i][j] = v
 
     def increment_at_indices(self, tensor_to_modify: Any, mask: Any):
-        raise NotImplementedError("increment_at_indices not implemented for CTensorOperations")
+        for i, flag in enumerate(mask):
+            if flag:
+                tensor_to_modify[i] += 1
 
     def clamp(self, tensor: Any, min_val: Optional[float] = None, max_val: Optional[float] = None) -> Any:
-        raise NotImplementedError("clamp not implemented for CTensorOperations")
+        if isinstance(tensor, list):
+            return [self.clamp(t, min_val, max_val) for t in tensor]
+        value = tensor
+        if min_val is not None:
+            value = max(value, min_val)
+        if max_val is not None:
+            value = min(value, max_val)
+        return value
 
     def shape(self, tensor: Any) -> Tuple[int, ...]:
-        raise NotImplementedError("shape not implemented for CTensorOperations")
+        return _get_shape(self.tolist(tensor))
 
     def numel(self, tensor: Any) -> int:
-        raise NotImplementedError("numel not implemented for CTensorOperations")
+        return len(_flatten(self.tolist(tensor)))
 
     def mean(self, tensor: Any, dim: Optional[int] = None) -> Any:
-        raise NotImplementedError("mean not implemented for CTensorOperations")
+        data = self.tolist(tensor)
+        if dim is None:
+            flat = _flatten(data)
+            return sum(flat) / len(flat) if flat else 0.0
+        if dim == 0:
+            return sum(data) / len(data) if data else 0.0
+        if dim == 1:
+            return [sum(row) / len(row) if row else 0.0 for row in data]
+        raise NotImplementedError("mean only implemented for dim 0, 1, or None")
 
     def pow(self, tensor: Any, exponent: float) -> Any:
-        raise NotImplementedError("pow not implemented for CTensorOperations")
+        if isinstance(tensor, list):
+            return [self.pow(t, exponent) for t in tensor]
+        return tensor ** exponent
 
     def sqrt(self, tensor: Any) -> Any:
         if self.lib is None:
@@ -128,16 +214,23 @@ class CTensorOperations(AbstractTensorOperations):
         return arr
 
     def boolean_mask_select(self, tensor: Any, mask: Any) -> Any:
-        raise NotImplementedError("boolean_mask_select not implemented for CTensorOperations")
+        data = self.tolist(tensor)
+        return [v for v, m in zip(data, mask) if m]
 
     def tolist(self, tensor: Any) -> List[Any]:
         return [tensor[i] for i in range(len(tensor))]
 
     def less(self, tensor: Any, value: Any) -> Any:
-        raise NotImplementedError("less not implemented for CTensorOperations")
+        data = self.tolist(tensor)
+        return [v < value for v in data]
 
     def index_select(self, tensor: Any, dim: int, indices: Any) -> Any:
-        raise NotImplementedError("index_select not implemented for CTensorOperations")
+        if dim == 0:
+            data = self.tolist(tensor)
+            return [data[i] for i in indices]
+        if dim == 1:
+            return [[row[i] for i in indices] for row in tensor]
+        raise NotImplementedError("index_select only implemented for dim 0 or 1")
 
     @property
     def long_dtype(self) -> Any:
