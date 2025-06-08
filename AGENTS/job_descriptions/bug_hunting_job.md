@@ -6,5 +6,9 @@ Steps:
 1. Run `pytest -v` and note any failures or warnings.
 2. Reproduce reported issues and write regression tests if missing.
 3. Fix the underlying problems or open issues describing the root cause.
-4. Eliminate warnings by updating calls or replacing deprecated APIs.
-5. Document each fix in an experience report and update the CHANGELOG if user facing.
+4. If a fix is not immediately possible:
+   - File a ticket detailing the bug and current investigation status.
+   - Create a stub that documents the bug's nature following the format in `AGENTS/CODING_STANDARDS.md`.
+   - Mark especially bad issues for human review.
+5. Eliminate warnings by updating calls or replacing deprecated APIs.
+6. Document each fix or ticket in an experience report and update the CHANGELOG if user facing.
