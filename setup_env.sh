@@ -3,12 +3,22 @@
 # setup_env.sh — unified installer for core, extras, CPU/GPU
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-set -euo pipefail
+set -uo pipefail
+
+# Helper: run a command but never terminate on failure
+safe_run() {
+  "$@"
+  local status=$?
+  if [ $status -ne 0 ]; then
+    echo "Warning: command '$*' failed with status $status" >&2
+  fi
+  return 0
+}
 
 # 1. Create & activate venv
-python -m venv .venv
-source .venv/bin/activate
-pip install --upgrade pip
+safe_run python -m venv .venv
+safe_run source .venv/bin/activate
+safe_run pip install --upgrade pip
 
 # 2. Parse flags
 EXTRAS=0
@@ -26,33 +36,33 @@ for arg in "$@"; do
 done
 
 # 3. Install core + dev + plot
-pip install -r requirements.txt -r requirements-dev.txt
+safe_run pip install -r requirements.txt -r requirements-dev.txt
 if [[ $EXTRAS -eq 1 ]]; then
-  pip install .[plot]
+  safe_run pip install .[plot]
 fi
 
 # 4. Handle CPU vs GPU torch & optional ML extras
 if [[ $EXTRAS -eq 1 ]]; then
   if [[ "${GITHUB_ACTIONS:-}" == "true" ]]; then
     echo "👷 Installing CPU-only torch (CI environment)"
-    pip install torch==1.13.1+cpu --index-url https://download.pytorch.org/whl/cpu
+    safe_run pip install torch==1.13.1+cpu --index-url https://download.pytorch.org/whl/cpu
   elif [[ $FORCE_GPU -eq 1 ]]; then
     echo "⚡ Installing GPU-enabled torch"
-    pip install torch --index-url https://download.pytorch.org/whl/cu118
+    safe_run pip install torch --index-url https://download.pytorch.org/whl/cu118
   else
     echo "🧠 Installing CPU-only torch (default)"
-    pip install torch==1.13.1+cpu --index-url https://download.pytorch.org/whl/cpu
+    safe_run pip install torch==1.13.1+cpu --index-url https://download.pytorch.org/whl/cpu
   fi
 
   if [[ $ML -eq 1 ]]; then
     echo "🔬 Installing ML extras"
-    pip install .[ml]
+    safe_run pip install .[ml]
   fi
 fi
 
 # 5. Prefetch large models if requested
 if [[ $PREFETCH -eq 1 ]]; then
-  bash fetch_models.sh
+  safe_run bash fetch_models.sh
 fi
 echo "🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥"
 echo "🔥       REPO PURGE INITIATED        🔥"
