@@ -2,6 +2,8 @@
 
 Identify, reproduce, and fix bugs across the project. Pay special attention to runtime warnings and deprecation notices that hint a feature will be removed in a future version. The goal is a clean test suite with no warnings.
 
+**Stub Design Policy Reminder**: Bug hunters should **never** implement or modify existing stubs unless they are elevating them to the fully documented format defined in `AGENTS/job_descriptions/prototype_stubs_job.md`. Always consult that job description and `AGENTS/CODING_STANDARDS.md` before touching stub blocks.
+
 Steps:
 1. Run `pytest -v` and note any failures or warnings.
 2. Reproduce reported issues and write regression tests if missing.

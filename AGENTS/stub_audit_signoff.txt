@@ -55,3 +55,4 @@ tests/test_snap_beam_path.py - OK
 tests/test_validate_guestbook.py - OK
 tests/test_validate_headers.py - OK
 AGENTS/tools/validate_headers.py - STUB documented, OK
+# 2025-06-08 - All listed stubs verified intact by Codex
