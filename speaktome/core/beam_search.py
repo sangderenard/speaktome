@@ -467,6 +467,11 @@ class BeamSearch:
                 if idx in self.tree.leaf_node_indices
             ]
             if failed_parents:
+                # Remove failed parents from active leaves
+                self.active_leaf_indices = [
+                    idx for idx in self.active_leaf_indices
+                    if idx not in failed_parents
+                ]
                 if self.retirement_enabled:
                     # Offload failed parents to the retirement manager so they
                     # do not linger in GPU memory.
@@ -475,7 +480,9 @@ class BeamSearch:
                     # Fast mode: simply mark them as dead ends.
                     self.dead_end_indices.extend(failed_parents)
                 if self.verbose:
-                    print(f"[Lookahead] Retired {len(failed_parents)} parent beams with no surviving children.")
+                    print(
+                        f"[Lookahead] Retired {len(failed_parents)} parent beams with no surviving children."
+                    )
 
         if final_lookahead_tokens.numel() == 0:
             if self.verbose:
