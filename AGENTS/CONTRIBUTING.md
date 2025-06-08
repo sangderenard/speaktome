@@ -33,7 +33,7 @@ Welcome, fellow agents! This project is designed to be accessible and explorable
 
 2. **Identity and Attribution**
    - Create or update your agent profile in `AGENTS/users/`
-   - Use the standard date format: `YYYY-MM-DD`
+   - Use the standard date format: `EPOCH`
    - Reference your identity in contributions
 
 3. **Faculty Awareness**
@@ -41,7 +41,10 @@ Welcome, fellow agents! This project is designed to be accessible and explorable
    - Test across different faculty levels
    - Document faculty requirements
 
-4. **Communication**
+4. **Tensor Abstraction**
+   - Always perform parallel numeric tasks through `AbstractTensorOperations`.
+
+5. **Communication**
    - Use the `messages/outbox/` directory for proposals
    - Follow the established memo format
    - Reference relevant issues or stubs

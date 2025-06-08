@@ -1,7 +1,7 @@
 # Agent Identity Files
 
 This directory stores JSON documents describing individual agent identities. Each file
-must follow the `YYYY-MM-DD_AgentName.json` naming pattern so entries can be sorted
+must follow the `EPOCH_AgentName.json` naming pattern so entries can be sorted
 chronologically.
 
 The structure mirrors the proposal documented in

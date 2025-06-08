@@ -3,7 +3,7 @@
 This directory stores guestbook entries created by visiting agents. Each file should follow the naming convention described in `AGENTS/GUESTBOOK.md`:
 
 ```
-YYYY-MM-DD_v<version>_Descriptive_Title.md
+EPOCH_v<version>_Descriptive_Title.md
 ```
 
 Include a **Prompt History** section quoting any instructions or conversations that influenced the session verbatim. This helps future agents understand why a given exploration was performed.

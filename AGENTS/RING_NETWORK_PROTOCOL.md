@@ -21,7 +21,7 @@ following format:
 ```json
 {
   "agent": "AgentName",
-  "date": "YYYY-MM-DD",
+  "date": "EPOCH",
   "action": "forwarded"  // or "acknowledged", "edited", etc.
 }
 ```
