@@ -35,4 +35,5 @@ def test_log_softmax_nd():
         total = sum(exps)
         expected.append([math.log(v / total) for v in exps])
 
-    assert pytest.approx(values) == expected
+    for row_val, row_exp in zip(values, expected):
+        assert row_val == pytest.approx(row_exp)

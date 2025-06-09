@@ -100,7 +100,7 @@ from pathlib import Path
 # Attempt to load the C implementation from a standalone source file so it can
 # be compiled ahead of time. Fall back to the inlined version if the file is
 # missing. This paves the way for alternative build systems like Zig.
-SOURCE_PATH = Path(__file__).with_name("ctensor_ops.c")
+SOURCE_PATH = Path(__file__).with_name("c_backend") / "ctensor_ops.c"
 if SOURCE_PATH.exists():
     C_SOURCE = SOURCE_PATH.read_text()
 else:
@@ -526,7 +526,40 @@ else:
 # NOTES: This stub is the first step toward supporting non-CFFI builds.
 # ###########################################################################
 def build_ctensor_with_zig(source_path: str, out_dir: str) -> str:
-    raise NotImplementedError("Zig build not yet implemented.")
+    """Compile ``ctensor_ops.c`` using Zig's embedded clang compiler."""
+    from importlib.util import find_spec
+    from pathlib import Path
+    import subprocess
+    import sys
+
+    if find_spec("ziglang") is None:
+        raise RuntimeError("ziglang package is required to build ctensor library")
+
+    import ziglang  # type: ignore
+
+    zig_exe = Path(ziglang.__file__).with_name("zig")
+    ext = {
+        "linux": ".so",
+        "darwin": ".dylib",
+        "win32": ".dll",
+    }.get(sys.platform, ".so")
+
+    out_path = Path(out_dir) / f"ctensor_ops{ext}"
+    if not out_path.exists():
+        cmd = [
+            sys.executable,
+            "-m",
+            "ziglang",
+            "cc",
+            "-shared",
+            "-O3",
+            source_path,
+            "-o",
+            str(out_path),
+        ]
+        subprocess.check_call(cmd)
+
+    return str(out_path)
 
 class CTensor:
     """C-backed tensor using cffi buffer."""
