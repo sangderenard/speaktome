@@ -117,6 +117,9 @@ def test_basic_operator_dispatch(backend_cls):
     a_list_int = [1, 2]
     b_list_int = [3, 4]
 
+    if isinstance(ops, PurePythonTensorOperations):
+        pytest.skip("Pure backend does not support arithmetic operators")
+
     try:
         # Use backend-specific dtypes
         float_dtype = ops.float_dtype
