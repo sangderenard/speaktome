@@ -62,13 +62,13 @@ if [ $NOEXTRAS -eq 0 ]; then
 
   if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
       echo "Installing latest stable CPU-only torch (CI environment)"
-      safe_run $VENV_PIP install torch -f https://download.pytorch.org/whl/torch_stable.html
+      safe_run $VENV_PIP install torch==2.3.1+cpu -f https://download.pytorch.org/whl/torch_stable.html
   elif [ $FORCE_GPU -eq 1 ]; then
       echo "Installing GPU-enabled torch"
-      safe_run $VENV_PIP install torch --extra-index-url https://download.pytorch.org/whl/cu118
+      safe_run $VENV_PIP install torch -f https://download.pytorch.org/whl/cu118
   else
       echo "Installing latest stable CPU-only torch (default)"
-      safe_run $VENV_PIP install torch -f https://download.pytorch.org/whl/torch_stable.html
+      safe_run $VENV_PIP install torch==2.3.1+cpu -f https://download.pytorch.org/whl/torch_stable.html
   fi
 
   if [ $ML -eq 1 ]; then

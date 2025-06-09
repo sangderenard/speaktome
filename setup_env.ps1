@@ -52,13 +52,13 @@ if (-not $NoExtras) {
     # 3. Handle CPU vs GPU torch & optional ML extras
     if ($env:GITHUB_ACTIONS -eq 'true') {
         Write-Host 'Installing CPU-only torch (CI environment)'
-        Safe-Run { & $venvPip install torch==1.13.1+cpu -f https://download.pytorch.org/whl/torch_stable.html }
+        Safe-Run { & $venvPip install torch==2.3.1+cpu -f https://download.pytorch.org/whl/torch_stable.html }
     } elseif ($gpu) {
         Write-Host 'Installing GPU-enabled torch'
-        Safe-Run { & $venvPip install torch --index-url https://download.pytorch.org/whl/cu118 }
+        Safe-Run { & $venvPip install torch -f https://download.pytorch.org/whl/cu118 }
     } else {
         Write-Host 'Installing CPU-only torch (default)'
-        Safe-Run { & $venvPip install torch==1.13.1+cpu -f https://download.pytorch.org/whl/torch_stable.html }
+        Safe-Run { & $venvPip install torch==2.3.1+cpu -f https://download.pytorch.org/whl/torch_stable.html }
     }
 
     if ($ml) {
