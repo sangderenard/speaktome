@@ -63,6 +63,9 @@ ffi.cdef("""
     void floor_div_const(const double* a, double b, double* out, int n);
     void rfloor_div_const(const double* a, double b, double* out, int n);
     void sqrt_double(const double* a, double* out, int n);
+    void log_softmax_1d(const double* a, double* out, int n);
+    void pad_double_nd(const double* input, double* output, const int* shape, const int* new_shape, const int* left_pad, int dims, double value);
+    void mean_dim(const double* a, double* out, const int* shape, int ndim, int dim);
     void gather_pairs_2d(const double* a, const int* rows, const int* cols,
                          double* out, int n_pairs, int stride);
     double sum_double(const double* a, int n);
@@ -80,6 +83,7 @@ ffi.cdef("""
 
 C_SOURCE = """
     #include <math.h>
+    #include <stdlib.h>
     void add_double(const double* a, const double* b, double* out, int n) {
         for (int i = 0; i < n; ++i) out[i] = a[i] + b[i];
     }
@@ -141,6 +145,81 @@ C_SOURCE = """
     void sqrt_double(const double* a, double* out, int n) {
         for (int i = 0; i < n; ++i) out[i] = sqrt(a[i]);
     }
+
+    void log_softmax_1d(const double* a, double* out, int n) {
+        double max_val = a[0];
+        for (int i = 1; i < n; ++i) {
+            if (a[i] > max_val) max_val = a[i];
+        }
+        double sum = 0.0;
+        for (int i = 0; i < n; ++i) {
+            out[i] = exp(a[i] - max_val);
+            sum += out[i];
+        }
+        for (int i = 0; i < n; ++i) {
+            out[i] = log(out[i] / sum);
+        }
+
+    void pad_double_nd(const double* input, double* output, const int* shape,
+                       const int* new_shape, const int* left_pad, int dims,
+                       double value) {
+        int i;
+        int total_out = 1;
+        for (i = 0; i < dims; ++i) total_out *= new_shape[i];
+        for (i = 0; i < total_out; ++i) output[i] = value;
+
+        int input_size = 1;
+        for (i = 0; i < dims; ++i) input_size *= shape[i];
+
+        int* in_stride = (int*)malloc(sizeof(int) * dims);
+        int* out_stride = (int*)malloc(sizeof(int) * dims);
+        int* idx = (int*)malloc(sizeof(int) * dims);
+
+        in_stride[dims - 1] = 1;
+        out_stride[dims - 1] = 1;
+        for (i = dims - 2; i >= 0; --i) {
+            in_stride[i] = in_stride[i + 1] * shape[i + 1];
+            out_stride[i] = out_stride[i + 1] * new_shape[i + 1];
+        }
+
+        for (i = 0; i < dims; ++i) idx[i] = 0;
+        for (i = 0; i < input_size; ++i) {
+            int out_index = 0;
+            for (int d = 0; d < dims; ++d) {
+                out_index += (idx[d] + left_pad[d]) * out_stride[d];
+            }
+            output[out_index] = input[i];
+            idx[dims - 1]++;
+            for (int d = dims - 1; d > 0; --d) {
+                if (idx[d] >= shape[d]) {
+                    idx[d] = 0;
+                    idx[d - 1]++;
+                }
+            }
+        }
+
+        free(in_stride);
+        free(out_stride);
+        free(idx);
+
+    void mean_dim(const double* a, double* out, const int* shape, int ndim, int dim) {
+        int before = 1;
+        for (int i = 0; i < dim; ++i) before *= shape[i];
+        int axis = shape[dim];
+        int after = 1;
+        for (int i = dim + 1; i < ndim; ++i) after *= shape[i];
+        int out_index = 0;
+        for (int b = 0; b < before; ++b) {
+            for (int c = 0; c < after; ++c) {
+                double sum = 0.0;
+                for (int j = 0; j < axis; ++j) {
+                    int idx = (b * axis + j) * after + c;
+                    sum += a[idx];
+                }
+                out[out_index++] = sum / axis;
+            }
+        }
+
     void gather_pairs_2d(const double* a, const int* rows, const int* cols,
                          double* out, int n_pairs, int stride) {
         for (int i = 0; i < n_pairs; ++i) {
@@ -185,6 +264,7 @@ C_SOURCE = """
             }
         }
         free(used);
+
     }
 
     void topk_double_dim(
@@ -409,19 +489,21 @@ class CTensorOperations(AbstractTensorOperations):
             tensor = CTensor.from_list(tensor, _get_shape(tensor))
         values = _flatten(tensor.tolist())
         if dim is None:
-            s = C.sum_double(tensor.as_c_ptr(), tensor.size)
-            return s / tensor.size if tensor.size else 0.0
-        # ########## STUB: CTensorOperations.mean_dim ##########
-        # PURPOSE: Placeholder for dimension-wise mean on CTensors.
-        # EXPECTED BEHAVIOR: Compute mean along the specified dimension.
-        # INPUTS: ``tensor`` CTensor, ``dim`` dimension index
-        # OUTPUTS: CTensor or float representing the mean.
-        # KEY ASSUMPTIONS/DEPENDENCIES: Requires proper shape traversal.
-        # TODO:
-        #   - Implement mean over arbitrary dimensions.
-        # NOTES: Current implementation only handles ``dim=None``.
-        # ############################################################
-        raise NotImplementedError("mean(dim) not implemented for C backend")
+            return sum(values) / len(values) if values else 0.0
+
+        shape = tensor.shape
+        if dim < 0:
+            dim += len(shape)
+        if dim < 0 or dim >= len(shape):
+            raise ValueError("dim out of range")
+
+        out_shape = shape[:dim] + shape[dim + 1 :]
+        out = CTensor(out_shape if out_shape else ())
+        shape_arr = ffi.new("int[]", list(shape))
+        C.mean_dim(tensor.as_c_ptr(), out.as_c_ptr(), shape_arr, len(shape), dim)
+        if not out_shape:
+            return out.buffer[0]
+        return out
 
     def less(self, tensor: Any, value: Any) -> list:
         if not isinstance(tensor, CTensor):
@@ -432,6 +514,29 @@ class CTensorOperations(AbstractTensorOperations):
         if not isinstance(tensor, CTensor):
             tensor = CTensor.from_list(tensor, _get_shape(tensor))
         return _flatten(tensor.tolist())
+
+    def tolist(self, tensor: Any) -> list:
+        if not isinstance(tensor, CTensor):
+            tensor = CTensor.from_list(tensor, _get_shape(tensor))
+        return tensor.tolist()
+
+    def clamp(
+        self,
+        tensor: Any,
+        min_val: Optional[float] = None,
+        max_val: Optional[float] = None,
+    ) -> CTensor:
+        if not isinstance(tensor, CTensor):
+            tensor = CTensor.from_list(tensor, _get_shape(tensor))
+        out = CTensor(tensor.shape)
+        for i in range(tensor.size):
+            val = tensor.buffer[i]
+            if min_val is not None and val < min_val:
+                val = min_val
+            if max_val is not None and val > max_val:
+                val = max_val
+            out.buffer[i] = val
+        return out
 
     def select_by_indices(self, tensor: CTensor, indices_dim0: Any, indices_dim1: Any) -> Any:
         # ########## STUB: CTensorOperations.select_by_indices ##########
@@ -472,30 +577,58 @@ class CTensorOperations(AbstractTensorOperations):
         return CTensor(out_shape, out_buf)
 
     def log_softmax(self, tensor: CTensor, dim: int) -> Any:
-        # ########## STUB: CTensorOperations.log_softmax ##########
-        # PURPOSE: Compute log softmax along ``dim``.
-        # EXPECTED BEHAVIOR: Returns a CTensor of same shape with log probabilities.
-        # INPUTS: ``tensor`` CTensor, ``dim`` dimension index.
-        # OUTPUTS: CTensor with log softmax values.
-        # KEY ASSUMPTIONS/DEPENDENCIES: Would require exponential and reduction ops.
-        # TODO:
-        #   - Implement stable log softmax in C.
-        # NOTES: Placeholder due to implementation complexity.
-        # ############################################################
-        raise NotImplementedError("log_softmax not implemented for C backend")
+        """Compute log softmax along ``dim`` using C routines."""
+        if not isinstance(tensor, CTensor):
+            tensor = CTensor.from_list(tensor, _get_shape(tensor))
+        if dim < 0:
+            dim += len(tensor.shape)
+        if dim != 0 or len(tensor.shape) != 1:
+            raise NotImplementedError(
+                "log_softmax only implemented for 1D tensors on the C backend"
+            )
+        out = CTensor(tensor.shape)
+        C.log_softmax_1d(tensor.as_c_ptr(), out.as_c_ptr(), tensor.size)
+        return out
 
     def pad(self, tensor: CTensor, pad: Tuple[int, ...], value: float = 0) -> Any:
-        # ########## STUB: CTensorOperations.pad ##########
-        # PURPOSE: Pad ``tensor`` with ``value`` according to ``pad`` spec.
-        # EXPECTED BEHAVIOR: Return new CTensor with additional elements.
-        # INPUTS: ``tensor`` CTensor, padding tuple.
-        # OUTPUTS: Padded CTensor.
-        # KEY ASSUMPTIONS/DEPENDENCIES: Requires dynamic shape manipulation.
-        # TODO:
-        #   - Implement generic padding logic for all dimensions.
-        # NOTES: Currently unsupported.
-        # ############################################################
-        raise NotImplementedError("pad not implemented for C backend")
+        """Pad ``tensor`` with ``value`` according to ``pad`` specification."""
+        if not isinstance(tensor, CTensor):
+            tensor = CTensor.from_list(tensor, _get_shape(tensor))
+
+        if len(pad) % 2 != 0:
+            raise ValueError("Padding length must be even.")
+
+        dims = len(tensor.shape)
+        num_pad_dims = len(pad) // 2
+        if num_pad_dims > dims:
+            raise ValueError(
+                "Padding tuple length implies padding more dimensions than tensor has."
+            )
+
+        left = [0] * dims
+        right = [0] * dims
+        for i in range(num_pad_dims):
+            left[dims - num_pad_dims + i] = int(pad[-2 * (i + 1)])
+            right[dims - num_pad_dims + i] = int(pad[-2 * (i + 1) + 1])
+
+        new_shape = [
+            tensor.shape[i] + left[i] + right[i] for i in range(dims)
+        ]
+
+        out = CTensor(tuple(new_shape))
+        shape_c = ffi.new("int[]", list(tensor.shape))
+        new_shape_c = ffi.new("int[]", new_shape)
+        left_c = ffi.new("int[]", left)
+        C.pad_double_nd(
+            tensor.as_c_ptr(),
+            out.as_c_ptr(),
+            shape_c,
+            new_shape_c,
+            left_c,
+            dims,
+            float(value),
+        )
+        return out
 
     def topk(self, tensor: CTensor, k: int, dim: int) -> Tuple[Any, Any]:
         shape = tensor.shape
