@@ -60,7 +60,7 @@ install_speaktome_extras() {
   pushd "$SPEAKTOME_DIR" > /dev/null
 
   echo "Attempting to upgrade pip..."
-  if ! "$VENV_PIP" install --upgrade pip; then
+  if ! "$VENV_PYTHON" -m pip install --upgrade pip; then
     echo "Warning: Failed to upgrade pip." >&2
   fi
 

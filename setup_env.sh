@@ -32,7 +32,7 @@ else
   VENV_PIP="pip"
 fi
 
-safe_run $VENV_PIP install --upgrade pip
+safe_run $VENV_PYTHON -m pipinstall --upgrade pip
 safe_run $VENV_PIP install -r requirements.txt -r requirements-dev.txt
 
 EXTRAS=0

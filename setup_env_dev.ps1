@@ -36,11 +36,26 @@ Safe-Run { & $venvPython AGENTS/tools/preview_doc.py AGENTS/PROJECT_OVERVIEW.md 
 
 function Install-Speaktome-Extras {
     $speaktomeDir = Join-Path $PSScriptRoot "speaktome"
+    if (-not (Test-Path $speaktomeDir -PathType Container)) {
+        Write-Host "Warning: SpeakToMe directory not found at '$speaktomeDir' or it is not a directory. Skipping extras installation."
+        return
+    }
     Push-Location $speaktomeDir
 
     # Ensure pip is up to date and editable install is present
-    & $venvPip install --upgrade pip
-    & $venvPip install -e .
+    Write-Host "Attempting to upgrade pip..."
+    try {
+        & $venvPython -m pip install --upgrade pip
+    } catch {
+        Write-Host "Warning: Failed to upgrade pip. Error: $($_.Exception.Message)"
+    }
+
+    Write-Host "Attempting to install SpeakToMe in editable mode..."
+    try {
+        & $venvPip install -e .
+    } catch {
+        Write-Host "Warning: Failed to install SpeakToMe in editable mode. Error: $($_.Exception.Message)"
+    }
 
     $optionalGroups = @("plot", "ml", "dev")
     foreach ($group in $optionalGroups) {
@@ -48,7 +63,7 @@ function Install-Speaktome-Extras {
         try {
             & $venvPip "install" ".[$group]"
         } catch {
-            Write-Host "Warning: Failed to install optional group: $group"
+            Write-Host "Warning: Failed to install optional group: $group. Error: $($_.Exception.Message)"
         }
     }
 
@@ -58,7 +73,7 @@ function Install-Speaktome-Extras {
         try {
             & $venvPip "install" ".[$group]"
         } catch {
-            Write-Host "Warning: Failed to install backend group: $group"
+            Write-Host "Warning: Failed to install backend group: $group. Error: $($_.Exception.Message)"
         }
     }
 

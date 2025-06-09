@@ -36,7 +36,7 @@ if (-not $NoVenv) {
 }
 
 # 2. Install core + dev requirements
-Safe-Run { & $venvPip install --upgrade pip }
+Safe-Run { & $venvPython -m pip install --upgrade pip }
 Safe-Run { & $venvPip install -r requirements.txt -r requirements-dev.txt }
 if ($extras) {
     Safe-Run { & $venvPip install .[plot] }
