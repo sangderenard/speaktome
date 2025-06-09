@@ -61,17 +61,29 @@ install_speaktome_extras() {
 
   OPTIONAL_GROUPS=("plot" "ml" "dev")
   for group in "${OPTIONAL_GROUPS[@]}"; do
-    echo "Attempting to install optional group: $group"
-    if ! "$VENV_PIP" install ".[${group}]" ; then
-      echo "Warning: Failed to install optional group: $group" >&2
+    read -t 3 -p "Install optional group '$group'? [y/N] (auto-skip in 3s): " reply
+    reply=${reply:-N}
+    if [[ "$reply" =~ ^[Yy]$ ]]; then
+      echo "Attempting to install optional group: $group"
+      if ! "$VENV_PIP" install ".[${group}]" ; then
+        echo "Warning: Failed to install optional group: $group" >&2
+      fi
+    else
+      echo "Skipping optional group: $group"
     fi
   done
 
   BACKEND_GROUPS=("numpy" "jax" "ctensor")
   for group in "${BACKEND_GROUPS[@]}"; do
-    echo "Attempting to install backend group: $group"
-    if ! "$VENV_PIP" install ".[${group}]" ; then
-      echo "Warning: Failed to install backend group: $group" >&2
+    read -t 3 -p "Install backend group '$group'? [y/N] (auto-skip in 3s): " reply
+    reply=${reply:-N}
+    if [[ "$reply" =~ ^[Yy]$ ]]; then
+      echo "Attempting to install backend group: $group"
+      if ! "$VENV_PIP" install ".[${group}]" ; then
+        echo "Warning: Failed to install backend group: $group" >&2
+      fi
+    else
+      echo "Skipping backend group: $group"
     fi
   done
 
