@@ -80,29 +80,45 @@ function Install-Speaktome-Extras {
 
 Install-Speaktome-Extras
 
-# Optionally run document dump with user confirmation and countdown
-Write-Host ""
-$docdump = $null
-Write-Host "Run document dump (headers, stubs, docs)? [Y/n] (auto-yes in 10s): "
-for ($i=10; $i -gt 0; $i--) {
-    if ($Host.UI.RawUI.KeyAvailable) {
-        $key = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
-        $docdump = $key.Character
-        break
+# Interactive document menu with inactivity timeout
+function Read-InputWithTimeout([int]$seconds) {
+    $task = [System.Threading.Tasks.Task[string]]::Factory.StartNew({ [Console]::ReadLine() })
+    if ($task.Wait([TimeSpan]::FromSeconds($seconds))) { return $task.Result } else { return $null }
+}
+
+function Show-Menu {
+    param([int]$Timeout = 60)
+    while ($true) {
+        Write-Host "`nDeveloper info menu (timeout $Timeout s):"
+        Write-Host " 1) Dump headers"
+        Write-Host " 2) Stub finder"
+        Write-Host " 3) List contributors"
+        Write-Host " 4) Preview AGENT_CONSTITUTION.md"
+        Write-Host " 5) Preview AGENTS.md"
+        Write-Host " 6) Preview LICENSE"
+        Write-Host " 7) Preview CODING_STANDARDS.md"
+        Write-Host " 8) Preview CONTRIBUTING.md"
+        Write-Host " 9) Preview PROJECT_OVERVIEW.md"
+        Write-Host " q) Quit"
+        Write-Host -NoNewline "Select option: "
+        $choice = Read-InputWithTimeout $Timeout
+        if (-not $choice) { Write-Host "No input in $Timeout seconds. Exiting."; break }
+        switch ($choice) {
+            '1' { Write-Host "Running dump_headers"; Safe-Run { & $venvPython AGENTS/tools/dump_headers.py speaktome --markdown } }
+            '2' { Write-Host "Running stubfinder"; Safe-Run { & $venvPython AGENTS/tools/stubfinder.py speaktome } }
+            '3' { Write-Host "Running list_contributors"; Safe-Run { & $venvPython AGENTS/tools/list_contributors.py } }
+            '4' { Write-Host "Preview AGENT_CONSTITUTION.md"; Safe-Run { & $venvPython AGENTS/tools/preview_doc.py AGENTS/AGENT_CONSTITUTION.md } }
+            '5' { Write-Host "Preview AGENTS.md"; Safe-Run { & $venvPython AGENTS/tools/preview_doc.py AGENTS.md } }
+            '6' { Write-Host "Preview LICENSE"; Safe-Run { & $venvPython AGENTS/tools/preview_doc.py LICENSE } }
+            '7' { Write-Host "Preview CODING_STANDARDS.md"; Safe-Run { & $venvPython AGENTS/tools/preview_doc.py AGENTS/CODING_STANDARDS.md } }
+            '8' { Write-Host "Preview CONTRIBUTING.md"; Safe-Run { & $venvPython AGENTS/tools/preview_doc.py AGENTS/CONTRIBUTING.md } }
+            '9' { Write-Host "Preview PROJECT_OVERVIEW.md"; Safe-Run { & $venvPython AGENTS/tools/preview_doc.py AGENTS/PROJECT_OVERVIEW.md } }
+            'q' { Write-Host "Exiting."; break }
+            'Q' { Write-Host "Exiting."; break }
+            default { Write-Host "Unknown choice: $choice" }
+        }
+        Write-Host ""
     }
-    Start-Sleep -Seconds 1
 }
-if (-not $docdump) { $docdump = "Y" }
-if ($docdump -match "^[Yy]$") {
-    Safe-Run { & $venvPython AGENTS/tools/dump_headers.py speaktome --markdown }
-    Safe-Run { & $venvPython AGENTS/tools/stubfinder.py speaktome }
-    Safe-Run { & $venvPython AGENTS/tools/list_contributors.py }
-    Safe-Run { & $venvPython AGENTS/tools/preview_doc.py AGENTS/AGENT_CONSTITUTION.md }
-    Safe-Run { & $venvPython AGENTS/tools/preview_doc.py AGENTS.md }
-    Safe-Run { & $venvPython AGENTS/tools/preview_doc.py LICENSE }
-    Safe-Run { & $venvPython AGENTS/tools/preview_doc.py AGENTS/CODING_STANDARDS.md }
-    Safe-Run { & $venvPython AGENTS/tools/preview_doc.py AGENTS/CONTRIBUTING.md }
-    Safe-Run { & $venvPython AGENTS/tools/preview_doc.py AGENTS/PROJECT_OVERVIEW.md }
-} else {
-    Write-Host "Document dump skipped."
-}
+
+Show-Menu
