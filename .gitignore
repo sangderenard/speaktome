@@ -8,3 +8,11 @@ build/
 .venv/
 node_modules/
 todo/*.stub.md
+
+# Agent toolkit binaries
+AGENTS/tools/bin/busybox
+AGENTS/tools/bin/nano
+AGENTS/tools/bin/bat
+AGENTS/tools/bin/fzf
+AGENTS/tools/bin/rg
+AGENTS/tools/bin/*.exe
