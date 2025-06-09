@@ -1,5 +1,5 @@
+#!/usr/bin/env python3
 """Tensor backends and abstraction layer."""
-
 from __future__ import annotations
 
 try:
@@ -11,6 +11,7 @@ try:
     from .torch_backend import PyTorchTensorOperations
     from .numpy_backend import NumPyTensorOperations
     from .pure_backend import PurePythonTensorOperations
+
     try:
         from .jax_backend import JAXTensorOperations
     except Exception:  # pragma: no cover - optional backend
@@ -19,6 +20,7 @@ try:
         from .c_backend import CTensorOperations
     except Exception:  # pragma: no cover - optional backend
         CTensorOperations = None  # type: ignore
+
 except Exception:
     print(
         "\n"
@@ -30,6 +32,9 @@ except Exception:
     )
     raise
 # --- END HEADER ---
+
+JAXTensorOperations = locals().get("JAXTensorOperations", None)  # pragma: no cover
+CTensorOperations = locals().get("CTensorOperations", None)  # pragma: no cover
 
 __all__ = [
     "AbstractTensorOperations",

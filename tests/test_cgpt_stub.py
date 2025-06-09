@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+"""CGPT stub test."""
 from __future__ import annotations
 
 try:
