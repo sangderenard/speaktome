@@ -5,7 +5,13 @@ Allows selecting available backends and running small correctness tests.
 # --- END HEADER ---
 
 import importlib.util
+import os
+import sys
 from typing import Any, Tuple
+
+REPO_ROOT = os.path.dirname(os.path.dirname(__file__))
+if REPO_ROOT not in sys.path:
+    sys.path.insert(0, REPO_ROOT)
 
 from speaktome import tensors as ta
 
