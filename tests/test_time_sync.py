@@ -5,6 +5,7 @@ from unittest import mock
 
 import pytest
 
+ntplib = pytest.importorskip("ntplib")
 from time_sync import adjust_datetime, compose_ascii_digits, get_offset, set_offset, sync_offset
 
 # --- END HEADER ---
