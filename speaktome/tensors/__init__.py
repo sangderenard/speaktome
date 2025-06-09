@@ -4,6 +4,7 @@ from .abstraction import (
     AbstractTensorOperations,
     get_tensor_operations,
 )
+from .faculty import Faculty, DEFAULT_FACULTY, FORCE_ENV, detect_faculty
 from .torch_backend import PyTorchTensorOperations
 from .numpy_backend import NumPyTensorOperations
 from .pure_backend import PurePythonTensorOperations
@@ -22,6 +23,10 @@ __all__ = [
     "PyTorchTensorOperations",
     "NumPyTensorOperations",
     "PurePythonTensorOperations",
+    "Faculty",
+    "DEFAULT_FACULTY",
+    "FORCE_ENV",
+    "detect_faculty",
 ]
 
 if JAXTensorOperations is not None:

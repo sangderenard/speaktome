@@ -3,7 +3,7 @@ from typing import List, Tuple, Dict, Optional, Any, Callable, TYPE_CHECKING
 import argparse
 
 # Third-party imports
-from . import Faculty, DEFAULT_FACULTY
+from .tensors.faculty import Faculty, DEFAULT_FACULTY
 try:
     import torch
 except ModuleNotFoundError:  # pragma: no cover - runtime message only

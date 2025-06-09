@@ -5,7 +5,7 @@ from typing import Dict, List, Tuple, TYPE_CHECKING
 # Third-party imports
 import torch
 
-from ...faculty import Faculty
+from ...tensors.faculty import Faculty
 
 FACULTY_REQUIREMENT = Faculty.PYGEO
 

@@ -9,7 +9,7 @@ prints the top ``k`` results after ``d`` lookahead steps.
 import argparse
 from typing import Any, Dict
 
-from . import Faculty
+from .tensors.faculty import Faculty
 
 FACULTY_REQUIREMENT = Faculty.PURE_PYTHON
 try:

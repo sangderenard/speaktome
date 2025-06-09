@@ -7,7 +7,7 @@ import math
 if TYPE_CHECKING:  # pragma: no cover - type hints only
     import torch
 
-from .. import Faculty
+from ..tensors.faculty import Faculty
 
 FACULTY_REQUIREMENT = Faculty.TORCH
 

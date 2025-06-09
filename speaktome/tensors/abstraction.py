@@ -3,7 +3,7 @@ from typing import Any, Tuple, Optional, List, Union, Callable
 import math
 import time
 
-from ..faculty import Faculty, DEFAULT_FACULTY
+from .faculty import Faculty, DEFAULT_FACULTY
 from .. import config
 # --- END HEADER ---
 try:
