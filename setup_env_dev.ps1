@@ -10,10 +10,17 @@ function Safe-Run([ScriptBlock]$cmd) {
 }
 
 # Run the regular setup script with forwarded arguments
-Safe-Run { powershell -ExecutionPolicy Bypass -File setup_env.ps1 @args }
+$scriptRoot = $PSScriptRoot
+Safe-Run { & "$scriptRoot\setup_env.ps1" @args }
 
-$venvPython = Join-Path $PSScriptRoot '.venv\Scripts\python.exe'
-$venvPip = Join-Path $PSScriptRoot '.venv\Scripts\pip.exe'
+$venvDir = Join-Path $scriptRoot '.venv'
+if ($IsWindows) {
+    $venvPython = Join-Path $venvDir 'Scripts\python.exe'
+    $venvPip = Join-Path $venvDir 'Scripts\pip.exe'
+} else {
+    $venvPython = Join-Path $venvDir 'bin/python'
+    $venvPip = Join-Path $venvDir 'bin/pip'
+}
 
 if (-not (Test-Path $venvPython)) {
     Write-Host "Error: Virtual environment Python not found at $venvPython"
