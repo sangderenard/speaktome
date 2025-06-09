@@ -20,7 +20,7 @@ class PyTorchTensorOperations(AbstractTensorOperations):
             raise RuntimeError("PyTorch is required for this backend")
         self.default_device = torch.device(default_device)
 
-    def _apply_operator(self, op: str, left: Any, right: Any):
+    def _AbstractTensorOperations__apply_operator(self, op: str, left: Any, right: Any):
         """Delegate arithmetic ops to PyTorch tensors."""
         a = left
         b = right
@@ -156,11 +156,6 @@ class PyTorchTensorOperations(AbstractTensorOperations):
     def index_select(self, tensor, dim, indices):
         return torch.index_select(tensor, dim, indices)
 
-    def sub_scalar(self, tensor, value):
-        return tensor - value
-
-    def div_scalar(self, tensor, value):
-        return tensor / value
 
     def save(self, tensor, filepath: str) -> None:
         torch.save(tensor, filepath)

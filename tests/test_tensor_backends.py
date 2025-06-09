@@ -65,8 +65,9 @@ def run_checks(ops):
     assert vals == expect_vals
     assert idxs == expect_inds
 
-    assert ops.tolist(ops._apply_operator("sub", [2, 4, 6], 1)) == [1, 3, 5]
-    assert ops.tolist(ops._apply_operator("truediv", [2.0, 4.0], 2.0)) == [1.0, 2.0]
+    fn = getattr(ops, "_AbstractTensorOperations__apply_operator")
+    assert ops.tolist(fn("sub", [2, 4, 6], 1)) == [1, 3, 5]
+    assert ops.tolist(fn("truediv", [2.0, 4.0], 2.0)) == [1.0, 2.0]
 
     assert ops.long_dtype is not None
     assert ops.bool_dtype is not None
@@ -80,3 +81,37 @@ def test_tensor_ops_across_backends(backend_cls, tensor_interactive) -> None:
     run_checks(ops)
     if tensor_interactive:
         assert ops.last_op_time is not None
+
+
+def _norm(val):
+    """Convert backend tensors to plain Python types for assertions."""
+    if hasattr(val, "tolist"):
+        return val.tolist()
+    return val
+
+
+
+
+@pytest.mark.parametrize("backend_cls", available_backends())
+def test_basic_operator_dispatch(backend_cls):
+    """Verify arithmetic helpers via the private dispatcher."""
+    ops = backend_cls()
+    fn = getattr(ops, "_AbstractTensorOperations__apply_operator")
+    a = [1, 2]
+    b = [3, 4]
+    assert _norm(fn("add", a, b)) == [4, 6]
+    assert _norm(fn("sub", b, a)) == [2, 2]
+    assert _norm(fn("mul", a, b)) == [3, 8]
+    assert _norm(fn("truediv", b, a)) == [3.0, 2.0]
+    assert _norm(fn("floordiv", b, a)) == [3 // 1, 4 // 2]
+    assert _norm(fn("mod", b, a)) == [0, 0]
+    assert _norm(fn("pow", a, a)) == [1, 4]
+
+
+@pytest.mark.parametrize("backend_cls", available_backends())
+def test_apply_operator_inaccessible(backend_cls):
+    """Ensure the legacy helper raises an error."""
+    ops = backend_cls()
+    with pytest.raises(AttributeError):
+        ops._apply_operator("add", [1], [2])
+
