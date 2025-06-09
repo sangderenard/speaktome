@@ -86,6 +86,13 @@ _DIGITS = {
         "  #  ",
         "     ",
     ],
+    '.': [
+        "     ",
+        "     ",
+        "     ",
+        "     ",
+        "  #  ",
+    ],
     ' ': [
         "     ",
         "     ",
@@ -104,6 +111,13 @@ def compose_ascii_digits(text: str) -> str:
         for i in range(5):
             rows[i] += patt[i] + "  "
     return "\n".join(rows)
+
+
+def print_digital_clock(time: _dt.datetime) -> None:
+    """Print ``time`` in HH:MM:SS format as ASCII art digits."""
+
+    digits = compose_ascii_digits(time.strftime("%H:%M:%S"))
+    print(digits)
 
 
 def print_analog_clock(time: _dt.datetime) -> None:

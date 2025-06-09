@@ -6,7 +6,14 @@ from unittest import mock
 import pytest
 
 ntplib = pytest.importorskip("ntplib")
-from time_sync import adjust_datetime, compose_ascii_digits, get_offset, set_offset, sync_offset
+from time_sync import (
+    adjust_datetime,
+    compose_ascii_digits,
+    get_offset,
+    set_offset,
+    sync_offset,
+    print_digital_clock,
+)
 
 # --- END HEADER ---
 
@@ -31,3 +38,17 @@ def test_compose_ascii_digits():
     lines = art.splitlines()
     assert len(lines) == 5
     assert all(len(line) > 0 for line in lines)
+
+
+def test_compose_ascii_digits_dot():
+    art = compose_ascii_digits(".")
+    lines = art.splitlines()
+    assert len(lines) == 5
+    assert lines[-1].strip()  # bottom row contains the dot
+
+
+def test_print_digital_clock(capsys):
+    time = dt.datetime(2024, 1, 1, 12, 0, 0)
+    print_digital_clock(time)
+    captured = capsys.readouterr().out
+    assert "12" in captured
