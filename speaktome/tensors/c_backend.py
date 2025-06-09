@@ -63,6 +63,8 @@ ffi.cdef("""
     void floor_div_const(const double* a, double b, double* out, int n);
     void rfloor_div_const(const double* a, double b, double* out, int n);
     void sqrt_double(const double* a, double* out, int n);
+    void gather_pairs_2d(const double* a, const int* rows, const int* cols,
+                         double* out, int n_pairs, int stride);
 """)
 
 C_SOURCE = """
@@ -127,6 +129,12 @@ C_SOURCE = """
     }
     void sqrt_double(const double* a, double* out, int n) {
         for (int i = 0; i < n; ++i) out[i] = sqrt(a[i]);
+    }
+    void gather_pairs_2d(const double* a, const int* rows, const int* cols,
+                         double* out, int n_pairs, int stride) {
+        for (int i = 0; i < n_pairs; ++i) {
+            out[i] = a[rows[i] * stride + cols[i]];
+        }
     }
 """
 
@@ -326,7 +334,32 @@ class CTensorOperations(AbstractTensorOperations):
         #   - Implement efficient index selection.
         # NOTES: Complex indexing left for future work.
         # ############################################################
-        raise NotImplementedError("select_by_indices not implemented for C backend")
+        if not isinstance(tensor, CTensor):
+            tensor = CTensor.from_list(tensor, _get_shape(tensor))
+
+        rows = list(indices_dim0)
+
+        if isinstance(indices_dim1, slice):
+            start, stop, step = indices_dim1.indices(tensor.shape[1])
+            cols_range = list(range(start, stop, step))
+            row_arr = [r for r in rows for _ in cols_range]
+            col_arr = cols_range * len(rows)
+            out_shape = (len(rows), len(cols_range))
+        else:
+            cols = [indices_dim1] * len(rows) if isinstance(indices_dim1, int) else list(indices_dim1)
+            if len(rows) != len(cols):
+                raise ValueError("Index lists must have same length for element-wise selection")
+            row_arr = rows
+            col_arr = cols
+            out_shape = (len(cols),) if not isinstance(indices_dim1, int) else (len(rows),)
+
+        row_buf = ffi.new("int[]", row_arr)
+        col_buf = ffi.new("int[]", col_arr)
+        n_pairs = len(row_arr)
+        out_buf = ffi.new("double[]", n_pairs)
+        C.gather_pairs_2d(tensor.as_c_ptr(), row_buf, col_buf, out_buf, n_pairs, tensor.shape[1])
+
+        return CTensor(out_shape, out_buf)
 
     def log_softmax(self, tensor: CTensor, dim: int) -> Any:
         # ########## STUB: CTensorOperations.log_softmax ##########
