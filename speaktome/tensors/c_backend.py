@@ -64,6 +64,12 @@ ffi.cdef("""
     void rfloor_div_const(const double* a, double b, double* out, int n);
     void sqrt_double(const double* a, double* out, int n);
     void log_softmax_1d(const double* a, double* out, int n);
+    void log_softmax_dim(
+        const double* a,
+        double* out,
+        const int* shape,
+        int ndim,
+        int dim);
     void pad_double_nd(const double* input, double* output, const int* shape, const int* new_shape, const int* left_pad, int dims, double value);
     void mean_dim(const double* a, double* out, const int* shape, int ndim, int dim);
     void gather_pairs_2d(const double* a, const int* rows, const int* cols,
@@ -168,6 +174,44 @@ C_SOURCE = """
         for (int i = 0; i < n; ++i) {
             out[i] = log(out[i] / sum);
         }
+    }
+
+    typedef struct {
+        double* out;
+        int axis;
+        int* out_index;
+    } log_softmax_ctx;
+
+    static void log_softmax_callback(const double* slice, int stride, int idx, void* user_data) {
+        log_softmax_ctx* ctx = (log_softmax_ctx*)user_data;
+        double max_val = slice[0];
+        for (int i = 1; i < ctx->axis; ++i) {
+            double v = slice[i * stride];
+            if (v > max_val) max_val = v;
+        }
+        double sum = 0.0;
+        for (int i = 0; i < ctx->axis; ++i) {
+            double e = exp(slice[i * stride] - max_val);
+            ctx->out[*ctx->out_index + i] = e;
+            sum += e;
+        }
+        for (int i = 0; i < ctx->axis; ++i) {
+            double e = ctx->out[*ctx->out_index + i];
+            ctx->out[*ctx->out_index + i] = log(e / sum);
+        }
+        *ctx->out_index += ctx->axis;
+    }
+
+    void log_softmax_dim(
+        const double* a,
+        double* out,
+        const int* shape,
+        int ndim,
+        int dim) {
+        int out_idx = 0;
+        log_softmax_ctx ctx = {out, shape[dim], &out_idx};
+        for_each_cell_along_dim(a, shape, ndim, dim, log_softmax_callback, &ctx);
+    }
 
     void pad_double_nd(const double* input, double* output, const int* shape,
                        const int* new_shape, const int* left_pad, int dims,
@@ -565,12 +609,17 @@ class CTensorOperations(AbstractTensorOperations):
             tensor = CTensor.from_list(tensor, _get_shape(tensor))
         if dim < 0:
             dim += len(tensor.shape)
-        if dim != 0 or len(tensor.shape) != 1:
-            raise NotImplementedError(
-                "log_softmax only implemented for 1D tensors on the C backend"
+        shape = tensor.shape
+        if dim < 0 or dim >= len(shape):
+            raise ValueError("dim out of range")
+        out = CTensor(shape)
+        if len(shape) == 1:
+            C.log_softmax_1d(tensor.as_c_ptr(), out.as_c_ptr(), tensor.size)
+        else:
+            c_shape = ffi.new("int[]", list(shape))
+            C.log_softmax_dim(
+                tensor.as_c_ptr(), out.as_c_ptr(), c_shape, len(shape), dim
             )
-        out = CTensor(tensor.shape)
-        C.log_softmax_1d(tensor.as_c_ptr(), out.as_c_ptr(), tensor.size)
         return out
 
     def pad(self, tensor: CTensor, pad: Tuple[int, ...], value: float = 0) -> Any:
