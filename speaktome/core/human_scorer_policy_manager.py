@@ -7,6 +7,11 @@ from .scorer import Scorer
 # --- END HEADER ---
 
 class HumanScorerPolicyManager:
+    HEADER = "Manage persistent human-defined scoring policies"
+
+    @staticmethod
+    def test() -> None:
+        pass
     DEFAULT_POLICY_FILE = "human_scorer_policy.json"
 
     def __init__(self, scorer: Scorer):  # Forward reference Scorer

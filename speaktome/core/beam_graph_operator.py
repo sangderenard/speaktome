@@ -74,6 +74,10 @@ class BeamGraphOperator:
         # Ancestors a2, a1, root remain on their current device until/unless independently retired.
     """
 
+    @staticmethod
+    def test() -> None:
+        pass
+
 
     def __init__(
         self,

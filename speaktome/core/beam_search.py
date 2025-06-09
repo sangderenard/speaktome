@@ -31,6 +31,11 @@ from .lookahead_controller import LookaheadConfig, LookaheadController
 # --- END HEADER ---
 
 class BeamSearch:
+    """Core orchestrator for beam expansion and pruning."""
+
+    @staticmethod
+    def test() -> None:
+        pass
     def __init__(self, scorer: Scorer, beam_width: int = 5, gpu_limit: int = GPU_LIMIT, 
                  lookahead_steps: int = 1, initial_retirement_enabled: bool = True,
                  device=config.DEVICE, verbose=True, max_len=LENGTH_LIMIT, # General params

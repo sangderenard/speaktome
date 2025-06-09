@@ -18,6 +18,10 @@ class LookaheadConfig:
       - lookahead_temp: temperature for softmax during lookahead
       - aggregate_fn: function mapping [N, width]→[N] to score each candidate
     """
+
+    @staticmethod
+    def test() -> None:
+        pass
     def __init__(
         self,
         instruction: BeamSearchInstruction | None, # Can be None for simpler setups
@@ -32,6 +36,12 @@ class LookaheadConfig:
 
 
 class LookaheadController:
+    HEADER = "Driver for lookahead expansion phase"
+
+    @staticmethod
+    def test() -> None:
+        pass
+
     def __init__(
         self,
         lookahead_steps: int,

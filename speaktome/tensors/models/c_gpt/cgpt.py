@@ -30,6 +30,10 @@ _lib = ffi.verify(C_SOURCE, include_dirs=[str(Path(__file__).parent)])
 class CGPT:
     """Thin wrapper around the C implementation."""
 
+    @staticmethod
+    def test() -> None:
+        pass
+
     def __init__(self, n_layers: int = 1) -> None:
         self.model = ffi.new("CGPTModel*", dict(n_layers=n_layers))
 

@@ -41,6 +41,11 @@ from .abstraction import AbstractTensorOperations
 # --- END HEADER ---
 
 class PyTorchTensorOperations(AbstractTensorOperations):
+    HEADER = "Tensor operations backed by PyTorch"
+
+    @staticmethod
+    def test() -> None:
+        pass
     def __init__(self, default_device: Union[str, "torch.device"] = "cpu", track_time: bool = False):
         super().__init__(track_time=track_time)
         if torch is None:

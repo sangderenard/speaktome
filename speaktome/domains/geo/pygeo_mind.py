@@ -38,6 +38,10 @@ class PyGeoMind(torch.nn.Module):
     with authority granted by learned policy.
     """
 
+    @staticmethod
+    def test() -> None:
+        pass
+
     def __init__(self, scorer: Scorer, input_dim: int = 768, hidden_dim: int = 512, beam_width: int = 5, **kwargs):
         super().__init__()
 

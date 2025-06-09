@@ -20,6 +20,11 @@ from ...core.beam_tree_visualizer import BeamTreeVisualizer
 from ...config import get_sentence_transformer_model
 # --- END HEADER ---
 class PyGGraphController:
+    HEADER = "Graph-based controller guiding beam search via PyGeoMind"
+
+    @staticmethod
+    def test() -> None:
+        pass
     def __init__(self, beam_search: BeamSearch, pygeomind_model: Optional[PyGeoMind] = None, human_in_control: bool = False):
         self.beam_search = beam_search
         self.tree = beam_search.tree

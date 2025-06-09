@@ -20,6 +20,10 @@ class HumanPilotController:
     ╚══════════════════════════════════════════════════════════╝
     """
 
+    @staticmethod
+    def test() -> None:
+        pass
+
     def __init__(self, beam_search: BeamSearch, policy_model: Optional[torch.nn.Module] = None):
         self.beam_search = beam_search
         self.tree = beam_search.tree

@@ -44,6 +44,11 @@ from .abstraction import AbstractTensorOperations
 # --- END HEADER ---
 
 class NumPyTensorOperations(AbstractTensorOperations):
+    HEADER = "Tensor operations using NumPy"
+
+    @staticmethod
+    def test() -> None:
+        pass
     def __init__(self, track_time: bool = False):
         super().__init__(track_time=track_time)
 

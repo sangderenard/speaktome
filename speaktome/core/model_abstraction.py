@@ -9,6 +9,11 @@ except ModuleNotFoundError:  # pragma: no cover - optional dependency
     torch = None  # type: ignore
 
 class AbstractModelWrapper(ABC):
+    HEADER = "Unified interface for varying model types"
+
+    @staticmethod
+    def test() -> None:
+        pass
     @abstractmethod
     def forward(self, input_ids: Any, attention_mask: Any, **kwargs) -> Dict[str, Any]:
         pass
@@ -18,6 +23,11 @@ class AbstractModelWrapper(ABC):
         pass
 
 class PyTorchModelWrapper(AbstractModelWrapper):
+    HEADER = "Wrapper exposing PyTorch models via common API"
+
+    @staticmethod
+    def test() -> None:
+        pass
     def __init__(self, model: torch.nn.Module):
         if torch is None:
             raise RuntimeError("PyTorch is required for this wrapper")

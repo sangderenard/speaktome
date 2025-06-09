@@ -35,6 +35,10 @@ VOCAB = TokenVocabulary("abcdefghijklmnopqrstuvwxyz ")
 class RandomModel(AbstractModelWrapper):
     """Random two-layer network built from :class:`AbstractLinearLayer`."""
 
+    @staticmethod
+    def test() -> None:
+        pass
+
     def __init__(self) -> None:
         self.ops = get_tensor_operations(
             Faculty.NUMPY if NUMPY_AVAILABLE else Faculty.PURE_PYTHON

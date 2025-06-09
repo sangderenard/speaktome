@@ -17,6 +17,11 @@ if TYPE_CHECKING:
     from sentence_transformers import SentenceTransformer
 
 class BeamTreeVisualizer:
+    HEADER = "Helper for visualizing beam search trees"
+
+    @staticmethod
+    def test() -> None:
+        pass
     def visualize_subtree(
         self,
         pyg_data: 'PyGData',

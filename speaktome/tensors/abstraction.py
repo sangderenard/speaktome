@@ -56,6 +56,11 @@ def _find_conversion_path(src_cls: type, tgt_cls: type) -> List[Tuple[type, type
     return []
 
 class AbstractTensorOperations(ABC):
+    HEADER = "Backend-agnostic tensor operation interface"
+
+    @staticmethod
+    def test() -> None:
+        pass
     def __init__(self, track_time: bool = False) -> None:
         """Optional benchmark support for tensor operations."""
         self.track_time = track_time

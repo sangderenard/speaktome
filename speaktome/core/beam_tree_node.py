@@ -13,6 +13,11 @@ from ..tensors import (
 # --- END HEADER ---
 
 class BeamTreeNode:
+    HEADER = "Minimal container for beam tree node state"
+
+    @staticmethod
+    def test() -> None:
+        pass
     def __init__(
         self,
         token: int,

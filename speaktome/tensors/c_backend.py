@@ -169,6 +169,10 @@ def build_ctensor_with_zig(source_path: str, out_dir: str) -> str:
 
 class CTensor:
     """C-backed tensor using cffi buffer."""
+
+    @staticmethod
+    def test() -> None:
+        pass
     def __init__(self, shape: Tuple[int, ...], buffer=None):
         self.shape = shape
         self.size = 1

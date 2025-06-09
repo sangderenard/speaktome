@@ -20,6 +20,10 @@ class BeamSearchInstruction:
          and, if targeted, what node_id/beam_idx.
     """
 
+    @staticmethod
+    def test() -> None:
+        pass
+
     def __init__(
         self,
         node_id: int,

@@ -20,6 +20,10 @@ class BeamRetirementManager:
     - Thread-safe, high-throughput.
     """
 
+    @staticmethod
+    def test() -> None:
+        pass
+
     def __init__(self, tree: 'CompressedBeamTree', prefix_len=8, tokenizer=None, filter_config=None, queue_size=16384):
         self.tree = tree # Reference to the main beam tree
         self.prefix_len = prefix_len

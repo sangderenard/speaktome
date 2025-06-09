@@ -13,6 +13,10 @@ from ..tensors.abstraction import AbstractTensorOperations
 class AbstractLinearLayer:
     """Single linear transformation with optional activation."""
 
+    @staticmethod
+    def test() -> None:
+        pass
+
     def __init__(
         self,
         weight: Any,
@@ -46,6 +50,10 @@ class AbstractLinearLayer:
 
 class SequentialLinearModel(AbstractModelWrapper):
     """Compose multiple :class:`AbstractLinearLayer` objects."""
+
+    @staticmethod
+    def test() -> None:
+        pass
 
     def __init__(
         self,

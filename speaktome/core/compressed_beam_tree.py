@@ -20,6 +20,11 @@ from ..tensors import (
 # --- END HEADER ---
 
 class CompressedBeamTree:
+    HEADER = "Storage structure for active beams"
+
+    @staticmethod
+    def test() -> None:
+        pass
     def __init__(
         self,
         device: str = "cuda",

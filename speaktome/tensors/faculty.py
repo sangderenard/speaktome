@@ -16,6 +16,10 @@ class Faculty(Enum):
     PYGEO = auto()  # NN programmable smart search
     CTENSOR = auto()  # Experimental C backend
 
+    @staticmethod
+    def test() -> None:
+        pass
+
 
 FORCE_ENV = "SPEAKTOME_FACULTY"
 
