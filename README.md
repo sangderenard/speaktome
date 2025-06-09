@@ -96,7 +96,7 @@ access. If you skip this step, the application falls back to the lightweight
 CPU demo mode.
 
 ### Developer Setup
-Use the developer script to run the standard installation and display key documentation:
+Use the developer script to run the standard installation. It then launches an interactive menu for viewing key documentation:
 
 ```bash
 bash setup_env_dev.sh --extras --prefetch

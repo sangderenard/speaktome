@@ -92,20 +92,35 @@ install_speaktome_extras() {
 }
 install_speaktome_extras
 
-# Optionally run document dump with user confirmation and countdown
-echo
-read -t 10 -p "Run document dump (headers, stubs, docs)? [Y/n] (auto-yes in 10s): " docdump
-docdump=${docdump:-Y}
-if [[ "$docdump" =~ ^[Yy]$ ]]; then
-  safe_run "$VENV_PYTHON" AGENTS/tools/dump_headers.py speaktome --markdown
-  safe_run "$VENV_PYTHON" AGENTS/tools/stubfinder.py speaktome
-  safe_run "$VENV_PYTHON" AGENTS/tools/list_contributors.py
-  safe_run "$VENV_PYTHON" AGENTS/tools/preview_doc.py AGENTS/AGENT_CONSTITUTION.md
-  safe_run "$VENV_PYTHON" AGENTS/tools/preview_doc.py AGENTS.md
-  safe_run "$VENV_PYTHON" AGENTS/tools/preview_doc.py LICENSE
-  safe_run "$VENV_PYTHON" AGENTS/tools/preview_doc.py AGENTS/CODING_STANDARDS.md
-  safe_run "$VENV_PYTHON" AGENTS/tools/preview_doc.py AGENTS/CONTRIBUTING.md
-  safe_run "$VENV_PYTHON" AGENTS/tools/preview_doc.py AGENTS/PROJECT_OVERVIEW.md
-else
-  echo "Document dump skipped."
-fi
+# Interactive document menu with inactivity timeout
+dev_menu() {
+  local TIMEOUT=60 choice
+  while true; do
+    echo "\nDeveloper info menu (timeout ${TIMEOUT}s):"
+    echo " 1) Dump headers"
+    echo " 2) Stub finder"
+    echo " 3) List contributors"
+    echo " 4) Preview AGENT_CONSTITUTION.md"
+    echo " 5) Preview AGENTS.md"
+    echo " 6) Preview LICENSE"
+    echo " 7) Preview CODING_STANDARDS.md"
+    echo " 8) Preview CONTRIBUTING.md"
+    echo " 9) Preview PROJECT_OVERVIEW.md"
+    echo " q) Quit"
+    read -r -t "$TIMEOUT" -p "Select option: " choice || { echo "No input in ${TIMEOUT}s. Exiting."; break; }
+    case $choice in
+      1) echo "Running dump_headers"; safe_run "$VENV_PYTHON" AGENTS/tools/dump_headers.py speaktome --markdown ;;
+      2) echo "Running stubfinder"; safe_run "$VENV_PYTHON" AGENTS/tools/stubfinder.py speaktome ;;
+      3) echo "Running list_contributors"; safe_run "$VENV_PYTHON" AGENTS/tools/list_contributors.py ;;
+      4) echo "Preview AGENT_CONSTITUTION.md"; safe_run "$VENV_PYTHON" AGENTS/tools/preview_doc.py AGENTS/AGENT_CONSTITUTION.md ;;
+      5) echo "Preview AGENTS.md"; safe_run "$VENV_PYTHON" AGENTS/tools/preview_doc.py AGENTS.md ;;
+      6) echo "Preview LICENSE"; safe_run "$VENV_PYTHON" AGENTS/tools/preview_doc.py LICENSE ;;
+      7) echo "Preview CODING_STANDARDS.md"; safe_run "$VENV_PYTHON" AGENTS/tools/preview_doc.py AGENTS/CODING_STANDARDS.md ;;
+      8) echo "Preview CONTRIBUTING.md"; safe_run "$VENV_PYTHON" AGENTS/tools/preview_doc.py AGENTS/CONTRIBUTING.md ;;
+      9) echo "Preview PROJECT_OVERVIEW.md"; safe_run "$VENV_PYTHON" AGENTS/tools/preview_doc.py AGENTS/PROJECT_OVERVIEW.md ;;
+      q|Q) echo "Exiting."; break ;;
+      *) echo "Unknown choice: $choice" ;;
+    esac
+  done
+}
+dev_menu
