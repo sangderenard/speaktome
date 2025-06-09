@@ -10,7 +10,7 @@ your agents file misses the reality and the point, these primitives DO need to b
 
 ## Summary
 - Updated `speaktome/tensors/AGENTS.md` to clarify backend operator policy.
-- Implemented `sub_scalar` and `div_scalar` in `jax_backend.py`.
+- Implemented missing arithmetic primitives in `jax_backend.py`.
 
 ## Next Steps
 Ensure all backends remain aligned with `AbstractTensorOperations` interface.

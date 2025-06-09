@@ -314,15 +314,6 @@ class PurePythonTensorOperations(AbstractTensorOperations):
             return [[row[i] for i in indices] for row in tensor]
         raise NotImplementedError("index_select only implemented for dim 0 or 1")
 
-    def sub_scalar(self, tensor: Any, value: Any) -> Any:
-        if isinstance(tensor, list):
-            return [self.sub_scalar(item, value) for item in tensor]
-        return tensor - value
-
-    def div_scalar(self, tensor: Any, value: Any) -> Any:
-        if isinstance(tensor, list):
-            return [self.div_scalar(item, value) for item in tensor]
-        return tensor / value
 
     def save(self, tensor: Any, filepath: str) -> None:
         with open(filepath, "w") as f:

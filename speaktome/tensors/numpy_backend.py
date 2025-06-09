@@ -211,11 +211,6 @@ class NumPyTensorOperations(AbstractTensorOperations):
     def index_select(self, tensor, dim, indices):
         return np.take(tensor, indices, axis=dim)
 
-    def sub_scalar(self, tensor, value):
-        return tensor - value
-
-    def div_scalar(self, tensor, value):
-        return tensor / value
 
     def save(self, tensor, filepath: str) -> None:
         np.save(filepath, tensor)

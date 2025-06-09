@@ -24,17 +24,17 @@ ffi.cdef("""
     void floordiv_double(const double* a, const double* b, double* out, int n);
     // Scalar ops
     void add_scalar(const double* a, double b, double* out, int n);
-    void sub_scalar(const double* a, double b, double* out, int n);
-    void rsub_scalar(const double* a, double b, double* out, int n);
+    void subtract_const(const double* a, double b, double* out, int n);
+    void rsubtract_const(const double* a, double b, double* out, int n);
     void mul_scalar(const double* a, double b, double* out, int n);
-    void div_scalar(const double* a, double b, double* out, int n);
-    void rdiv_scalar(const double* a, double b, double* out, int n);
+    void divide_const(const double* a, double b, double* out, int n);
+    void rdivide_const(const double* a, double b, double* out, int n);
     void pow_scalar(const double* a, double b, double* out, int n);
     void rpow_scalar(const double* a, double b, double* out, int n);
     void mod_scalar(const double* a, double b, double* out, int n);
     void rmod_scalar(const double* a, double b, double* out, int n);
-    void floordiv_scalar(const double* a, double b, double* out, int n);
-    void rfloordiv_scalar(const double* a, double b, double* out, int n);
+    void floor_div_const(const double* a, double b, double* out, int n);
+    void rfloor_div_const(const double* a, double b, double* out, int n);
 """)
 
 C_SOURCE = """
@@ -64,19 +64,19 @@ C_SOURCE = """
     void add_scalar(const double* a, double b, double* out, int n) {
         for (int i = 0; i < n; ++i) out[i] = a[i] + b;
     }
-    void sub_scalar(const double* a, double b, double* out, int n) {
+    void subtract_const(const double* a, double b, double* out, int n) {
         for (int i = 0; i < n; ++i) out[i] = a[i] - b;
     }
-    void rsub_scalar(const double* a, double b, double* out, int n) {
+    void rsubtract_const(const double* a, double b, double* out, int n) {
         for (int i = 0; i < n; ++i) out[i] = b - a[i];
     }
     void mul_scalar(const double* a, double b, double* out, int n) {
         for (int i = 0; i < n; ++i) out[i] = a[i] * b;
     }
-    void div_scalar(const double* a, double b, double* out, int n) {
+    void divide_const(const double* a, double b, double* out, int n) {
         for (int i = 0; i < n; ++i) out[i] = a[i] / b;
     }
-    void rdiv_scalar(const double* a, double b, double* out, int n) {
+    void rdivide_const(const double* a, double b, double* out, int n) {
         for (int i = 0; i < n; ++i) out[i] = b / a[i];
     }
     void pow_scalar(const double* a, double b, double* out, int n) {
@@ -91,10 +91,10 @@ C_SOURCE = """
     void rmod_scalar(const double* a, double b, double* out, int n) {
         for (int i = 0; i < n; ++i) out[i] = fmod(b, a[i]);
     }
-    void floordiv_scalar(const double* a, double b, double* out, int n) {
+    void floor_div_const(const double* a, double b, double* out, int n) {
         for (int i = 0; i < n; ++i) out[i] = floor(a[i] / b);
     }
-    void rfloordiv_scalar(const double* a, double b, double* out, int n) {
+    void rfloor_div_const(const double* a, double b, double* out, int n) {
         for (int i = 0; i < n; ++i) out[i] = floor(b / a[i]);
     }
 """
@@ -163,17 +163,17 @@ class CTensorOperations(AbstractTensorOperations):
             elif op == 'radd':
                 C.add_scalar(left.as_c_ptr(), val, out.as_c_ptr(), n)
             elif op in ('sub', 'isub'):
-                C.sub_scalar(left.as_c_ptr(), val, out.as_c_ptr(), n)
+                C.subtract_const(left.as_c_ptr(), val, out.as_c_ptr(), n)
             elif op == 'rsub':
-                C.rsub_scalar(left.as_c_ptr(), val, out.as_c_ptr(), n)
+                C.rsubtract_const(left.as_c_ptr(), val, out.as_c_ptr(), n)
             elif op in ('mul', 'imul'):
                 C.mul_scalar(left.as_c_ptr(), val, out.as_c_ptr(), n)
             elif op == 'rmul':
                 C.mul_scalar(left.as_c_ptr(), val, out.as_c_ptr(), n)
             elif op in ('truediv', 'itruediv'):
-                C.div_scalar(left.as_c_ptr(), val, out.as_c_ptr(), n)
+                C.divide_const(left.as_c_ptr(), val, out.as_c_ptr(), n)
             elif op == 'rtruediv':
-                C.rdiv_scalar(left.as_c_ptr(), val, out.as_c_ptr(), n)
+                C.rdivide_const(left.as_c_ptr(), val, out.as_c_ptr(), n)
             elif op in ('pow', 'ipow'):
                 C.pow_scalar(left.as_c_ptr(), val, out.as_c_ptr(), n)
             elif op == 'rpow':
@@ -183,9 +183,9 @@ class CTensorOperations(AbstractTensorOperations):
             elif op == 'rmod':
                 C.rmod_scalar(left.as_c_ptr(), val, out.as_c_ptr(), n)
             elif op in ('floordiv', 'ifloordiv'):
-                C.floordiv_scalar(left.as_c_ptr(), val, out.as_c_ptr(), n)
+                C.floor_div_const(left.as_c_ptr(), val, out.as_c_ptr(), n)
             elif op == 'rfloordiv':
-                C.rfloordiv_scalar(left.as_c_ptr(), val, out.as_c_ptr(), n)
+                C.rfloor_div_const(left.as_c_ptr(), val, out.as_c_ptr(), n)
             else:
                 raise NotImplementedError(f"Operator {op} not implemented for C backend.")
             return out

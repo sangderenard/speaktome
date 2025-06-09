@@ -153,7 +153,7 @@ class TetrahedralMarchingCubes:
                     z_end = min(z_start + tile_size + 1, Nz)
 
                     # Extract the subdomain
-                    sub_scalar = scalar_field[x_start:x_end, y_start:y_end, z_start:z_end]
+                    sub_field = scalar_field[x_start:x_end, y_start:y_end, z_start:z_end]
                     sub_positions = vertex_positions[x_start:x_end, y_start:y_end, z_start:z_end, :, :]
 
                     # Process the subdomain
@@ -161,7 +161,7 @@ class TetrahedralMarchingCubes:
                         self._extract_subdomain(
                             isovalue,
                             isovalue_idx,
-                            sub_scalar,
+                            sub_field,
                             sub_positions,
                             results[isovalue_idx]
                         )
@@ -179,7 +179,7 @@ class TetrahedralMarchingCubes:
 
         return results
 
-    def _extract_subdomain(self, isovalue: float, isovalue_idx: int, sub_scalar: torch.Tensor,
+    def _extract_subdomain(self, isovalue: float, isovalue_idx: int, sub_field: torch.Tensor,
                           sub_positions: torch.Tensor, result: Dict):
         """
         Extract isosurface from a subdomain for a specific isovalue.
@@ -187,11 +187,11 @@ class TetrahedralMarchingCubes:
         Args:
             isovalue (float): Scalar value at which to extract the isosurface.
             isovalue_idx (int): Index of the isovalue.
-            sub_scalar (torch.Tensor): Scalar field of the subdomain.
+            sub_field (torch.Tensor): Scalar field of the subdomain.
             sub_positions (torch.Tensor): Vertex positions of the subdomain.
             result (dict): Dictionary to accumulate the results.
         """
-        Nx, Ny, Nz = sub_scalar.shape
+        Nx, Ny, Nz = sub_field.shape
 
         # Iterate through all cubes in the subdomain
         for x in range(Nx - 1):
@@ -200,19 +200,19 @@ class TetrahedralMarchingCubes:
                     # Process each tetrahedron in the current cube
                     for tet_index in range(6):  # 6 tetrahedrons per cube
                         tet_scalars, tet_positions = self._get_tetrahedron(
-                            sub_scalar, sub_positions, x, y, z, tet_index
+                            sub_field, sub_positions, x, y, z, tet_index
                         )
                         self._process_tetrahedron(
                             isovalue, isovalue_idx, tet_scalars, tet_positions, result
                         )
 
-    def _get_tetrahedron(self, sub_scalar: torch.Tensor, sub_positions: torch.Tensor,
+    def _get_tetrahedron(self, sub_field: torch.Tensor, sub_positions: torch.Tensor,
                         x: int, y: int, z: int, tet_index: int) -> Tuple[torch.Tensor, torch.Tensor]:
         """
         Retrieve scalar values and positions for a single tetrahedron.
 
         Args:
-            sub_scalar (torch.Tensor): Scalar field values in the subdomain (Nx, Ny, Nz).
+            sub_field (torch.Tensor): Scalar field values in the subdomain (Nx, Ny, Nz).
             sub_positions (torch.Tensor): Vertex positions in the subdomain (Nx, Ny, Nz, 8, 3).
             x, y, z (int): Grid indices.
             tet_index (int): Tetrahedron index (0-5 within a cube).
@@ -231,8 +231,8 @@ class TetrahedralMarchingCubes:
         tet_vertices = TETRAHEDRON_DECOMPOSITION[tet_index]
 
 
-        tet_scalars = torch.tensor([sub_scalar[x + (v >> 0 & 1), 
-                                              y + (v >> 1 & 1), 
+        tet_scalars = torch.tensor([sub_field[x + (v >> 0 & 1),
+                                              y + (v >> 1 & 1),
                                               z + (v >> 2 & 1)] for v in tet_vertices])
 
         # Get the positions

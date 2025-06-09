@@ -14,7 +14,7 @@ this is unacceptable, use the actual operators do not use the _apply_operator, a
 ## Steps Taken
 1. Changed `_apply_operator` into an internal method and introduced `__apply_operator` for backend dispatch.
 2. Updated all backends to implement the mangled abstract method.
-3. Replaced direct calls in tests with operations using new `DummyTensor` wrapper.
+3. Replaced direct calls in tests with simple helper invoking the private dispatcher.
 4. Added check that calling `_apply_operator` raises `AttributeError`.
 5. Ran the full test suite via `python testing/test_hub.py`.
 
