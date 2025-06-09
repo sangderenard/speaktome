@@ -14,6 +14,7 @@ class Faculty(Enum):
     NUMPY = auto()  # Research demo of algorithm
     TORCH = auto()  # Performant production faculty
     PYGEO = auto()  # NN programmable smart search
+    CTENSOR = auto()  # Experimental C backend
 
 
 FORCE_ENV = "SPEAKTOME_FACULTY"
@@ -52,3 +53,32 @@ def detect_faculty() -> Faculty:
 
 
 DEFAULT_FACULTY = detect_faculty()
+
+
+def available_faculties() -> list[Faculty]:
+    """Return all faculty tiers available in the current environment."""
+    levels = [Faculty.PURE_PYTHON]
+    try:
+        import numpy  # type: ignore
+        _ = numpy
+        levels.append(Faculty.NUMPY)
+    except ModuleNotFoundError:
+        return levels
+    try:
+        import torch  # type: ignore
+        _ = torch
+        levels.append(Faculty.TORCH)
+    except ModuleNotFoundError:
+        return levels
+    try:
+        import torch_geometric  # type: ignore
+        _ = torch_geometric
+        levels.append(Faculty.PYGEO)
+    except ModuleNotFoundError:
+        pass
+    try:
+        from .c_backend import CTensorOperations  # noqa: F401
+        levels.append(Faculty.CTENSOR)
+    except Exception:
+        pass
+    return levels

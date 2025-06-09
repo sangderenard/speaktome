@@ -1,4 +1,4 @@
-"""Tests for the :mod:`speaktome.faculty` module.
+"""Tests for the :mod:`speaktome.tensors.faculty` module.
 
 These exercises confirm that the faculty-detection logic honours installed
 libraries and environment overrides.  The language used here aims for clarity
@@ -10,7 +10,7 @@ import pytest
 import sys
 from unittest import mock
 
-from speaktome.faculty import detect_faculty, Faculty, FORCE_ENV, DEFAULT_FACULTY
+from speaktome.tensors.faculty import detect_faculty, Faculty, FORCE_ENV, DEFAULT_FACULTY
 # --- END HEADER ---
 
 
@@ -64,6 +64,7 @@ def test_detect_faculty_pygeo() -> None:
     ("NUMPY", Faculty.NUMPY),
     ("TORCH", Faculty.TORCH),
     ("PYGEO", Faculty.PYGEO),
+    ("CTENSOR", Faculty.CTENSOR),
 ])
 def test_detect_faculty_env_override_valid(monkeypatch, faculty_name, expected_faculty) -> None:
     """Respect valid environment overrides regardless of installed packages."""

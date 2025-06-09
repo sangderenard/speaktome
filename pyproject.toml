@@ -1,44 +1,27 @@
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# pyproject.toml — modular extras, clear comments
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-[build-system]
-requires = ["setuptools>=61", "wheel"]
-build-backend = "setuptools.build_meta"
-
 [project]
-name = "speaktome"
+name = "speaktome-agent-tools"
 version = "0.1.0"
-description = "Beam search controllers and utilities for generating text"
+description = "Agent tools and repo management utilities for SpeakToMe"
+authors = [
+    { name = "Your Name", email = "your@email.com" }
+]
 readme = "README.md"
 requires-python = ">=3.8"
-license = { text = "MIT" }
-authors = [{ name = "SpeakToMe Authors" }]
-
-# Core (always needed)
 dependencies = [
-  "numpy>=1.26"
+    "tomli; python_version<'3.11'",
+    "importlib-metadata; python_version<'3.8'",
+    "pytz"  # For timezone-aware datetime objects
+    # Add ONLY what is imported by AGENTS/tools scripts
 ]
 
-# Named feature groups—install only what you need:
-#  • plot: visualization & analysis
-#  • ml: full ML stack & beam search
-#  • dev: testing & linting
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [project.optional-dependencies]
-plot = [
-  "matplotlib>=3.7",    # plotting
-  "networkx>=3.1",      # graph tools
-  "scikit-learn>=1.2"   # classical ML
-]
-ml = [
-  "transformers>=4.30",           # model interfaces
-  "sentence-transformers>=2.2"    # high-level embeddings
-  # torch & torch_geometric handled by setup_env.sh for CPU vs GPU installs
-]
 dev = [
-  "pytest>=8.0"
+    "pytest>=8.0" # Test framework
 ]
-
-[tool.setuptools.packages.find]
-where = ["."]
-include = ["speaktome*"]
+time = [
+    "ntplib"      # For querying NTP servers
+]

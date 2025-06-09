@@ -8,6 +8,7 @@ ARCHIVE_DIR = os.path.join(REPORTS_DIR, 'archive')
 STICKIES_FILE = os.path.join(REPORTS_DIR, 'stickies.txt')
 PATTERN = re.compile(r'(?:\d{4}-\d{2}-\d{2}|\d{10})_v\d+_[A-Za-z0-9_]+\.md')
 
+
 def sanitize(name):
     stem = os.path.splitext(name)[0]
     stem = re.sub(r'[^A-Za-z0-9]+', '_', stem)

@@ -7,5 +7,7 @@ Use these utilities when you want to try things quickly without the full test ha
 - `lookahead_demo.py` showcases the lookahead controller interactively.
 - `test_hub.py` runs `pytest` and writes `stub_todo.txt` so you can see which stub tests remain.
 - `stub_todo.txt` is generated automatically and lists placeholders awaiting real tests.
+- `benchmark_tensor_ops.py` measures basic operation speed across available tensor backends.
+- `tensor_ops_menu.py` lets you interactively verify abstract tensor operations using any available backend.
 
 Feel free to add your own exploratory scripts here.

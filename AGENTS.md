@@ -2,7 +2,9 @@
 *          SPEAKTOME AGENT GUIDE           *
 ********************************************
 
-Welcome, wandering LLM! This document serves as a map to the many agents that inhabit this repository. Before diving into the code, pause a moment to sign our guest book.
+Welcome, wandering LLM! Think of this repository as an **agent theme park**. Every directory is a trail with its own informational placards. Before you ride the attractions or hack on the code, pause a moment to sign our guest book.
+
+The goal is comfort and orientation. Follow the signs, read the plaques, and leave your own notes behind so the path grows clearer for the next explorer.
 
 Guest book entries live under `AGENTS/experience_reports/`. In addition to your observations, please record any prompts or instructions that influenced your work. Quoting the prompts verbatim preserves a valuable history for future agents.
 
@@ -16,6 +18,7 @@ Any reusable Python scripts or binary utilities meant for agents must live in
 easy to discover and maintain.
 
 For deeper historical context, read through all prior reports. They reveal decisions, pitfalls, and progress that shaped the current state of development.
+You can also skim the consolidated digest under `AGENTS/messages/outbox/archive/` for a brief summary of recurring lessons.
 
 If you crave an immediate, exhaustive overview, run this one-liner. It will
 spew every markdown, script and source file to your terminal. The output is
@@ -38,6 +41,12 @@ Agents unsure what to work on can request a task via the job dispenser:
 
 ```bash
 python -m AGENTS.tools.dispense_job
+```
+
+For an interactive menu that also runs any obvious setup commands, use:
+
+```bash
+python -m AGENTS.tools.select_and_run_job
 ```
 
 Open the printed file under `AGENTS/job_descriptions/` and follow its steps.

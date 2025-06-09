@@ -5,7 +5,7 @@ from typing import List, Tuple, Callable, Any, Set, TYPE_CHECKING
 # Local application/library specific imports
 if TYPE_CHECKING:  # pragma: no cover - type hints only
     from .beam_search_instruction import BeamSearchInstruction
-from .tensor_abstraction import AbstractTensorOperations
+from ..tensors import AbstractTensorOperations
 from .model_abstraction import AbstractModelWrapper
 # --- END HEADER ---
 
@@ -121,14 +121,18 @@ class LookaheadController:
             )
             logits = outputs_dict['logits']
 
-            last_indices = self.tensor_ops.clamp(current_lengths - 1, min_val=0)
+            last_indices = self.tensor_ops.clamp(
+                self.tensor_ops.sub_scalar(current_lengths, 1), min_val=0
+            )
             last_logits = self.tensor_ops.select_by_indices(
                 logits,
                 self.tensor_ops.arange(0, B_cur, device=self.device),
                 last_indices,
             )
 
-            logprobs = self.tensor_ops.log_softmax(last_logits / self.temp, dim=-1)
+            logprobs = self.tensor_ops.log_softmax(
+                self.tensor_ops.div_scalar(last_logits, self.temp), dim=-1
+            )
             topk_scores, topk_indices = self.tensor_ops.topk(logprobs, k=self.top_k, dim=-1)
 
             num_parents = B_cur

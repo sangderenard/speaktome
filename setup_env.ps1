@@ -1,5 +1,14 @@
 # Windows PowerShell environment setup script for SpeakToMe
-# Creates a virtual environment and installs required packages
+# No Unicode. All pip/python commands run inside venv unless -NoVenv is used.
+
+param(
+    [switch]$extras,
+    [switch]$ml,
+    [switch]$gpu,
+    [switch]$prefetch,
+    [switch]$NoVenv,
+    [string[]]$Codebases = @(".")
+)
 
 $ErrorActionPreference = 'Continue'
 
@@ -10,13 +19,57 @@ function Safe-Run([ScriptBlock]$cmd) {
     }
 }
 
-Safe-Run { python -m venv .venv }
-Safe-Run { & .venv\Scripts\Activate.ps1 }
-Safe-Run { pip install --upgrade pip }
-Safe-Run { pip install -r requirements.txt }
+if (-not $NoVenv) {
+    # 1. Create & activate venv
+    Safe-Run { python -m venv .venv }
+    Safe-Run { & .venv\Scripts\Activate.ps1 }
+    $venvPython = ".venv\Scripts\python.exe"
+    $venvPip = ".venv\Scripts\pip.exe"
+} else {
+    $venvPython = "python"
+    $venvPip = "pip"
+}
 
-if ($args.Length -gt 0 -and $args[0] -eq '--prefetch') {
+# 2. Install core + dev requirements
+Safe-Run { & $venvPip install --upgrade pip }
+Safe-Run { & $venvPip install -r requirements.txt -r requirements-dev.txt }
+if ($extras) {
+    Safe-Run { & $venvPip install .[plot] }
+
+    # 3. Handle CPU vs GPU torch & optional ML extras
+    if ($env:GITHUB_ACTIONS -eq 'true') {
+        Write-Host 'Installing CPU-only torch (CI environment)'
+        Safe-Run { & $venvPip install torch==1.13.1+cpu --index-url https://download.pytorch.org/whl/cpu }
+    } elseif ($gpu) {
+        Write-Host 'Installing GPU-enabled torch'
+        Safe-Run { & $venvPip install torch --index-url https://download.pytorch.org/whl/cu118 }
+    } else {
+        Write-Host 'Installing CPU-only torch (default)'
+        Safe-Run { & $venvPip install torch==1.13.1+cpu --index-url https://download.pytorch.org/whl/cpu }
+    }
+
+    if ($ml) {
+        Write-Host 'Installing ML extras'
+        Safe-Run { & $venvPip install .[ml] }
+    }
+}
+
+# Install package in editable mode so changes are picked up automatically
+Safe-Run { & $venvPip install -e . }
+
+# Install additional codebases in editable mode
+foreach ($cb in $Codebases) {
+    if ($cb -ne "." -and (Test-Path "$cb\pyproject.toml" -or (Test-Path "$cb\setup.py"))) {
+        Safe-Run { & $venvPip install -e $cb }
+    }
+}
+
+# 4. Prefetch large models if requested
+if ($prefetch) {
     Safe-Run { powershell -ExecutionPolicy Bypass -File fetch_models.ps1 }
 }
+
+# Ensure optional dependencies from pyproject.toml are installed
+Safe-Run { & $venvPython AGENTS/tools/ensure_pyproject_deps.py }
 
 Write-Host "Environment setup complete. Activate with '.venv\Scripts\Activate.ps1'"

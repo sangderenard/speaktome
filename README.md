@@ -39,12 +39,20 @@ bash setup_env.sh                      # minimal install
 bash setup_env.sh --extras --prefetch  # install optional packages too
 ```
 
+The script installs the repository in editable mode and then runs a
+verification step that ensures all optional groups defined in
+``pyproject.toml`` are present. Missing packages are installed on demand,
+with any failures reported but not fatal.
+
 On Windows use the PowerShell script:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File setup_env.ps1                      # minimal
 powershell -ExecutionPolicy Bypass -File setup_env.ps1 --extras --prefetch  # optional
 ```
+
+Like the Bash version, this script installs the package in editable mode and
+checks for missing optional dependencies.
 
 Activate the environment with:
 
@@ -87,6 +95,20 @@ Once the models are downloaded you can run the program without further network
 access. If you skip this step, the application falls back to the lightweight
 CPU demo mode.
 
+### Developer Setup
+Use the developer script to run the standard installation and display key documentation:
+
+```bash
+bash setup_env_dev.sh --extras --prefetch
+```
+
+On Windows run:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File setup_env_dev.ps1 -extras -prefetch
+```
+
+
 ## Running SpeakToMe
 
 Use the provided wrapper scripts to ensure the `.venv` interpreter is used
@@ -115,6 +137,21 @@ On Windows run either script:
 From `cmd.exe`:
 ```cmd
 run.cmd -s "Hello" -m 10 -c -a 5 --final_viz
+```
+
+## Job Selection
+
+The `AGENTS` directory contains repeatable jobs for agents. To fetch a task at
+random run:
+
+```bash
+python -m AGENTS.tools.dispense_job
+```
+
+For a guided menu that also executes any obvious setup commands, run:
+
+```bash
+python -m AGENTS.tools.select_and_run_job
 ```
 
 These scripts are equivalent to running:
@@ -246,3 +283,4 @@ the project see `AGENTS/PROJECT_OVERVIEW.md`, and consult
 prompts that informed your work so future agents can trace the discussion. Use
 pull requests for code changes and feel free to open issues for questions or
 feature requests.
+You can also review the consolidated digest under `AGENTS/messages/outbox/archive/` for a short summary of prior insights.

@@ -20,8 +20,9 @@ def temp_reports(tmp_path, monkeypatch):
     dst = tmp_path / 'experience_reports'
     dst.mkdir()
     (dst / 'template_experience_report.md').write_text('')
+    base = 1749417600
     for i in range(12):
-        fname = dst / f'2025-06-0{i}_v1_Test{i}.md'
+        fname = dst / f'{base + i}_v1_Test{i}.md'
         fname.write_text('x')
     vg_mod = reload(vg)
     monkeypatch.setattr(vg_mod, 'REPORTS_DIR', str(dst))

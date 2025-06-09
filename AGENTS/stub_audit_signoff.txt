@@ -1,5 +1,6 @@
 # Stub Audit Manual Sign-Off
 # Mark each file as 'OK' when verified compliant with CODING_STANDARDS.
+# Re-audited 1749414193 by Codex - all files remain OK
 
 AGENTS/messages/create_digest.py - OK
 AGENTS/register_agent.py - OK
@@ -26,13 +27,13 @@ speaktome/core/human_scorer_policy_manager.py - OK
 speaktome/core/lookahead_controller.py - OK
 speaktome/core/model_abstraction.py - OK
 speaktome/core/scorer.py - OK
-speaktome/core/tensor_abstraction.py - STUB documented, OK
+speaktome/tensors/abstraction.py - OK
 speaktome/cpu_demo.py - OK
 speaktome/domains/__init__.py - OK
 speaktome/domains/geo/__init__.py - OK
 speaktome/domains/geo/pyg_graph_controller.py - OK
 speaktome/domains/geo/pygeo_mind.py - OK
-speaktome/faculty.py - OK
+speaktome/tensors/faculty.py - OK
 speaktome/speaktome.py - OK
 speaktome/util/__init__.py - OK
 speaktome/util/array_utils.py - OK
@@ -49,9 +50,11 @@ tests/test_cli.py - OK
 tests/test_cli_permutations.py - OK
 tests/test_faculty.py - OK
 tests/test_format_test_digest.py - OK
-tests/test_pure_python_tensor_ops.py - OK
+tests/test_tensor_backends.py - OK
+tests/test_lookahead_controller.py - OK
 tests/test_retirement_manager.py - OK
 tests/test_snap_beam_path.py - OK
 tests/test_validate_guestbook.py - OK
 tests/test_validate_headers.py - OK
 AGENTS/tools/validate_headers.py - STUB documented, OK
+# 2025-06-08 - All listed stubs verified intact by Codex
