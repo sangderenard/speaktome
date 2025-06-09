@@ -20,7 +20,6 @@ try:
         from .c_backend import CTensorOperations
     except Exception:  # pragma: no cover - optional backend
         CTensorOperations = None  # type: ignore
-
 except Exception:
     print(ENV_SETUP_BOX)
     raise

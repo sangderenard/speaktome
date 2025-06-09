@@ -9,6 +9,7 @@ try:
     import pytest
     import itertools
 
+
     from speaktome.tensors import (
         PurePythonTensorOperations,
         NumPyTensorOperations,
