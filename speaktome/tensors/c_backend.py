@@ -64,10 +64,19 @@ ffi.cdef("""
     void rfloor_div_const(const double* a, double b, double* out, int n);
     void sqrt_double(const double* a, double* out, int n);
     void log_softmax_1d(const double* a, double* out, int n);
+    void pad_double_nd(const double* input, double* output, const int* shape, const int* new_shape, const int* left_pad, int dims, double value);
+    void mean_dim(const double* a, double* out, const int* shape, int ndim, int dim);
+    void gather_pairs_2d(const double* a, const int* rows, const int* cols,
+                         double* out, int n_pairs, int stride);
+    double sum_double(const double* a, int n);
+    void create_arange(double start, double step, int n, double* out);
+    void topk_double(const double* a, int n, int k, int* indices, double* out);
+
 """)
 
 C_SOURCE = """
     #include <math.h>
+    #include <stdlib.h>
     void add_double(const double* a, const double* b, double* out, int n) {
         for (int i = 0; i < n; ++i) out[i] = a[i] + b[i];
     }
@@ -129,6 +138,7 @@ C_SOURCE = """
     void sqrt_double(const double* a, double* out, int n) {
         for (int i = 0; i < n; ++i) out[i] = sqrt(a[i]);
     }
+
     void log_softmax_1d(const double* a, double* out, int n) {
         double max_val = a[0];
         for (int i = 1; i < n; ++i) {
@@ -142,6 +152,112 @@ C_SOURCE = """
         for (int i = 0; i < n; ++i) {
             out[i] = log(out[i] / sum);
         }
+
+    void pad_double_nd(const double* input, double* output, const int* shape,
+                       const int* new_shape, const int* left_pad, int dims,
+                       double value) {
+        int i;
+        int total_out = 1;
+        for (i = 0; i < dims; ++i) total_out *= new_shape[i];
+        for (i = 0; i < total_out; ++i) output[i] = value;
+
+        int input_size = 1;
+        for (i = 0; i < dims; ++i) input_size *= shape[i];
+
+        int* in_stride = (int*)malloc(sizeof(int) * dims);
+        int* out_stride = (int*)malloc(sizeof(int) * dims);
+        int* idx = (int*)malloc(sizeof(int) * dims);
+
+        in_stride[dims - 1] = 1;
+        out_stride[dims - 1] = 1;
+        for (i = dims - 2; i >= 0; --i) {
+            in_stride[i] = in_stride[i + 1] * shape[i + 1];
+            out_stride[i] = out_stride[i + 1] * new_shape[i + 1];
+        }
+
+        for (i = 0; i < dims; ++i) idx[i] = 0;
+        for (i = 0; i < input_size; ++i) {
+            int out_index = 0;
+            for (int d = 0; d < dims; ++d) {
+                out_index += (idx[d] + left_pad[d]) * out_stride[d];
+            }
+            output[out_index] = input[i];
+            idx[dims - 1]++;
+            for (int d = dims - 1; d > 0; --d) {
+                if (idx[d] >= shape[d]) {
+                    idx[d] = 0;
+                    idx[d - 1]++;
+                }
+            }
+        }
+
+        free(in_stride);
+        free(out_stride);
+        free(idx);
+
+    void mean_dim(const double* a, double* out, const int* shape, int ndim, int dim) {
+        int before = 1;
+        for (int i = 0; i < dim; ++i) before *= shape[i];
+        int axis = shape[dim];
+        int after = 1;
+        for (int i = dim + 1; i < ndim; ++i) after *= shape[i];
+        int out_index = 0;
+        for (int b = 0; b < before; ++b) {
+            for (int c = 0; c < after; ++c) {
+                double sum = 0.0;
+                for (int j = 0; j < axis; ++j) {
+                    int idx = (b * axis + j) * after + c;
+                    sum += a[idx];
+                }
+                out[out_index++] = sum / axis;
+            }
+        }
+
+    void gather_pairs_2d(const double* a, const int* rows, const int* cols,
+                         double* out, int n_pairs, int stride) {
+        for (int i = 0; i < n_pairs; ++i) {
+            out[i] = a[rows[i] * stride + cols[i]];
+        }
+    }
+    double sum_double(const double* a, int n) {
+        double s = 0;
+        for (int i = 0; i < n; i++) {
+            s += a[i];
+        }
+        return s;
+    }
+
+    void create_arange(double start, double step, int n, double* out) {
+        for (int i = 0; i < n; i++) {
+            out[i] = start + i * step;
+        }
+    }
+
+    void topk_double(const double* a, int n, int k, int* indices, double* out) {
+        int i, j, best;
+        double best_val;
+        int *used = (int*)malloc(n * sizeof(int));
+        for (i = 0; i < n; i++) used[i] = 0;
+        for (i = 0; i < k; i++) {
+            best = -1;
+            best_val = -1e300; // a very small number as initial comparator
+            for (j = 0; j < n; j++) {
+                if (!used[j] && a[j] > best_val) {
+                    best_val = a[j];
+                    best = j;
+                }
+            }
+            if (best != -1) {
+                used[best] = 1;
+                indices[i] = best;
+                out[i] = best_val;
+            } else {
+                indices[i] = -1;
+                out[i] = 0.0;
+            }
+        }
+        free(used);
+
     }
 """
 
@@ -260,8 +376,7 @@ class CTensorOperations(AbstractTensorOperations):
 
     def clone(self, tensor: CTensor) -> CTensor:
         t = CTensor(tensor.shape)
-        for i in range(t.size):
-            t.buffer[i] = tensor.buffer[i]
+        ffi.memmove(t.buffer, tensor.buffer, tensor.size * ffi.sizeof("double"))
         return t
 
     def to_device(self, tensor: CTensor, device: Any) -> CTensor:
@@ -275,8 +390,17 @@ class CTensorOperations(AbstractTensorOperations):
         device: Any = None,
         dtype: Any = None,
     ) -> CTensor:
-        data = list(range(start)) if end is None else list(range(start, end, step))
-        return CTensor.from_list(data, (len(data),))
+        if end is None:
+            n = start
+            start_val = 0.0
+            step_val = 1.0
+        else:
+            n = int((end - start) // step)
+            start_val = float(start)
+            step_val = float(step)
+        out = CTensor((n,))
+        C.create_arange(start_val, step_val, n, out.as_c_ptr())
+        return out
 
     def pow(self, tensor: Any, exponent: float) -> CTensor:
         if not isinstance(tensor, CTensor):
@@ -308,17 +432,20 @@ class CTensorOperations(AbstractTensorOperations):
         values = _flatten(tensor.tolist())
         if dim is None:
             return sum(values) / len(values) if values else 0.0
-        # ########## STUB: CTensorOperations.mean_dim ##########
-        # PURPOSE: Placeholder for dimension-wise mean on CTensors.
-        # EXPECTED BEHAVIOR: Compute mean along the specified dimension.
-        # INPUTS: ``tensor`` CTensor, ``dim`` dimension index
-        # OUTPUTS: CTensor or float representing the mean.
-        # KEY ASSUMPTIONS/DEPENDENCIES: Requires proper shape traversal.
-        # TODO:
-        #   - Implement mean over arbitrary dimensions.
-        # NOTES: Current implementation only handles ``dim=None``.
-        # ############################################################
-        raise NotImplementedError("mean(dim) not implemented for C backend")
+
+        shape = tensor.shape
+        if dim < 0:
+            dim += len(shape)
+        if dim < 0 or dim >= len(shape):
+            raise ValueError("dim out of range")
+
+        out_shape = shape[:dim] + shape[dim + 1 :]
+        out = CTensor(out_shape if out_shape else ())
+        shape_arr = ffi.new("int[]", list(shape))
+        C.mean_dim(tensor.as_c_ptr(), out.as_c_ptr(), shape_arr, len(shape), dim)
+        if not out_shape:
+            return out.buffer[0]
+        return out
 
     def less(self, tensor: Any, value: Any) -> list:
         if not isinstance(tensor, CTensor):
@@ -364,7 +491,32 @@ class CTensorOperations(AbstractTensorOperations):
         #   - Implement efficient index selection.
         # NOTES: Complex indexing left for future work.
         # ############################################################
-        raise NotImplementedError("select_by_indices not implemented for C backend")
+        if not isinstance(tensor, CTensor):
+            tensor = CTensor.from_list(tensor, _get_shape(tensor))
+
+        rows = list(indices_dim0)
+
+        if isinstance(indices_dim1, slice):
+            start, stop, step = indices_dim1.indices(tensor.shape[1])
+            cols_range = list(range(start, stop, step))
+            row_arr = [r for r in rows for _ in cols_range]
+            col_arr = cols_range * len(rows)
+            out_shape = (len(rows), len(cols_range))
+        else:
+            cols = [indices_dim1] * len(rows) if isinstance(indices_dim1, int) else list(indices_dim1)
+            if len(rows) != len(cols):
+                raise ValueError("Index lists must have same length for element-wise selection")
+            row_arr = rows
+            col_arr = cols
+            out_shape = (len(cols),) if not isinstance(indices_dim1, int) else (len(rows),)
+
+        row_buf = ffi.new("int[]", row_arr)
+        col_buf = ffi.new("int[]", col_arr)
+        n_pairs = len(row_arr)
+        out_buf = ffi.new("double[]", n_pairs)
+        C.gather_pairs_2d(tensor.as_c_ptr(), row_buf, col_buf, out_buf, n_pairs, tensor.shape[1])
+
+        return CTensor(out_shape, out_buf)
 
     def log_softmax(self, tensor: CTensor, dim: int) -> Any:
         """Compute log softmax along ``dim`` using C routines."""
@@ -381,48 +533,60 @@ class CTensorOperations(AbstractTensorOperations):
         return out
 
     def pad(self, tensor: CTensor, pad: Tuple[int, ...], value: float = 0) -> Any:
-        # ########## STUB: CTensorOperations.pad ##########
-        # PURPOSE: Pad ``tensor`` with ``value`` according to ``pad`` spec.
-        # EXPECTED BEHAVIOR: Return new CTensor with additional elements.
-        # INPUTS: ``tensor`` CTensor, padding tuple.
-        # OUTPUTS: Padded CTensor.
-        # KEY ASSUMPTIONS/DEPENDENCIES: Requires dynamic shape manipulation.
-        # TODO:
-        #   - Implement generic padding logic for all dimensions.
-        # NOTES: Currently unsupported.
-        # ############################################################
-        raise NotImplementedError("pad not implemented for C backend")
+        """Pad ``tensor`` with ``value`` according to ``pad`` specification."""
+        if not isinstance(tensor, CTensor):
+            tensor = CTensor.from_list(tensor, _get_shape(tensor))
 
-    def topk(self, tensor: CTensor, k: int, dim: int) -> Tuple[Any, Any]:
-        # ########## STUB: CTensorOperations.topk ##########
-        # PURPOSE: Return the top ``k`` values and their indices along ``dim``.
-        # EXPECTED BEHAVIOR: Similar to numpy.take_along_axis with sorting.
-        # INPUTS: ``tensor`` CTensor, ``k`` int, ``dim`` dimension index.
-        # OUTPUTS: Tuple of (values CTensor, indices list).
-        # KEY ASSUMPTIONS/DEPENDENCIES: Requires sorting capabilities.
-        # TODO:
-        #   - Implement efficient top-k selection.
-        # NOTES: Complex due to absence of vectorized sort in this backend.
-        # ############################################################
-        if dim < 0:
-            dim += len(tensor.shape)
-        if dim != len(tensor.shape) - 1:
-            raise NotImplementedError(
-                "topk only implemented for the last dimension"
+        if len(pad) % 2 != 0:
+            raise ValueError("Padding length must be even.")
+
+        dims = len(tensor.shape)
+        num_pad_dims = len(pad) // 2
+        if num_pad_dims > dims:
+            raise ValueError(
+                "Padding tuple length implies padding more dimensions than tensor has."
             )
 
-        if len(tensor.shape) != 1:
-            raise NotImplementedError("topk only implemented for 1D tensors")
+        left = [0] * dims
+        right = [0] * dims
+        for i in range(num_pad_dims):
+            left[dims - num_pad_dims + i] = int(pad[-2 * (i + 1)])
+            right[dims - num_pad_dims + i] = int(pad[-2 * (i + 1) + 1])
 
-        data = tensor.tolist()
-        indexed = sorted(
-            [(i, v) for i, v in enumerate(data)], key=lambda x: x[1], reverse=True
-        )[:k]
-        values = [v for _, v in indexed]
-        indices = [i for i, _ in indexed]
-        return CTensor.from_list(values, (len(values),)), CTensor.from_list(
-            indices, (len(indices),)
+        new_shape = [
+            tensor.shape[i] + left[i] + right[i] for i in range(dims)
+        ]
+
+        out = CTensor(tuple(new_shape))
+        shape_c = ffi.new("int[]", list(tensor.shape))
+        new_shape_c = ffi.new("int[]", new_shape)
+        left_c = ffi.new("int[]", left)
+        C.pad_double_nd(
+            tensor.as_c_ptr(),
+            out.as_c_ptr(),
+            shape_c,
+            new_shape_c,
+            left_c,
+            dims,
+            float(value),
         )
+        return out
+
+    def topk(self, tensor: CTensor, k: int, dim: int) -> Tuple[Any, Any]:
+        # For this C backend, topk is implemented in C for 1D data.
+        # If the tensor is multidimensional, we flatten it.
+        flat = _flatten(tensor.tolist())
+        n = len(flat)
+        # allocate C arrays for indices and values
+        c_indices = ffi.new("int[]", k)
+        c_values = ffi.new("double[]", k)
+        # Create a temporary C array for the flattened data
+        temp = ffi.new("double[]", flat)
+        C.topk_double(temp, n, k, c_indices, c_values)
+        # Convert C arrays to Python lists and then to CTensors
+        py_values = [c_values[i] for i in range(k)]
+        py_indices = [c_indices[i] for i in range(k)]
+        return CTensor.from_list(py_values, (k,)), CTensor.from_list(py_indices, (k,))
 
     def repeat_interleave(self, tensor: CTensor, repeats: int, dim: Optional[int] = None) -> Any:
         # ########## STUB: CTensorOperations.repeat_interleave ##########
@@ -452,7 +616,7 @@ class CTensorOperations(AbstractTensorOperations):
         # KEY ASSUMPTIONS/DEPENDENCIES: Requires index math support.
         # TODO:
         #   - Implement multi-dimensional indexing.
-        # NOTES: Stubbed pending full CTensor infrastructure.
+        # NOTES: Stub pending full CTensor infrastructure.
         # ############################################################
         raise NotImplementedError("assign_at_indices not implemented for C backend")
 
