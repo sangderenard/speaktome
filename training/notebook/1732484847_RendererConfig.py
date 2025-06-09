@@ -1,7 +1,21 @@
 # renderer/renderer_config.py
 
-import pygame
-from OpenGL.GL import *
+from __future__ import annotations
+
+try:
+    import pygame
+    from OpenGL.GL import *  # noqa: F401,F403
+except Exception:
+    print(
+        "\n"
+        "+-----------------------------------------------------------------------+\n"
+        "| Imports failed. Run setup_env or setup_env_dev and select every    |\n"
+        "| project and module you plan to use. Missing packages mean setup was |\n"
+        "| skipped or incomplete.                                             |\n"
+        "+-----------------------------------------------------------------------+\n"
+    )
+    raise
+# --- END HEADER ---
 
 class RendererConfig:
     def __init__(self, width=800, height=600, camera_pos=(2.0, 2.0, 1.0), lighting=True):
