@@ -51,6 +51,12 @@ for arg in "$@"; do
   esac
 done
 
+# Always include the time_sync codebase
+case ",${CODEBASES}," in
+  *",time_sync,"*) ;;
+  *) CODEBASES="${CODEBASES},time_sync" ;;
+esac
+
 if [ $EXTRAS -eq 1 ]; then
   safe_run $VENV_PIP install .[plot]
   if [ "${GITHUB_ACTIONS:-}" = "true" ]; then

@@ -10,6 +10,11 @@ param(
     [string[]]$Codebases = @(".")
 )
 
+# Always include the time_sync codebase
+if (-not ($Codebases -contains 'time_sync')) {
+    $Codebases += 'time_sync'
+}
+
 $ErrorActionPreference = 'Continue'
 
 function Safe-Run([ScriptBlock]$cmd) {
