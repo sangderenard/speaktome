@@ -35,7 +35,7 @@ jobs:
       - name: Run tests
         run: |
           source .venv/bin/activate
-          pytest -v
+          .venv/bin/pytest -v
 
       # ─── Optional: add coverage, lint, or ml extras ─────────
       # - name: Install ML extras (only if you’re ready for GPU or CPU ML)

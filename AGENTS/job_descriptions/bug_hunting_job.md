@@ -5,7 +5,7 @@ Identify, reproduce, and fix bugs across the project. Pay special attention to r
 **Stub Design Policy Reminder**: Bug hunters should **never** implement or modify existing stubs unless they are elevating them to the fully documented format defined in `AGENTS/job_descriptions/prototype_stubs_job.md`. Always consult that job description and `AGENTS/CODING_STANDARDS.md` before touching stub blocks.
 
 Steps:
-1. Run `pytest -v` and note any failures or warnings.
+1. Run `./.venv/bin/pytest -v` (Windows: `.venv\Scripts\pytest.exe -v`) and note any failures or warnings.
 2. Reproduce reported issues and write regression tests if missing.
 3. Fix the underlying problems or open issues describing the root cause.
 4. If a fix is not immediately possible:

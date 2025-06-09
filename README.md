@@ -248,11 +248,12 @@ bash auto_demo.sh --interactive
 
 ## Testing
 
-Install the development requirements and run `pytest`:
+Install the development requirements and run `pytest` from the virtual
+environment:
 
 ```bash
 pip install -r requirements-dev.txt
-pytest -v
+./.venv/bin/pytest -v  # Windows: .venv\Scripts\pytest.exe -v
 ```
 
 Each test run writes a log to `testing/logs/pytest_<TIMESTAMP>.log` so results
