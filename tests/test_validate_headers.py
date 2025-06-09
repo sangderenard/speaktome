@@ -44,6 +44,9 @@ def test_validate_headers_rewrite(tmp_path, monkeypatch) -> None:
     content = mod.read_text()
     assert "HEADER" in content
     assert "def test()" in content
+    assert "import sys" in content
+    assert "print(ENV_SETUP_BOX)" in content
+    assert "sys.exit(1)" in content
     # Subsequent validation should succeed without rewrites
     code = vh.validate(pkg)
     assert code == 0

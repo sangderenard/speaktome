@@ -72,9 +72,9 @@ path.
 
 Every Python file should begin with a shebang and module docstring followed by
 ``from __future__ import annotations``. All subsequent imports must appear in a
-``try`` block. If an exception occurs, print the shared ``ENV_SETUP_BOX``
-message from ``AGENTS.tools.header_utils``. After the ``except`` block, include
-the sentinel line:
+``try`` block. If an exception occurs, first import ``sys``, then print the
+shared ``ENV_SETUP_BOX`` message from ``AGENTS.tools.header_utils``, and finally
+call ``sys.exit(1)``. After the ``except`` block, include the sentinel line:
 
 ```python
 #!/usr/bin/env python3
@@ -84,8 +84,8 @@ from __future__ import annotations
 try:
     from AGENTS.tools.header_utils import ENV_SETUP_BOX
     import your_modules
-    import sys
 except Exception:
+    import sys
     print(ENV_SETUP_BOX)
     sys.exit(1)
 # --- END HEADER ---

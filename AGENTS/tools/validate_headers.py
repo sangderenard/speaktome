@@ -4,11 +4,12 @@ from __future__ import annotations
 
 try:
     import ast
-    import sys
     from pathlib import Path
     from typing import Iterable
     from .header_utils import ENV_SETUP_BOX
 except Exception:
+    import sys
+
     print(ENV_SETUP_BOX)
     sys.exit(1)
 # --- END HEADER ---
@@ -22,6 +23,7 @@ PACKAGE_ROOT = Path(__file__).parent / "speaktome"
 # is supplied the script will insert minimal placeholders for any missing
 # elements.  This makes it easier to bootstrap new modules and keep
 # documentation consistent.
+
 
 def collect_classes(root: Path) -> list[tuple[str, Path, ast.ClassDef]]:
     classes: list[tuple[str, Path, ast.ClassDef]] = []
@@ -41,6 +43,7 @@ def collect_classes(root: Path) -> list[tuple[str, Path, ast.ClassDef]]:
                 classes.append((mod_name, path, node))
     return classes
 
+
 def check_class(cls: ast.ClassDef) -> tuple[bool, bool, str | None]:
     doc = ast.get_docstring(cls)
     header = None
@@ -55,7 +58,9 @@ def check_class(cls: ast.ClassDef) -> tuple[bool, bool, str | None]:
                     and target.id == "HEADER"
                     and isinstance(stmt.value, (ast.Str, ast.Constant))
                 ):
-                    header = getattr(stmt.value, "s", getattr(stmt.value, "value", None))
+                    header = getattr(
+                        stmt.value, "s", getattr(stmt.value, "value", None)
+                    )
         if isinstance(stmt, ast.FunctionDef) and stmt.name == "test":
             for deco in stmt.decorator_list:
                 if isinstance(deco, ast.Name) and deco.id == "staticmethod":
@@ -83,15 +88,21 @@ def validate(root: Path, *, rewrite: bool = False) -> int:
                 f"{', '.join(parts)}"
             )
             if rewrite:
-                rewrites.setdefault(path, []).append((cls, missing_header, missing_test))
+                rewrites.setdefault(path, []).append(
+                    (cls, missing_header, missing_test)
+                )
 
     if rewrite:
         for path, items in rewrites.items():
             lines = path.read_text(encoding="utf-8").splitlines()
-            for cls, miss_head, miss_test in sorted(items, key=lambda t: t[0].lineno, reverse=True):
+            for cls, miss_head, miss_test in sorted(
+                items, key=lambda t: t[0].lineno, reverse=True
+            ):
                 insert_at = cls.lineno
-                if cls.body and isinstance(cls.body[0], ast.Expr) and isinstance(
-                    cls.body[0].value, (ast.Str, ast.Constant)
+                if (
+                    cls.body
+                    and isinstance(cls.body[0], ast.Expr)
+                    and isinstance(cls.body[0].value, (ast.Str, ast.Constant))
                 ):
                     insert_at = cls.body[0].end_lineno
                 insert_idx = insert_at - 1
@@ -99,11 +110,10 @@ def validate(root: Path, *, rewrite: bool = False) -> int:
                 new_lines: list[str] = []
                 if miss_head:
                     new_lines.append(f"{indent}try:")
-                    new_lines.append(f"{indent}    HEADER = \"TODO\"")
+                    new_lines.append(f'{indent}    HEADER = "TODO"')
                     new_lines.append(f"{indent}except Exception as exc:")
-                    new_lines.append(
-                        f"{indent}    print(ENV_SETUP_BOX)"
-                    )
+                    new_lines.append(f"{indent}    import sys")
+                    new_lines.append(f"{indent}    print(ENV_SETUP_BOX)")
                     new_lines.append(f"{indent}    sys.exit(1)")
                 if miss_test:
                     new_lines.append(f"{indent}@staticmethod")

@@ -1,14 +1,16 @@
 """Pre-commit hook enforcing HEADER, tests, and the end sentinel."""
+
 from __future__ import annotations
 
 try:
     from .header_utils import ENV_SETUP_BOX
-    import sys
     import subprocess
     import ast
     import os
     from pathlib import Path
 except Exception:
+    import sys
+
     print(ENV_SETUP_BOX)
     sys.exit(1)
 # --- END HEADER ---
@@ -25,7 +27,7 @@ If the pre-commit hook caught your changes, here's a friendly checklist:
    - A `@staticmethod test()` method in each class
    - `from __future__ import annotations` before the `try` block
    - Imports wrapped in a `try` block
-   - An `except` block printing guidance about running `setup_env_dev` and activating the virtual environment
+   - An `except` block that imports `sys`, prints guidance about running `setup_env_dev`, then calls `sys.exit(1)`
    - A `# --- END HEADER ---` sentinel after the `except` block
 
 2. Example structure:
@@ -35,9 +37,9 @@ If the pre-commit hook caught your changes, here's a friendly checklist:
    from __future__ import annotations
 
    try:
-       import sys
        import your_modules
    except Exception:
+       import sys
        print(ENV_SETUP_BOX)
        sys.exit(1)
    # --- END HEADER ---
@@ -54,14 +56,18 @@ Need to bypass temporarily? Use:
 For full standards, see the `AGENTS/` directory documentation.
 """
 
+
 def get_staged_py_files():
     """Return a list of staged Python files (relative paths)."""
     result = subprocess.run(
         ["git", "diff", "--cached", "--name-only", "--diff-filter=ACM"],
-        stdout=subprocess.PIPE, text=True, check=True
+        stdout=subprocess.PIPE,
+        text=True,
+        check=True,
     )
-    files = [f for f in result.stdout.splitlines() if f.endswith('.py')]
+    files = [f for f in result.stdout.splitlines() if f.endswith(".py")]
     return files
+
 
 def check_class_header_and_test(filepath):
     """Return a list of (lineno, classname, missing) for classes missing HEADER or test()."""
@@ -77,9 +83,9 @@ def check_class_header_and_test(filepath):
             # Check for HEADER (either as a docstring or HEADER attribute)
             docstring = ast.get_docstring(node)
             has_header_attr = any(
-                isinstance(stmt, ast.Assign) and
-                any(getattr(t, 'id', None) == 'HEADER' for t in stmt.targets) and
-                isinstance(stmt.value, ast.Str)
+                isinstance(stmt, ast.Assign)
+                and any(getattr(t, "id", None) == "HEADER" for t in stmt.targets)
+                and isinstance(stmt.value, ast.Str)
                 for stmt in node.body
             )
             has_header = bool(docstring) or has_header_attr
@@ -106,7 +112,9 @@ def check_end_header(filepath: Path) -> list[str]:
     with open(filepath, encoding="utf-8") as f:
         lines = f.readlines()
 
-    sentinel_line = next((i + 1 for i, ln in enumerate(lines) if ln.strip() == sentinel), None)
+    sentinel_line = next(
+        (i + 1 for i, ln in enumerate(lines) if ln.strip() == sentinel), None
+    )
     if sentinel_line is None:
         return [f"Missing sentinel '{sentinel}'"]
 
@@ -132,22 +140,35 @@ def check_try_header(filepath: Path) -> list[str]:
     with open(filepath, encoding="utf-8") as f:
         lines = f.readlines()
 
-    try_idx = next((i for i, ln in enumerate(lines) if ln.strip().startswith("try:")), None)
-    sentinel_idx = next((i for i, ln in enumerate(lines) if ln.strip() == sentinel), None)
-    future_idx = next((i for i, ln in enumerate(lines) if ln.strip().startswith("from __future__")), None)
+    try_idx = next(
+        (i for i, ln in enumerate(lines) if ln.strip().startswith("try:")), None
+    )
+    sentinel_idx = next(
+        (i for i, ln in enumerate(lines) if ln.strip() == sentinel), None
+    )
+    future_idx = next(
+        (i for i, ln in enumerate(lines) if ln.strip().startswith("from __future__")),
+        None,
+    )
     except_idx = next(
         (
             i
             for i, ln in enumerate(lines)
-            if ln.strip().startswith("except") and (sentinel_idx is None or i < sentinel_idx)
+            if ln.strip().startswith("except")
+            and (sentinel_idx is None or i < sentinel_idx)
         ),
         None,
     )
 
     env_print = False
+    sys_import = False
+    sys_exit = False
     if except_idx is not None:
         search_end = sentinel_idx if sentinel_idx is not None else len(lines)
-        env_print = any("print(ENV_SETUP_BOX)" in ln for ln in lines[except_idx:search_end])
+        region = lines[except_idx:search_end]
+        env_print = any("print(ENV_SETUP_BOX)" in ln for ln in region)
+        sys_import = any("import sys" in ln for ln in region)
+        sys_exit = any("sys.exit(" in ln for ln in region)
 
     errors = []
     if not lines or not lines[0].startswith("#!"):
@@ -165,9 +186,15 @@ def check_try_header(filepath: Path) -> list[str]:
         errors.append("Missing 'try:' at start of header")
     if except_idx is None:
         errors.append("Missing 'except' block for header")
-    elif not env_print:
-        errors.append("Missing 'print(ENV_SETUP_BOX)' in except block")
+    else:
+        if not sys_import:
+            errors.append("Missing 'import sys' in except block")
+        if not env_print:
+            errors.append("Missing 'print(ENV_SETUP_BOX)' in except block")
+        if not sys_exit:
+            errors.append("Missing 'sys.exit(1)' in except block")
     return errors
+
 
 def main():
     if os.getenv("SKIP_HEADER_GUARD"):
@@ -197,6 +224,7 @@ def main():
         print("\nNeed help? Here's a friendly guide:")
         print(FRIENDLY_GUIDANCE)
         sys.exit(1)
+
 
 if __name__ == "__main__":
     main()

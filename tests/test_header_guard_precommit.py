@@ -11,15 +11,17 @@ except Exception:
     raise
 # --- END HEADER ---
 
+
 def test_check_try_header_pass(tmp_path: Path) -> None:
     path = tmp_path / "ok.py"
     path.write_text(
         "#!/usr/bin/env python3\n"
-        "\"\"\"doc\"\"\"\n"
+        '"""doc"""\n'
         "from __future__ import annotations\n"
-        "try:\n    import os\nexcept Exception:\n    print(ENV_SETUP_BOX)\n    raise\n# --- END HEADER ---\n"
+        "try:\n    import os\nexcept Exception:\n    import sys\n    print(ENV_SETUP_BOX)\n    sys.exit(1)\n# --- END HEADER ---\n"
     )
     assert hg.check_try_header(path) == []
+
 
 def test_check_try_header_fail(tmp_path: Path) -> None:
     path = tmp_path / "bad.py"
@@ -28,13 +30,38 @@ def test_check_try_header_fail(tmp_path: Path) -> None:
     assert "Missing shebang" in errors
     assert "Missing module docstring" in errors
 
+
 def test_check_env_print_missing(tmp_path: Path) -> None:
     path = tmp_path / "noprint.py"
     path.write_text(
         "#!/usr/bin/env python3\n"
-        "\"\"\"doc\"\"\"\n"
+        '"""doc"""\n'
         "from __future__ import annotations\n"
-        "try:\n    import os\nexcept Exception:\n    raise\n# --- END HEADER ---\n"
+        "try:\n    import os\nexcept Exception:\n    import sys\n    sys.exit(1)\n# --- END HEADER ---\n"
     )
     errors = hg.check_try_header(path)
     assert "Missing 'print(ENV_SETUP_BOX)' in except block" in errors
+
+
+def test_check_sys_import_missing(tmp_path: Path) -> None:
+    path = tmp_path / "nosys.py"
+    path.write_text(
+        "#!/usr/bin/env python3\n"
+        '"""doc"""\n'
+        "from __future__ import annotations\n"
+        "try:\n    import os\nexcept Exception:\n    print(ENV_SETUP_BOX)\n    sys.exit(1)\n# --- END HEADER ---\n"
+    )
+    errors = hg.check_try_header(path)
+    assert "Missing 'import sys' in except block" in errors
+
+
+def test_check_sys_exit_missing(tmp_path: Path) -> None:
+    path = tmp_path / "noexit.py"
+    path.write_text(
+        "#!/usr/bin/env python3\n"
+        '"""doc"""\n'
+        "from __future__ import annotations\n"
+        "try:\n    import os\nexcept Exception:\n    import sys\n    print(ENV_SETUP_BOX)\n# --- END HEADER ---\n"
+    )
+    errors = hg.check_try_header(path)
+    assert "Missing 'sys.exit(1)' in except block" in errors
