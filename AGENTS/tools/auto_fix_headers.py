@@ -4,29 +4,32 @@ from __future__ import annotations
 
 try:
     import re
-    import sys
     from pathlib import Path
     from .header_utils import ENV_SETUP_BOX
 except Exception:
+    import sys
+
     print(ENV_SETUP_BOX)
     sys.exit(1)
 # --- END HEADER ---
 
 
 EXCLUDE_DIRS = {
-    'archive',
-    'third_party',
-    'laplace',
-    'training',
+    "archive",
+    "third_party",
+    "laplace",
+    "training",
 }
+
 
 def in_tensor_printing_inspiration(path: Path) -> bool:
     parts = path.parts
-    return 'tensor printing' in parts and 'inspiration' in parts
+    return "tensor printing" in parts and "inspiration" in parts
+
 
 HEADER_SENTINEL = "# --- END HEADER ---"
 
-IMPORT_RE = re.compile(r"^(from\s+\S+\s+import|import\s+\S+)" )
+IMPORT_RE = re.compile(r"^(from\s+\S+\s+import|import\s+\S+)")
 
 
 def should_skip(path: Path) -> bool:
@@ -40,8 +43,35 @@ def should_skip(path: Path) -> bool:
 
 
 def fix_file(path: Path) -> None:
-    text = path.read_text(encoding='utf-8')
+    text = path.read_text(encoding="utf-8")
     if HEADER_SENTINEL in text:
+        if all(
+            token in text
+            for token in ("import sys", "print(ENV_SETUP_BOX)", "sys.exit(1)")
+        ):
+            return
+        lines = text.splitlines()
+        sentinel_idx = lines.index(HEADER_SENTINEL)
+        except_idx = None
+        for i in range(sentinel_idx - 1, -1, -1):
+            if lines[i].strip().startswith("except"):
+                except_idx = i
+                break
+        if except_idx is None:
+            return
+        insert_idx = except_idx + 1
+        indent = " " * (len(lines[except_idx]) - len(lines[except_idx].lstrip()) + 4)
+        region = lines[except_idx:sentinel_idx]
+        block: list[str] = []
+        if not any("import sys" in ln for ln in region):
+            block.append(f"{indent}import sys")
+        if not any("print(ENV_SETUP_BOX)" in ln for ln in region):
+            block.append(f"{indent}print(ENV_SETUP_BOX)")
+        if not any("sys.exit(1)" in ln for ln in region):
+            block.append(f"{indent}sys.exit(1)")
+        if block:
+            lines[insert_idx:insert_idx] = block
+            Path(path).write_text("\n".join(lines) + "\n", encoding="utf-8")
         return
 
     lines = text.splitlines()
@@ -55,12 +85,18 @@ def fix_file(path: Path) -> None:
         idx = 1
 
     # Capture leading comments or encoding declarations
-    while idx < len(lines) and lines[idx].startswith("#") and not IMPORT_RE.match(lines[idx]):
+    while (
+        idx < len(lines)
+        and lines[idx].startswith("#")
+        and not IMPORT_RE.match(lines[idx])
+    ):
         out_lines.append(lines[idx])
         idx += 1
 
     # Capture module docstring
-    if idx < len(lines) and (lines[idx].startswith('"""') or lines[idx].startswith("'''")):
+    if idx < len(lines) and (
+        lines[idx].startswith('"""') or lines[idx].startswith("'''")
+    ):
         quote = lines[idx][:3]
         out_lines.append(lines[idx])
         idx += 1
@@ -89,6 +125,7 @@ def fix_file(path: Path) -> None:
         break
 
     out_lines.append("except Exception:")
+    out_lines.append("    import sys")
     out_lines.append("    print(ENV_SETUP_BOX)")
     out_lines.append("    sys.exit(1)")
     out_lines.append(HEADER_SENTINEL)
@@ -98,12 +135,12 @@ def fix_file(path: Path) -> None:
 
 
 def main() -> None:
-    root = Path('.')
-    for path in root.rglob('*.py'):
+    root = Path(".")
+    for path in root.rglob("*.py"):
         if should_skip(path):
             continue
         fix_file(path)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

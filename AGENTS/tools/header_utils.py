@@ -14,6 +14,8 @@ ENV_SETUP_BOX = (
 try:
     import sys
 except Exception:
+    import sys
+
     print(ENV_SETUP_BOX)
     sys.exit(1)
 # --- END HEADER ---
@@ -23,7 +25,7 @@ HEADER_REQUIREMENTS = [
     "module docstring",
     "'from __future__ import annotations' before the try block",
     "imports wrapped in a try block",
-    "except block printing ENV_SETUP_BOX",
+    "except block imports sys then prints ENV_SETUP_BOX and exits",
     "'# --- END HEADER ---' sentinel after the except block",
 ]
 
