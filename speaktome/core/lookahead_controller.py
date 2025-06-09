@@ -5,7 +5,7 @@ from typing import List, Tuple, Callable, Any, Set, TYPE_CHECKING
 # Local application/library specific imports
 if TYPE_CHECKING:  # pragma: no cover - type hints only
     from .beam_search_instruction import BeamSearchInstruction
-from ..tensors import AbstractTensorOperations
+from ..tensors import AbstractTensorOperations, get_tensor_operations
 from .model_abstraction import AbstractModelWrapper
 # --- END HEADER ---
 
@@ -39,14 +39,18 @@ class LookaheadController:
         device: Any, # Generic device type
         tokenizer: Any, # Tokenizer should have pad_token_id
         config: LookaheadConfig,
-        tensor_ops: AbstractTensorOperations,
-        model_wrapper: AbstractModelWrapper,
+        tensor_ops: AbstractTensorOperations | None = None,
+        model_wrapper: AbstractModelWrapper | None = None,
     ):
         self.lookahead_steps = lookahead_steps
         self.max_len = max_len
         self.device = device
         self.tokenizer = tokenizer
+        if tensor_ops is None:
+            tensor_ops = get_tensor_operations()
         self.tensor_ops = tensor_ops
+        if model_wrapper is None:
+            raise ValueError("model_wrapper is required")
         self.model_wrapper = model_wrapper
 
         # Unpack from config
@@ -91,8 +95,14 @@ class LookaheadController:
         for i in range(B_initial):
             l = self.tensor_ops.item(prefix_lengths[i])
             if l > 0:
-                self.tensor_ops.assign_at_indices(current_tokens, i, slice(0, l), prefix_tokens[i, :l])
-                self.tensor_ops.assign_at_indices(current_scores, i, slice(0, l), prefix_scores[i, :l])
+                row_tokens = self.tensor_ops.select_by_indices(prefix_tokens, [i], slice(0, l))
+                row_scores = self.tensor_ops.select_by_indices(prefix_scores, [i], slice(0, l))
+                flat_tokens = self.tensor_ops.view_flat(row_tokens)
+                flat_scores = self.tensor_ops.view_flat(row_scores)
+                rows = [i] * l
+                cols = list(range(l))
+                self.tensor_ops.assign_at_indices(current_tokens, rows, cols, flat_tokens)
+                self.tensor_ops.assign_at_indices(current_scores, rows, cols, flat_scores)
 
         current_lengths = self.tensor_ops.to_device(self.tensor_ops.clone(prefix_lengths), self.device)
         current_parent_beam_idxs = self.tensor_ops.to_device(self.tensor_ops.clone(original_parent_beam_idxs), self.device)
@@ -111,7 +121,11 @@ class LookaheadController:
             if B_cur > 0:
                 effective_input_width = max(1, effective_input_width)
 
-            tokens_for_lm = current_tokens[:, :effective_input_width]
+            tokens_for_lm = self.tensor_ops.select_by_indices(
+                current_tokens,
+                self.tensor_ops.arange(0, B_cur, device=self.device),
+                slice(0, effective_input_width),
+            )
             attention_mask = self.tensor_ops.long_cast(
                 self.tensor_ops.not_equal(tokens_for_lm, self.pad_id)
             )
@@ -121,14 +135,32 @@ class LookaheadController:
             )
             logits = outputs_dict['logits']
 
-            last_indices = self.tensor_ops.clamp(current_lengths - 1, min_val=0)
+            length_list = self.tensor_ops.tolist(current_lengths)
+            last_idx_list = [max(int(l) - 1, 0) for l in length_list]
+            last_indices = self.tensor_ops.tensor_from_list(
+                last_idx_list,
+                dtype=self.tensor_ops.long_dtype,
+                device=self.device,
+            )
             last_logits = self.tensor_ops.select_by_indices(
                 logits,
                 self.tensor_ops.arange(0, B_cur, device=self.device),
                 last_indices,
             )
 
-            logprobs = self.tensor_ops.log_softmax(last_logits / self.temp, dim=-1)
+            if self.temp != 1.0:
+                logits_list = self.tensor_ops.tolist(last_logits)
+                scaled_list = [
+                    [x / self.temp for x in row] for row in logits_list
+                ]
+                scaled_logits = self.tensor_ops.tensor_from_list(
+                    scaled_list,
+                    dtype=self.tensor_ops.get_dtype(last_logits),
+                    device=self.device,
+                )
+            else:
+                scaled_logits = last_logits
+            logprobs = self.tensor_ops.log_softmax(scaled_logits, dim=-1)
             topk_scores, topk_indices = self.tensor_ops.topk(logprobs, k=self.top_k, dim=-1)
 
             num_parents = B_cur
