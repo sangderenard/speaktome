@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tensor_printing"
+version = "0.1.0"
+description = "Grand Printing Press experiments"
+readme = "README.md"
+requires-python = ">=3.8"
+license = { text = "MIT" }
+authors = [{ name = "Tensor Printing Authors" }]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["tensor_printing*"]

@@ -4,5 +4,6 @@ This document lists the independent project directories maintained in this repos
 
 - **speaktome** — main beam search controllers and utilities.
 - **laplace** — Laplace builder and DEC utilities.
+- **tensor_printing** — experimental Grand Printing Press package.
 
 Additional codebases can be added here as the repository grows.
