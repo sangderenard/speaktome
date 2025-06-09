@@ -6,12 +6,56 @@ import os
 import re
 import subprocess
 import sys
+import threading
 from pathlib import Path
 
 try:
     import tomllib
 except ModuleNotFoundError:  # Python < 3.11
     import tomli as tomllib
+
+# Platform-specific input handling
+if os.name == 'nt':  # Windows
+    import msvcrt
+    def getch_timeout(timeout):
+        """Get a single character with timeout on Windows."""
+        result = []
+        def input_thread():
+            try:
+                result.append(msvcrt.getch().decode())
+            except Exception:
+                result.append(None)
+        
+        thread = threading.Thread(target=input_thread)
+        thread.daemon = True
+        thread.start()
+        thread.join(timeout)
+        return result[0] if result else None
+
+else:  # Unix
+    import select
+    import termios
+    import tty
+    
+    def getch_timeout(timeout):
+        """Get a single character with timeout on Unix."""
+        fd = sys.stdin.fileno()
+        old_settings = termios.tcgetattr(fd)
+        try:
+            tty.setraw(sys.stdin.fileno())
+            if select.select([sys.stdin], [], [], timeout)[0]:
+                return sys.stdin.read(1)
+            return None
+        finally:
+            termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+
+def ask(prompt, timeout=3, default="n"):
+    """Cross-platform input with timeout."""
+    print(prompt, end='', flush=True)
+    result = getch_timeout(timeout)
+    print()  # Move to next line
+    return result.lower() if result else default
+
 # --- END HEADER ---
 
 """Interactive dev environment setup with dynamic codebase discovery.
@@ -65,28 +109,6 @@ def build_codebase_groups() -> dict[str, list[str]]:
 
 
 CODEBASES = build_codebase_groups()
-
-
-def ask(prompt: str, timeout: int = 3, default: str = "n") -> str:
-    """Prompt the user with ``prompt`` and return the lowercase response.
-
-    If no input is provided within ``timeout`` seconds ``default`` is returned.
-    """
-
-    import signal
-
-    def handler(signum, frame):  # pragma: no cover - interactive helper
-        raise TimeoutError
-
-    signal.signal(signal.SIGALRM, handler)
-    signal.alarm(timeout)
-    try:
-        resp = input(prompt)
-        signal.alarm(0)
-        return resp.strip().lower() or default
-    except TimeoutError:  # pragma: no cover - interactive helper
-        print()
-        return default
 
 
 def interactive_selection() -> tuple[list[str], dict[str, list[str]]]:

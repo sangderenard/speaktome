@@ -26,7 +26,7 @@ for arg in "$@"; do
   esac
 done
 
-safe_run bash "$SCRIPT_ROOT/setup_env.sh" "$@"
+safe_run bash "$SCRIPT_ROOT/setup_env.sh" "$@" --from-dev
 
 # Define the venv Python path (assumes setup_env.sh created it at .venv)
 if [ $USE_VENV -eq 1 ]; then
@@ -74,11 +74,6 @@ install_speaktome_extras() {
   echo "Attempting to upgrade pip..."
   if ! "$VENV_PYTHON" -m pip install --upgrade pip; then
     echo "Warning: Failed to upgrade pip." >&2
-  fi
-
-  echo "Attempting to install SpeakToMe in editable mode..."
-  if ! "$VENV_PIP" install -e .; then
-    echo "Warning: Failed to install SpeakToMe in editable mode." >&2
   fi
 
   # Restore previous directory

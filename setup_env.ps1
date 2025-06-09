@@ -27,16 +27,19 @@ function Safe-Run([ScriptBlock]$cmd) {
 if (-not $NoVenv) {
     # 1. Create venv
     Safe-Run { python -m venv .venv }
-    if ($IsWindows) {
-        # Windows layout
-        Safe-Run { & .venv\Scripts\Activate.ps1 }
-        $venvPython = ".venv\Scripts\python.exe"
-        $venvPip = ".venv\Scripts\pip.exe"
-    }
-    else {
-        # POSIX layout
-        $venvPython = "./.venv/bin/python"
-        $venvPip = "./.venv/bin/pip"
+    
+    # Always use Windows paths in PowerShell
+    $venvDir = Join-Path $PSScriptRoot '.venv'
+    $venvPython = Join-Path $venvDir 'Scripts\python.exe'
+    $venvPip = Join-Path $venvDir 'Scripts\pip.exe'
+    
+    # Activate the virtual environment
+    $activateScript = Join-Path $venvDir 'Scripts\Activate.ps1'
+    if (Test-Path $activateScript) {
+        . $activateScript
+    } else {
+        Write-Host "Error: Virtual environment activation script not found at $activateScript"
+        return
     }
 } else {
     $venvPython = "python"
@@ -67,19 +70,29 @@ if (-not $NoExtras) {
     }
 }
 
-# Install codebases in editable mode so changes are picked up automatically
-foreach ($cb in $Codebases) {
-    if ($cb -ne "." -and ((Test-Path "$cb\pyproject.toml") -or (Test-Path "$cb\setup.py"))) {
-        Safe-Run { & $venvPip install -e $cb }
-    }
+# Always install torch first for GPU safety
+if ($env:GITHUB_ACTIONS -eq 'true') {
+    Write-Host 'Installing CPU-only torch (CI environment)'
+    Safe-Run { & $venvPip install torch==2.3.1+cpu -f https://download.pytorch.org/whl/torch_stable.html }
+} elseif ($gpu) {
+    Write-Host 'Installing GPU-enabled torch'
+    Safe-Run { & $venvPip install torch -f https://download.pytorch.org/whl/cu118 }
+} else {
+    Write-Host 'Installing CPU-only torch (default)'
+    Safe-Run { & $venvPip install torch==2.3.1+cpu -f https://download.pytorch.org/whl/torch_stable.html }
 }
 
-# 4. Prefetch large models if requested
-if ($prefetch) {
-    Safe-Run { powershell -ExecutionPolicy Bypass -File fetch_models.ps1 }
+# If not called from a dev script, launch the dev menu for all codebase/group installs
+$calledByDev = $false
+foreach ($arg in $args) {
+    if ($arg -eq '--from-dev') { $calledByDev = $true }
 }
 
-# Ensure optional dependencies from pyproject.toml are installed
-Safe-Run { & $venvPython AGENTS/tools/ensure_pyproject_deps.py }
+if (-not $calledByDev) {
+    Write-Host "Launching codebase/group selection tool for editable installs..."
+    $env:PIP_CMD = $venvPip
+    & $venvPython (Join-Path $PSScriptRoot "AGENTS\tools\dev_group_menu.py") --install
+    Remove-Item Env:PIP_CMD
+}
 
 Write-Host "Environment setup complete. Activate with '.venv\Scripts\Activate.ps1' on Windows or 'source .venv/bin/activate' on Unix-like systems"

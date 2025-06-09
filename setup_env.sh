@@ -77,25 +77,31 @@ if [ $NOEXTRAS -eq 0 ]; then
   fi
 fi
 
-# Install codebases in editable mode so local changes apply immediately
-IFS=',' read -ra CB <<< "$CODEBASES"
-for cb in "${CB[@]}"; do
-  [ "$cb" = "." ] && continue
-  if [ -f "$cb/pyproject.toml" ] || [ -f "$cb/setup.py" ]; then
-    safe_run $VENV_PIP install -e "$cb"
-  fi
-done
-
-# Prefetch large models if requested
-if [ $PREFETCH -eq 1 ]; then
-  safe_run bash fetch_models.sh
+# Always install torch first for GPU safety
+if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
+    echo "Installing latest stable CPU-only torch (CI environment)"
+    safe_run $VENV_PIP install torch==2.3.1+cpu -f https://download.pytorch.org/whl/torch_stable.html
+elif [ $FORCE_GPU -eq 1 ]; then
+    echo "Installing GPU-enabled torch"
+    safe_run $VENV_PIP install torch -f https://download.pytorch.org/whl/cu118
+else
+    echo "Installing latest stable CPU-only torch (default)"
+    safe_run $VENV_PIP install torch==2.3.1+cpu -f https://download.pytorch.org/whl/torch_stable.html
 fi
 
-safe_run $VENV_PYTHON AGENTS/tools/ensure_pyproject_deps.py
+# If not called from a dev script, launch the dev menu for all codebase/group installs
+CALLED_BY_DEV=0
+for arg in "$@"; do
+  case $arg in
+    --from-dev) CALLED_BY_DEV=1 ;;
+  esac
+done
+
+if [ $CALLED_BY_DEV -eq 0 ]; then
+  echo "Launching codebase/group selection tool for editable installs..."
+  PIP_CMD="$VENV_PIP" "$VENV_PYTHON" "$SCRIPT_ROOT/AGENTS/tools/dev_group_menu.py" --install
+fi
 
 echo "Environment setup complete."
 echo "[OK] Environment ready. Activate with 'source .venv/bin/activate'."
-echo "   * Core  = requirements.txt + dev"
-echo "   * Plot  = matplotlib, networkx, scikit-learn"
-echo "   * ML    = transformers, sentence-transformers"
 echo "   * Torch = $(python -c 'import torch; print(torch.__version__, torch.version.cuda if torch.cuda.is_available() else "N/A")')"

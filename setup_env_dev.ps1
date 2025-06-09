@@ -15,39 +15,32 @@ $useVenv = $true
 foreach ($arg in $args) {
     if ($arg -eq '--no-venv' -or $arg -eq '-no-venv') { $useVenv = $false }
 }
-Safe-Run { & "$scriptRoot\setup_env.ps1" @args }
+Safe-Run { & "$scriptRoot\setup_env.ps1" @args --from-dev }
 
+# Update the venv path handling section:
 if ($useVenv) {
     $venvDir = Join-Path $scriptRoot '.venv'
-    if ($IsWindows) {
-        $venvPython = Join-Path $venvDir 'Scripts\python.exe'
-        $venvPip = Join-Path $venvDir 'Scripts\pip.exe'
-    } else {
-        $venvPython = Join-Path $venvDir 'bin/python'
-        $venvPip = Join-Path $venvDir 'bin/pip'
-    }
+    # Always use Windows paths since we're in PowerShell
+    $venvPython = Join-Path $venvDir 'Scripts\python.exe'
+    $venvPip = Join-Path $venvDir 'Scripts\pip.exe'
 } else {
     $venvPython = 'python'
     $venvPip = 'pip'
 }
 
+# Update the activation section:
 if ($useVenv) {
     if (-not (Test-Path $venvPython)) {
         Write-Host "Error: Virtual environment Python not found at $venvPython"
         return
     }
     if (-not (Test-Path $venvPip)) {
-        Write-Host "Error: Virtual environment Pip not found at $venvPip. Ensure setup_env.ps1 created the .venv correctly."
+        Write-Host "Error: Virtual environment Pip not found at $venvPip"
         return
     }
 
-    # Activate the virtual environment
-    if ($IsWindows) {
-        $activateScript = Join-Path $venvDir "Scripts\Activate.ps1"
-    } else {
-        $activateScript = Join-Path $venvDir "bin/Activate.ps1"
-    }
-
+    # Always use Windows path for activation in PowerShell
+    $activateScript = Join-Path $venvDir 'Scripts\Activate.ps1'
     if (Test-Path $activateScript) {
         . $activateScript
     } else {
@@ -57,15 +50,15 @@ if ($useVenv) {
 }
 
 
+# Update the Install-Speaktome-Extras function to use proper paths:
 function Install-Speaktome-Extras {
-    $speaktomeDir = Join-Path $PSScriptRoot "speaktome"
+    $speaktomeDir = Join-Path $scriptRoot "speaktome"
     if (-not (Test-Path $speaktomeDir -PathType Container)) {
-        Write-Host "Warning: SpeakToMe directory not found at '$speaktomeDir' or it is not a directory. Skipping extras installation."
+        Write-Host "Warning: SpeakToMe directory not found at '$speaktomeDir'. Skipping extras installation."
         return
     }
     Push-Location $speaktomeDir
 
-    # Ensure pip is up to date and editable install is present
     Write-Host "Attempting to upgrade pip..."
     try {
         & $venvPython -m pip install --upgrade pip
@@ -73,19 +66,12 @@ function Install-Speaktome-Extras {
         Write-Host "Warning: Failed to upgrade pip. Error: $($_.Exception.Message)"
     }
 
-    Write-Host "Attempting to install SpeakToMe in editable mode..."
-    try {
-        & $venvPip install -e .
-    } catch {
-        Write-Host "Warning: Failed to install SpeakToMe in editable mode. Error: $($_.Exception.Message)"
-    }
-
-    Pop-Location
-
     Write-Host "Launching codebase/group selection tool..."
     $env:PIP_CMD = $venvPip
-    & $venvPython AGENTS/tools/dev_group_menu.py --install
+    & $venvPython (Join-Path $scriptRoot "AGENTS\tools\dev_group_menu.py") --install
     Remove-Item Env:PIP_CMD
+
+    Pop-Location
 }
 
 Install-Speaktome-Extras
