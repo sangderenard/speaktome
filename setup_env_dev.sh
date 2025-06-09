@@ -81,36 +81,11 @@ install_speaktome_extras() {
     echo "Warning: Failed to install SpeakToMe in editable mode." >&2
   fi
 
-  OPTIONAL_GROUPS=("plot" "ml" "dev")
-  for group in "${OPTIONAL_GROUPS[@]}"; do
-    read -t 3 -p "Install optional group '$group'? [y/N] (auto-skip in 3s): " reply
-    reply=${reply:-N}
-    if [[ "$reply" =~ ^[Yy]$ ]]; then
-      echo "Attempting to install optional group: $group"
-      if ! "$VENV_PIP" install ".[${group}]" ; then
-        echo "Warning: Failed to install optional group: $group" >&2
-      fi
-    else
-      echo "Skipping optional group: $group"
-    fi
-  done
-
-  BACKEND_GROUPS=("numpy" "jax" "ctensor")
-  for group in "${BACKEND_GROUPS[@]}"; do
-    read -t 3 -p "Install backend group '$group'? Install if you plan to run the corresponding abstract tensor backend. [y/N] (auto-skip in 3s): " reply
-    reply=${reply:-N}
-    if [[ "$reply" =~ ^[Yy]$ ]]; then
-      echo "Attempting to install backend group: $group"
-      if ! "$VENV_PIP" install ".[${group}]" ; then
-        echo "Warning: Failed to install backend group: $group" >&2
-      fi
-    else
-      echo "Skipping backend group: $group"
-    fi
-  done
-
   # Restore previous directory
   cd "$OLD_DIR"
+
+  echo "Launching codebase/group selection tool..."
+  PIP_CMD="$VENV_PIP" "$VENV_PYTHON" "$SCRIPT_ROOT/AGENTS/tools/dev_group_menu.py" --install
 }
 install_speaktome_extras
 
