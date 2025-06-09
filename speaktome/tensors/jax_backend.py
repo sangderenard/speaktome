@@ -179,10 +179,20 @@ class JAXTensorOperations(AbstractTensorOperations):
         return jnp.concatenate(tensors, axis=dim).tolist()
 
     def topk(self, tensor: Any, k: int, dim: int) -> Tuple[Any, Any]:
-        if dim != -1 and dim != tensor.ndim - 1:
-            raise NotImplementedError("topk only implemented for last dimension")
+        """Return the top ``k`` values and indices along ``dim``."""
         tensor = self._to_jnp(tensor)
-        values, idxs = lax.top_k(tensor, k)
+        if dim < 0:
+            dim = tensor.ndim + dim
+        if dim < 0 or dim >= tensor.ndim:
+            raise ValueError("dim out of range")
+
+        if dim == tensor.ndim - 1:
+            values, idxs = lax.top_k(tensor, k)
+        else:
+            moved = jnp.moveaxis(tensor, dim, -1)
+            values, idxs = lax.top_k(moved, k)
+            values = jnp.moveaxis(values, -1, dim)
+            idxs = jnp.moveaxis(idxs, -1, dim)
         return values.tolist(), idxs.tolist()
 
     def stack(self, tensors: List[Any], dim: int = 0) -> Any:
