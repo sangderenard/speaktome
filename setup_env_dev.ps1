@@ -11,39 +11,49 @@ function Safe-Run([ScriptBlock]$cmd) {
 
 # Run the regular setup script with forwarded arguments
 $scriptRoot = $PSScriptRoot
+$useVenv = $true
+foreach ($arg in $args) {
+    if ($arg -eq '--no-venv' -or $arg -eq '-no-venv') { $useVenv = $false }
+}
 Safe-Run { & "$scriptRoot\setup_env.ps1" @args }
 
-$venvDir = Join-Path $scriptRoot '.venv'
-if ($IsWindows) {
-    $venvPython = Join-Path $venvDir 'Scripts\python.exe'
-    $venvPip = Join-Path $venvDir 'Scripts\pip.exe'
+if ($useVenv) {
+    $venvDir = Join-Path $scriptRoot '.venv'
+    if ($IsWindows) {
+        $venvPython = Join-Path $venvDir 'Scripts\python.exe'
+        $venvPip = Join-Path $venvDir 'Scripts\pip.exe'
+    } else {
+        $venvPython = Join-Path $venvDir 'bin/python'
+        $venvPip = Join-Path $venvDir 'bin/pip'
+    }
 } else {
-    $venvPython = Join-Path $venvDir 'bin/python'
-    $venvPip = Join-Path $venvDir 'bin/pip'
+    $venvPython = 'python'
+    $venvPip = 'pip'
 }
 
-if (-not (Test-Path $venvPython)) {
-    Write-Host "Error: Virtual environment Python not found at $venvPython"
-    return
-}
-if (-not (Test-Path $venvPip)) {
-    Write-Host "Error: Virtual environment Pip not found at $venvPip. Ensure setup_env.ps1 created the .venv correctly."
-    return
-}
+if ($useVenv) {
+    if (-not (Test-Path $venvPython)) {
+        Write-Host "Error: Virtual environment Python not found at $venvPython"
+        return
+    }
+    if (-not (Test-Path $venvPip)) {
+        Write-Host "Error: Virtual environment Pip not found at $venvPip. Ensure setup_env.ps1 created the .venv correctly."
+        return
+    }
 
+    # Activate the virtual environment
+    if ($IsWindows) {
+        $activateScript = Join-Path $venvDir "Scripts\Activate.ps1"
+    } else {
+        $activateScript = Join-Path $venvDir "bin/Activate.ps1"
+    }
 
-# Activate the virtual environment
-if ($IsWindows) {
-    $activateScript = Join-Path $venvDir "Scripts\Activate.ps1"
-} else {
-    $activateScript = Join-Path $venvDir "bin/Activate.ps1"
-}
-
-if (Test-Path $activateScript) {
-    . $activateScript
-} else {
-    Write-Host "Error: Virtual environment activation script not found at $activateScript"
-    return
+    if (Test-Path $activateScript) {
+        . $activateScript
+    } else {
+        Write-Host "Error: Virtual environment activation script not found at $activateScript"
+        return
+    }
 }
 
 
