@@ -18,3 +18,21 @@ def test_log_softmax_1d():
     expected = [math.log(v / total) for v in exps]
 
     assert pytest.approx(values) == expected
+
+
+def test_log_softmax_nd():
+    ops = CTensorOperations()
+    tensor = ops.tensor_from_list(
+        [[1.0, 2.0], [3.0, 4.0]], dtype=ops.float_dtype, device=None
+    )
+    result = ops.log_softmax(tensor, dim=1)
+    values = ops.tolist(result)
+
+    expected = []
+    for row in [[1.0, 2.0], [3.0, 4.0]]:
+        max_v = max(row)
+        exps = [math.exp(v - max_v) for v in row]
+        total = sum(exps)
+        expected.append([math.log(v / total) for v in exps])
+
+    assert pytest.approx(values) == expected
