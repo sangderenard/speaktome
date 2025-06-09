@@ -36,6 +36,13 @@ if [ ! -x "$VENV_PIP" ]; then
 fi
 
 
+# Explicitly set Python environment variables so all commands run against the
+# virtual environment without relying on activation scripts.
+PY_VERSION="$($VENV_PYTHON -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')"
+export PYTHONHOME="$SCRIPT_ROOT/.venv"
+export PYTHONPATH="$SCRIPT_ROOT/.venv/lib/python${PY_VERSION}/site-packages"
+
+
 
 install_speaktome_extras() {
   local SPEAKTOME_DIR="$SCRIPT_ROOT/speaktome"

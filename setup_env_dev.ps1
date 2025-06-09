@@ -32,6 +32,17 @@ if (-not (Test-Path $venvPip)) {
 }
 
 
+# Explicitly configure Python environment variables so commands use the
+# virtual environment regardless of shell activation state.
+$env:PYTHONHOME = $venvDir
+$pyVer = & $venvPython -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')"
+if ($IsWindows) {
+    $env:PYTHONPATH = Join-Path $venvDir "Lib\site-packages"
+} else {
+    $env:PYTHONPATH = Join-Path $venvDir "lib/python$pyVer/site-packages"
+}
+
+
 function Install-Speaktome-Extras {
     $speaktomeDir = Join-Path $PSScriptRoot "speaktome"
     if (-not (Test-Path $speaktomeDir -PathType Container)) {
