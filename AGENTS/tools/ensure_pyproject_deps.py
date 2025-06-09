@@ -14,7 +14,8 @@ and installs any missing packages for each group using ``pip``. Installation
 errors are reported but do not abort execution.
 """
 
-PYPROJECT = Path(__file__).resolve().parents[2] / "pyproject.toml"
+# ``pyproject.toml`` now resides in this directory alongside the tools package.
+PYPROJECT = Path(__file__).resolve().parent / "pyproject.toml"
 
 
 def parse_extras() -> dict[str, list[str]]:

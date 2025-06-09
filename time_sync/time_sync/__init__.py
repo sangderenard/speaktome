@@ -10,6 +10,7 @@ from .core import (
     utcnow,
 )
 from .ascii_digits import compose_ascii_digits, print_analog_clock
+from . import _internet  # exported for tests
 
 __all__ = [
     "sync_offset",
@@ -20,4 +21,5 @@ __all__ = [
     "utcnow",
     "compose_ascii_digits",
     "print_analog_clock",
+    "_internet",
 ]
