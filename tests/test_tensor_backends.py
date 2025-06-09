@@ -12,6 +12,7 @@ from speaktome.tensors import (
 )
 from speaktome.tensors.faculty import detect_faculty
 from speaktome.tensors.pure_backend import PurePythonTensorOperations # For isinstance check
+import itertools
 
 logger = logging.getLogger(__name__)
 
@@ -154,5 +155,21 @@ def test_basic_operator_dispatch(backend_cls):
 
     except (TypeError, NotImplementedError, AttributeError):
         raise # Let the test fail if operators are not supported as expected
+
+
+@pytest.mark.parametrize(
+    "src_cls,tgt_cls",
+    itertools.permutations(available_backends(), 2),
+)
+def test_to_backend_roundtrip(src_cls, tgt_cls):
+    """Ensure ``to_backend`` converts tensors faithfully across backends."""
+    src_ops = src_cls()
+    tgt_ops = tgt_cls()
+    data = [[1, 2], [3, 4]]
+    tensor = src_ops.tensor_from_list(data, dtype=src_ops.float_dtype, device=None)
+    converted = src_ops.to_backend(tensor, tgt_ops)
+    assert tgt_ops.tolist(converted) == data
+    roundtrip = tgt_ops.to_backend(converted, src_ops)
+    assert src_ops.tolist(roundtrip) == data
         
 
