@@ -212,22 +212,10 @@ C_SOURCE = """
         free(idx);
 
     void mean_dim(const double* a, double* out, const int* shape, int ndim, int dim) {
-        int before = 1;
-        for (int i = 0; i < dim; ++i) before *= shape[i];
-        int axis = shape[dim];
-        int after = 1;
-        for (int i = dim + 1; i < ndim; ++i) after *= shape[i];
         int out_index = 0;
-        for (int b = 0; b < before; ++b) {
-            for (int c = 0; c < after; ++c) {
-                double sum = 0.0;
-                for (int j = 0; j < axis; ++j) {
-                    int idx = (b * axis + j) * after + c;
-                    sum += a[idx];
-                }
-                out[out_index++] = sum / axis;
-            }
-        }
+        mean_dim_ctx ctx = {out, shape[dim], &out_index};
+        for_each_cell_along_dim(a, shape, ndim, dim, mean_dim_callback, &ctx);
+    }
 
     void gather_pairs_2d(const double* a, const int* rows, const int* cols,
                          double* out, int n_pairs, int stride) {
@@ -284,47 +272,9 @@ C_SOURCE = """
         int k,
         double* indices,
         double* out) {
-        int stride_after = 1;
-        for (int i = dim + 1; i < ndim; ++i) {
-            stride_after *= shape[i];
-        }
-        int stride_before = 1;
-        for (int i = 0; i < dim; ++i) {
-            stride_before *= shape[i];
-        }
-        int dim_size = shape[dim];
-        int slice_count = stride_before * stride_after;
-        for (int b = 0; b < stride_before; ++b) {
-            for (int a_idx = 0; a_idx < stride_after; ++a_idx) {
-                const double* slice_ptr =
-                    a + b * dim_size * stride_after + a_idx;
-                int* used = (int*)malloc(dim_size * sizeof(int));
-                for (int i = 0; i < dim_size; ++i) used[i] = 0;
-                for (int t = 0; t < k; ++t) {
-                    int best = -1;
-                    double best_val = -1e300;
-                    for (int j = 0; j < dim_size; ++j) {
-                        if (!used[j]) {
-                            double val = slice_ptr[j * stride_after];
-                            if (val > best_val) {
-                                best_val = val;
-                                best = j;
-                            }
-                        }
-                    }
-                    int out_index = (b * stride_after + a_idx) * k + t;
-                    if (best != -1) {
-                        used[best] = 1;
-                        indices[out_index] = (double)best;
-                        out[out_index] = best_val;
-                    } else {
-                        indices[out_index] = -1.0;
-                        out[out_index] = 0.0;
-                    }
-                }
-                free(used);
-            }
-        }
+        int out_index = 0;
+        topk_dim_ctx ctx = {out, indices, k, shape[dim], &out_index};
+        for_each_cell_along_dim(a, shape, ndim, dim, topk_dim_callback, &ctx);
     }
 
     void for_each_cell_along_dim(
