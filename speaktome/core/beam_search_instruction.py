@@ -1,13 +1,24 @@
-# Standard library imports
-from typing import Any, Callable, Dict, List, Optional, Tuple, TYPE_CHECKING
 try:
+    # Standard library imports
+    from typing import Any, Callable, Dict, List, Optional, Tuple, TYPE_CHECKING
+
     import torch  # type: ignore
-except ModuleNotFoundError:  # pragma: no cover - optional dependency
-    torch = None  # type: ignore
-if TYPE_CHECKING:  # pragma: no cover - type hints only
-    from torch import Tensor
-# Local application/library specific imports
-from .scorer import Scorer # Assuming Scorer is in scorer.py
+
+    if TYPE_CHECKING:  # pragma: no cover - type hints only
+        from torch import Tensor
+
+    # Local application/library specific imports
+    from .scorer import Scorer  # Assuming Scorer is in scorer.py
+except Exception:
+    print(
+        "\n"
+        "+-----------------------------------------------------------------------+\n"
+        "| Imports failed. Run setup_env or setup_env_dev and select every    |\n"
+        "| project and module you plan to use. Missing packages mean setup was |\n"
+        "| skipped or incomplete.                                             |\n"
+        "+-----------------------------------------------------------------------+\n"
+    )
+    raise
 # --- END HEADER ---
 
 class BeamSearchInstruction:
@@ -19,6 +30,7 @@ class BeamSearchInstruction:
       4. Which “action” to take (“expand_any”, “expand_targeted”, “promote”, “done”) 
          and, if targeted, what node_id/beam_idx.
     """
+
 
     def __init__(
         self,

@@ -1,22 +1,32 @@
-# Standard library imports
-from typing import Dict, List, Optional, Tuple, Any, TYPE_CHECKING
+try:
+    # Standard library imports
+    from typing import Dict, List, Optional, Tuple, Any, TYPE_CHECKING
 
-# Third-party imports
-import torch
-from ..util.lazy_loader import lazy_install
+    import torch
+    from ..util.lazy_loader import lazy_install
 
-if TYPE_CHECKING:
-    from transformers import PreTrainedTokenizer  # For type hinting
+    if TYPE_CHECKING:
+        from transformers import PreTrainedTokenizer  # For type hinting
 
-if TYPE_CHECKING:
-    from torch_geometric.data import Data as PyGData  # pragma: no cover
+    if TYPE_CHECKING:
+        from torch_geometric.data import Data as PyGData  # pragma: no cover
 
-# Local application/library specific imports
-from .beam_tree_node import BeamTreeNode  # Assuming BeamTreeNode is in beam_tree_node.py
-from ..tensors import (
-    AbstractTensorOperations,
-    get_tensor_operations,
-)
+    # Local application/library specific imports
+    from .beam_tree_node import BeamTreeNode  # Assuming BeamTreeNode is in beam_tree_node.py
+    from ..tensors import (
+        AbstractTensorOperations,
+        get_tensor_operations,
+    )
+except Exception:
+    print(
+        "\n"
+        "+-----------------------------------------------------------------------+\n"
+        "| Imports failed. Run setup_env or setup_env_dev and select every    |\n"
+        "| project and module you plan to use. Missing packages mean setup was |\n"
+        "| skipped or incomplete.                                             |\n"
+        "+-----------------------------------------------------------------------+\n"
+    )
+    raise
 # --- END HEADER ---
 
 class CompressedBeamTree:
