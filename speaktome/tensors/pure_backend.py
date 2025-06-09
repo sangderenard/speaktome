@@ -3,62 +3,6 @@
 from __future__ import annotations
 
 from typing import Any, Tuple, Optional, List
-
-
-class PureTensor(list):
-    """Simple list subclass to emulate tensor arithmetic."""
-
-    def __init__(self, data: List[Any], ops: "PurePythonTensorOperations") -> None:
-        super().__init__(data)
-        self._ops = ops
-
-    def _op(self, name: str, other: Any):
-        other_data = list(other) if isinstance(other, PureTensor) else other
-        result = self._ops._AbstractTensorOperations__apply_operator(name, list(self), other_data)
-        return PureTensor(result, self._ops) if isinstance(result, list) else result
-
-    def __add__(self, other):
-        return self._op('add', other)
-
-    def __radd__(self, other):
-        return self._op('radd', other)
-
-    def __sub__(self, other):
-        return self._op('sub', other)
-
-    def __rsub__(self, other):
-        return self._op('rsub', other)
-
-    def __mul__(self, other):
-        return self._op('mul', other)
-
-    def __rmul__(self, other):
-        return self._op('rmul', other)
-
-    def __truediv__(self, other):
-        return self._op('truediv', other)
-
-    def __rtruediv__(self, other):
-        return self._op('rtruediv', other)
-
-    def __floordiv__(self, other):
-        return self._op('floordiv', other)
-
-    def __rfloordiv__(self, other):
-        return self._op('rfloordiv', other)
-
-    def __mod__(self, other):
-        return self._op('mod', other)
-
-    def __rmod__(self, other):
-        return self._op('rmod', other)
-
-    def __pow__(self, other):
-        return self._op('pow', other)
-
-    def __rpow__(self, other):
-        return self._op('rpow', other)
-
 import math
 import json
 
@@ -135,8 +79,6 @@ class PurePythonTensorOperations(AbstractTensorOperations):
         return self.full(size, 0, dtype, device)
 
     def clone(self, tensor: Any) -> Any:
-        if isinstance(tensor, PureTensor):
-            return PureTensor([self.clone(item) for item in tensor], self)
         if not isinstance(tensor, list):
             return tensor
         return [self.clone(item) for item in tensor]
@@ -350,7 +292,7 @@ class PurePythonTensorOperations(AbstractTensorOperations):
         return math.sqrt(tensor)
 
     def tensor_from_list(self, data: List[Any], dtype: Any, device: Any) -> Any:
-        return PureTensor(data, self)
+        return data
 
     def boolean_mask_select(self, tensor: Any, mask: Any) -> Any:
         if not isinstance(tensor, list) or not isinstance(mask, list) or len(tensor) != len(mask):
@@ -358,11 +300,7 @@ class PurePythonTensorOperations(AbstractTensorOperations):
         return [tensor[i] for i in range(len(tensor)) if mask[i]]
 
     def tolist(self, tensor: Any) -> List[Any]:
-        if isinstance(tensor, PureTensor):
-            tensor = list(tensor)
-        if not isinstance(tensor, list):
-            return tensor
-        return [self.tolist(x) for x in tensor]
+        return self.clone(tensor)
 
     def less(self, tensor: Any, value: Any) -> Any:
         if isinstance(tensor, list):
