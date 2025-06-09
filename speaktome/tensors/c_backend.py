@@ -130,7 +130,7 @@ class CTensor:
 class CTensorOperations(AbstractTensorOperations):
     """C backend using cffi for all arithmetic ops."""
 
-    def _apply_operator(self, op: str, left: CTensor, right: Any):
+    def _AbstractTensorOperations__apply_operator(self, op: str, left: CTensor, right: Any):
         """Operate on ``CTensor`` objects or scalars."""
         if isinstance(right, CTensor) and isinstance(left, CTensor):
             if left.shape != right.shape:

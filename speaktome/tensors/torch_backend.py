@@ -20,7 +20,7 @@ class PyTorchTensorOperations(AbstractTensorOperations):
             raise RuntimeError("PyTorch is required for this backend")
         self.default_device = torch.device(default_device)
 
-    def _apply_operator(self, op: str, left: Any, right: Any):
+    def _AbstractTensorOperations__apply_operator(self, op: str, left: Any, right: Any):
         """Delegate arithmetic ops to PyTorch tensors."""
         a = left
         b = right

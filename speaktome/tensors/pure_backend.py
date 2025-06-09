@@ -31,7 +31,7 @@ class PurePythonTensorOperations(AbstractTensorOperations):
         # ###############################################################
         pass
 
-    def _apply_operator(self, op: str, left: Any, right: Any):
+    def _AbstractTensorOperations__apply_operator(self, op: str, left: Any, right: Any):
         """Dispatch basic arithmetic for nested lists."""
         if isinstance(right, list) and isinstance(left, list):
             return self._elementwise_op(op, left, right)

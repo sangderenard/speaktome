@@ -65,8 +65,8 @@ def run_checks(ops):
     assert vals == expect_vals
     assert idxs == expect_inds
 
-    assert ops.tolist(ops._apply_operator("sub", [2, 4, 6], 1)) == [1, 3, 5]
-    assert ops.tolist(ops._apply_operator("truediv", [2.0, 4.0], 2.0)) == [1.0, 2.0]
+    assert ops.tolist(ops.sub_scalar([2, 4, 6], 1)) == [1, 3, 5]
+    assert ops.tolist(ops.div_scalar([2.0, 4.0], 2.0)) == [1.0, 2.0]
 
     assert ops.long_dtype is not None
     assert ops.bool_dtype is not None
@@ -89,25 +89,68 @@ def _norm(val):
     return val
 
 
+class DummyTensor:
+    """Lightweight tensor wrapper exercising operator overloads."""
+
+    def __init__(self, ops, data):
+        self.ops = ops
+        self.data = data
+
+    def _apply(self, op, other):
+        right = other.data if isinstance(other, DummyTensor) else other
+        fn = getattr(self.ops, "_AbstractTensorOperations__apply_operator")
+        return DummyTensor(self.ops, fn(op, self.data, right))
+
+    def __add__(self, other):
+        return self._apply("add", other)
+
+    def __radd__(self, other):
+        return self._apply("radd", other)
+
+    def __sub__(self, other):
+        return self._apply("sub", other)
+
+    def __rsub__(self, other):
+        return self._apply("rsub", other)
+
+    def __mul__(self, other):
+        return self._apply("mul", other)
+
+    def __truediv__(self, other):
+        return self._apply("truediv", other)
+
+    def __floordiv__(self, other):
+        return self._apply("floordiv", other)
+
+    def __mod__(self, other):
+        return self._apply("mod", other)
+
+    def __pow__(self, other):
+        return self._apply("pow", other)
+
+    def tolist(self):
+        return self.ops.tolist(self.data)
+
+
 @pytest.mark.parametrize("backend_cls", available_backends())
-@pytest.mark.parametrize(
-    "op,left,right,expected",
-    [
-        ("add", [1, 2], [3, 4], [4, 6]),
-        ("radd", 1, [3, 4], [4, 5]),
-        ("sub", [5, 7], [1, 2], [4, 5]),
-        ("rsub", 1, [3, 4], [-2, -3]),
-        ("mul", [2, 3], [4, 5], [8, 15]),
-        ("truediv", [5.0, 8.0], [2.0, 2.0], [2.5, 4.0]),
-        ("rtruediv", 2.0, [4.0, 1.0], [0.5, 2.0]),
-        ("floordiv", [5, 7], [2, 3], [2, 2]),
-        ("mod", [5, 7], [2, 3], [1, 1]),
-        ("pow", [2, 3], [3, 2], [8, 9]),
-    ],
-)
-def test_apply_operator_basic_ops(backend_cls, op, left, right, expected):
-    """Verify arithmetic operator dispatch for each backend."""
+def test_magic_operator_dispatch(backend_cls):
+    """Verify arithmetic overloads funnel to backend ops."""
     ops = backend_cls()
-    result = _norm(ops._apply_operator(op, left, right))
-    assert result == expected
+    a = DummyTensor(ops, [1, 2])
+    b = DummyTensor(ops, [3, 4])
+    assert (a + b).tolist() == [4, 6]
+    assert (b - a).tolist() == [2, 2]
+    assert (a * b).tolist() == [3, 8]
+    assert (b / a).tolist() == [3.0, 2.0]
+    assert (b // a).tolist() == [3 // 1, 4 // 2]
+    assert (b % a).tolist() == [0, 0]
+    assert (a ** a).tolist() == [1, 4]
+
+
+@pytest.mark.parametrize("backend_cls", available_backends())
+def test_apply_operator_inaccessible(backend_cls):
+    """Ensure private operator helper cannot be called directly."""
+    ops = backend_cls()
+    with pytest.raises(AttributeError):
+        ops._apply_operator("add", [1], [2])
 

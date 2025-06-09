@@ -53,7 +53,7 @@ class JAXTensorOperations(AbstractTensorOperations):
         
         return jax.device_put(self._to_jnp(tensor), target_device)
 
-    def _apply_operator(self, op: str, left: Any, right: Any):
+    def _AbstractTensorOperations__apply_operator(self, op: str, left: Any, right: Any):
         """Apply arithmetic ops using JAX arrays."""
         a = self._to_jnp(left)
         b = self._to_jnp(right)

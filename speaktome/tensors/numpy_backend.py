@@ -20,7 +20,7 @@ class NumPyTensorOperations(AbstractTensorOperations):
     def __init__(self, track_time: bool = False):
         super().__init__(track_time=track_time)
 
-    def _apply_operator(self, op: str, left: Any, right: Any):
+    def _AbstractTensorOperations__apply_operator(self, op: str, left: Any, right: Any):
         """Apply arithmetic operators on NumPy arrays."""
         a = np.array(left) if not isinstance(left, np.ndarray) else left
         b = np.array(right) if not isinstance(right, np.ndarray) else right
