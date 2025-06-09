@@ -1,21 +1,23 @@
 #!/usr/bin/env python3
-"""Static header validation utility for the SPEAKTOME project.
-
-This script walks the ``speaktome/`` package and checks that every class
-defines a ``HEADER`` attribute or docstring and provides a
-``@staticmethod`` ``test()`` method.  Any violations are printed with the
-``[AGENT_ACTIONABLE_ERROR]`` tag for easy parsing.
-
-When invoked with ``--rewrite`` it will inject a minimal ``HEADER`` and
-``test`` stub into classes that are missing them.
-"""
-
+"""Static header validation utility for the SPEAKTOME project."""
 from __future__ import annotations
 
-import ast
-import sys
-from pathlib import Path
-from typing import Iterable
+try:
+    import ast
+    import sys
+    from pathlib import Path
+    from typing import Iterable
+except Exception:
+    print(
+        "\n"
+        "+-----------------------------------------------------------------------+\n"
+        "| Imports failed. Run setup_env or setup_env_dev and select every    |\n"
+        "| project and module you plan to use. Missing packages mean setup was |\n"
+        "| skipped or incomplete.                                             |\n"
+        "+-----------------------------------------------------------------------+\n"
+    )
+    raise
+# --- END HEADER ---
 
 ENV_SETUP_BOX = (
     "\n"
