@@ -70,10 +70,21 @@ path.
 
 ## Standard Header End Comment
 
-Every Python file should begin with a short explanatory header that ends
-with the sentinel line:
+Every Python file should begin with a short explanatory header wrapped in a
+``try`` block. Imports may appear inside this block. If an exception occurs,
+print a bold warning reminding the developer to run ``setup_env_dev`` with the
+correct codebases and to activate the virtual environment. After the ``except``
+block, include the sentinel line:
 
-```
+```python
+try:
+    import your_modules
+except Exception as exc:
+    print(
+        "\n*** Did you run setup_env_dev with the correct codebases?"\
+        " Are you using the project's virtual environment?***\n"
+    )
+    raise
 # --- END HEADER ---
 ```
 
