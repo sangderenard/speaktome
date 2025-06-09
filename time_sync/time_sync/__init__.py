@@ -9,7 +9,11 @@ from .core import (
     now,
     utcnow,
 )
-from .ascii_digits import compose_ascii_digits, print_analog_clock
+from .ascii_digits import (
+    compose_ascii_digits,
+    print_analog_clock,
+    print_digital_clock,
+)
 from . import _internet  # exported for tests
 
 __all__ = [
@@ -21,5 +25,6 @@ __all__ = [
     "utcnow",
     "compose_ascii_digits",
     "print_analog_clock",
+    "print_digital_clock",
     "_internet",
 ]

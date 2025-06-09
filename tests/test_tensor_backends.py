@@ -110,6 +110,9 @@ def _norm(val):
 @pytest.mark.parametrize("backend_cls", available_backends())
 def test_basic_operator_dispatch(backend_cls):
     """Verify arithmetic helpers via the private dispatcher."""
+    if backend_cls is PurePythonTensorOperations:
+        pytest.skip("Pure Python backend lacks operator overloading")
+
     ops = backend_cls()
 
     a_list_float = [1.0, 2.0]

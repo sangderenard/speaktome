@@ -11,7 +11,8 @@ requires-python = ">=3.8"
 license = { text = "MIT" }
 authors = [{ name = "Time Sync Authors" }]
 dependencies = [
-    "ntplib"  # Network Time Protocol client library
+    "ntplib",  # Network Time Protocol client library
+    "colorama",
 ]
 
 [tool.setuptools.packages.find]
