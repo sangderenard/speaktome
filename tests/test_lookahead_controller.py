@@ -12,6 +12,10 @@ from speaktome.core.lookahead_controller import LookaheadController, LookaheadCo
 from speaktome.core.model_abstraction import AbstractModelWrapper
 from speaktome.tensors import get_tensor_operations
 from speaktome.tensors.faculty import available_faculties
+from speaktome.core.abstract_linear_net import (
+    AbstractLinearLayer,
+    SequentialLinearModel,
+)
 
 # --- END HEADER ---
 
@@ -19,17 +23,52 @@ logger = logging.getLogger(__name__)
 
 
 class DummyModel(AbstractModelWrapper):
+    """Minimal sequential linear network returning a fixed distribution."""
+
+    def __init__(self, ops):
+        self.ops = ops
+        self.vocab_size = 3
+        self.embed = self.ops.tensor_from_list(
+            [[1.0 if i == j else 0.0 for j in range(self.vocab_size)] for i in range(self.vocab_size)],
+            dtype=self.ops.float_dtype,
+            device="cpu",
+        )
+
+        w0 = self.ops.zeros((self.vocab_size, 1), dtype=self.ops.float_dtype, device="cpu")
+        b0 = self.ops.zeros((1, 1), dtype=self.ops.float_dtype, device="cpu")
+        w1 = self.ops.zeros((1, self.vocab_size), dtype=self.ops.float_dtype, device="cpu")
+        b1 = self.ops.tensor_from_list([[0.0, 1.0, 0.0]], dtype=self.ops.float_dtype, device="cpu")
+
+        self.model = SequentialLinearModel(
+            [AbstractLinearLayer(w0, b0, self.ops), AbstractLinearLayer(w1, b1, self.ops)],
+            self.ops,
+        )
+
     def forward(self, input_ids, attention_mask, **kwargs):
+        ops = self.ops
         if hasattr(input_ids, "shape"):
             batch, width = input_ids.shape
+            flat_ids = input_ids.reshape(-1)
         else:
             batch = len(input_ids)
             width = len(input_ids[0]) if batch else 0
-        if np is not None:
-            logits = np.zeros((batch, width, 3), dtype=np.float32)
-            logits[:, :, 1] = 1.0
+            flat_ids = [tok for row in input_ids for tok in row]
+
+        one_hot = ops.index_select(self.embed, 0, flat_ids)
+        logits_flat = self.model.forward(one_hot, None)["logits"]
+
+        if hasattr(input_ids, "shape"):
+            logits = logits_flat.reshape(batch, width, self.vocab_size)
         else:
-            logits = [[[0.0, 1.0, 0.0] for _ in range(width)] for _ in range(batch)]
+            logits = []
+            idx = 0
+            for _ in range(batch):
+                row = []
+                for _ in range(width):
+                    row.append(logits_flat[idx])
+                    idx += 1
+                logits.append(row)
+
         return {"logits": logits}
 
     def get_device(self):
@@ -75,7 +114,7 @@ def test_lookahead_across_backends(faculty, caplog):
         tokenizer=DummyTokenizer(),
         config=cfg,
         tensor_ops=ops,
-        model_wrapper=DummyModel(),
+        model_wrapper=DummyModel(ops),
     )
 
     ptoks = ops.tensor_from_list([[1]], dtype=ops.long_dtype, device="cpu")
@@ -110,7 +149,7 @@ def test_lookahead_default_backend(steps):
         tokenizer=DummyTokenizer(),
         config=cfg,
         tensor_ops=get_tensor_operations(track_time=True),
-        model_wrapper=DummyModel(),
+        model_wrapper=DummyModel(get_tensor_operations()),
     )
 
     ops = controller.tensor_ops

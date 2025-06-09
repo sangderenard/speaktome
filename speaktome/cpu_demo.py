@@ -22,6 +22,10 @@ except ModuleNotFoundError:  # pragma: no cover - optional dependency
 from .util.token_vocab import TokenVocabulary
 from .tensors import get_tensor_operations
 from .core.model_abstraction import AbstractModelWrapper
+from .core.abstract_linear_net import (
+    AbstractLinearLayer,
+    SequentialLinearModel,
+)
 from .core.lookahead_controller import LookaheadController, LookaheadConfig
 # --- END HEADER ---
 
@@ -29,23 +33,70 @@ VOCAB = TokenVocabulary("abcdefghijklmnopqrstuvwxyz ")
 
 
 class RandomModel(AbstractModelWrapper):
-    """Dummy model producing random logits for each token position."""
+    """Random two-layer network built from :class:`AbstractLinearLayer`."""
+
+    def __init__(self) -> None:
+        self.ops = get_tensor_operations(
+            Faculty.NUMPY if NUMPY_AVAILABLE else Faculty.PURE_PYTHON
+        )
+        hidden = 8
+        if NUMPY_AVAILABLE:
+            rng_w0 = np.random.rand(len(VOCAB), hidden).astype(np.float32)
+            rng_b0 = np.random.rand(1, hidden).astype(np.float32)
+            rng_w1 = np.random.rand(hidden, len(VOCAB)).astype(np.float32)
+            rng_b1 = np.random.rand(1, len(VOCAB)).astype(np.float32)
+        else:
+            import random
+
+            def rand_mat(rows, cols):
+                return [[random.random() for _ in range(cols)] for _ in range(rows)]
+
+            rng_w0 = rand_mat(len(VOCAB), hidden)
+            rng_b0 = [rand_mat(1, hidden)[0]]
+            rng_w1 = rand_mat(hidden, len(VOCAB))
+            rng_b1 = [rand_mat(1, len(VOCAB))[0]]
+
+        w0 = self.ops.tensor_from_list(rng_w0, dtype=self.ops.float_dtype, device=None)
+        b0 = self.ops.tensor_from_list(rng_b0, dtype=self.ops.float_dtype, device=None)
+        w1 = self.ops.tensor_from_list(rng_w1, dtype=self.ops.float_dtype, device=None)
+        b1 = self.ops.tensor_from_list(rng_b1, dtype=self.ops.float_dtype, device=None)
+
+        self.embed = self.ops.tensor_from_list(
+            [[1.0 if i == j else 0.0 for j in range(len(VOCAB))] for i in range(len(VOCAB))],
+            dtype=self.ops.float_dtype,
+            device=None,
+        )
+
+        self.model = SequentialLinearModel(
+            [AbstractLinearLayer(w0, b0, self.ops), AbstractLinearLayer(w1, b1, self.ops)],
+            self.ops,
+        )
 
     def forward(self, input_ids: Any, attention_mask: Any, **kwargs) -> Dict[str, Any]:
+        ops = self.ops
         if NUMPY_AVAILABLE:
             batch, width = input_ids.shape
-            logits = np.random.rand(batch, width, len(VOCAB)).astype(np.float32)
+            flat_ids = input_ids.reshape(-1)
         else:
             batch = len(input_ids)
             width = len(input_ids[0]) if batch > 0 else 0
-            import random
-            logits = [
-                [
-                    [random.random() for _ in range(len(VOCAB))]
-                    for _ in range(width)
-                ]
-                for _ in range(batch)
-            ]
+            flat_ids = [tok for row in input_ids for tok in row]
+
+        one_hot = ops.index_select(self.embed, 0, flat_ids)
+        logits_flat = self.model.forward(one_hot, None)["logits"]
+
+        if NUMPY_AVAILABLE:
+            logits = logits_flat.reshape(batch, width, len(VOCAB))
+        else:
+            logits = []
+            idx = 0
+            for _ in range(batch):
+                row = []
+                for _ in range(width):
+                    row.append(logits_flat[idx])
+                    idx += 1
+                logits.append(row)
+
         return {"logits": logits}
 
     def get_device(self) -> Any:
