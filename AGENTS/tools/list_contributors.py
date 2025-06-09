@@ -3,20 +3,24 @@ Generates a dignified credits list from agent JSON files in AGENTS/users/.
 Most recent version of each named agent is used.
 """
 import json
-import glob
 from pathlib import Path
+from typing import Dict
 # --- END HEADER ---
 
-def generate_credits():
+def generate_credits(users_dir: Path | None = None) -> str:
     """Load all agent JSONs and create a formatted contributor list."""
-    users_dir = Path(__file__).parent.parent / "users"
-    agents = {}
+    if users_dir is None:
+        users_dir = Path(__file__).parent.parent / "users"
+    agents: Dict[str, dict] = {}
     
     # Load all JSON files, later ones overwrite earlier ones with same name
     for json_path in sorted(users_dir.glob("*.json")):
-        with open(json_path) as f:
-            data = json.load(f)
-            agents[data["name"]] = data
+        content = json_path.read_text(encoding="utf-8")
+        if content.startswith("version https://git-lfs.github.com/spec/v1"):
+            print(f"Skipping LFS pointer: {json_path.name}")
+            continue
+        data = json.loads(content)
+        agents[data["name"]] = data
             
     # Generate formatted output
     output = [
