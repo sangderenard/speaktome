@@ -68,6 +68,14 @@ ffi.cdef("""
     double sum_double(const double* a, int n);
     void create_arange(double start, double step, int n, double* out);
     void topk_double(const double* a, int n, int k, int* indices, double* out);
+    void topk_double_dim(
+        const double* a,
+        const int* shape,
+        int ndim,
+        int dim,
+        int k,
+        double* indices,
+        double* out);
 """)
 
 C_SOURCE = """
@@ -177,6 +185,57 @@ C_SOURCE = """
             }
         }
         free(used);
+    }
+
+    void topk_double_dim(
+        const double* a,
+        const int* shape,
+        int ndim,
+        int dim,
+        int k,
+        double* indices,
+        double* out) {
+        int stride_after = 1;
+        for (int i = dim + 1; i < ndim; ++i) {
+            stride_after *= shape[i];
+        }
+        int stride_before = 1;
+        for (int i = 0; i < dim; ++i) {
+            stride_before *= shape[i];
+        }
+        int dim_size = shape[dim];
+        int slice_count = stride_before * stride_after;
+        for (int b = 0; b < stride_before; ++b) {
+            for (int a_idx = 0; a_idx < stride_after; ++a_idx) {
+                const double* slice_ptr =
+                    a + b * dim_size * stride_after + a_idx;
+                int* used = (int*)malloc(dim_size * sizeof(int));
+                for (int i = 0; i < dim_size; ++i) used[i] = 0;
+                for (int t = 0; t < k; ++t) {
+                    int best = -1;
+                    double best_val = -1e300;
+                    for (int j = 0; j < dim_size; ++j) {
+                        if (!used[j]) {
+                            double val = slice_ptr[j * stride_after];
+                            if (val > best_val) {
+                                best_val = val;
+                                best = j;
+                            }
+                        }
+                    }
+                    int out_index = (b * stride_after + a_idx) * k + t;
+                    if (best != -1) {
+                        used[best] = 1;
+                        indices[out_index] = (double)best;
+                        out[out_index] = best_val;
+                    } else {
+                        indices[out_index] = -1.0;
+                        out[out_index] = 0.0;
+                    }
+                }
+                free(used);
+            }
+        }
     }
 """
 
@@ -439,20 +498,31 @@ class CTensorOperations(AbstractTensorOperations):
         raise NotImplementedError("pad not implemented for C backend")
 
     def topk(self, tensor: CTensor, k: int, dim: int) -> Tuple[Any, Any]:
-        # For this C backend, topk is implemented in C for 1D data.
-        # If the tensor is multidimensional, we flatten it.
-        flat = _flatten(tensor.tolist())
-        n = len(flat)
-        # allocate C arrays for indices and values
-        c_indices = ffi.new("int[]", k)
-        c_values = ffi.new("double[]", k)
-        # Create a temporary C array for the flattened data
-        temp = ffi.new("double[]", flat)
-        C.topk_double(temp, n, k, c_indices, c_values)
-        # Convert C arrays to Python lists and then to CTensors
-        py_values = [c_values[i] for i in range(k)]
-        py_indices = [c_indices[i] for i in range(k)]
-        return CTensor.from_list(py_values, (k,)), CTensor.from_list(py_indices, (k,))
+        shape = tensor.shape
+        ndim = len(shape)
+        if dim < 0:
+            dim += ndim
+        if dim < 0 or dim >= ndim:
+            raise ValueError("dim out of range")
+
+        if k > shape[dim]:
+            k = shape[dim]
+
+        c_shape = ffi.new("int[]", list(shape))
+        out_shape = list(shape)
+        out_shape[dim] = k
+        values = CTensor(tuple(out_shape))
+        indices = CTensor(tuple(out_shape))
+        C.topk_double_dim(
+            tensor.as_c_ptr(),
+            c_shape,
+            ndim,
+            dim,
+            k,
+            indices.as_c_ptr(),
+            values.as_c_ptr(),
+        )
+        return values, indices
 
     def repeat_interleave(self, tensor: CTensor, repeats: int, dim: Optional[int] = None) -> Any:
         # ########## STUB: CTensorOperations.repeat_interleave ##########

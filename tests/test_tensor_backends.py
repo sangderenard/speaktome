@@ -76,6 +76,14 @@ def run_checks(ops):
     assert ops.tolist(vals) == expect_vals
     assert ops.tolist(idxs) == expect_inds
 
+    # Multi-dimensional topk
+    matrix = ops.tensor_from_list(
+        [[1, 5, 3], [4, 2, 6]], dtype=ops.float_dtype, device=None
+    )
+    tvals, tidxs = ops.benchmark(lambda: ops.topk(matrix, k=2, dim=1))
+    assert ops.tolist(tvals) == [[5, 3], [6, 4]]
+    assert ops.tolist(tidxs) == [[1, 2], [2, 0]]
+
     # Test operators on tensors created by the backend
     try:
         # Use float_dtype for these operations
