@@ -1,14 +1,26 @@
 """Tests for the guestbook validation helper."""
+from __future__ import annotations
 
-import os
-import shutil
-import logging
-from pathlib import Path
-from importlib import reload
+try:
+    import os
+    import shutil
+    import logging
+    from pathlib import Path
+    from importlib import reload
 
-import pytest
+    import pytest
 
-import AGENTS.validate_guestbook as vg
+    import AGENTS.validate_guestbook as vg
+except Exception:
+    print(
+        "\n"
+        "+-----------------------------------------------------------------------+\n"
+        "| Imports failed. Run setup_env or setup_env_dev and select every    |\n"
+        "| project and module you plan to use. Missing packages mean setup was |\n"
+        "| skipped or incomplete.                                             |\n"
+        "+-----------------------------------------------------------------------+\n"
+    )
+    raise
 # --- END HEADER ---
 SCRIPT = Path('AGENTS/validate_guestbook.py')
 

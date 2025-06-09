@@ -1,5 +1,18 @@
-import os
-import re
+from __future__ import annotations
+
+try:
+    import os
+    import re
+except Exception:
+    print(
+        "\n"
+        "+-----------------------------------------------------------------------+\n"
+        "| Imports failed. Run setup_env or setup_env_dev and select every    |\n"
+        "| project and module you plan to use. Missing packages mean setup was |\n"
+        "| skipped or incomplete.                                             |\n"
+        "+-----------------------------------------------------------------------+\n"
+    )
+    raise
 # --- END HEADER ---
 
 REPORTS_DIR = os.path.join(os.path.dirname(__file__), 'experience_reports')
