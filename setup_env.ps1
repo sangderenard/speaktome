@@ -59,10 +59,7 @@ if ($extras) {
     }
 }
 
-# Install package in editable mode so changes are picked up automatically
-Safe-Run { & $venvPip install -e speaktome }
-
-# Install additional codebases in editable mode
+# Install codebases in editable mode so changes are picked up automatically
 foreach ($cb in $Codebases) {
     if ($cb -ne "." -and ((Test-Path "$cb\pyproject.toml") -or (Test-Path "$cb\setup.py"))) {
         Safe-Run { & $venvPip install -e $cb }

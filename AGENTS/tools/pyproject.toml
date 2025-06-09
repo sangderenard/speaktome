@@ -2,20 +2,21 @@
 name = "speaktome-agent-tools"
 version = "0.1.0"
 description = "Agent tools and repo management utilities for SpeakToMe"
-authors = [
-    { name = "Your Name", email = "your@email.com" }
-]
+authors = [ { name = "Your Name", email = "your@email.com" } ]
 readme = "README.md"
 requires-python = ">=3.8"
 dependencies = [
     "tomli; python_version<'3.11'",
     "importlib-metadata; python_version<'3.8'",
-    "pytz"  # For timezone-aware datetime objects
-    "ntplib"      # For querying NTP servers
-    "pytest>=8.0" # Test framework
+    "pytz",
+    "ntplib",
+    "pytest>=8.0",
 ]
 
-[build-system]
-requires = ["setuptools>=61.0", "wheel"]
-build-backend = "setuptools.build_meta"
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["*"]
 
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
