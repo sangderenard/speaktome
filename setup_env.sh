@@ -39,7 +39,7 @@ EXTRAS=0
 ML=0        # flag for full ML extras (transformers, torch_geometric)
 FORCE_GPU=0
 PREFETCH=0
-CODEBASES="."
+CODEBASES="speaktome,AGENTS/tools,time_sync"
 
 for arg in "$@"; do
   case $arg in
@@ -76,7 +76,7 @@ if [ $EXTRAS -eq 1 ]; then
 fi
 
 # Install package in editable mode so local changes apply immediately
-safe_run $VENV_PIP install -e .
+safe_run $VENV_PIP install -e speaktome
 
 # Install additional codebases in editable mode
 IFS=',' read -ra CB <<< "$CODEBASES"

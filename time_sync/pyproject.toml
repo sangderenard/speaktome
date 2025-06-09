@@ -10,6 +10,9 @@ readme = "README.md"
 requires-python = ">=3.8"
 license = { text = "MIT" }
 authors = [{ name = "Time Sync Authors" }]
+dependencies = [
+    "ntplib"  # Network Time Protocol client library
+]
 
 [tool.setuptools.packages.find]
 where = ["."]
