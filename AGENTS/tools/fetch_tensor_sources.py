@@ -17,6 +17,18 @@ THIRD_PARTY = {
     "blis": "https://github.com/flame/blis.git",
     "blasfeo": "https://github.com/giaf/blasfeo.git",
     "sleef": "https://github.com/shibatch/sleef.git",
+    "cephes": "https://github.com/jeremybarnes/cephes.git",
+    "cnpy": "https://github.com/rogersce/cnpy.git",
+    "klib": "https://github.com/attractivechaos/klib.git",
+    "uthash": "https://github.com/troydhanson/uthash.git",
+    "marisa-trie": "https://github.com/s-yata/marisa-trie.git",
+    "jsmn": "https://github.com/zserge/jsmn.git",
+    "cJSON": "https://github.com/DaveGamble/cJSON.git",
+    "pcg-c": "https://github.com/imneme/pcg-c.git",
+    "xoshiro-c": "https://github.com/brycelelbach/xoshiro-c.git",
+    "stb": "https://github.com/nothings/stb.git",
+    "docopt.c": "https://github.com/docopt/docopt.c.git",
+    "linenoise": "https://github.com/antirez/linenoise.git",
 }
 
 
