@@ -15,26 +15,41 @@ from .abstraction import AbstractTensorOperations
 
 # --- END HEADER ---
 
-def _to_jnp(x: Any) -> Any:
-    """Convert nested lists to a ``jax.numpy`` array if needed."""
-    if jnp is None:
-        raise RuntimeError("JAX is not available")
-    if isinstance(x, (list, tuple)):
-        return jnp.array(x)
-    return x
-
 class JAXTensorOperations(AbstractTensorOperations):
     """Tensor operations powered by `jax.numpy`."""
 
-    def __init__(self, default_device: str = "cpu", track_time: bool = False) -> None:
+    def __init__(self, default_device: Optional[Any] = None, track_time: bool = False) -> None:
         super().__init__(track_time=track_time)
-        if jax is None or jnp is None:
-            raise RuntimeError("JAX is required for this backend")
-        if isinstance(default_device, str):
-            devices = jax.devices(default_device)
-            self.default_device = devices[0] if devices else jax.devices()[0]
-        else:
-            self.default_device = default_device
+        self.default_device = default_device
+        self._validate_jax_setup()
+
+    def _validate_jax_setup(self) -> None:
+        """Validates JAX installation and available devices."""
+        try:
+            devices = jax.devices()
+            self.available_devices = {str(d): d for d in devices}
+            self.has_gpu = any('gpu' in str(d).lower() for d in devices)
+            self.has_tpu = any('tpu' in str(d).lower() for d in devices)
+        except Exception as e:
+            raise RuntimeError(f"JAX initialization failed: {str(e)}")
+
+    def _to_jnp(self, tensor: Any) -> jnp.ndarray:
+        """Safely convert input to JAX array."""
+        if isinstance(tensor, jnp.ndarray):
+            return tensor
+        return jnp.array(tensor)
+
+    def to_device(self, tensor: Any, device: Any) -> Any:
+        """Move tensor to specified device with validation."""
+        target_device = device or self.default_device
+        if target_device is not None:
+            device_str = str(target_device).lower()
+            if ('gpu' in device_str and not self.has_gpu) or \
+               ('tpu' in device_str and not self.has_tpu):
+                print(f"Warning: Requested device {device_str} not available. Using CPU.")
+                target_device = jax.devices('cpu')[0]
+        
+        return jax.device_put(self._to_jnp(tensor), target_device)
 
     # ------------------------------------------------------------------
     # Creation ops
@@ -46,9 +61,6 @@ class JAXTensorOperations(AbstractTensorOperations):
 
     def clone(self, tensor: Any) -> Any:
         return jnp.array(tensor, copy=True)
-
-    def to_device(self, tensor: Any, device: Any) -> Any:
-        return jax.device_put(_to_jnp(tensor), device or self.default_device)
 
     # ------------------------------------------------------------------
     # Basic info
