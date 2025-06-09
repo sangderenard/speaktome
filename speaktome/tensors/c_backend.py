@@ -361,6 +361,8 @@ C_SOURCE = """
         free(out_stride);
         free(idx);
 
+    }
+
     void mean_dim(const double* a, double* out, const int* shape, int ndim, int dim) {
         int after = 1;
         for (int i = dim + 1; i < ndim; ++i) after *= shape[i];
