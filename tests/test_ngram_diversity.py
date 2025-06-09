@@ -1,7 +1,21 @@
-import pytest
+from __future__ import annotations
 
-torch = pytest.importorskip("torch", reason="requires PyTorch")
-from speaktome.core.scorer import Scorer
+try:
+    import pytest
+
+    torch = pytest.importorskip("torch", reason="requires PyTorch")
+    from speaktome.core.scorer import Scorer
+except Exception:
+    print(
+        "\n"
+        "+-----------------------------------------------------------------------+\n"
+        "| Imports failed. Run setup_env or setup_env_dev and select every    |\n"
+        "| project and module you plan to use. Missing packages mean setup was |\n"
+        "| skipped or incomplete.                                             |\n"
+        "+-----------------------------------------------------------------------+\n"
+    )
+    raise
+# --- END HEADER ---
 
 
 def slow_ngram_diversity(beams, lengths, n=2, penalty=-1.0):

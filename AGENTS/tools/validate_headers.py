@@ -12,10 +12,22 @@ When invoked with ``--rewrite`` it will inject a minimal ``HEADER`` and
 
 from __future__ import annotations
 
-import ast
-import sys
-from pathlib import Path
-from typing import Iterable
+try:
+    import ast
+    import sys
+    from pathlib import Path
+    from typing import Iterable
+except Exception:
+    print(
+        "\n"
+        "+-----------------------------------------------------------------------+\n"
+        "| Imports failed. Run setup_env or setup_env_dev and select every    |\n"
+        "| project and module you plan to use. Missing packages mean setup was |\n"
+        "| skipped or incomplete.                                             |\n"
+        "+-----------------------------------------------------------------------+\n"
+    )
+    raise
+# --- END HEADER ---
 
 ENV_SETUP_BOX = (
     "\n"

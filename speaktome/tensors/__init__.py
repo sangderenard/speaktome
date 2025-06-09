@@ -1,21 +1,35 @@
 """Tensor backends and abstraction layer."""
 
-from .abstraction import (
-    AbstractTensorOperations,
-    get_tensor_operations,
-)
-from .faculty import Faculty, DEFAULT_FACULTY, FORCE_ENV, detect_faculty
-from .torch_backend import PyTorchTensorOperations
-from .numpy_backend import NumPyTensorOperations
-from .pure_backend import PurePythonTensorOperations
+from __future__ import annotations
+
 try:
-    from .jax_backend import JAXTensorOperations
-except Exception:  # pragma: no cover - optional backend
-    JAXTensorOperations = None  # type: ignore
-try:
-    from .c_backend import CTensorOperations
-except Exception:  # pragma: no cover - optional backend
-    CTensorOperations = None  # type: ignore
+    from .abstraction import (
+        AbstractTensorOperations,
+        get_tensor_operations,
+    )
+    from .faculty import Faculty, DEFAULT_FACULTY, FORCE_ENV, detect_faculty
+    from .torch_backend import PyTorchTensorOperations
+    from .numpy_backend import NumPyTensorOperations
+    from .pure_backend import PurePythonTensorOperations
+    try:
+        from .jax_backend import JAXTensorOperations
+    except Exception:  # pragma: no cover - optional backend
+        JAXTensorOperations = None  # type: ignore
+    try:
+        from .c_backend import CTensorOperations
+    except Exception:  # pragma: no cover - optional backend
+        CTensorOperations = None  # type: ignore
+except Exception:
+    print(
+        "\n"
+        "+-----------------------------------------------------------------------+\n"
+        "| Imports failed. Run setup_env or setup_env_dev and select every    |\n"
+        "| project and module you plan to use. Missing packages mean setup was |\n"
+        "| skipped or incomplete.                                             |\n"
+        "+-----------------------------------------------------------------------+\n"
+    )
+    raise
+# --- END HEADER ---
 
 __all__ = [
     "AbstractTensorOperations",

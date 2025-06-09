@@ -1,9 +1,23 @@
 """CTensorOperations.log_softmax behaviour."""
 
-import math
-import pytest
+from __future__ import annotations
 
-from speaktome.tensors.c_backend import CTensorOperations
+try:
+    import math
+    import pytest
+
+    from speaktome.tensors.c_backend import CTensorOperations
+except Exception:
+    print(
+        "\n"
+        "+-----------------------------------------------------------------------+\n"
+        "| Imports failed. Run setup_env or setup_env_dev and select every    |\n"
+        "| project and module you plan to use. Missing packages mean setup was |\n"
+        "| skipped or incomplete.                                             |\n"
+        "+-----------------------------------------------------------------------+\n"
+    )
+    raise
+# --- END HEADER ---
 
 
 def test_log_softmax_1d():

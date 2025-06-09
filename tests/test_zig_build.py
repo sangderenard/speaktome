@@ -1,10 +1,24 @@
-import importlib.util
-from pathlib import Path
-import tempfile
+from __future__ import annotations
 
-import pytest
+try:
+    import importlib.util
+    from pathlib import Path
+    import tempfile
 
-from speaktome.tensors import c_backend
+    import pytest
+
+    from speaktome.tensors import c_backend
+except Exception:
+    print(
+        "\n"
+        "+-----------------------------------------------------------------------+\n"
+        "| Imports failed. Run setup_env or setup_env_dev and select every    |\n"
+        "| project and module you plan to use. Missing packages mean setup was |\n"
+        "| skipped or incomplete.                                             |\n"
+        "+-----------------------------------------------------------------------+\n"
+    )
+    raise
+# --- END HEADER ---
 
 zig_available = importlib.util.find_spec("ziglang") is not None
 
