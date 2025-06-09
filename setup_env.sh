@@ -75,10 +75,7 @@ if [ $EXTRAS -eq 1 ]; then
   fi
 fi
 
-# Install package in editable mode so local changes apply immediately
-safe_run $VENV_PIP install -e speaktome
-
-# Install additional codebases in editable mode
+# Install codebases in editable mode so local changes apply immediately
 IFS=',' read -ra CB <<< "$CODEBASES"
 for cb in "${CB[@]}"; do
   [ "$cb" = "." ] && continue
