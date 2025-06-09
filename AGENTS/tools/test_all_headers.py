@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Run all class ``test()`` methods across faculty tiers."""
+
 from __future__ import annotations
 
 try:

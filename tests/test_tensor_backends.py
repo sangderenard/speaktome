@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Comprehensive tensor backend checks."""
+
 from __future__ import annotations
 
 try:
@@ -7,6 +8,7 @@ try:
     import logging
     import pytest
     import itertools
+
 
     from speaktome.tensors import (
         PurePythonTensorOperations,
@@ -17,6 +19,7 @@ try:
     from speaktome.tensors.faculty import detect_faculty
 
     from speaktome.tensors.pure_backend import PurePythonTensorOperations  # For isinstance check
+
 except Exception:
     print(
         "\n"
