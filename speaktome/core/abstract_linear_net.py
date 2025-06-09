@@ -1,4 +1,4 @@
-"""Prototype for backend-agnostic linear networks."""
+"""Backend-agnostic linear layers for small network experiments."""
 
 from __future__ import annotations
 
@@ -11,26 +11,37 @@ from ..tensors.abstraction import AbstractTensorOperations
 
 
 class AbstractLinearLayer:
-    """Single linear transformation using :class:`AbstractTensorOperations`."""
+    """Single linear transformation with optional activation."""
 
     def __init__(
         self,
         weight: Any,
         bias: Any,
         tensor_ops: AbstractTensorOperations,
+        activation: str | None = None,
     ) -> None:
         self.weight = weight
         self.bias = bias
         self.ops = tensor_ops
+        self.activation = activation
+
+    def _apply_activation(self, tensor: Any) -> Any:
+        """Apply ``self.activation`` if specified."""
+        if self.activation is None:
+            return tensor
+        if self.activation == "relu":
+            return self.ops.clamp(tensor, min_val=0.0)
+        raise ValueError(f"Unsupported activation {self.activation!r}")
 
     def forward(self, inputs: Any) -> Any:
         # matrix multiply then add bias using backend operators
         out = self.ops._AbstractTensorOperations__apply_operator(
             "matmul", inputs, self.weight
         )
-        return self.ops._AbstractTensorOperations__apply_operator(
+        out = self.ops._AbstractTensorOperations__apply_operator(
             "add", out, self.bias
         )
+        return self._apply_activation(out)
 
 
 class SequentialLinearModel(AbstractModelWrapper):
@@ -43,6 +54,20 @@ class SequentialLinearModel(AbstractModelWrapper):
     ) -> None:
         self.layers = list(layers)
         self.ops = tensor_ops
+
+    @classmethod
+    def from_weights(
+        cls,
+        weights: Iterable[tuple[Any, Any]],
+        tensor_ops: AbstractTensorOperations,
+        activation: str | None = None,
+    ) -> "SequentialLinearModel":
+        """Construct layers from ``(weight, bias)`` pairs."""
+        built_layers = [
+            AbstractLinearLayer(w, b, tensor_ops, activation=activation)
+            for w, b in weights
+        ]
+        return cls(built_layers, tensor_ops)
 
     def forward(
         self, input_ids: Any, attention_mask: Any | None = None, **kwargs
