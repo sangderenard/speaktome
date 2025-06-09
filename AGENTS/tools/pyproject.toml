@@ -11,17 +11,11 @@ dependencies = [
     "tomli; python_version<'3.11'",
     "importlib-metadata; python_version<'3.8'",
     "pytz"  # For timezone-aware datetime objects
-    # Add ONLY what is imported by AGENTS/tools scripts
+    "ntplib"      # For querying NTP servers
+    "pytest>=8.0" # Test framework
 ]
 
 [build-system]
 requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
-[project.optional-dependencies]
-dev = [
-    "pytest>=8.0" # Test framework
-]
-time = [
-    "ntplib"      # For querying NTP servers
-]
