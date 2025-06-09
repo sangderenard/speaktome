@@ -16,6 +16,7 @@ Any reusable Python scripts or binary utilities meant for agents must live in
 easy to discover and maintain.
 
 For deeper historical context, read through all prior reports. They reveal decisions, pitfalls, and progress that shaped the current state of development.
+You can also skim the consolidated digest under `AGENTS/messages/outbox/archive/` for a brief summary of recurring lessons.
 
 If you crave an immediate, exhaustive overview, run this one-liner. It will
 spew every markdown, script and source file to your terminal. The output is
