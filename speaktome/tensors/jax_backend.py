@@ -53,6 +53,44 @@ class JAXTensorOperations(AbstractTensorOperations):
         
         return jax.device_put(self._to_jnp(tensor), target_device)
 
+    def _apply_operator(self, op: str, left: Any, right: Any):
+        """Apply arithmetic ops using JAX arrays."""
+        a = self._to_jnp(left)
+        b = self._to_jnp(right)
+        if op in ("add", "iadd"):
+            return a + b
+        if op == "radd":
+            return b + a
+        if op in ("sub", "isub"):
+            return a - b
+        if op == "rsub":
+            return b - a
+        if op in ("mul", "imul"):
+            return a * b
+        if op == "rmul":
+            return b * a
+        if op in ("truediv", "itruediv"):
+            return a / b
+        if op == "rtruediv":
+            return b / a
+        if op in ("floordiv", "ifloordiv"):
+            return jnp.floor(a / b)
+        if op == "rfloordiv":
+            return jnp.floor(b / a)
+        if op in ("mod", "imod"):
+            return jnp.mod(a, b)
+        if op == "rmod":
+            return jnp.mod(b, a)
+        if op in ("pow", "ipow"):
+            return jnp.power(a, b)
+        if op == "rpow":
+            return jnp.power(b, a)
+        if op in ("matmul", "imatmul"):
+            return a @ b
+        if op == "rmatmul":
+            return b @ a
+        raise NotImplementedError(f"Operator {op} not implemented for JAX backend.")
+
     # ------------------------------------------------------------------
     # Creation ops
     def full(self, size: Tuple[int, ...], fill_value: Any, dtype: Any, device: Any):

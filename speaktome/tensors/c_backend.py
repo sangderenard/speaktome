@@ -130,62 +130,62 @@ class CTensor:
 class CTensorOperations(AbstractTensorOperations):
     """C backend using cffi for all arithmetic ops."""
 
-    def _apply_operator(self, op: str, other):
-        # Only support CTensor <op> CTensor or CTensor <op> scalar
-        if isinstance(other, CTensor):
-            if self.shape != other.shape:
+    def _apply_operator(self, op: str, left: CTensor, right: Any):
+        """Operate on ``CTensor`` objects or scalars."""
+        if isinstance(right, CTensor) and isinstance(left, CTensor):
+            if left.shape != right.shape:
                 raise ValueError("Shape mismatch")
-            out = CTensor(self.shape)
-            n = self.size
+            out = CTensor(left.shape)
+            n = left.size
             if op in ('add', 'iadd'):
-                C.add_double(self.as_c_ptr(), other.as_c_ptr(), out.as_c_ptr(), n)
+                C.add_double(left.as_c_ptr(), right.as_c_ptr(), out.as_c_ptr(), n)
             elif op in ('sub', 'isub'):
-                C.sub_double(self.as_c_ptr(), other.as_c_ptr(), out.as_c_ptr(), n)
+                C.sub_double(left.as_c_ptr(), right.as_c_ptr(), out.as_c_ptr(), n)
             elif op in ('mul', 'imul'):
-                C.mul_double(self.as_c_ptr(), other.as_c_ptr(), out.as_c_ptr(), n)
+                C.mul_double(left.as_c_ptr(), right.as_c_ptr(), out.as_c_ptr(), n)
             elif op in ('truediv', 'itruediv'):
-                C.div_double(self.as_c_ptr(), other.as_c_ptr(), out.as_c_ptr(), n)
+                C.div_double(left.as_c_ptr(), right.as_c_ptr(), out.as_c_ptr(), n)
             elif op in ('pow', 'ipow'):
-                C.pow_double(self.as_c_ptr(), other.as_c_ptr(), out.as_c_ptr(), n)
+                C.pow_double(left.as_c_ptr(), right.as_c_ptr(), out.as_c_ptr(), n)
             elif op in ('mod', 'imod'):
-                C.mod_double(self.as_c_ptr(), other.as_c_ptr(), out.as_c_ptr(), n)
+                C.mod_double(left.as_c_ptr(), right.as_c_ptr(), out.as_c_ptr(), n)
             elif op in ('floordiv', 'ifloordiv'):
-                C.floordiv_double(self.as_c_ptr(), other.as_c_ptr(), out.as_c_ptr(), n)
+                C.floordiv_double(left.as_c_ptr(), right.as_c_ptr(), out.as_c_ptr(), n)
             else:
                 raise NotImplementedError(f"Operator {op} not implemented for C backend.")
             return out
-        elif isinstance(other, (int, float)):
-            out = CTensor(self.shape)
-            n = self.size
-            val = float(other)
+        elif isinstance(left, CTensor) and isinstance(right, (int, float)):
+            out = CTensor(left.shape)
+            n = left.size
+            val = float(right)
             if op in ('add', 'iadd'):
-                C.add_scalar(self.as_c_ptr(), val, out.as_c_ptr(), n)
+                C.add_scalar(left.as_c_ptr(), val, out.as_c_ptr(), n)
             elif op == 'radd':
-                C.add_scalar(self.as_c_ptr(), val, out.as_c_ptr(), n)
+                C.add_scalar(left.as_c_ptr(), val, out.as_c_ptr(), n)
             elif op in ('sub', 'isub'):
-                C.sub_scalar(self.as_c_ptr(), val, out.as_c_ptr(), n)
+                C.sub_scalar(left.as_c_ptr(), val, out.as_c_ptr(), n)
             elif op == 'rsub':
-                C.rsub_scalar(self.as_c_ptr(), val, out.as_c_ptr(), n)
+                C.rsub_scalar(left.as_c_ptr(), val, out.as_c_ptr(), n)
             elif op in ('mul', 'imul'):
-                C.mul_scalar(self.as_c_ptr(), val, out.as_c_ptr(), n)
+                C.mul_scalar(left.as_c_ptr(), val, out.as_c_ptr(), n)
             elif op == 'rmul':
-                C.mul_scalar(self.as_c_ptr(), val, out.as_c_ptr(), n)
+                C.mul_scalar(left.as_c_ptr(), val, out.as_c_ptr(), n)
             elif op in ('truediv', 'itruediv'):
-                C.div_scalar(self.as_c_ptr(), val, out.as_c_ptr(), n)
+                C.div_scalar(left.as_c_ptr(), val, out.as_c_ptr(), n)
             elif op == 'rtruediv':
-                C.rdiv_scalar(self.as_c_ptr(), val, out.as_c_ptr(), n)
+                C.rdiv_scalar(left.as_c_ptr(), val, out.as_c_ptr(), n)
             elif op in ('pow', 'ipow'):
-                C.pow_scalar(self.as_c_ptr(), val, out.as_c_ptr(), n)
+                C.pow_scalar(left.as_c_ptr(), val, out.as_c_ptr(), n)
             elif op == 'rpow':
-                C.rpow_scalar(self.as_c_ptr(), val, out.as_c_ptr(), n)
+                C.rpow_scalar(left.as_c_ptr(), val, out.as_c_ptr(), n)
             elif op in ('mod', 'imod'):
-                C.mod_scalar(self.as_c_ptr(), val, out.as_c_ptr(), n)
+                C.mod_scalar(left.as_c_ptr(), val, out.as_c_ptr(), n)
             elif op == 'rmod':
-                C.rmod_scalar(self.as_c_ptr(), val, out.as_c_ptr(), n)
+                C.rmod_scalar(left.as_c_ptr(), val, out.as_c_ptr(), n)
             elif op in ('floordiv', 'ifloordiv'):
-                C.floordiv_scalar(self.as_c_ptr(), val, out.as_c_ptr(), n)
+                C.floordiv_scalar(left.as_c_ptr(), val, out.as_c_ptr(), n)
             elif op == 'rfloordiv':
-                C.rfloordiv_scalar(self.as_c_ptr(), val, out.as_c_ptr(), n)
+                C.rfloordiv_scalar(left.as_c_ptr(), val, out.as_c_ptr(), n)
             else:
                 raise NotImplementedError(f"Operator {op} not implemented for C backend.")
             return out
