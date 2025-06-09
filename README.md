@@ -261,3 +261,4 @@ the project see `AGENTS/PROJECT_OVERVIEW.md`, and consult
 prompts that informed your work so future agents can trace the discussion. Use
 pull requests for code changes and feel free to open issues for questions or
 feature requests.
+You can also review the consolidated digest under `AGENTS/messages/outbox/archive/` for a short summary of prior insights.
