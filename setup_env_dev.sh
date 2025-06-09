@@ -19,30 +19,44 @@ safe_run() {
 }
 
 # Run the regular setup script (this creates the venv)
+USE_VENV=1
+for arg in "$@"; do
+  case $arg in
+    --no-venv) USE_VENV=0 ;;
+  esac
+done
+
 safe_run bash "$SCRIPT_ROOT/setup_env.sh" "$@"
 
 # Define the venv Python path (assumes setup_env.sh created it at .venv)
-VENV_PYTHON="$SCRIPT_ROOT/.venv/bin/python"
-VENV_PIP="$SCRIPT_ROOT/.venv/bin/pip"
+if [ $USE_VENV -eq 1 ]; then
+  VENV_PYTHON="$SCRIPT_ROOT/.venv/bin/python"
+  VENV_PIP="$SCRIPT_ROOT/.venv/bin/pip"
+else
+  VENV_PYTHON="python"
+  VENV_PIP="pip"
+fi
 
 # Fail fast if venv not created
-if [ ! -x "$VENV_PYTHON" ]; then
-  echo "Error: Virtual environment Python not found at $VENV_PYTHON" >&2
-  # Allow script to continue, subsequent VENV_PYTHON commands will be caught by safe_run
-fi
-if [ ! -x "$VENV_PIP" ]; then
-  echo "Error: Virtual environment Pip not found at $VENV_PIP. Ensure setup_env.sh created the .venv correctly." >&2
-  # Allow script to continue, subsequent VENV_PIP commands will be handled or fail gracefully
-fi
+if [ $USE_VENV -eq 1 ]; then
+  if [ ! -x "$VENV_PYTHON" ]; then
+    echo "Error: Virtual environment Python not found at $VENV_PYTHON" >&2
+    # Allow script to continue, subsequent VENV_PYTHON commands will be caught by safe_run
+  fi
+  if [ ! -x "$VENV_PIP" ]; then
+    echo "Error: Virtual environment Pip not found at $VENV_PIP. Ensure setup_env.sh created the .venv correctly." >&2
+    # Allow script to continue, subsequent VENV_PIP commands will be handled or fail gracefully
+  fi
 
-# Activate the virtual environment
-VENV_ACTIVATE="$SCRIPT_ROOT/.venv/bin/activate"
-if [ -f "$VENV_ACTIVATE" ]; then
-    # shellcheck disable=SC1090
-    source "$VENV_ACTIVATE"
-else
-    echo "Error: Virtual environment activation script not found at $VENV_ACTIVATE" >&2
-    exit 1
+  # Activate the virtual environment
+  VENV_ACTIVATE="$SCRIPT_ROOT/.venv/bin/activate"
+  if [ -f "$VENV_ACTIVATE" ]; then
+      # shellcheck disable=SC1090
+      source "$VENV_ACTIVATE"
+  else
+      echo "Error: Virtual environment activation script not found at $VENV_ACTIVATE" >&2
+      exit 1
+  fi
 fi
 
 install_speaktome_extras() {
