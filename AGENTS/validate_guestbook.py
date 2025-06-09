@@ -6,13 +6,13 @@ REPORTS_DIR = os.path.join(os.path.dirname(__file__), 'experience_reports')
 TEMPLATE = 'template_experience_report.md'
 ARCHIVE_DIR = os.path.join(REPORTS_DIR, 'archive')
 STICKIES_FILE = os.path.join(REPORTS_DIR, 'stickies.txt')
-PATTERN = re.compile(r'\d{4}-\d{2}-\d{2}_v\d+_[A-Za-z0-9_]+\.md')
+PATTERN = re.compile(r'(?:\d{4}-\d{2}-\d{2}|\d{10})_v\d+_[A-Za-z0-9_]+\.md')
 
 def sanitize(name):
     stem = os.path.splitext(name)[0]
     stem = re.sub(r'[^A-Za-z0-9]+', '_', stem)
     stem = re.sub(r'_+', '_', stem).strip('_')
-    return f'0000-00-00_v0_{stem}.md'
+    return f'0000000000_v0_{stem}.md'
 
 def validate_and_fix(interactive: bool = False):
     """Validate filenames in the guestbook folder.
@@ -77,11 +77,26 @@ def load_stickies():
 
 
 def archive_old_reports():
+    from datetime import datetime
+
+    def extract_epoch(fname: str) -> int:
+        prefix = fname.split('_', 1)[0]
+        if '-' in prefix:
+            try:
+                dt = datetime.strptime(prefix, "%Y-%m-%d")
+                return int(dt.timestamp())
+            except Exception:
+                return 0
+        try:
+            return int(prefix)
+        except ValueError:
+            return 0
+
     os.makedirs(ARCHIVE_DIR, exist_ok=True)
     stickies = load_stickies()
     files = [f for f in os.listdir(REPORTS_DIR)
-             if f.endswith('.md') and f not in {TEMPLATE}]
-    files.sort()
+             if f.endswith('.md') and f not in {TEMPLATE, 'AGENTS.md'}]
+    files.sort(key=extract_epoch)
     keep = stickies.union(files[-10:])
     for fname in files:
         if fname not in keep:
