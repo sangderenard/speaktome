@@ -39,7 +39,8 @@ jax = [
   "jax[cpu]>=0.4"       # experimental JAX backend
 ]
 ctensor = [
-  "cffi>=1.15"          # C backend helpers
+  "cffi>=1.15",         # C backend helpers
+  "setuptools>=61"      # required for CFFI builds
 ]
 numpy = [
   "numpy>=1.26"        # standard NumPy backend
