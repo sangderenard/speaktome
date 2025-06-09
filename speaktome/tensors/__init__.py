@@ -11,6 +11,7 @@ try:
     from .torch_backend import PyTorchTensorOperations
     from .numpy_backend import NumPyTensorOperations
     from .pure_backend import PurePythonTensorOperations
+
     try:
         from .jax_backend import JAXTensorOperations
     except Exception:  # pragma: no cover - optional backend
@@ -19,10 +20,12 @@ try:
         from .c_backend import CTensorOperations
     except Exception:  # pragma: no cover - optional backend
         CTensorOperations = None  # type: ignore
+
 except Exception:
     print(ENV_SETUP_BOX)
     raise
 # --- END HEADER ---
+
 
 __all__ = [
     "AbstractTensorOperations",
