@@ -87,18 +87,18 @@ class JAXTensorOperations(AbstractTensorOperations):
         return jax.device_put(arr, device or self.default_device)
 
     def select_by_indices(self, tensor: Any, indices_dim0: Any, indices_dim1: Any) -> Any:
-        return _to_jnp(tensor)[indices_dim0, indices_dim1]
+        return self._to_jnp(tensor)[indices_dim0, indices_dim1]
 
     def log_softmax(self, tensor: Any, dim: int) -> Any:
         from jax.nn import log_softmax
-        return log_softmax(_to_jnp(tensor), axis=dim)
+        return log_softmax(self._to_jnp(tensor), axis=dim)
 
     def pad(self, tensor: Any, pad: Tuple[int, ...], value: float = 0) -> Any:
         if len(pad) % 2 != 0:
             raise ValueError("Padding length must be even.")
         num_dims_to_pad = len(pad) // 2
         pad_width: List[Tuple[int, int]] = []
-        tensor = _to_jnp(tensor)
+        tensor = self._to_jnp(tensor)
         for _ in range(tensor.ndim - num_dims_to_pad):
             pad_width.append((0, 0))
         for i in range(num_dims_to_pad):
@@ -108,69 +108,69 @@ class JAXTensorOperations(AbstractTensorOperations):
         return jnp.pad(tensor, pad_width=tuple(pad_width), constant_values=value).tolist()
 
     def cat(self, tensors: List[Any], dim: int = 0) -> Any:
-        tensors = [_to_jnp(t) for t in tensors]
+        tensors = [self._to_jnp(t) for t in tensors]
         return jnp.concatenate(tensors, axis=dim).tolist()
 
     def topk(self, tensor: Any, k: int, dim: int) -> Tuple[Any, Any]:
         if dim != -1 and dim != tensor.ndim - 1:
             raise NotImplementedError("topk only implemented for last dimension")
-        tensor = _to_jnp(tensor)
+        tensor = self._to_jnp(tensor)
         values, idxs = lax.top_k(tensor, k)
         return values.tolist(), idxs.tolist()
 
     def stack(self, tensors: List[Any], dim: int = 0) -> Any:
-        tensors = [_to_jnp(t) for t in tensors]
+        tensors = [self._to_jnp(t) for t in tensors]
         return jnp.stack(tensors, axis=dim).tolist()
 
     def repeat_interleave(self, tensor: Any, repeats: int, dim: Optional[int] = None) -> Any:
-        return jnp.repeat(_to_jnp(tensor), repeats, axis=dim).tolist()
+        return jnp.repeat(self._to_jnp(tensor), repeats, axis=dim).tolist()
 
     def view_flat(self, tensor: Any) -> Any:
-        return jnp.ravel(_to_jnp(tensor)).tolist()
+        return jnp.ravel(self._to_jnp(tensor)).tolist()
 
     def assign_at_indices(self, tensor_to_modify: Any, indices_dim0: Any, indices_dim1: Any, values_to_assign: Any):
-        tensor_to_modify = _to_jnp(tensor_to_modify)
-        updated = tensor_to_modify.at[indices_dim0, indices_dim1].set(_to_jnp(values_to_assign))
+        tensor_to_modify = self._to_jnp(tensor_to_modify)
+        updated = tensor_to_modify.at[indices_dim0, indices_dim1].set(self._to_jnp(values_to_assign))
         return updated
 
     def increment_at_indices(self, tensor_to_modify: Any, mask: Any):
-        tensor_to_modify = _to_jnp(tensor_to_modify)
+        tensor_to_modify = self._to_jnp(tensor_to_modify)
         updated = tensor_to_modify.at[mask].add(1)
         return updated
 
     def clamp(self, tensor: Any, min_val: Optional[float] = None, max_val: Optional[float] = None) -> Any:
-        return jnp.clip(_to_jnp(tensor), a_min=min_val, a_max=max_val)
+        return jnp.clip(self._to_jnp(tensor), a_min=min_val, a_max=max_val)
 
     def shape(self, tensor: Any) -> Tuple[int, ...]:
-        return tuple(_to_jnp(tensor).shape)
+        return tuple(self._to_jnp(tensor).shape)
 
     def numel(self, tensor: Any) -> int:
-        return _to_jnp(tensor).size
+        return self._to_jnp(tensor).size
 
     def mean(self, tensor: Any, dim: Optional[int] = None) -> Any:
-        return jnp.mean(_to_jnp(tensor), axis=dim)
+        return jnp.mean(self._to_jnp(tensor), axis=dim)
 
     def pow(self, tensor: Any, exponent: float) -> Any:
-        return jnp.power(_to_jnp(tensor), exponent)
+        return jnp.power(self._to_jnp(tensor), exponent)
 
     def sqrt(self, tensor: Any) -> Any:
-        return jnp.sqrt(_to_jnp(tensor))
+        return jnp.sqrt(self._to_jnp(tensor))
 
     def tensor_from_list(self, data: List[Any], dtype: Any, device: Any) -> Any:
         arr = jnp.array(data, dtype=dtype)
         return jax.device_put(arr, device or self.default_device)
 
     def boolean_mask_select(self, tensor: Any, mask: Any) -> Any:
-        return _to_jnp(tensor)[mask]
+        return self._to_jnp(tensor)[mask]
 
     def tolist(self, tensor: Any) -> List[Any]:
-        return list(_to_jnp(tensor).tolist())
+        return list(self._to_jnp(tensor).tolist())
 
     def less(self, tensor: Any, value: Any) -> Any:
-        return jnp.less(_to_jnp(tensor), value)
+        return jnp.less(self._to_jnp(tensor), value)
 
     def index_select(self, tensor: Any, dim: int, indices: Any) -> Any:
-        return jnp.take(_to_jnp(tensor), indices, axis=dim)
+        return jnp.take(self._to_jnp(tensor), indices, axis=dim)
 
     # --- Persistence helpers ---
     def save(self, tensor: Any, filepath: str) -> None:
@@ -207,4 +207,3 @@ class JAXTensorOperations(AbstractTensorOperations):
         assert ops.tolist(stacked) == [[1, 2], [3, 4]]
         values, idxs = ops.topk(jnp.array([1, 3, 2, 4]), k=2, dim=-1)
         assert ops.tolist(values) == [4, 3] and ops.tolist(idxs) == [3, 1]
-
