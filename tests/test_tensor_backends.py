@@ -11,6 +11,7 @@ from speaktome.tensors import (
     JAXTensorOperations,
 )
 from speaktome.tensors.faculty import detect_faculty
+
 from speaktome.tensors.pure_backend import PurePythonTensorOperations # For isinstance check
 import itertools
 
@@ -37,7 +38,9 @@ def run_checks(ops):
     assert ops.tolist(stacked1) == [[[1, 2], [1, 2]], [[3, 4], [3, 4]]]
 
     rng = list(range(3))
-    data = ops.tensor_from_list([[i + j for j in rng] for i in rng], dtype=ops.float_dtype, device=None)
+    data = ops.tensor_from_list(
+        [[i + j for j in rng] for i in rng], dtype=ops.float_dtype, device=None
+    )
     stacked0 = ops.benchmark(lambda: ops.stack([data, data], dim=0))
     assert ops.tolist(stacked0) == [ops.tolist(data), ops.tolist(data)]
     stacked1 = ops.benchmark(lambda: ops.stack([data, data], dim=1))
@@ -52,7 +55,9 @@ def run_checks(ops):
         [0, 0, 0, 0],
     ]
 
-    base = ops.tensor_from_list([[i for i in range(3)] for _ in range(2)], dtype=ops.float_dtype, device=None)
+    base = ops.tensor_from_list(
+        [[i for i in range(3)] for _ in range(2)], dtype=ops.float_dtype, device=None
+    )
     padded = ops.benchmark(lambda: ops.pad(base, (0, 2, 1, 0), value=9))
     padded_list = ops.tolist(padded)
     assert len(padded_list) == 3
@@ -106,8 +111,6 @@ def _norm(val):
     return val
 
 
-
-
 @pytest.mark.parametrize("backend_cls", available_backends())
 def test_basic_operator_dispatch(backend_cls):
     """Verify arithmetic helpers via the private dispatcher."""
@@ -143,17 +146,18 @@ def test_basic_operator_dispatch(backend_cls):
         assert _norm(ops.tolist(b_float - a_float)) == [2.0, 2.0]
         assert _norm(ops.tolist(a_float * b_float)) == [3.0, 8.0]
         assert _norm(ops.tolist(b_float / a_float)) == [3.0, 2.0]
-        
+
         # For floor division and modulo, integer-like inputs are typical
         assert _norm(ops.tolist(b_int // a_int)) == [3, 2]
         assert _norm(ops.tolist(b_int % a_int)) == [0, 0]
-        
+
         # Power can use float or int base/exponent depending on desired outcome
         # Using a_float for potentially float results (e.g. non-integer exponents)
         # Here, a_float ** a_float (e.g., 1.0**1.0, 2.0**2.0)
-        assert _norm(ops.tolist(a_float ** a_float)) == [1.0, 4.0]
+        assert _norm(ops.tolist(a_float**a_float)) == [1.0, 4.0]
 
     except (TypeError, NotImplementedError, AttributeError):
+
         raise # Let the test fail if operators are not supported as expected
 
 
@@ -173,3 +177,11 @@ def test_to_backend_roundtrip(src_cls, tgt_cls):
     assert src_ops.tolist(roundtrip) == data
         
 
+
+def test_pure_python_matmul():
+    """Verify matrix multiplication for the pure python backend."""
+    ops = PurePythonTensorOperations()
+    a = [[1, 2], [3, 4]]
+    b = [[5, 6], [7, 8]]
+    result = ops._AbstractTensorOperations__apply_operator("matmul", a, b)
+    assert result == [[19, 22], [43, 50]]
