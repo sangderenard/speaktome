@@ -22,19 +22,10 @@ try:
         CTensorOperations = None  # type: ignore
 
 except Exception:
-    print(
-        "\n"
-        "+-----------------------------------------------------------------------+\n"
-        "| Imports failed. Run setup_env or setup_env_dev and select every    |\n"
-        "| project and module you plan to use. Missing packages mean setup was |\n"
-        "| skipped or incomplete.                                             |\n"
-        "+-----------------------------------------------------------------------+\n"
-    )
+    print(ENV_SETUP_BOX)
     raise
 # --- END HEADER ---
 
-JAXTensorOperations = locals().get("JAXTensorOperations", None)  # pragma: no cover
-CTensorOperations = locals().get("CTensorOperations", None)  # pragma: no cover
 
 __all__ = [
     "AbstractTensorOperations",
