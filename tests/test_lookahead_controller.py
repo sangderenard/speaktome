@@ -108,7 +108,7 @@ def test_lookahead_default_backend():
         device="cpu",
         tokenizer=DummyTokenizer(),
         config=cfg,
-        tensor_ops=None,
+        tensor_ops=get_tensor_operations(track_time=True),
         model_wrapper=DummyModel(),
     )
 
