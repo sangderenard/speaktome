@@ -4,6 +4,11 @@
 
 set -uo pipefail
 
+# Resolve repository root so we can reliably access the venv even after
+# changing directories with pushd. This allows the script to be invoked
+# from anywhere while still locating `.venv`.
+SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 safe_run() {
   "$@"
   local status=$?
@@ -14,11 +19,11 @@ safe_run() {
 }
 
 # Run the regular setup script (this creates the venv)
-safe_run bash setup_env.sh "$@"
+safe_run bash "$SCRIPT_ROOT/setup_env.sh" "$@"
 
 # Define the venv Python path (assumes setup_env.sh created it at .venv)
-VENV_PYTHON="./.venv/bin/python"
-VENV_PIP="./.venv/bin/pip"
+VENV_PYTHON="$SCRIPT_ROOT/.venv/bin/python"
+VENV_PIP="$SCRIPT_ROOT/.venv/bin/pip"
 
 # Fail fast if venv not created
 if [ ! -x "$VENV_PYTHON" ]; then

@@ -25,11 +25,19 @@ function Safe-Run([ScriptBlock]$cmd) {
 }
 
 if (-not $NoVenv) {
-    # 1. Create & activate venv
+    # 1. Create venv
     Safe-Run { python -m venv .venv }
-    Safe-Run { & .venv\Scripts\Activate.ps1 }
-    $venvPython = ".venv\Scripts\python.exe"
-    $venvPip = ".venv\Scripts\pip.exe"
+    if ($IsWindows) {
+        # Windows layout
+        Safe-Run { & .venv\Scripts\Activate.ps1 }
+        $venvPython = ".venv\Scripts\python.exe"
+        $venvPip = ".venv\Scripts\pip.exe"
+    }
+    else {
+        # POSIX layout
+        $venvPython = "./.venv/bin/python"
+        $venvPip = "./.venv/bin/pip"
+    }
 } else {
     $venvPython = "python"
     $venvPip = "pip"
@@ -74,4 +82,4 @@ if ($prefetch) {
 # Ensure optional dependencies from pyproject.toml are installed
 Safe-Run { & $venvPython AGENTS/tools/ensure_pyproject_deps.py }
 
-Write-Host "Environment setup complete. Activate with '.venv\Scripts\Activate.ps1'"
+Write-Host "Environment setup complete. Activate with '.venv\Scripts\Activate.ps1' on Windows or 'source .venv/bin/activate' on Unix-like systems"
