@@ -80,3 +80,34 @@ def test_tensor_ops_across_backends(backend_cls, tensor_interactive) -> None:
     run_checks(ops)
     if tensor_interactive:
         assert ops.last_op_time is not None
+
+
+def _norm(val):
+    """Convert backend tensors to plain Python types for assertions."""
+    if hasattr(val, "tolist"):
+        return val.tolist()
+    return val
+
+
+@pytest.mark.parametrize("backend_cls", available_backends())
+@pytest.mark.parametrize(
+    "op,left,right,expected",
+    [
+        ("add", [1, 2], [3, 4], [4, 6]),
+        ("radd", 1, [3, 4], [4, 5]),
+        ("sub", [5, 7], [1, 2], [4, 5]),
+        ("rsub", 1, [3, 4], [-2, -3]),
+        ("mul", [2, 3], [4, 5], [8, 15]),
+        ("truediv", [5.0, 8.0], [2.0, 2.0], [2.5, 4.0]),
+        ("rtruediv", 2.0, [4.0, 1.0], [0.5, 2.0]),
+        ("floordiv", [5, 7], [2, 3], [2, 2]),
+        ("mod", [5, 7], [2, 3], [1, 1]),
+        ("pow", [2, 3], [3, 2], [8, 9]),
+    ],
+)
+def test_apply_operator_basic_ops(backend_cls, op, left, right, expected):
+    """Verify arithmetic operator dispatch for each backend."""
+    ops = backend_cls()
+    result = _norm(ops._apply_operator(op, left, right))
+    assert result == expected
+
