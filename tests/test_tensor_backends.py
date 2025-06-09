@@ -29,19 +29,19 @@ def available_backends():
 
 def run_checks(ops):
     t = [[1, 2], [3, 4]]
-    stacked0 = ops.stack([t, t], dim=0)
+    stacked0 = ops.benchmark(lambda: ops.stack([t, t], dim=0))
     assert stacked0 == [[[1, 2], [3, 4]], [[1, 2], [3, 4]]]
-    stacked1 = ops.stack([t, t], dim=1)
+    stacked1 = ops.benchmark(lambda: ops.stack([t, t], dim=1))
     assert stacked1 == [[[1, 2], [1, 2]], [[3, 4], [3, 4]]]
 
     rng = list(range(3))
     data = [[i + j for j in rng] for i in rng]
-    stacked0 = ops.stack([data, data], dim=0)
+    stacked0 = ops.benchmark(lambda: ops.stack([data, data], dim=0))
     assert stacked0 == [data, data]
-    stacked1 = ops.stack([data, data], dim=1)
+    stacked1 = ops.benchmark(lambda: ops.stack([data, data], dim=1))
     assert stacked1 == [[row, row] for row in data]
 
-    padded = ops.pad(t, (1, 1, 1, 1), value=0)
+    padded = ops.benchmark(lambda: ops.pad(t, (1, 1, 1, 1), value=0))
     assert padded == [
         [0, 0, 0, 0],
         [0, 1, 2, 0],
@@ -50,16 +50,16 @@ def run_checks(ops):
     ]
 
     base = [[i for i in range(3)] for _ in range(2)]
-    padded = ops.pad(base, (0, 2, 1, 0), value=9)
+    padded = ops.benchmark(lambda: ops.pad(base, (0, 2, 1, 0), value=9))
     assert len(padded) == 3
     assert all(len(row) == 5 for row in padded)
 
-    values, indices = ops.topk([1, 3, 2, 4], k=2, dim=-1)
+    values, indices = ops.benchmark(lambda: ops.topk([1, 3, 2, 4], k=2, dim=-1))
     assert values == [4, 3]
     assert indices == [3, 1]
 
     seq = [7, 1, 4, 9, 2, 6]
-    vals, idxs = ops.topk(seq, k=3, dim=-1)
+    vals, idxs = ops.benchmark(lambda: ops.topk(seq, k=3, dim=-1))
     expect_vals = sorted(seq, reverse=True)[:3]
     expect_inds = [seq.index(v) for v in expect_vals]
     assert vals == expect_vals
