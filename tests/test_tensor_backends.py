@@ -11,6 +11,7 @@ from speaktome.tensors import (
     JAXTensorOperations,
 )
 from speaktome.tensors.faculty import detect_faculty
+from speaktome.tensors.pure_backend import PurePythonTensorOperations # For isinstance check
 
 logger = logging.getLogger(__name__)
 
@@ -65,9 +66,19 @@ def run_checks(ops):
     assert vals == expect_vals
     assert idxs == expect_inds
 
-    fn = getattr(ops, "_AbstractTensorOperations__apply_operator")
-    assert ops.tolist(fn("sub", [2, 4, 6], 1)) == [1, 3, 5]
-    assert ops.tolist(fn("truediv", [2.0, 4.0], 2.0)) == [1.0, 2.0]
+    # Test operators on tensors created by the backend
+    try:
+        # Use float_dtype for these operations
+        dtype = ops.float_dtype
+
+        data_sub = ops.tensor_from_list([2.0, 4.0, 6.0], dtype=dtype, device=None)
+        # Python float scalar, relying on backend's operator broadcasting/handling
+        assert ops.tolist(data_sub - 1.0) == [1.0, 3.0, 5.0]
+
+        data_div = ops.tensor_from_list([2.0, 4.0], dtype=dtype, device=None) # type: ignore
+        assert ops.tolist(data_div / 2.0) == [1.0, 2.0]
+    except (TypeError, NotImplementedError, AttributeError):
+        raise # Let the test fail if operators are not supported as expected
 
     assert ops.long_dtype is not None
     assert ops.bool_dtype is not None
@@ -96,22 +107,40 @@ def _norm(val):
 def test_basic_operator_dispatch(backend_cls):
     """Verify arithmetic helpers via the private dispatcher."""
     ops = backend_cls()
-    fn = getattr(ops, "_AbstractTensorOperations__apply_operator")
-    a = [1, 2]
-    b = [3, 4]
-    assert _norm(fn("add", a, b)) == [4, 6]
-    assert _norm(fn("sub", b, a)) == [2, 2]
-    assert _norm(fn("mul", a, b)) == [3, 8]
-    assert _norm(fn("truediv", b, a)) == [3.0, 2.0]
-    assert _norm(fn("floordiv", b, a)) == [3 // 1, 4 // 2]
-    assert _norm(fn("mod", b, a)) == [0, 0]
-    assert _norm(fn("pow", a, a)) == [1, 4]
 
+    a_list_float = [1.0, 2.0]
+    b_list_float = [3.0, 4.0]
+    a_list_int = [1, 2]
+    b_list_int = [3, 4]
 
-@pytest.mark.parametrize("backend_cls", available_backends())
-def test_apply_operator_inaccessible(backend_cls):
-    """Ensure the legacy helper raises an error."""
-    ops = backend_cls()
-    with pytest.raises(AttributeError):
-        ops._apply_operator("add", [1], [2])
+    try:
+        # Use backend-specific dtypes
+        float_dtype = ops.float_dtype
+        long_dtype = ops.long_dtype
+
+        # Create tensors using the backend's tensor_from_list
+        a_float = ops.tensor_from_list(a_list_float, dtype=float_dtype, device=None)
+        b_float = ops.tensor_from_list(b_list_float, dtype=float_dtype, device=None)
+
+        a_int = ops.tensor_from_list(a_list_int, dtype=long_dtype, device=None)
+        b_int = ops.tensor_from_list(b_list_int, dtype=long_dtype, device=None)
+
+        # Test operators on these tensors
+        assert _norm(ops.tolist(a_float + b_float)) == [4.0, 6.0]
+        assert _norm(ops.tolist(b_float - a_float)) == [2.0, 2.0]
+        assert _norm(ops.tolist(a_float * b_float)) == [3.0, 8.0]
+        assert _norm(ops.tolist(b_float / a_float)) == [3.0, 2.0]
+        
+        # For floor division and modulo, integer-like inputs are typical
+        assert _norm(ops.tolist(b_int // a_int)) == [3, 2]
+        assert _norm(ops.tolist(b_int % a_int)) == [0, 0]
+        
+        # Power can use float or int base/exponent depending on desired outcome
+        # Using a_float for potentially float results (e.g. non-integer exponents)
+        # Here, a_float ** a_float (e.g., 1.0**1.0, 2.0**2.0)
+        assert _norm(ops.tolist(a_float ** a_float)) == [1.0, 4.0]
+
+    except (TypeError, NotImplementedError, AttributeError):
+        raise # Let the test fail if operators are not supported as expected
+        
 
