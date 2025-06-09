@@ -33,7 +33,6 @@ else
 fi
 
 safe_run $VENV_PYTHON -m pip install --upgrade pip
-safe_run $VENV_PIP install -r requirements.txt -r requirements-dev.txt
 
 NOEXTRAS=0
 ML=0        # flag for full ML extras (transformers, torch_geometric)
@@ -51,31 +50,6 @@ for arg in "$@"; do
   esac
 done
 
-# Always include the time_sync codebase
-case ",${CODEBASES}," in
-  *",time_sync,"*) ;;
-  *) CODEBASES="${CODEBASES},time_sync" ;;
-esac
-
-if [ $NOEXTRAS -eq 0 ]; then
-  safe_run $VENV_PIP install .[plot]
-
-  if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
-      echo "Installing latest stable CPU-only torch (CI environment)"
-      safe_run $VENV_PIP install torch==2.3.1+cpu -f https://download.pytorch.org/whl/torch_stable.html
-  elif [ $FORCE_GPU -eq 1 ]; then
-      echo "Installing GPU-enabled torch"
-      safe_run $VENV_PIP install torch -f https://download.pytorch.org/whl/cu118
-  else
-      echo "Installing latest stable CPU-only torch (default)"
-      safe_run $VENV_PIP install torch==2.3.1+cpu -f https://download.pytorch.org/whl/torch_stable.html
-  fi
-
-  if [ $ML -eq 1 ]; then
-    echo "Installing ML extras"
-    safe_run $VENV_PIP install .[ml]
-  fi
-fi
 
 # Always install torch first for GPU safety
 if [ "${GITHUB_ACTIONS:-}" = "true" ]; then

@@ -57,6 +57,15 @@ if [ $USE_VENV -eq 1 ]; then
       echo "Error: Virtual environment activation script not found at $VENV_ACTIVATE" >&2
       exit 1
   fi
+
+  # Install dev requirements
+  REQUIREMENTS_DEV="$SCRIPT_ROOT/requirements-dev.txt"
+  if [ -f "$REQUIREMENTS_DEV" ]; then
+    echo "Installing requirements-dev.txt..."
+    safe_run "$VENV_PIP" install -r "$REQUIREMENTS_DEV"
+  else
+    echo "Warning: requirements-dev.txt not found at $REQUIREMENTS_DEV" >&2
+  fi
 fi
 
 install_speaktome_extras() {
