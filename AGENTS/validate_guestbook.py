@@ -3,6 +3,7 @@ from __future__ import annotations
 try:
     import os
     import re
+    import sys
 except Exception:
     print(
         "\n"
@@ -12,7 +13,7 @@ except Exception:
         "| skipped or incomplete.                                             |\n"
         "+-----------------------------------------------------------------------+\n"
     )
-    raise
+    sys.exit(1)
 # --- END HEADER ---
 
 REPORTS_DIR = os.path.join(os.path.dirname(__file__), 'experience_reports')

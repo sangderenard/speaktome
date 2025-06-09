@@ -1,21 +1,15 @@
+#!/usr/bin/env python3
+"""Backend-agnostic linear layers for small network experiments."""
+from __future__ import annotations
+
 try:
-    """Backend-agnostic linear layers for small network experiments."""
-
-    from __future__ import annotations
-
+    from AGENTS.tools.header_utils import ENV_SETUP_BOX
     from typing import Any, Iterable, Dict
 
     from .model_abstraction import AbstractModelWrapper
     from ..tensors.abstraction import AbstractTensorOperations
 except Exception:
-    print(
-        "\n"
-        "+-----------------------------------------------------------------------+\n"
-        "| Imports failed. Run setup_env or setup_env_dev and select every    |\n"
-        "| project and module you plan to use. Missing packages mean setup was |\n"
-        "| skipped or incomplete.                                             |\n"
-        "+-----------------------------------------------------------------------+\n"
-    )
+    print(ENV_SETUP_BOX)
     raise
 # --- END HEADER ---
 

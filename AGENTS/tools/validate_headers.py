@@ -10,7 +10,7 @@ try:
     from .header_utils import ENV_SETUP_BOX
 except Exception:
     print(ENV_SETUP_BOX)
-    raise
+    sys.exit(1)
 # --- END HEADER ---
 
 PACKAGE_ROOT = Path(__file__).parent / "speaktome"
@@ -104,7 +104,7 @@ def validate(root: Path, *, rewrite: bool = False) -> int:
                     new_lines.append(
                         f"{indent}    print(ENV_SETUP_BOX)"
                     )
-                    new_lines.append(f"{indent}    raise")
+                    new_lines.append(f"{indent}    sys.exit(1)")
                 if miss_test:
                     new_lines.append(f"{indent}@staticmethod")
                     new_lines.append(f"{indent}def test() -> None:")

@@ -10,7 +10,7 @@ try:
     from pathlib import Path
 except Exception:
     print(ENV_SETUP_BOX)
-    raise
+    sys.exit(1)
 # --- END HEADER ---
 
 FRIENDLY_GUIDANCE = """
@@ -39,7 +39,7 @@ If the pre-commit hook caught your changes, here's a friendly checklist:
        import your_modules
    except Exception:
        print(ENV_SETUP_BOX)
-       raise
+       sys.exit(1)
    # --- END HEADER ---
    ```
 

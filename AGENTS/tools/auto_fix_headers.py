@@ -9,7 +9,7 @@ try:
     from .header_utils import ENV_SETUP_BOX
 except Exception:
     print(ENV_SETUP_BOX)
-    raise
+    sys.exit(1)
 # --- END HEADER ---
 
 
@@ -90,7 +90,7 @@ def fix_file(path: Path) -> None:
 
     out_lines.append("except Exception:")
     out_lines.append("    print(ENV_SETUP_BOX)")
-    out_lines.append("    raise")
+    out_lines.append("    sys.exit(1)")
     out_lines.append(HEADER_SENTINEL)
 
     out_lines.extend(lines[idx:])

@@ -12,10 +12,10 @@ ENV_SETUP_BOX = (
 )
 
 try:
-    pass
+    import sys
 except Exception:
     print(ENV_SETUP_BOX)
-    raise
+    sys.exit(1)
 # --- END HEADER ---
 
 __all__ = ["ENV_SETUP_BOX"]
