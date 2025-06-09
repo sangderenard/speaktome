@@ -64,6 +64,12 @@ ffi.cdef("""
     void rfloor_div_const(const double* a, double b, double* out, int n);
     void sqrt_double(const double* a, double* out, int n);
     void log_softmax_1d(const double* a, double* out, int n);
+    void log_softmax_dim(
+        const double* a,
+        const int* shape,
+        int ndim,
+        int dim,
+        double* out);
     void pad_double_nd(const double* input, double* output, const int* shape, const int* new_shape, const int* left_pad, int dims, double value);
     void mean_dim(const double* a, double* out, const int* shape, int ndim, int dim);
     void gather_pairs_2d(const double* a, const int* rows, const int* cols,
@@ -92,6 +98,111 @@ C_SOURCE = """
     #include <math.h>
     #include <stdlib.h>
     #include <stddef.h>
+
+    typedef struct {
+        double* out;
+        int dim_size;
+        int cell_len;
+        int out_index;
+        double* accum;
+    } mean_dim_ctx;
+
+    static void mean_dim_callback(const double* data, int cell_len, int idx, void* user_data) {
+        mean_dim_ctx* ctx = (mean_dim_ctx*)user_data;
+        if (idx == 0) {
+            for (int i = 0; i < ctx->cell_len; ++i) ctx->accum[i] = 0.0;
+        }
+        for (int i = 0; i < ctx->cell_len; ++i) ctx->accum[i] += data[i];
+        if (idx == ctx->dim_size - 1) {
+            for (int i = 0; i < ctx->cell_len; ++i) {
+                ctx->out[ctx->out_index * ctx->cell_len + i] = ctx->accum[i] / ctx->dim_size;
+            }
+            ctx->out_index++;
+        }
+    }
+
+    typedef struct {
+        double* values;
+        double* indices;
+        int k;
+        int dim_size;
+        int cell_len;
+        int out_index;
+        double* buffer;
+    } topk_dim_ctx;
+
+    static void topk_dim_callback(const double* data, int cell_len, int idx, void* user_data) {
+        topk_dim_ctx* ctx = (topk_dim_ctx*)user_data;
+        for (int i = 0; i < ctx->cell_len; ++i) {
+            ctx->buffer[idx * ctx->cell_len + i] = data[i];
+        }
+        if (idx == ctx->dim_size - 1) {
+            for (int i = 0; i < ctx->cell_len; ++i) {
+                const double* slice = ctx->buffer + i;
+                int* used = (int*)malloc(ctx->dim_size * sizeof(int));
+                for (int u = 0; u < ctx->dim_size; ++u) used[u] = 0;
+                for (int t = 0; t < ctx->k; ++t) {
+                    int best = -1;
+                    double best_val = -1e300;
+                    for (int j = 0; j < ctx->dim_size; ++j) {
+                        double val = slice[j * ctx->cell_len];
+                        if (!used[j] && val > best_val) {
+                            best_val = val;
+                            best = j;
+                        }
+                    }
+                    int out_pos = (ctx->out_index * ctx->cell_len + i) * ctx->k + t;
+                    if (best != -1) {
+                        used[best] = 1;
+                        ctx->indices[out_pos] = best;
+                        ctx->values[out_pos] = best_val;
+                    } else {
+                        ctx->indices[out_pos] = -1;
+                        ctx->values[out_pos] = 0.0;
+                    }
+                }
+                free(used);
+            }
+            ctx->out_index++;
+        }
+    }
+
+    typedef struct {
+        double* out;
+        int dim_size;
+        int cell_len;
+        int out_index;
+        double* buffer;
+        double* max_vals;
+        double* sum_vals;
+    } log_softmax_dim_ctx;
+
+    static void log_softmax_dim_callback(const double* data, int cell_len, int idx, void* user_data) {
+        log_softmax_dim_ctx* ctx = (log_softmax_dim_ctx*)user_data;
+        double* slice = ctx->buffer + idx * ctx->cell_len;
+        for (int i = 0; i < ctx->cell_len; ++i) {
+            slice[i] = data[i];
+            if (idx == 0 || data[i] > ctx->max_vals[i]) ctx->max_vals[i] = data[i];
+        }
+        if (idx == ctx->dim_size - 1) {
+            for (int i = 0; i < ctx->cell_len; ++i) ctx->sum_vals[i] = 0.0;
+            for (int j = 0; j < ctx->dim_size; ++j) {
+                double* row = ctx->buffer + j * ctx->cell_len;
+                for (int i = 0; i < ctx->cell_len; ++i) {
+                    row[i] = exp(row[i] - ctx->max_vals[i]);
+                    ctx->sum_vals[i] += row[i];
+                }
+            }
+            for (int j = 0; j < ctx->dim_size; ++j) {
+                double* row = ctx->buffer + j * ctx->cell_len;
+                for (int i = 0; i < ctx->cell_len; ++i) {
+                    int pos = (ctx->out_index * ctx->dim_size + j) * ctx->cell_len + i;
+                    ctx->out[pos] = log(row[i] / ctx->sum_vals[i]);
+                }
+            }
+            ctx->out_index++;
+        }
+    }
 
     void add_double(const double* a, const double* b, double* out, int n) {
         for (int i = 0; i < n; ++i) out[i] = a[i] + b[i];
@@ -212,9 +323,12 @@ C_SOURCE = """
         free(idx);
 
     void mean_dim(const double* a, double* out, const int* shape, int ndim, int dim) {
-        int out_index = 0;
-        mean_dim_ctx ctx = {out, shape[dim], &out_index};
+        int after = 1;
+        for (int i = dim + 1; i < ndim; ++i) after *= shape[i];
+        double* accum = (double*)malloc(after * sizeof(double));
+        mean_dim_ctx ctx = {out, shape[dim], after, 0, accum};
         for_each_cell_along_dim(a, shape, ndim, dim, mean_dim_callback, &ctx);
+        free(accum);
     }
 
     void gather_pairs_2d(const double* a, const int* rows, const int* cols,
@@ -272,9 +386,31 @@ C_SOURCE = """
         int k,
         double* indices,
         double* out) {
-        int out_index = 0;
-        topk_dim_ctx ctx = {out, indices, k, shape[dim], &out_index};
+        int after = 1;
+        for (int i = dim + 1; i < ndim; ++i) after *= shape[i];
+        double* buffer = (double*)malloc(shape[dim] * after * sizeof(double));
+        topk_dim_ctx ctx = {out, indices, k, shape[dim], after, 0, buffer};
         for_each_cell_along_dim(a, shape, ndim, dim, topk_dim_callback, &ctx);
+        free(buffer);
+    }
+
+    void log_softmax_dim(
+        const double* a,
+        const int* shape,
+        int ndim,
+        int dim,
+        double* out) {
+        int after = 1;
+        for (int i = dim + 1; i < ndim; ++i) after *= shape[i];
+        int dim_size = shape[dim];
+        double* buffer = (double*)malloc(dim_size * after * sizeof(double));
+        double* max_vals = (double*)malloc(after * sizeof(double));
+        double* sum_vals = (double*)malloc(after * sizeof(double));
+        log_softmax_dim_ctx ctx = {out, dim_size, after, 0, buffer, max_vals, sum_vals};
+        for_each_cell_along_dim(a, shape, ndim, dim, log_softmax_dim_callback, &ctx);
+        free(buffer);
+        free(max_vals);
+        free(sum_vals);
     }
 
     void for_each_cell_along_dim(
@@ -576,14 +712,17 @@ class CTensorOperations(AbstractTensorOperations):
         """Compute log softmax along ``dim`` using C routines."""
         if not isinstance(tensor, CTensor):
             tensor = CTensor.from_list(tensor, _get_shape(tensor))
+        ndim = len(tensor.shape)
         if dim < 0:
-            dim += len(tensor.shape)
-        if dim != 0 or len(tensor.shape) != 1:
-            raise NotImplementedError(
-                "log_softmax only implemented for 1D tensors on the C backend"
-            )
+            dim += ndim
+        if dim < 0 or dim >= ndim:
+            raise ValueError("dim out of range")
+        c_shape = ffi.new("int[]", list(tensor.shape))
         out = CTensor(tensor.shape)
-        C.log_softmax_1d(tensor.as_c_ptr(), out.as_c_ptr(), tensor.size)
+        if ndim == 1:
+            C.log_softmax_1d(tensor.as_c_ptr(), out.as_c_ptr(), tensor.size)
+        else:
+            C.log_softmax_dim(tensor.as_c_ptr(), c_shape, ndim, dim, out.as_c_ptr())
         return out
 
     def pad(self, tensor: CTensor, pad: Tuple[int, ...], value: float = 0) -> Any:
