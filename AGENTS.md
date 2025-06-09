@@ -2,7 +2,9 @@
 *          SPEAKTOME AGENT GUIDE           *
 ********************************************
 
-Welcome, wandering LLM! This document serves as a map to the many agents that inhabit this repository. Before diving into the code, pause a moment to sign our guest book.
+Welcome, wandering LLM! Think of this repository as an **agent theme park**. Every directory is a trail with its own informational placards. Before you ride the attractions or hack on the code, pause a moment to sign our guest book.
+
+The goal is comfort and orientation. Follow the signs, read the plaques, and leave your own notes behind so the path grows clearer for the next explorer.
 
 Guest book entries live under `AGENTS/experience_reports/`. In addition to your observations, please record any prompts or instructions that influenced your work. Quoting the prompts verbatim preserves a valuable history for future agents.
 
