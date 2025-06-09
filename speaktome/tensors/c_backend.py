@@ -284,21 +284,34 @@ C_SOURCE = """
         int batch_dim,
         void (*callback)(const double*, int, int, void*),
         void* user_data) {
+        // Compute strides
+        int* strides = (int*)malloc(ndim * sizeof(int));
+        strides[ndim - 1] = 1;
+        for (int i = ndim - 2; i >= 0; --i)
+            strides[i] = strides[i + 1] * shape[i + 1];
+
         int before = 1, after = 1;
         for (int i = 0; i < batch_dim; ++i) before *= shape[i];
         for (int i = batch_dim + 1; i < ndim; ++i) after *= shape[i];
         int batch = shape[batch_dim];
         int cell_len = after;
-        int total_cells = before * after;
 
+        // Iterate over all cells
         for (int b = 0; b < before; ++b) {
-            for (int a = 0; a < after; ++a) {
-                for (int i = 0; i < batch; ++i) {
-                    int idx = (b * batch * after) + (i * after) + a;
-                    callback(data + idx, cell_len, i, user_data);
-                }
+            // Compute base offset for this cell
+            int base = 0;
+            int rem = b;
+            for (int i = batch_dim - 1; i >= 0; --i) {
+                int idx = rem % shape[i];
+                base += idx * strides[i];
+                rem /= shape[i];
+            }
+            for (int i = 0; i < batch; ++i) {
+                int cell_offset = base + i * strides[batch_dim];
+                callback(data + cell_offset, cell_len, i, user_data);
             }
         }
+        free(strides);
     }
 """
 
