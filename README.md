@@ -39,12 +39,20 @@ bash setup_env.sh                      # minimal install
 bash setup_env.sh --extras --prefetch  # install optional packages too
 ```
 
+The script installs the repository in editable mode and then runs a
+verification step that ensures all optional groups defined in
+``pyproject.toml`` are present. Missing packages are installed on demand,
+with any failures reported but not fatal.
+
 On Windows use the PowerShell script:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File setup_env.ps1                      # minimal
 powershell -ExecutionPolicy Bypass -File setup_env.ps1 --extras --prefetch  # optional
 ```
+
+Like the Bash version, this script installs the package in editable mode and
+checks for missing optional dependencies.
 
 Activate the environment with:
 

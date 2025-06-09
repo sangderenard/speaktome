@@ -28,6 +28,9 @@ if ($extras) {
     Safe-Run { pip install .[plot] }
 }
 
+# Install package in editable mode so changes are picked up automatically
+Safe-Run { pip install -e . }
+
 # 3. Handle CPU vs GPU torch & optional ML extras
 if ($extras) {
     if ($env:GITHUB_ACTIONS -eq 'true') {
@@ -51,5 +54,8 @@ if ($extras) {
 if ($prefetch) {
     Safe-Run { powershell -ExecutionPolicy Bypass -File fetch_models.ps1 }
 }
+
+# Ensure optional dependencies from pyproject.toml are installed
+Safe-Run { python AGENTS/tools/ensure_pyproject_deps.py }
 
 Write-Host "Environment setup complete. Activate with '.venv\\Scripts\\Activate.ps1'"
