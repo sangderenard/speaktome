@@ -25,3 +25,15 @@ def test_remove_used_prunes_buckets():
     mgr.remove_used([2, 3])
     assert mgr._bucket == {1: [1], 2: [4]}
     logger.info("test_remove_used_prunes_buckets end")
+
+
+def test_garbage_collect_limits_buckets():
+    mgr = make_manager()
+    # create several buckets with many entries
+    for i in range(30):
+        mgr._bucket.setdefault(i % 3, []).append(i)
+
+    mgr.garbage_collect(limit_per_bucket=5, total_limit=8)
+    assert all(len(g) <= 5 for g in mgr._bucket.values())
+    total = sum(len(g) for g in mgr._bucket.values())
+    assert total <= 8

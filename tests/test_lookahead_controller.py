@@ -92,7 +92,8 @@ def test_lookahead_across_backends(faculty, caplog):
         logger.info("%s backend lookahead time: %.6f", faculty.name, ops.last_op_time)
 
 
-def test_lookahead_default_backend():
+@pytest.mark.parametrize("steps", [1, 2])
+def test_lookahead_default_backend(steps):
     facs = available_faculties()
     if facs == [facs[0]] and facs[0].name == "PURE_PYTHON":
         pytest.skip("Pure Python backend only")
@@ -103,7 +104,7 @@ def test_lookahead_default_backend():
         aggregate_fn=lambda s: get_tensor_operations().mean(s, dim=-1),
     )
     controller = LookaheadController(
-        lookahead_steps=1,
+        lookahead_steps=steps,
         max_len=2,
         device="cpu",
         tokenizer=DummyTokenizer(),

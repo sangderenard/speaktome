@@ -21,13 +21,15 @@ def slow_ngram_diversity(beams, lengths, n=2, penalty=-1.0):
     return -penalties
 
 
-def test_ngram_diversity_matches_slow():
+@pytest.mark.parametrize("n", [2, 3])
+def test_ngram_diversity_matches_slow(n):
     beams = torch.tensor([
-        [1, 2, 3, 4, 5],
-        [1, 1, 1, 1, 1],
+        [1, 2, 3, 4, 1, 2],
+        [5, 5, 5, 5, 5, 5],
+        [1, 1, 1, 1, 1, 1],
     ])
-    lengths = torch.tensor([5, 5])
+    lengths = torch.tensor([6, 6, 6])
     tok = type('T', (), {'pad_token_id':0, 'vocab_size':10})()
-    fast = Scorer.ngram_diversity_score(beams=beams, lengths=lengths, tokenizer=tok, n=2)
-    slow = slow_ngram_diversity(beams, lengths, n=2)
+    fast = Scorer.ngram_diversity_score(beams=beams, lengths=lengths, tokenizer=tok, n=n)
+    slow = slow_ngram_diversity(beams, lengths, n=n)
     assert torch.allclose(fast, slow)

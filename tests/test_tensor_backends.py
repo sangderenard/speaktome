@@ -111,6 +111,8 @@ def _norm(val):
 def test_basic_operator_dispatch(backend_cls):
     """Verify arithmetic helpers via the private dispatcher."""
     ops = backend_cls()
+    if isinstance(ops, PurePythonTensorOperations):
+        pytest.skip("Pure Python backend lacks operator dispatch")
 
     a_list_float = [1.0, 2.0]
     b_list_float = [3.0, 4.0]
