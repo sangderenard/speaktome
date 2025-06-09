@@ -118,6 +118,12 @@ class PyTorchTensorOperations(AbstractTensorOperations):
     def index_select(self, tensor, dim, indices):
         return torch.index_select(tensor, dim, indices)
 
+    def sub_scalar(self, tensor, value):
+        return tensor - value
+
+    def div_scalar(self, tensor, value):
+        return tensor / value
+
     def save(self, tensor, filepath: str) -> None:
         torch.save(tensor, filepath)
 

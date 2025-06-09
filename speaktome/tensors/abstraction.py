@@ -160,6 +160,16 @@ class AbstractTensorOperations(ABC):
     def index_select(self, tensor: Any, dim: int, indices: Any) -> Any:
         pass
 
+    @abstractmethod
+    def sub_scalar(self, tensor: Any, value: Any) -> Any:
+        """Return ``tensor`` element-wise minus ``value``."""
+        pass
+
+    @abstractmethod
+    def div_scalar(self, tensor: Any, value: Any) -> Any:
+        """Return ``tensor`` element-wise divided by ``value``."""
+        pass
+
     # --- Persistence helpers ---
     @abstractmethod
     def save(self, tensor: Any, filepath: str) -> None:

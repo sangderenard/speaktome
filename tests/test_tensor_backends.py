@@ -65,6 +65,9 @@ def run_checks(ops):
     assert vals == expect_vals
     assert idxs == expect_inds
 
+    assert ops.sub_scalar([2, 4, 6], 1) == [1, 3, 5]
+    assert ops.div_scalar([2.0, 4.0], 2.0) == [1.0, 2.0]
+
     assert ops.long_dtype is not None
     assert ops.bool_dtype is not None
 
