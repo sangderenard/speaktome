@@ -1,6 +1,6 @@
 # Stub Audit Manual Sign-Off
 # Mark each file as 'OK' when verified compliant with CODING_STANDARDS.
-# Re-audited 1749414193 by Codex - all files remain OK
+# Re-audited 1749498829 by Codex - all files remain OK
 
 AGENTS/messages/create_digest.py - OK
 AGENTS/register_agent.py - OK
@@ -17,7 +17,7 @@ speaktome/config.py - OK
 speaktome/core/__init__.py - OK
 speaktome/core/beam_graph_operator.py - OK
 speaktome/core/beam_retirement_manager.py - OK
-speaktome/core/beam_search.py - STUB documented, OK
+speaktome/core/beam_search.py - OK
 speaktome/core/beam_search_instruction.py - OK
 speaktome/core/beam_tree_node.py - OK
 speaktome/core/beam_tree_visualizer.py - OK
@@ -56,5 +56,6 @@ tests/test_retirement_manager.py - OK
 tests/test_snap_beam_path.py - OK
 tests/test_validate_guestbook.py - OK
 tests/test_validate_headers.py - OK
-AGENTS/tools/validate_headers.py - STUB documented, OK
-# 2025-06-08 - All listed stubs verified intact by Codex
+AGENTS/tools/validate_headers.py - OK
+# 2025-06-08 - All listed stubs verified intact by Codex (re-audited)
+# 1749498829 - Re-audited by Codex
