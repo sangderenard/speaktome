@@ -1,36 +1,48 @@
-# Standard library imports
-from __future__ import annotations
-from typing import List, Optional, Tuple, Callable, Dict, Any, TYPE_CHECKING
-import math
+try:
+    # Standard library imports
+    from __future__ import annotations
+    from typing import List, Optional, Tuple, Callable, Dict, Any, TYPE_CHECKING
+    import math
 
-# Third-party imports
-if TYPE_CHECKING:  # pragma: no cover - type hints only
-    import torch
+    # Third-party imports
+    if TYPE_CHECKING:  # pragma: no cover - type hints only
+        import torch
 
-from ..tensors.faculty import Faculty
+    from ..tensors.faculty import Faculty
 
-FACULTY_REQUIREMENT = Faculty.TORCH
+    FACULTY_REQUIREMENT = Faculty.TORCH
 
-# Local application/library specific imports
-# Please adjust these import paths based on your actual project structure.
-from .. import config
-from ..config import GPU_LIMIT, LENGTH_LIMIT
-from .beam_graph_operator import BeamGraphOperator
-from .beam_search_instruction import BeamSearchInstruction
-from .scorer import Scorer
-from .beam_retirement_manager import BeamRetirementManager
-from .compressed_beam_tree import CompressedBeamTree
-from ..tensors import (
-    AbstractTensorOperations,
-)
-from .model_abstraction import (
-    AbstractModelWrapper,
-    PyTorchModelWrapper,
-)
-from .lookahead_controller import LookaheadConfig, LookaheadController
+    # Local application/library specific imports
+    # Please adjust these import paths based on your actual project structure.
+    from .. import config
+    from ..config import GPU_LIMIT, LENGTH_LIMIT
+    from .beam_graph_operator import BeamGraphOperator
+    from .beam_search_instruction import BeamSearchInstruction
+    from .scorer import Scorer
+    from .beam_retirement_manager import BeamRetirementManager
+    from .compressed_beam_tree import CompressedBeamTree
+    from ..tensors import (
+        AbstractTensorOperations,
+    )
+    from .model_abstraction import (
+        AbstractModelWrapper,
+        PyTorchModelWrapper,
+    )
+    from .lookahead_controller import LookaheadConfig, LookaheadController
+except Exception:
+    print(
+        "\n"
+        "+-----------------------------------------------------------------------+\n"
+        "| Imports failed. Run setup_env or setup_env_dev and select every    |\n"
+        "| project and module you plan to use. Missing packages mean setup was |\n"
+        "| skipped or incomplete.                                             |\n"
+        "+-----------------------------------------------------------------------+\n"
+    )
+    raise
 # --- END HEADER ---
 
 class BeamSearch:
+    """Core orchestrator for beam expansion and pruning."""
     def __init__(self, scorer: Scorer, beam_width: int = 5, gpu_limit: int = GPU_LIMIT, 
                  lookahead_steps: int = 1, initial_retirement_enabled: bool = True,
                  device=config.DEVICE, verbose=True, max_len=LENGTH_LIMIT, # General params

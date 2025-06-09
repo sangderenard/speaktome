@@ -1,20 +1,28 @@
-from abc import ABC, abstractmethod
-from typing import Any, Tuple, Optional, List, Union, Callable, Dict, Deque
-import math
-import time
-from collections import deque
+try:
+    from abc import ABC, abstractmethod
+    from typing import Any, Tuple, Optional, List, Union, Callable, Dict, Deque
+    import math
+    import time
+    from collections import deque
 
-from .faculty import Faculty, DEFAULT_FACULTY
-from .. import config
-# --- END HEADER ---
-try:
+    from .faculty import Faculty, DEFAULT_FACULTY
+    from .. import config
     import torch
-except ModuleNotFoundError:  # pragma: no cover - optional dependency
-    torch = None  # type: ignore
-try:
     import numpy as np
-except ModuleNotFoundError:  # pragma: no cover - optional dependency
+except ModuleNotFoundError:
+    torch = None  # type: ignore
     np = None  # type: ignore
+except Exception:
+    print(
+        "\n"
+        "+-----------------------------------------------------------------------+\n"
+        "| Imports failed. Run setup_env or setup_env_dev and select every    |\n"
+        "| project and module you plan to use. Missing packages mean setup was |\n"
+        "| skipped or incomplete.                                             |\n"
+        "+-----------------------------------------------------------------------+\n"
+    )
+    raise
+# --- END HEADER ---
 
 CONVERSION_REGISTRY: Dict[Tuple[type, type], Callable[["AbstractTensorOperations", Any, "AbstractTensorOperations"], Any]] = {}
 

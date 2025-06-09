@@ -1,32 +1,43 @@
-"""CPU-only demo exercising :class:`LookaheadController`.
-
-This lightweight path demonstrates how the project can operate with
-either NumPy or a pure Python fallback. A simple random model drives the
-lookahead search using the generic tensor and model wrappers. The demo
-prints the top ``k`` results after ``d`` lookahead steps.
-"""
-
-import argparse
-from typing import Any, Dict
-
-from .tensors.faculty import Faculty
-
-FACULTY_REQUIREMENT = Faculty.PURE_PYTHON
 try:
-    import numpy as np
-    NUMPY_AVAILABLE = True
-except ModuleNotFoundError:  # pragma: no cover - optional dependency
-    NUMPY_AVAILABLE = False
-    np = None  # type: ignore
+    """CPU-only demo exercising :class:`LookaheadController`.
 
-from .util.token_vocab import TokenVocabulary
-from .tensors import get_tensor_operations
-from .core.model_abstraction import AbstractModelWrapper
-from .core.abstract_linear_net import (
-    AbstractLinearLayer,
-    SequentialLinearModel,
-)
-from .core.lookahead_controller import LookaheadController, LookaheadConfig
+    This lightweight path demonstrates how the project can operate with
+    either NumPy or a pure Python fallback. A simple random model drives the
+    lookahead search using the generic tensor and model wrappers. The demo
+    prints the top ``k`` results after ``d`` lookahead steps.
+    """
+
+    import argparse
+    from typing import Any, Dict
+
+    from .tensors.faculty import Faculty
+
+    FACULTY_REQUIREMENT = Faculty.PURE_PYTHON
+    try:
+        import numpy as np
+        NUMPY_AVAILABLE = True
+    except ModuleNotFoundError:  # pragma: no cover - optional dependency
+        NUMPY_AVAILABLE = False
+        np = None  # type: ignore
+
+    from .util.token_vocab import TokenVocabulary
+    from .tensors import get_tensor_operations
+    from .core.model_abstraction import AbstractModelWrapper
+    from .core.abstract_linear_net import (
+        AbstractLinearLayer,
+        SequentialLinearModel,
+    )
+    from .core.lookahead_controller import LookaheadController, LookaheadConfig
+except Exception:
+    print(
+        "\n"
+        "+-----------------------------------------------------------------------+\n"
+        "| Imports failed. Run setup_env or setup_env_dev and select every    |\n"
+        "| project and module you plan to use. Missing packages mean setup was |\n"
+        "| skipped or incomplete.                                             |\n"
+        "+-----------------------------------------------------------------------+\n"
+    )
+    raise
 # --- END HEADER ---
 
 VOCAB = TokenVocabulary("abcdefghijklmnopqrstuvwxyz ")

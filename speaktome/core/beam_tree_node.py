@@ -1,15 +1,23 @@
-# Standard library imports
-from typing import List, Optional
-
 try:
-    import torch
-except ModuleNotFoundError:  # pragma: no cover - optional
-    torch = None
+    # Standard library imports
+    from typing import List, Optional
 
-from ..tensors import (
-    AbstractTensorOperations,
-    get_tensor_operations,
-)
+    import torch
+
+    from ..tensors import (
+        AbstractTensorOperations,
+        get_tensor_operations,
+    )
+except Exception:
+    print(
+        "\n"
+        "+-----------------------------------------------------------------------+\n"
+        "| Imports failed. Run setup_env or setup_env_dev and select every    |\n"
+        "| project and module you plan to use. Missing packages mean setup was |\n"
+        "| skipped or incomplete.                                             |\n"
+        "+-----------------------------------------------------------------------+\n"
+    )
+    raise
 # --- END HEADER ---
 
 class BeamTreeNode:

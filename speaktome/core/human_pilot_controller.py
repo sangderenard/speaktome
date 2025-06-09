@@ -1,13 +1,24 @@
-# Standard library imports
-from typing import List, Optional, TYPE_CHECKING
+try:
+    # Standard library imports
+    from typing import List, Optional, TYPE_CHECKING
 
-# Third-party imports
-import torch # type: ignore[import-untyped]
-from torch_geometric.data import Data as PyGData # type: ignore[import-untyped] # Moved for runtime availability
+    # Third-party imports
+    import torch  # type: ignore[import-untyped]
+    from torch_geometric.data import Data as PyGData  # type: ignore[import-untyped] # Moved for runtime availability
 
-# Local application/library specific imports
-from .beam_search import BeamSearch
-from .beam_search_instruction import BeamSearchInstruction
+    # Local application/library specific imports
+    from .beam_search import BeamSearch
+    from .beam_search_instruction import BeamSearchInstruction
+except Exception:
+    print(
+        "\n"
+        "+-----------------------------------------------------------------------+\n"
+        "| Imports failed. Run setup_env or setup_env_dev and select every    |\n"
+        "| project and module you plan to use. Missing packages mean setup was |\n"
+        "| skipped or incomplete.                                             |\n"
+        "+-----------------------------------------------------------------------+\n"
+    )
+    raise
 # --- END HEADER ---
 
 class HumanPilotController:
@@ -19,6 +30,7 @@ class HumanPilotController:
     ║   future autonomous simulation control.                  ║
     ╚══════════════════════════════════════════════════════════╝
     """
+
 
     def __init__(self, beam_search: BeamSearch, policy_model: Optional[torch.nn.Module] = None):
         self.beam_search = beam_search

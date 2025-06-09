@@ -1,10 +1,20 @@
-# Standard library imports
-import queue as py_queue
-import threading
-from typing import Dict, List, Optional, Tuple, TYPE_CHECKING
+try:
+    # Standard library imports
+    import queue as py_queue
+    import threading
+    from typing import Dict, List, Optional, Tuple, TYPE_CHECKING
 
-# Third-party imports
-import torch
+    import torch
+except Exception:
+    print(
+        "\n"
+        "+-----------------------------------------------------------------------+\n"
+        "| Imports failed. Run setup_env or setup_env_dev and select every    |\n"
+        "| project and module you plan to use. Missing packages mean setup was |\n"
+        "| skipped or incomplete.                                             |\n"
+        "+-----------------------------------------------------------------------+\n"
+    )
+    raise
 # --- END HEADER ---
 
 if TYPE_CHECKING:
@@ -19,6 +29,7 @@ class BeamRetirementManager:
     - get_gpu_batch(): pull up to N beams for GPU batch.
     - Thread-safe, high-throughput.
     """
+
 
     def __init__(self, tree: 'CompressedBeamTree', prefix_len=8, tokenizer=None, filter_config=None, queue_size=16384):
         self.tree = tree # Reference to the main beam tree

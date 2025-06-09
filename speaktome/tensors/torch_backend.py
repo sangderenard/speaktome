@@ -27,17 +27,26 @@
 # AbstractTensorOperations. Backend implementations provide only the raw
 # tensor operations.
 
-from typing import Any, Tuple, List, Optional, Union
-
 try:
+    from typing import Any, Tuple, List, Optional, Union
+
     import torch
     import torch.nn.functional as F
-except ModuleNotFoundError:  # pragma: no cover - optional dependency
+except ModuleNotFoundError:
     torch = None  # type: ignore
     F = None  # type: ignore
+except Exception:
+    print(
+        "\n"
+        "+-----------------------------------------------------------------------+\n"
+        "| Imports failed. Run setup_env or setup_env_dev and select every    |\n"
+        "| project and module you plan to use. Missing packages mean setup was |\n"
+        "| skipped or incomplete.                                             |\n"
+        "+-----------------------------------------------------------------------+\n"
+    )
+    raise
 
 from .abstraction import AbstractTensorOperations
-
 # --- END HEADER ---
 
 class PyTorchTensorOperations(AbstractTensorOperations):
