@@ -59,16 +59,18 @@ esac
 
 if [ $NOEXTRAS -eq 0 ]; then
   safe_run $VENV_PIP install .[plot]
+
   if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
-    echo "Installing CPU-only torch (CI environment)"
-    safe_run $VENV_PIP install torch==1.13.1+cpu -f https://download.pytorch.org/whl/torch_stable.html
+      echo "Installing latest stable CPU-only torch (CI environment)"
+      safe_run $VENV_PIP install torch -f https://download.pytorch.org/whl/torch_stable.html
   elif [ $FORCE_GPU -eq 1 ]; then
-    echo "Installing GPU-enabled torch"
-    safe_run $VENV_PIP install torch --index-url https://download.pytorch.org/whl/cu118
+      echo "Installing GPU-enabled torch"
+      safe_run $VENV_PIP install torch --extra-index-url https://download.pytorch.org/whl/cu118
   else
-    echo "Installing CPU-only torch (default)"
-    safe_run $VENV_PIP install torch==1.13.1+cpu -f https://download.pytorch.org/whl/torch_stable.html
+      echo "Installing latest stable CPU-only torch (default)"
+      safe_run $VENV_PIP install torch -f https://download.pytorch.org/whl/torch_stable.html
   fi
+
   if [ $ML -eq 1 ]; then
     echo "Installing ML extras"
     safe_run $VENV_PIP install .[ml]

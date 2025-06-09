@@ -38,13 +38,16 @@ fi
 
 
 install_speaktome_extras() {
-  local SPEAKTOME_DIR="./speaktome"
+  local SPEAKTOME_DIR="$SCRIPT_ROOT/speaktome"
   if [ ! -d "$SPEAKTOME_DIR" ]; then
     echo "Warning: SpeakToMe directory not found at $SPEAKTOME_DIR. Skipping extras installation." >&2
     return 0
   fi
 
-  pushd "$SPEAKTOME_DIR" > /dev/null
+  # Save current directory and cd into speaktome
+  local OLD_DIR
+  OLD_DIR="$(pwd)"
+  cd "$SPEAKTOME_DIR"
 
   echo "Attempting to upgrade pip..."
   if ! "$VENV_PYTHON" -m pip install --upgrade pip; then
@@ -72,7 +75,8 @@ install_speaktome_extras() {
     fi
   done
 
-  popd > /dev/null
+  # Restore previous directory
+  cd "$OLD_DIR"
 }
 install_speaktome_extras
 # Run Python commands using the venv's interpreter
