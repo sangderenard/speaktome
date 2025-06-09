@@ -87,6 +87,20 @@ Once the models are downloaded you can run the program without further network
 access. If you skip this step, the application falls back to the lightweight
 CPU demo mode.
 
+### Developer Setup
+Use the developer script to run the standard installation and display key documentation:
+
+```bash
+bash setup_env_dev.sh --extras --prefetch
+```
+
+On Windows run:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File setup_env_dev.ps1 -extras -prefetch
+```
+
+
 ## Running SpeakToMe
 
 Use the provided wrapper scripts to ensure the `.venv` interpreter is used
