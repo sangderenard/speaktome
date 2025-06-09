@@ -18,4 +18,13 @@ except Exception:
     raise
 # --- END HEADER ---
 
-__all__ = ["ENV_SETUP_BOX"]
+HEADER_REQUIREMENTS = [
+    "shebang line '#!/usr/bin/env python3'",
+    "module docstring",
+    "'from __future__ import annotations' before the try block",
+    "imports wrapped in a try block",
+    "except block printing ENV_SETUP_BOX",
+    "'# --- END HEADER ---' sentinel after the except block",
+]
+
+__all__ = ["ENV_SETUP_BOX", "HEADER_REQUIREMENTS"]

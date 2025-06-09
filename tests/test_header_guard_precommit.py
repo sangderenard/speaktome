@@ -17,7 +17,7 @@ def test_check_try_header_pass(tmp_path: Path) -> None:
         "#!/usr/bin/env python3\n"
         "\"\"\"doc\"\"\"\n"
         "from __future__ import annotations\n"
-        "try:\n    import os\nexcept Exception:\n    print('warn')\n    raise\n# --- END HEADER ---\n"
+        "try:\n    import os\nexcept Exception:\n    print(ENV_SETUP_BOX)\n    raise\n# --- END HEADER ---\n"
     )
     assert hg.check_try_header(path) == []
 
@@ -27,3 +27,14 @@ def test_check_try_header_fail(tmp_path: Path) -> None:
     errors = hg.check_try_header(path)
     assert "Missing shebang" in errors
     assert "Missing module docstring" in errors
+
+def test_check_env_print_missing(tmp_path: Path) -> None:
+    path = tmp_path / "noprint.py"
+    path.write_text(
+        "#!/usr/bin/env python3\n"
+        "\"\"\"doc\"\"\"\n"
+        "from __future__ import annotations\n"
+        "try:\n    import os\nexcept Exception:\n    raise\n# --- END HEADER ---\n"
+    )
+    errors = hg.check_try_header(path)
+    assert "Missing 'print(ENV_SETUP_BOX)' in except block" in errors
