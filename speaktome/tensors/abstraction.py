@@ -200,12 +200,90 @@ class AbstractTensorOperations(ABC):
         """Return the default floating point dtype."""
         pass
 
+    # --- Operator routing ---
+    @abstractmethod
+    def _apply_operator(self, op: str, *args, **kwargs):
+        """
+        Centralized operator dispatch. Backends must implement.
+        Example: op='add', args=(other,)
+        """
+        pass
 
-        stacked = ops.stack([[1, 2], [3, 4]], dim=0)
-        assert stacked == [[[1, 2], [3, 4]], [[1, 2], [3, 4]]]
-        values, idxs = ops.topk([1, 3, 2, 4], k=2, dim=-1)
-        assert values == [4, 3] and idxs == [3, 1]
+    def __add__(self, other):
+        return self._apply_operator('add', other)
 
+    def __sub__(self, other):
+        return self._apply_operator('sub', other)
+
+    def __mul__(self, other):
+        return self._apply_operator('mul', other)
+
+    def __truediv__(self, other):
+        return self._apply_operator('truediv', other)
+
+    def __floordiv__(self, other):
+        return self._apply_operator('floordiv', other)
+
+    def __mod__(self, other):
+        return self._apply_operator('mod', other)
+
+    def __pow__(self, other):
+        return self._apply_operator('pow', other)
+
+    def __matmul__(self, other):
+        return self._apply_operator('matmul', other)
+
+    # Reverse operators
+    def __radd__(self, other):
+        return self._apply_operator('radd', other)
+
+    def __rsub__(self, other):
+        return self._apply_operator('rsub', other)
+
+    def __rmul__(self, other):
+        return self._apply_operator('rmul', other)
+
+    def __rtruediv__(self, other):
+        return self._apply_operator('rtruediv', other)
+
+    def __rfloordiv__(self, other):
+        return self._apply_operator('rfloordiv', other)
+
+    def __rmod__(self, other):
+        return self._apply_operator('rmod', other)
+
+    def __rpow__(self, other):
+        return self._apply_operator('rpow', other)
+
+    def __rmatmul__(self, other):
+        return self._apply_operator('rmatmul', other)
+
+    # In-place operators
+    def __iadd__(self, other):
+        return self._apply_operator('iadd', other)
+
+    def __isub__(self, other):
+        return self._apply_operator('isub', other)
+
+    def __imul__(self, other):
+        return self._apply_operator('imul', other)
+
+    def __itruediv__(self, other):
+        return self._apply_operator('itruediv', other)
+
+    def __ifloordiv__(self, other):
+        return self._apply_operator('ifloordiv', other)
+
+    def __imod__(self, other):
+        return self._apply_operator('imod', other)
+
+    def __ipow__(self, other):
+        return self._apply_operator('ipow', other)
+
+    def __imatmul__(self, other):
+        return self._apply_operator('imatmul', other)
+
+# Remove stray demo/test code (stacked = ..., values, idxs = ...)
 
 def _get_shape(data):
     if not isinstance(data, list):

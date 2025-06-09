@@ -31,6 +31,41 @@ class PurePythonTensorOperations(AbstractTensorOperations):
         # ###############################################################
         pass
 
+    def _apply_operator(self, op: str, other):
+        # Only support operations with other Python-list tensors or scalars
+        if isinstance(other, list):
+            return self._elementwise_op(op, self, other)
+        else:
+            return self._elementwise_op_scalar(op, self, other)
+
+    def _elementwise_op(self, op: str, a, b):
+        # Recursively apply op to nested lists
+        if not isinstance(a, list) and not isinstance(b, list):
+            return self._apply_scalar_op(op, a, b)
+        return [self._elementwise_op(op, ai, bi) for ai, bi in zip(a, b)]
+
+    def _elementwise_op_scalar(self, op: str, a, scalar):
+        if not isinstance(a, list):
+            return self._apply_scalar_op(op, a, scalar)
+        return [self._elementwise_op_scalar(op, ai, scalar) for ai in a]
+
+    def _apply_scalar_op(self, op: str, x, y):
+        if op in ('add', 'radd', 'iadd'):
+            return x + y
+        if op in ('sub', 'rsub', 'isub'):
+            return x - y if op != 'rsub' else y - x
+        if op in ('mul', 'rmul', 'imul'):
+            return x * y
+        if op in ('truediv', 'rtruediv', 'itruediv'):
+            return x / y if op != 'rtruediv' else y / x
+        if op in ('floordiv', 'rfloordiv', 'ifloordiv'):
+            return x // y if op != 'rfloordiv' else y // x
+        if op in ('mod', 'rmod', 'imod'):
+            return x % y if op != 'rmod' else y % x
+        if op in ('pow', 'rpow', 'ipow'):
+            return x ** y if op != 'rpow' else y ** x
+        raise NotImplementedError(f"Operator {op} not implemented for pure Python backend.")
+
     # Creation ops
     def full(self, size: Tuple[int, ...], fill_value: Any, dtype: Any, device: Any):
         if not size:
