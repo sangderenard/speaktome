@@ -94,7 +94,7 @@ function Install-Speaktome-Extras {
     $backendGroups = @("numpy", "jax", "ctensor")
     foreach ($group in $backendGroups) {
         $response = $null
-        Write-Host "Install backend group '$group'? [y/N] (auto-skip in 3s): " -NoNewline
+        Write-Host "Install backend group '$group'? Install if you plan to run the corresponding abstract tensor backend. [y/N] (auto-skip in 3s): " -NoNewline
         for ($i=3; $i -gt 0; $i--) {
             if ($Host.UI.RawUI.KeyAvailable) {
                 $key = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
