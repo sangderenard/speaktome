@@ -41,6 +41,9 @@ if [[ $EXTRAS -eq 1 ]]; then
   safe_run pip install .[plot]
 fi
 
+# Install package in editable mode so local changes apply immediately
+safe_run pip install -e .
+
 # 4. Handle CPU vs GPU torch & optional ML extras
 if [[ $EXTRAS -eq 1 ]]; then
   if [[ "${GITHUB_ACTIONS:-}" == "true" ]]; then
@@ -64,6 +67,9 @@ fi
 if [[ $PREFETCH -eq 1 ]]; then
   safe_run bash fetch_models.sh
 fi
+
+# Ensure optional dependencies defined in pyproject.toml are installed
+safe_run python AGENTS/tools/ensure_pyproject_deps.py
 echo "Environment setup complete."
 echo "✅ Environment ready. Activate with 'source .venv/bin/activate'."
 echo "   • Core  = requirements.txt + dev"
