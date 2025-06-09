@@ -7,7 +7,9 @@ import json
 from cffi import FFI
 from typing import Any, Tuple, Optional, List
 
-from .tensor_abstraction import AbstractTensorOperations, _get_shape, _flatten
+# The tensor abstraction module was renamed to ``abstraction``. Update imports
+# accordingly so the C backend stays in sync with the other backends.
+from .abstraction import AbstractTensorOperations, _get_shape, _flatten
 
 # --- END HEADER ---
 
