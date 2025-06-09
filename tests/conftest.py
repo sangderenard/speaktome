@@ -1,7 +1,7 @@
 """PyTest configuration with faculty-aware logging.
 
 This configuration file establishes a consistent logging setup for all tests
-and announces the active :class:`~speaktome.faculty.Faculty` tier.  The output
+and announces the active :class:`~speaktome.tensors.faculty.Faculty` tier.  The output
 is written to ``testing/logs`` so future agents may trace prior sessions.
 """
 
@@ -15,7 +15,7 @@ import importlib.util
 from io import StringIO
 
 # Import faculty components for logging
-from speaktome.faculty import DEFAULT_FACULTY, FORCE_ENV, Faculty
+from speaktome.tensors.faculty import DEFAULT_FACULTY, FORCE_ENV, Faculty
 
 spec = importlib.util.spec_from_file_location(
     "pretty_logger",
@@ -53,6 +53,12 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         action="store_true",
         default=False,
         help="Skip tests marked with @pytest.mark.stub",
+    )
+    parser.addoption(
+        "--interactive-tensor",
+        action="store_true",
+        default=False,
+        help="Enable interactive mode for tensor backend tests",
     )
 
 def pytest_configure(config: pytest.Config) -> None:
@@ -223,6 +229,12 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
 def pretty_logger(request: pytest.FixtureRequest):
     """Access the PrettyLogger configured for the session."""
     return request.config._speaktome_pretty_logger
+
+
+@pytest.fixture(scope="session")
+def tensor_interactive(request: pytest.FixtureRequest) -> bool:
+    """Return True if tensor backend tests should track time."""
+    return request.config.getoption("--interactive-tensor")
 
 
 @pytest.fixture(autouse=True)

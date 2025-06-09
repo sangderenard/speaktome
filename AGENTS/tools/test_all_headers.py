@@ -14,7 +14,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from speaktome.faculty import Faculty, FORCE_ENV
+from speaktome.tensors.faculty import Faculty, FORCE_ENV
 
 
 # ########## STUB: recursive test runner ##########

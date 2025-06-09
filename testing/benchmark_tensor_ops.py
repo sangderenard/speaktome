@@ -10,7 +10,7 @@ quick sanity check when experimenting with alternate implementations.
 # --- END HEADER ---
 
 import time
-from speaktome.faculty import Faculty
+from speaktome.tensors.faculty import Faculty
 from speaktome.tensors import get_tensor_operations
 
 

@@ -32,7 +32,7 @@
 ./speaktome/domains/geo/__init__.py
 ./speaktome/domains/geo/pyg_graph_controller.py
 ./speaktome/domains/geo/pygeo_mind.py
-./speaktome/faculty.py
+./speaktome/tensors/faculty.py
 ./speaktome/speaktome.py
 ./speaktome/util/__init__.py
 ./speaktome/util/array_utils.py
@@ -49,7 +49,7 @@
 ./tests/test_cli_permutations.py
 ./tests/test_faculty.py
 ./tests/test_format_test_digest.py
-./tests/test_pure_python_tensor_ops.py
+./tests/test_tensor_backends.py
 ./tests/test_retirement_manager.py
 ./tests/test_snap_beam_path.py
 ./tests/test_validate_guestbook.py
