@@ -39,13 +39,16 @@ class LookaheadController:
         device: Any, # Generic device type
         tokenizer: Any, # Tokenizer should have pad_token_id
         config: LookaheadConfig,
-        tensor_ops: AbstractTensorOperations,
+        tensor_ops: AbstractTensorOperations | None,
         model_wrapper: AbstractModelWrapper,
     ):
         self.lookahead_steps = lookahead_steps
         self.max_len = max_len
         self.device = device
         self.tokenizer = tokenizer
+        if tensor_ops is None:
+            from ..tensors import get_tensor_operations
+            tensor_ops = get_tensor_operations()
         self.tensor_ops = tensor_ops
         self.model_wrapper = model_wrapper
 
