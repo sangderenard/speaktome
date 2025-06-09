@@ -24,15 +24,6 @@ if (-not (Test-Path $venvPip)) {
     return
 }
 
-Safe-Run { & $venvPython AGENTS/tools/dump_headers.py speaktome --markdown }
-Safe-Run { & $venvPython AGENTS/tools/stubfinder.py speaktome }
-Safe-Run { & $venvPython AGENTS/tools/list_contributors.py }
-Safe-Run { & $venvPython AGENTS/tools/preview_doc.py AGENTS/AGENT_CONSTITUTION.md }
-Safe-Run { & $venvPython AGENTS/tools/preview_doc.py AGENTS.md }
-Safe-Run { & $venvPython AGENTS/tools/preview_doc.py LICENSE }
-Safe-Run { & $venvPython AGENTS/tools/preview_doc.py AGENTS/CODING_STANDARDS.md }
-Safe-Run { & $venvPython AGENTS/tools/preview_doc.py AGENTS/CONTRIBUTING.md }
-Safe-Run { & $venvPython AGENTS/tools/preview_doc.py AGENTS/PROJECT_OVERVIEW.md }
 
 function Install-Speaktome-Extras {
     $speaktomeDir = Join-Path $PSScriptRoot "speaktome"
@@ -81,3 +72,14 @@ function Install-Speaktome-Extras {
 }
 
 Install-Speaktome-Extras
+
+
+Safe-Run { & $venvPython AGENTS/tools/dump_headers.py speaktome --markdown }
+Safe-Run { & $venvPython AGENTS/tools/stubfinder.py speaktome }
+Safe-Run { & $venvPython AGENTS/tools/list_contributors.py }
+Safe-Run { & $venvPython AGENTS/tools/preview_doc.py AGENTS/AGENT_CONSTITUTION.md }
+Safe-Run { & $venvPython AGENTS/tools/preview_doc.py AGENTS.md }
+Safe-Run { & $venvPython AGENTS/tools/preview_doc.py LICENSE }
+Safe-Run { & $venvPython AGENTS/tools/preview_doc.py AGENTS/CODING_STANDARDS.md }
+Safe-Run { & $venvPython AGENTS/tools/preview_doc.py AGENTS/CONTRIBUTING.md }
+Safe-Run { & $venvPython AGENTS/tools/preview_doc.py AGENTS/PROJECT_OVERVIEW.md }
