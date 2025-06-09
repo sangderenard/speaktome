@@ -35,14 +35,15 @@ if [ ! -x "$VENV_PIP" ]; then
   # Allow script to continue, subsequent VENV_PIP commands will be handled or fail gracefully
 fi
 
-
-# Explicitly set Python environment variables so all commands run against the
-# virtual environment without relying on activation scripts.
-PY_VERSION="$($VENV_PYTHON -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')"
-export PYTHONHOME="$SCRIPT_ROOT/.venv"
-export PYTHONPATH="$SCRIPT_ROOT/.venv/lib/python${PY_VERSION}/site-packages"
-
-
+# Activate the virtual environment
+VENV_ACTIVATE="$SCRIPT_ROOT/.venv/bin/activate"
+if [ -f "$VENV_ACTIVATE" ]; then
+    # shellcheck disable=SC1090
+    source "$VENV_ACTIVATE"
+else
+    echo "Error: Virtual environment activation script not found at $VENV_ACTIVATE" >&2
+    exit 1
+fi
 
 install_speaktome_extras() {
   local SPEAKTOME_DIR="$SCRIPT_ROOT/speaktome"

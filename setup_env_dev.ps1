@@ -32,14 +32,18 @@ if (-not (Test-Path $venvPip)) {
 }
 
 
-# Explicitly configure Python environment variables so commands use the
-# virtual environment regardless of shell activation state.
-$env:PYTHONHOME = $venvDir
-$pyVer = & $venvPython -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')"
+# Activate the virtual environment
 if ($IsWindows) {
-    $env:PYTHONPATH = Join-Path $venvDir "Lib\site-packages"
+    $activateScript = Join-Path $venvDir "Scripts\Activate.ps1"
 } else {
-    $env:PYTHONPATH = Join-Path $venvDir "lib/python$pyVer/site-packages"
+    $activateScript = Join-Path $venvDir "bin/Activate.ps1"
+}
+
+if (Test-Path $activateScript) {
+    . $activateScript
+} else {
+    Write-Host "Error: Virtual environment activation script not found at $activateScript"
+    return
 }
 
 
