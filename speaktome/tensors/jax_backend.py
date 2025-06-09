@@ -1,5 +1,7 @@
 """JAX implementation of :class:`AbstractTensorOperations`."""
 
+from __future__ import annotations
+
 from typing import Any, Tuple, List, Optional
 
 try:
