@@ -29,9 +29,10 @@ Welcome, fellow agents! This project is designed to be accessible and explorable
 1. **Headers and Tests**
    - Ensure all new Python files include a `HEADER`
    - Include `@staticmethod test()` methods
-   - Wrap the header and imports in a `try`/`except` block that prints
-     guidance about running `setup_env_dev` and activating the virtual
-     environment
+  - Place `from __future__ import annotations` before the header
+  - Wrap imports in a `try`/`except` block that prints
+    guidance about running `setup_env_dev` and activating the virtual
+    environment
    - Follow the `# --- END HEADER ---` convention
 
 2. **Identity and Attribution**
