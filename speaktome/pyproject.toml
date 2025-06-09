@@ -1,0 +1,53 @@
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# pyproject.toml — modular extras, clear comments
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[build-system]
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "speaktome"
+version = "0.1.0"
+description = "Beam search controllers and utilities for generating text"
+readme = "README.md"
+requires-python = ">=3.8"
+license = { text = "MIT" }
+authors = [{ name = "SpeakToMe Authors" }]
+
+# Core (always needed)
+dependencies = [
+  "numpy>=1.26"
+]
+
+# Named feature groups—install only what you need:
+#  • plot: visualization & analysis
+#  • ml: full ML stack & beam search
+#  • dev: testing & linting
+[project.optional-dependencies]
+plot = [
+  "matplotlib>=3.7",    # plotting
+  "networkx>=3.1",      # graph tools
+  "scikit-learn>=1.2"   # classical ML
+]
+ml = [
+  "transformers>=4.30",           # model interfaces
+  "sentence-transformers>=2.2"    # high-level embeddings
+  # torch & torch_geometric handled by setup_env.sh for CPU vs GPU installs
+]
+jax = [
+  "jax[cpu]>=0.4"       # experimental JAX backend
+]
+ctensor = [
+  "cffi>=1.15"          # C backend helpers
+]
+numpy = [
+  "numpy>=1.26"        # standard NumPy backend
+]
+dev = [
+  "pytest>=8.0"
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["speaktome*"]

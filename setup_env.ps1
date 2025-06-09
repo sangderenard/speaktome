@@ -1,11 +1,13 @@
 # Windows PowerShell environment setup script for SpeakToMe
-# Mirrors setup_env.sh functionality
+# No Unicode. All pip/python commands run inside venv unless -NoVenv is used.
 
 param(
     [switch]$extras,
     [switch]$ml,
     [switch]$gpu,
-    [switch]$prefetch
+    [switch]$prefetch,
+    [switch]$NoVenv,
+    [string[]]$Codebases = @(".")
 )
 
 $ErrorActionPreference = 'Continue'
@@ -17,36 +19,48 @@ function Safe-Run([ScriptBlock]$cmd) {
     }
 }
 
-# 1. Create & activate venv
-Safe-Run { python -m venv .venv }
-Safe-Run { & .venv\Scripts\Activate.ps1 }
-Safe-Run { pip install --upgrade pip }
-
-# 2. Install core + dev requirements
-Safe-Run { pip install -r requirements.txt -r requirements-dev.txt }
-if ($extras) {
-    Safe-Run { pip install .[plot] }
+if (-not $NoVenv) {
+    # 1. Create & activate venv
+    Safe-Run { python -m venv .venv }
+    Safe-Run { & .venv\Scripts\Activate.ps1 }
+    $venvPython = ".venv\Scripts\python.exe"
+    $venvPip = ".venv\Scripts\pip.exe"
+} else {
+    $venvPython = "python"
+    $venvPip = "pip"
 }
 
-# Install package in editable mode so changes are picked up automatically
-Safe-Run { pip install -e . }
-
-# 3. Handle CPU vs GPU torch & optional ML extras
+# 2. Install core + dev requirements
+Safe-Run { & $venvPip install --upgrade pip }
+Safe-Run { & $venvPip install -r requirements.txt -r requirements-dev.txt }
 if ($extras) {
+    Safe-Run { & $venvPip install .[plot] }
+
+    # 3. Handle CPU vs GPU torch & optional ML extras
     if ($env:GITHUB_ACTIONS -eq 'true') {
-        Write-Host '👷 Installing CPU-only torch (CI environment)'
-        Safe-Run { pip install torch==1.13.1+cpu --index-url https://download.pytorch.org/whl/cpu }
+        Write-Host 'Installing CPU-only torch (CI environment)'
+        Safe-Run { & $venvPip install torch==1.13.1+cpu --index-url https://download.pytorch.org/whl/cpu }
     } elseif ($gpu) {
-        Write-Host '⚡ Installing GPU-enabled torch'
-        Safe-Run { pip install torch --index-url https://download.pytorch.org/whl/cu118 }
+        Write-Host 'Installing GPU-enabled torch'
+        Safe-Run { & $venvPip install torch --index-url https://download.pytorch.org/whl/cu118 }
     } else {
-        Write-Host '🧠 Installing CPU-only torch (default)'
-        Safe-Run { pip install torch==1.13.1+cpu --index-url https://download.pytorch.org/whl/cpu }
+        Write-Host 'Installing CPU-only torch (default)'
+        Safe-Run { & $venvPip install torch==1.13.1+cpu --index-url https://download.pytorch.org/whl/cpu }
     }
 
     if ($ml) {
-        Write-Host '🔬 Installing ML extras'
-        Safe-Run { pip install .[ml] }
+        Write-Host 'Installing ML extras'
+        Safe-Run { & $venvPip install .[ml] }
+    }
+}
+
+# Install package in editable mode so changes are picked up automatically
+Safe-Run { & $venvPip install -e . }
+
+# Install additional codebases in editable mode
+foreach ($cb in $Codebases) {
+    if ($cb -ne "." -and (Test-Path "$cb\pyproject.toml" -or (Test-Path "$cb\setup.py"))) {
+        Safe-Run { & $venvPip install -e $cb }
     }
 }
 
@@ -56,6 +70,6 @@ if ($prefetch) {
 }
 
 # Ensure optional dependencies from pyproject.toml are installed
-Safe-Run { python AGENTS/tools/ensure_pyproject_deps.py }
+Safe-Run { & $venvPython AGENTS/tools/ensure_pyproject_deps.py }
 
-Write-Host "Environment setup complete. Activate with '.venv\\Scripts\\Activate.ps1'"
+Write-Host "Environment setup complete. Activate with '.venv\Scripts\Activate.ps1'"

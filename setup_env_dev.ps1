@@ -1,5 +1,4 @@
 # PowerShell developer environment setup script for SpeakToMe
-# Mirrors setup_env_dev.sh functionality for Windows users
 
 $ErrorActionPreference = 'Stop'
 
@@ -19,7 +18,6 @@ if (-not (Test-Path $venvPython)) {
     return
 }
 
-# Execute developer helper scripts using the venv interpreter
 Safe-Run { & $venvPython AGENTS/tools/dump_headers.py speaktome --markdown }
 Safe-Run { & $venvPython AGENTS/tools/stubfinder.py speaktome }
 Safe-Run { & $venvPython AGENTS/tools/list_contributors.py }
