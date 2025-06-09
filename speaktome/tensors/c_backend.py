@@ -65,6 +65,9 @@ ffi.cdef("""
     void sqrt_double(const double* a, double* out, int n);
     void gather_pairs_2d(const double* a, const int* rows, const int* cols,
                          double* out, int n_pairs, int stride);
+    double sum_double(const double* a, int n);
+    void create_arange(double start, double step, int n, double* out);
+    void topk_double(const double* a, int n, int k, int* indices, double* out);
 """)
 
 C_SOURCE = """
@@ -135,6 +138,45 @@ C_SOURCE = """
         for (int i = 0; i < n_pairs; ++i) {
             out[i] = a[rows[i] * stride + cols[i]];
         }
+    }
+    double sum_double(const double* a, int n) {
+        double s = 0;
+        for (int i = 0; i < n; i++) {
+            s += a[i];
+        }
+        return s;
+    }
+
+    void create_arange(double start, double step, int n, double* out) {
+        for (int i = 0; i < n; i++) {
+            out[i] = start + i * step;
+        }
+    }
+
+    void topk_double(const double* a, int n, int k, int* indices, double* out) {
+        int i, j, best;
+        double best_val;
+        int *used = (int*)malloc(n * sizeof(int));
+        for (i = 0; i < n; i++) used[i] = 0;
+        for (i = 0; i < k; i++) {
+            best = -1;
+            best_val = -1e300; // a very small number as initial comparator
+            for (j = 0; j < n; j++) {
+                if (!used[j] && a[j] > best_val) {
+                    best_val = a[j];
+                    best = j;
+                }
+            }
+            if (best != -1) {
+                used[best] = 1;
+                indices[i] = best;
+                out[i] = best_val;
+            } else {
+                indices[i] = -1;
+                out[i] = 0.0;
+            }
+        }
+        free(used);
     }
 """
 
@@ -253,8 +295,7 @@ class CTensorOperations(AbstractTensorOperations):
 
     def clone(self, tensor: CTensor) -> CTensor:
         t = CTensor(tensor.shape)
-        for i in range(t.size):
-            t.buffer[i] = tensor.buffer[i]
+        ffi.memmove(t.buffer, tensor.buffer, tensor.size * ffi.sizeof("double"))
         return t
 
     def to_device(self, tensor: CTensor, device: Any) -> CTensor:
@@ -268,8 +309,17 @@ class CTensorOperations(AbstractTensorOperations):
         device: Any = None,
         dtype: Any = None,
     ) -> CTensor:
-        data = list(range(start)) if end is None else list(range(start, end, step))
-        return CTensor.from_list(data, (len(data),))
+        if end is None:
+            n = start
+            start_val = 0.0
+            step_val = 1.0
+        else:
+            n = int((end - start) // step)
+            start_val = float(start)
+            step_val = float(step)
+        out = CTensor((n,))
+        C.create_arange(start_val, step_val, n, out.as_c_ptr())
+        return out
 
     def pow(self, tensor: Any, exponent: float) -> CTensor:
         if not isinstance(tensor, CTensor):
@@ -300,7 +350,8 @@ class CTensorOperations(AbstractTensorOperations):
             tensor = CTensor.from_list(tensor, _get_shape(tensor))
         values = _flatten(tensor.tolist())
         if dim is None:
-            return sum(values) / len(values) if values else 0.0
+            s = C.sum_double(tensor.as_c_ptr(), tensor.size)
+            return s / tensor.size if tensor.size else 0.0
         # ########## STUB: CTensorOperations.mean_dim ##########
         # PURPOSE: Placeholder for dimension-wise mean on CTensors.
         # EXPECTED BEHAVIOR: Compute mean along the specified dimension.
@@ -388,35 +439,20 @@ class CTensorOperations(AbstractTensorOperations):
         raise NotImplementedError("pad not implemented for C backend")
 
     def topk(self, tensor: CTensor, k: int, dim: int) -> Tuple[Any, Any]:
-        # ########## STUB: CTensorOperations.topk ##########
-        # PURPOSE: Return the top ``k`` values and their indices along ``dim``.
-        # EXPECTED BEHAVIOR: Similar to numpy.take_along_axis with sorting.
-        # INPUTS: ``tensor`` CTensor, ``k`` int, ``dim`` dimension index.
-        # OUTPUTS: Tuple of (values CTensor, indices list).
-        # KEY ASSUMPTIONS/DEPENDENCIES: Requires sorting capabilities.
-        # TODO:
-        #   - Implement efficient top-k selection.
-        # NOTES: Complex due to absence of vectorized sort in this backend.
-        # ############################################################
-        if dim < 0:
-            dim += len(tensor.shape)
-        if dim != len(tensor.shape) - 1:
-            raise NotImplementedError(
-                "topk only implemented for the last dimension"
-            )
-
-        if len(tensor.shape) != 1:
-            raise NotImplementedError("topk only implemented for 1D tensors")
-
-        data = tensor.tolist()
-        indexed = sorted(
-            [(i, v) for i, v in enumerate(data)], key=lambda x: x[1], reverse=True
-        )[:k]
-        values = [v for _, v in indexed]
-        indices = [i for i, _ in indexed]
-        return CTensor.from_list(values, (len(values),)), CTensor.from_list(
-            indices, (len(indices),)
-        )
+        # For this C backend, topk is implemented in C for 1D data.
+        # If the tensor is multidimensional, we flatten it.
+        flat = _flatten(tensor.tolist())
+        n = len(flat)
+        # allocate C arrays for indices and values
+        c_indices = ffi.new("int[]", k)
+        c_values = ffi.new("double[]", k)
+        # Create a temporary C array for the flattened data
+        temp = ffi.new("double[]", flat)
+        C.topk_double(temp, n, k, c_indices, c_values)
+        # Convert C arrays to Python lists and then to CTensors
+        py_values = [c_values[i] for i in range(k)]
+        py_indices = [c_indices[i] for i in range(k)]
+        return CTensor.from_list(py_values, (k,)), CTensor.from_list(py_indices, (k,))
 
     def repeat_interleave(self, tensor: CTensor, repeats: int, dim: Optional[int] = None) -> Any:
         # ########## STUB: CTensorOperations.repeat_interleave ##########
@@ -446,7 +482,7 @@ class CTensorOperations(AbstractTensorOperations):
         # KEY ASSUMPTIONS/DEPENDENCIES: Requires index math support.
         # TODO:
         #   - Implement multi-dimensional indexing.
-        # NOTES: Stubbed pending full CTensor infrastructure.
+        # NOTES: Stub pending full CTensor infrastructure.
         # ############################################################
         raise NotImplementedError("assign_at_indices not implemented for C backend")
 
