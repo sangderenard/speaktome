@@ -1,24 +1,35 @@
-# Standard library imports
-import collections
-from typing import Dict, List, Tuple, TYPE_CHECKING
+try:
+    # Standard library imports
+    import collections
+    from typing import Dict, List, Tuple, TYPE_CHECKING
 
-# Third-party imports
-import torch
+    # Third-party imports
+    import torch
 
-from ...tensors.faculty import Faculty
+    from ...tensors.faculty import Faculty
 
-FACULTY_REQUIREMENT = Faculty.PYGEO
+    FACULTY_REQUIREMENT = Faculty.PYGEO
 
-from ...util.lazy_loader import lazy_install
-if TYPE_CHECKING:
-    from torch_geometric.data import Data as PyGData
-    import torch_geometric.nn as pyg_nn
+    from ...util.lazy_loader import lazy_install
+    if TYPE_CHECKING:
+        from torch_geometric.data import Data as PyGData
+        import torch_geometric.nn as pyg_nn
 
-# Local application/library specific imports
-from ...core.beam_search_instruction import BeamSearchInstruction
-from ...core.compressed_beam_tree import CompressedBeamTree
-from ...core.human_scorer_policy_manager import HumanScorerPolicyManager
-from ...core.scorer import Scorer
+    # Local application/library specific imports
+    from ...core.beam_search_instruction import BeamSearchInstruction
+    from ...core.compressed_beam_tree import CompressedBeamTree
+    from ...core.human_scorer_policy_manager import HumanScorerPolicyManager
+    from ...core.scorer import Scorer
+except Exception:
+    print(
+        "\n"
+        "+-----------------------------------------------------------------------+\n"
+        "| Imports failed. Run setup_env or setup_env_dev and select every    |\n"
+        "| project and module you plan to use. Missing packages mean setup was |\n"
+        "| skipped or incomplete.                                             |\n"
+        "+-----------------------------------------------------------------------+\n"
+    )
+    raise
 # --- END HEADER ---
 
 
@@ -37,6 +48,7 @@ class PyGeoMind(torch.nn.Module):
     GPT-inspired space traversals—arbitrary direction, 
     with authority granted by learned policy.
     """
+
 
     def __init__(self, scorer: Scorer, input_dim: int = 768, hidden_dim: int = 512, beam_width: int = 5, **kwargs):
         super().__init__()

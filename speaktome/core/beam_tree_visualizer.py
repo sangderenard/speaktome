@@ -1,13 +1,22 @@
-# Standard library imports
-import collections
-from typing import Optional, List, TYPE_CHECKING
+try:
+    # Standard library imports
+    import collections
+    from typing import Optional, List, TYPE_CHECKING
 
-# Third-party imports
+    if TYPE_CHECKING:
+        from transformers import PreTrainedTokenizer
 
-if TYPE_CHECKING:
-    from transformers import PreTrainedTokenizer
-
-from ..util.lazy_loader import lazy_install
+    from ..util.lazy_loader import lazy_install
+except Exception:
+    print(
+        "\n"
+        "+-----------------------------------------------------------------------+\n"
+        "| Imports failed. Run setup_env or setup_env_dev and select every    |\n"
+        "| project and module you plan to use. Missing packages mean setup was |\n"
+        "| skipped or incomplete.                                             |\n"
+        "+-----------------------------------------------------------------------+\n"
+    )
+    raise
 # --- END HEADER ---
 
 if TYPE_CHECKING:

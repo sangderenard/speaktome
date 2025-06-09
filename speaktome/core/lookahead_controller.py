@@ -1,12 +1,22 @@
-# Standard library imports
-from __future__ import annotations
-from typing import List, Tuple, Callable, Any, Set, TYPE_CHECKING
+try:
+    # Standard library imports
+    from __future__ import annotations
+    from typing import List, Tuple, Callable, Any, Set, TYPE_CHECKING
 
-# Local application/library specific imports
-if TYPE_CHECKING:  # pragma: no cover - type hints only
-    from .beam_search_instruction import BeamSearchInstruction
-from ..tensors import AbstractTensorOperations
-from .model_abstraction import AbstractModelWrapper
+    if TYPE_CHECKING:  # pragma: no cover - type hints only
+        from .beam_search_instruction import BeamSearchInstruction
+    from ..tensors import AbstractTensorOperations
+    from .model_abstraction import AbstractModelWrapper
+except Exception:
+    print(
+        "\n"
+        "+-----------------------------------------------------------------------+\n"
+        "| Imports failed. Run setup_env or setup_env_dev and select every    |\n"
+        "| project and module you plan to use. Missing packages mean setup was |\n"
+        "| skipped or incomplete.                                             |\n"
+        "+-----------------------------------------------------------------------+\n"
+    )
+    raise
 # --- END HEADER ---
 
 
@@ -18,6 +28,7 @@ class LookaheadConfig:
       - lookahead_temp: temperature for softmax during lookahead
       - aggregate_fn: function mapping [N, width]→[N] to score each candidate
     """
+
     def __init__(
         self,
         instruction: BeamSearchInstruction | None, # Can be None for simpler setups
@@ -32,6 +43,7 @@ class LookaheadConfig:
 
 
 class LookaheadController:
+
     def __init__(
         self,
         lookahead_steps: int,

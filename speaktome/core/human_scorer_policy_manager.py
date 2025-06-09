@@ -1,9 +1,20 @@
-# Standard library imports
-import json
-from typing import Dict, Callable, Optional, List, Tuple
+try:
+    # Standard library imports
+    import json
+    from typing import Dict, Callable, Optional, List, Tuple
 
-# Local application/library specific imports
-from .scorer import Scorer
+    # Local application/library specific imports
+    from .scorer import Scorer
+except Exception:
+    print(
+        "\n"
+        "+-----------------------------------------------------------------------+\n"
+        "| Imports failed. Run setup_env or setup_env_dev and select every    |\n"
+        "| project and module you plan to use. Missing packages mean setup was |\n"
+        "| skipped or incomplete.                                             |\n"
+        "+-----------------------------------------------------------------------+\n"
+    )
+    raise
 # --- END HEADER ---
 
 class HumanScorerPolicyManager:

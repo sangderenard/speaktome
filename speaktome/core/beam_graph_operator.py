@@ -1,19 +1,27 @@
-# Standard library imports
-import json
-from typing import List, Set, Optional, Tuple, Dict, Callable, TYPE_CHECKING, Union, Any
-
 try:
+    # Standard library imports
+    import json
+    from typing import List, Set, Optional, Tuple, Dict, Callable, TYPE_CHECKING, Union, Any
+
     import torch
-except ModuleNotFoundError:  # pragma: no cover - optional
-    torch = None
 
-from ..tensors import (
-    AbstractTensorOperations,
-    get_tensor_operations,
-)
+    from ..tensors import (
+        AbstractTensorOperations,
+        get_tensor_operations,
+    )
 
-# Local application/library specific imports
-from .beam_tree_node import BeamTreeNode # Assuming BeamTreeNode is in beam_tree_node.py
+    # Local application/library specific imports
+    from .beam_tree_node import BeamTreeNode  # Assuming BeamTreeNode is in beam_tree_node.py
+except Exception:
+    print(
+        "\n"
+        "+-----------------------------------------------------------------------+\n"
+        "| Imports failed. Run setup_env or setup_env_dev and select every    |\n"
+        "| project and module you plan to use. Missing packages mean setup was |\n"
+        "| skipped or incomplete.                                             |\n"
+        "+-----------------------------------------------------------------------+\n"
+    )
+    raise
 # --- END HEADER ---
 if TYPE_CHECKING:
     from .compressed_beam_tree import CompressedBeamTree # For type hinting 'tree'
@@ -73,6 +81,7 @@ class BeamGraphOperator:
         # (when offloading/retiring) moves only b1 to "cpu"
         # Ancestors a2, a1, root remain on their current device until/unless independently retired.
     """
+
 
 
     def __init__(
