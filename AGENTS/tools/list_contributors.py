@@ -2,9 +2,22 @@
 Generates a dignified credits list from agent JSON files in AGENTS/users/.
 Most recent version of each named agent is used.
 """
-import json
-from pathlib import Path
-from typing import Dict
+from __future__ import annotations
+
+try:
+    import json
+    from pathlib import Path
+    from typing import Dict
+except Exception:
+    print(
+        "\n"
+        "+-----------------------------------------------------------------------+\n"
+        "| Imports failed. Run setup_env or setup_env_dev and select every    |\n"
+        "| project and module you plan to use. Missing packages mean setup was |\n"
+        "| skipped or incomplete.                                             |\n"
+        "+-----------------------------------------------------------------------+\n"
+    )
+    raise
 # --- END HEADER ---
 
 def generate_credits(users_dir: Path | None = None) -> str:
