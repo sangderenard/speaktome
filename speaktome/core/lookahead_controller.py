@@ -122,7 +122,7 @@ class LookaheadController:
             logits = outputs_dict['logits']
 
             last_indices = self.tensor_ops.clamp(
-                self.tensor_ops.sub_scalar(current_lengths, 1), min_val=0
+                current_lengths - 1, min_val=0
             )
             last_logits = self.tensor_ops.select_by_indices(
                 logits,
@@ -131,7 +131,7 @@ class LookaheadController:
             )
 
             logprobs = self.tensor_ops.log_softmax(
-                self.tensor_ops.div_scalar(last_logits, self.temp), dim=-1
+                last_logits / self.temp, dim=-1
             )
             topk_scores, topk_indices = self.tensor_ops.topk(logprobs, k=self.top_k, dim=-1)
 
