@@ -63,6 +63,7 @@ ffi.cdef("""
     void floor_div_const(const double* a, double b, double* out, int n);
     void rfloor_div_const(const double* a, double b, double* out, int n);
     void sqrt_double(const double* a, double* out, int n);
+    void pad_double_nd(const double* input, double* output, const int* shape, const int* new_shape, const int* left_pad, int dims, double value);
     void mean_dim(const double* a, double* out, const int* shape, int ndim, int dim);
     void gather_pairs_2d(const double* a, const int* rows, const int* cols,
                          double* out, int n_pairs, int stride);
@@ -74,6 +75,7 @@ ffi.cdef("""
 
 C_SOURCE = """
     #include <math.h>
+    #include <stdlib.h>
     void add_double(const double* a, const double* b, double* out, int n) {
         for (int i = 0; i < n; ++i) out[i] = a[i] + b[i];
     }
@@ -135,6 +137,47 @@ C_SOURCE = """
     void sqrt_double(const double* a, double* out, int n) {
         for (int i = 0; i < n; ++i) out[i] = sqrt(a[i]);
     }
+    void pad_double_nd(const double* input, double* output, const int* shape,
+                       const int* new_shape, const int* left_pad, int dims,
+                       double value) {
+        int i;
+        int total_out = 1;
+        for (i = 0; i < dims; ++i) total_out *= new_shape[i];
+        for (i = 0; i < total_out; ++i) output[i] = value;
+
+        int input_size = 1;
+        for (i = 0; i < dims; ++i) input_size *= shape[i];
+
+        int* in_stride = (int*)malloc(sizeof(int) * dims);
+        int* out_stride = (int*)malloc(sizeof(int) * dims);
+        int* idx = (int*)malloc(sizeof(int) * dims);
+
+        in_stride[dims - 1] = 1;
+        out_stride[dims - 1] = 1;
+        for (i = dims - 2; i >= 0; --i) {
+            in_stride[i] = in_stride[i + 1] * shape[i + 1];
+            out_stride[i] = out_stride[i + 1] * new_shape[i + 1];
+        }
+
+        for (i = 0; i < dims; ++i) idx[i] = 0;
+        for (i = 0; i < input_size; ++i) {
+            int out_index = 0;
+            for (int d = 0; d < dims; ++d) {
+                out_index += (idx[d] + left_pad[d]) * out_stride[d];
+            }
+            output[out_index] = input[i];
+            idx[dims - 1]++;
+            for (int d = dims - 1; d > 0; --d) {
+                if (idx[d] >= shape[d]) {
+                    idx[d] = 0;
+                    idx[d - 1]++;
+                }
+            }
+        }
+
+        free(in_stride);
+        free(out_stride);
+        free(idx);
 
     void mean_dim(const double* a, double* out, const int* shape, int ndim, int dim) {
         int before = 1;
@@ -450,17 +493,44 @@ class CTensorOperations(AbstractTensorOperations):
         raise NotImplementedError("log_softmax not implemented for C backend")
 
     def pad(self, tensor: CTensor, pad: Tuple[int, ...], value: float = 0) -> Any:
-        # ########## STUB: CTensorOperations.pad ##########
-        # PURPOSE: Pad ``tensor`` with ``value`` according to ``pad`` spec.
-        # EXPECTED BEHAVIOR: Return new CTensor with additional elements.
-        # INPUTS: ``tensor`` CTensor, padding tuple.
-        # OUTPUTS: Padded CTensor.
-        # KEY ASSUMPTIONS/DEPENDENCIES: Requires dynamic shape manipulation.
-        # TODO:
-        #   - Implement generic padding logic for all dimensions.
-        # NOTES: Currently unsupported.
-        # ############################################################
-        raise NotImplementedError("pad not implemented for C backend")
+        """Pad ``tensor`` with ``value`` according to ``pad`` specification."""
+        if not isinstance(tensor, CTensor):
+            tensor = CTensor.from_list(tensor, _get_shape(tensor))
+
+        if len(pad) % 2 != 0:
+            raise ValueError("Padding length must be even.")
+
+        dims = len(tensor.shape)
+        num_pad_dims = len(pad) // 2
+        if num_pad_dims > dims:
+            raise ValueError(
+                "Padding tuple length implies padding more dimensions than tensor has."
+            )
+
+        left = [0] * dims
+        right = [0] * dims
+        for i in range(num_pad_dims):
+            left[dims - num_pad_dims + i] = int(pad[-2 * (i + 1)])
+            right[dims - num_pad_dims + i] = int(pad[-2 * (i + 1) + 1])
+
+        new_shape = [
+            tensor.shape[i] + left[i] + right[i] for i in range(dims)
+        ]
+
+        out = CTensor(tuple(new_shape))
+        shape_c = ffi.new("int[]", list(tensor.shape))
+        new_shape_c = ffi.new("int[]", new_shape)
+        left_c = ffi.new("int[]", left)
+        C.pad_double_nd(
+            tensor.as_c_ptr(),
+            out.as_c_ptr(),
+            shape_c,
+            new_shape_c,
+            left_c,
+            dims,
+            float(value),
+        )
+        return out
 
     def topk(self, tensor: CTensor, k: int, dim: int) -> Tuple[Any, Any]:
         # For this C backend, topk is implemented in C for 1D data.
