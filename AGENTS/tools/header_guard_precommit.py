@@ -1,3 +1,12 @@
+ENV_SETUP_BOX = (
+    "\n"
+    "+-----------------------------------------------------------------------+\n"
+    "| Imports failed. Run setup_env or setup_env_dev and select every    |\n"
+    "| project and module you plan to use. Missing packages mean setup was |\n"
+    "| skipped or incomplete.                                             |\n"
+    "+-----------------------------------------------------------------------+\n"
+)
+
 try:
     """Pre-commit hook enforcing HEADER, tests, and the end sentinel."""
     import sys
@@ -6,10 +15,7 @@ try:
     import os
     from pathlib import Path
 except Exception:
-    print(
-        "\n*** Did you run setup_env_dev with the correct codebases? "
-        "Is the virtual environment active?***\n"
-    )
+    print(ENV_SETUP_BOX)
     raise
 # --- END HEADER ---
 
@@ -33,10 +39,7 @@ If the pre-commit hook caught your changes, here's a friendly checklist:
        import sys
        import your_modules
    except Exception:
-       print(
-           "\n*** Did you run setup_env_dev with the correct codebases? "
-           "Is the virtual environment active?***\n"
-       )
+       print(ENV_SETUP_BOX)
        raise
    # --- END HEADER ---
    ```
