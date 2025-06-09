@@ -63,6 +63,7 @@ ffi.cdef("""
     void floor_div_const(const double* a, double b, double* out, int n);
     void rfloor_div_const(const double* a, double b, double* out, int n);
     void sqrt_double(const double* a, double* out, int n);
+    void log_softmax_1d(const double* a, double* out, int n);
     void pad_double_nd(const double* input, double* output, const int* shape, const int* new_shape, const int* left_pad, int dims, double value);
     void mean_dim(const double* a, double* out, const int* shape, int ndim, int dim);
     void gather_pairs_2d(const double* a, const int* rows, const int* cols,
@@ -137,6 +138,21 @@ C_SOURCE = """
     void sqrt_double(const double* a, double* out, int n) {
         for (int i = 0; i < n; ++i) out[i] = sqrt(a[i]);
     }
+
+    void log_softmax_1d(const double* a, double* out, int n) {
+        double max_val = a[0];
+        for (int i = 1; i < n; ++i) {
+            if (a[i] > max_val) max_val = a[i];
+        }
+        double sum = 0.0;
+        for (int i = 0; i < n; ++i) {
+            out[i] = exp(a[i] - max_val);
+            sum += out[i];
+        }
+        for (int i = 0; i < n; ++i) {
+            out[i] = log(out[i] / sum);
+        }
+
     void pad_double_nd(const double* input, double* output, const int* shape,
                        const int* new_shape, const int* left_pad, int dims,
                        double value) {
@@ -441,6 +457,29 @@ class CTensorOperations(AbstractTensorOperations):
             tensor = CTensor.from_list(tensor, _get_shape(tensor))
         return _flatten(tensor.tolist())
 
+    def tolist(self, tensor: Any) -> list:
+        if not isinstance(tensor, CTensor):
+            tensor = CTensor.from_list(tensor, _get_shape(tensor))
+        return tensor.tolist()
+
+    def clamp(
+        self,
+        tensor: Any,
+        min_val: Optional[float] = None,
+        max_val: Optional[float] = None,
+    ) -> CTensor:
+        if not isinstance(tensor, CTensor):
+            tensor = CTensor.from_list(tensor, _get_shape(tensor))
+        out = CTensor(tensor.shape)
+        for i in range(tensor.size):
+            val = tensor.buffer[i]
+            if min_val is not None and val < min_val:
+                val = min_val
+            if max_val is not None and val > max_val:
+                val = max_val
+            out.buffer[i] = val
+        return out
+
     def select_by_indices(self, tensor: CTensor, indices_dim0: Any, indices_dim1: Any) -> Any:
         # ########## STUB: CTensorOperations.select_by_indices ##########
         # PURPOSE: Gather elements from ``tensor`` using two index arrays.
@@ -480,17 +519,18 @@ class CTensorOperations(AbstractTensorOperations):
         return CTensor(out_shape, out_buf)
 
     def log_softmax(self, tensor: CTensor, dim: int) -> Any:
-        # ########## STUB: CTensorOperations.log_softmax ##########
-        # PURPOSE: Compute log softmax along ``dim``.
-        # EXPECTED BEHAVIOR: Returns a CTensor of same shape with log probabilities.
-        # INPUTS: ``tensor`` CTensor, ``dim`` dimension index.
-        # OUTPUTS: CTensor with log softmax values.
-        # KEY ASSUMPTIONS/DEPENDENCIES: Would require exponential and reduction ops.
-        # TODO:
-        #   - Implement stable log softmax in C.
-        # NOTES: Placeholder due to implementation complexity.
-        # ############################################################
-        raise NotImplementedError("log_softmax not implemented for C backend")
+        """Compute log softmax along ``dim`` using C routines."""
+        if not isinstance(tensor, CTensor):
+            tensor = CTensor.from_list(tensor, _get_shape(tensor))
+        if dim < 0:
+            dim += len(tensor.shape)
+        if dim != 0 or len(tensor.shape) != 1:
+            raise NotImplementedError(
+                "log_softmax only implemented for 1D tensors on the C backend"
+            )
+        out = CTensor(tensor.shape)
+        C.log_softmax_1d(tensor.as_c_ptr(), out.as_c_ptr(), tensor.size)
+        return out
 
     def pad(self, tensor: CTensor, pad: Tuple[int, ...], value: float = 0) -> Any:
         """Pad ``tensor`` with ``value`` according to ``pad`` specification."""
