@@ -57,21 +57,51 @@ function Install-Speaktome-Extras {
 
     $optionalGroups = @("plot", "ml", "dev")
     foreach ($group in $optionalGroups) {
-        Write-Host "Attempting to install optional group: $group"
-        try {
-            & $venvPip "install" ".[$group]"
-        } catch {
-            Write-Host "Warning: Failed to install optional group: $group. Error: $($_.Exception.Message)"
+        $response = $null
+        Write-Host "Install optional group '$group'? [y/N] (auto-skip in 3s): " -NoNewline
+        for ($i=3; $i -gt 0; $i--) {
+            if ($Host.UI.RawUI.KeyAvailable) {
+                $key = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+                $response = $key.Character
+                break
+            }
+            Start-Sleep -Seconds 1
+        }
+        if (-not $response) { $response = 'N' }
+        if ($response -match '^[Yy]$') {
+            Write-Host "Attempting to install optional group: $group"
+            try {
+                & $venvPip "install" ".[$group]"
+            } catch {
+                Write-Host "Warning: Failed to install optional group: $group. Error: $($_.Exception.Message)"
+            }
+        } else {
+            Write-Host "Skipping optional group: $group"
         }
     }
 
     $backendGroups = @("numpy", "jax", "ctensor")
     foreach ($group in $backendGroups) {
-        Write-Host "Attempting to install backend group: $group"
-        try {
-            & $venvPip "install" ".[$group]"
-        } catch {
-            Write-Host "Warning: Failed to install backend group: $group. Error: $($_.Exception.Message)"
+        $response = $null
+        Write-Host "Install backend group '$group'? [y/N] (auto-skip in 3s): " -NoNewline
+        for ($i=3; $i -gt 0; $i--) {
+            if ($Host.UI.RawUI.KeyAvailable) {
+                $key = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+                $response = $key.Character
+                break
+            }
+            Start-Sleep -Seconds 1
+        }
+        if (-not $response) { $response = 'N' }
+        if ($response -match '^[Yy]$') {
+            Write-Host "Attempting to install backend group: $group"
+            try {
+                & $venvPip "install" ".[$group]"
+            } catch {
+                Write-Host "Warning: Failed to install backend group: $group. Error: $($_.Exception.Message)"
+            }
+        } else {
+            Write-Host "Skipping backend group: $group"
         }
     }
 
