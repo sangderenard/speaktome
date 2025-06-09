@@ -1,18 +1,16 @@
-#!/usr/bin/env python3
-"""
-Pre-commit hook: Enforces HEADER, ``@staticmethod test()`` and ``# --- END HEADER ---`` placement.
-Blocks commit if any staged ``.py`` file is missing these requirements.
-Set environment variable ``SKIP_HEADER_GUARD`` to disable.
-
-Prototype author: GitHub Copilot (o3[4.1 sic]), for the SPEAKTOME agent ecosystem.
-License: MIT
-"""
-
-import sys
-import subprocess
-import ast
-import os
-from pathlib import Path
+try:
+    """Pre-commit hook enforcing HEADER, tests, and the end sentinel."""
+    import sys
+    import subprocess
+    import ast
+    import os
+    from pathlib import Path
+except Exception:
+    print(
+        "\n*** Did you run setup_env_dev with the correct codebases? "
+        "Is the virtual environment active?***\n"
+    )
+    raise
 # --- END HEADER ---
 
 FRIENDLY_GUIDANCE = """
@@ -25,19 +23,22 @@ If the pre-commit hook caught your changes, here's a friendly checklist:
 1. Every Python file needs:
    - A `HEADER` (as docstring or constant)
    - A `@staticmethod test()` method in each class
-   - A `# --- END HEADER ---` sentinel after imports
+   - Imports and header content wrapped in a `try` block
+   - An `except` block printing guidance about running `setup_env_dev` and activating the virtual environment
+   - A `# --- END HEADER ---` sentinel after the `except` block
 
 2. Example structure:
    ```python
-   \"\"\"
-   Your class header goes here as a docstring
-   -- or --
-   HEADER = '''Your class header goes here as a constant'''
-   \"\"\"
-
-   import sys
-   import your_modules
-   # --- END HEADER ---  # <- Exactly like this, after imports
+   try:
+       import sys
+       import your_modules
+   except Exception:
+       print(
+           "\n*** Did you run setup_env_dev with the correct codebases? "
+           "Is the virtual environment active?***\n"
+       )
+       raise
+   # --- END HEADER ---
    ```
 
 3. Quick tips:
@@ -122,6 +123,27 @@ def check_end_header(filepath: Path) -> list[str]:
 
     return []
 
+
+def check_try_header(filepath: Path) -> list[str]:
+    """Verify the header starts with ``try:`` and includes an ``except`` block."""
+    sentinel = "# --- END HEADER ---"
+    with open(filepath, encoding="utf-8") as f:
+        lines = f.readlines()
+
+    try_idx = next((i for i, ln in enumerate(lines) if ln.strip().startswith("try:")), None)
+    sentinel_idx = next((i for i, ln in enumerate(lines) if ln.strip() == sentinel), None)
+    except_idx = next(
+        (i for i, ln in enumerate(lines) if ln.strip().startswith("except") and (sentinel_idx is None or i < sentinel_idx)),
+        None,
+    )
+
+    errors = []
+    if try_idx is None or try_idx > 1:
+        errors.append("Missing 'try:' at start of header")
+    if except_idx is None:
+        errors.append("Missing 'except' block for header")
+    return errors
+
 def main():
     if os.getenv("SKIP_HEADER_GUARD"):
         return
@@ -131,7 +153,7 @@ def main():
         if not path.exists():
             continue
         class_errors = check_class_header_and_test(path)
-        header_errors = check_end_header(path)
+        header_errors = check_end_header(path) + check_try_header(path)
         for lineno, classname, missing in class_errors:
             print(
                 f"[AGENT_ACTIONABLE_ERROR] {relpath}"
@@ -143,7 +165,10 @@ def main():
             print(f"[AGENT_ACTIONABLE_ERROR] {relpath}: {msg}")
             failed = True
     if failed:
-        print("\nCommit blocked: Please add required HEADER and @staticmethod test() to all classes.")
+        print(
+            "\nCommit blocked: ensure each file has the try/except header, "
+            "class HEADER strings, and @staticmethod test() methods."
+        )
         print("\nNeed help? Here's a friendly guide:")
         print(FRIENDLY_GUIDANCE)
         sys.exit(1)
