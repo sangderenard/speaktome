@@ -51,6 +51,7 @@ tests/test_cli_permutations.py - OK
 tests/test_faculty.py - OK
 tests/test_format_test_digest.py - OK
 tests/test_tensor_backends.py - OK
+tests/test_lookahead_controller.py - OK
 tests/test_retirement_manager.py - OK
 tests/test_snap_beam_path.py - OK
 tests/test_validate_guestbook.py - OK
