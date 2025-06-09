@@ -62,6 +62,7 @@ ffi.cdef("""
     void rmod_scalar(const double* a, double b, double* out, int n);
     void floor_div_const(const double* a, double b, double* out, int n);
     void rfloor_div_const(const double* a, double b, double* out, int n);
+    void sqrt_double(const double* a, double* out, int n);
 """)
 
 C_SOURCE = """
@@ -123,6 +124,9 @@ C_SOURCE = """
     }
     void rfloor_div_const(const double* a, double b, double* out, int n) {
         for (int i = 0; i < n; ++i) out[i] = floor(b / a[i]);
+    }
+    void sqrt_double(const double* a, double* out, int n) {
+        for (int i = 0; i < n; ++i) out[i] = sqrt(a[i]);
     }
 """
 
@@ -263,16 +267,14 @@ class CTensorOperations(AbstractTensorOperations):
         if not isinstance(tensor, CTensor):
             tensor = CTensor.from_list(tensor, _get_shape(tensor))
         out = CTensor(tensor.shape)
-        for i in range(tensor.size):
-            out.buffer[i] = tensor.buffer[i] ** exponent
+        C.pow_scalar(tensor.as_c_ptr(), float(exponent), out.as_c_ptr(), tensor.size)
         return out
 
     def sqrt(self, tensor: Any) -> CTensor:
         if not isinstance(tensor, CTensor):
             tensor = CTensor.from_list(tensor, _get_shape(tensor))
         out = CTensor(tensor.shape)
-        for i in range(tensor.size):
-            out.buffer[i] = math.sqrt(tensor.buffer[i])
+        C.sqrt_double(tensor.as_c_ptr(), out.as_c_ptr(), tensor.size)
         return out
 
     def tensor_from_list(self, data: List[Any], dtype: Any, device: Any) -> CTensor:
