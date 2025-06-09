@@ -79,11 +79,20 @@ ffi.cdef("""
         int k,
         double* indices,
         double* out);
+    void for_each_cell_along_dim(
+        const double* data,
+        const int* shape,
+        int ndim,
+        int batch_dim,
+        void (*callback)(const double*, int, int, void*),
+        void* user_data);
 """)
 
 C_SOURCE = """
     #include <math.h>
     #include <stdlib.h>
+    #include <stddef.h>
+
     void add_double(const double* a, const double* b, double* out, int n) {
         for (int i = 0; i < n; ++i) out[i] = a[i] + b[i];
     }
@@ -314,6 +323,30 @@ C_SOURCE = """
                     }
                 }
                 free(used);
+            }
+        }
+    }
+
+    void for_each_cell_along_dim(
+        const double* data,
+        const int* shape,
+        int ndim,
+        int batch_dim,
+        void (*callback)(const double*, int, int, void*),
+        void* user_data) {
+        int before = 1, after = 1;
+        for (int i = 0; i < batch_dim; ++i) before *= shape[i];
+        for (int i = batch_dim + 1; i < ndim; ++i) after *= shape[i];
+        int batch = shape[batch_dim];
+        int cell_len = after;
+        int total_cells = before * after;
+
+        for (int b = 0; b < before; ++b) {
+            for (int a = 0; a < after; ++a) {
+                for (int i = 0; i < batch; ++i) {
+                    int idx = (b * batch * after) + (i * after) + a;
+                    callback(data + idx, cell_len, i, user_data);
+                }
             }
         }
     }
