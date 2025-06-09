@@ -79,11 +79,8 @@ block, include the sentinel line:
 ```python
 try:
     import your_modules
-except Exception as exc:
-    print(
-        "\n*** Did you run setup_env_dev with the correct codebases?"\
-        " Are you using the project's virtual environment?***\n"
-    )
+except Exception:
+    print(ENV_SETUP_BOX)
     raise
 # --- END HEADER ---
 ```

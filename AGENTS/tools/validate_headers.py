@@ -17,6 +17,15 @@ import sys
 from pathlib import Path
 from typing import Iterable
 
+ENV_SETUP_BOX = (
+    "\n"
+    "+-----------------------------------------------------------------------+\n"
+    "| Imports failed. Run setup_env or setup_env_dev and select every    |\n"
+    "| project and module you plan to use. Missing packages mean setup was |\n"
+    "| skipped or incomplete.                                             |\n"
+    "+-----------------------------------------------------------------------+\n"
+)
+
 PACKAGE_ROOT = Path(__file__).parent / "speaktome"
 
 
@@ -106,10 +115,7 @@ def validate(root: Path, *, rewrite: bool = False) -> int:
                     new_lines.append(f"{indent}    HEADER = \"TODO\"")
                     new_lines.append(f"{indent}except Exception as exc:")
                     new_lines.append(
-                        f"{indent}    print('Did you run setup_env_dev with the correct codebases and groups?')"
-                    )
-                    new_lines.append(
-                        f"{indent}    print('Is your virtual environment active or are you calling the .venv python binary?')"
+                        f"{indent}    print(ENV_SETUP_BOX)"
                     )
                     new_lines.append(f"{indent}    raise")
                 if miss_test:
@@ -140,11 +146,7 @@ def main() -> None:
     except Exception as exc:  # pragma: no cover - unexpected failure
         print(
             "[AGENT_ACTIONABLE_ERROR] validate_headers failed: "
-            f"{exc}.\n"
-            "Have you run setup_env_dev with the right selection of codebases"
-            " and groups?\n"
-            "Is your virtual environment active or are you calling the .venv"
-            " python binary?"
+            f"{exc}.\n{ENV_SETUP_BOX}"
         )
         sys.exit(1)
     sys.exit(exit_code)
