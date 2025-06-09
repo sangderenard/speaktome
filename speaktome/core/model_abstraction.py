@@ -1,20 +1,16 @@
-try:
-    from __future__ import annotations
+#!/usr/bin/env python3
+"""Abstractions over model interfaces."""
+from __future__ import annotations
 
+try:
+    from AGENTS.tools.header_utils import ENV_SETUP_BOX
     from abc import ABC, abstractmethod
     from typing import Any, Dict
     import torch
 except ModuleNotFoundError:  # pragma: no cover - optional dependency
     torch = None  # type: ignore
 except Exception:
-    print(
-        "\n"
-        "+-----------------------------------------------------------------------+\n"
-        "| Imports failed. Run setup_env or setup_env_dev and select every    |\n"
-        "| project and module you plan to use. Missing packages mean setup was |\n"
-        "| skipped or incomplete.                                             |\n"
-        "+-----------------------------------------------------------------------+\n"
-    )
+    print(ENV_SETUP_BOX)
     raise
 # --- END HEADER ---
 
