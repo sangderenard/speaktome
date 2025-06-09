@@ -1,16 +1,30 @@
-import pygame
-import numpy as np
-import threading
-import sys
-import time
-import select
-import numpy as np
-from queue import Queue
-import uuid
-from OpenGL.GL import *
-from OpenGL.GLU import *
-from hotrodprintingpress import GrandPrintingPress
-pygame.font.init()
+from __future__ import annotations
+
+try:
+    import pygame
+    import numpy as np
+    import threading
+    import sys
+    import time
+    import select
+    import numpy as np
+    from queue import Queue
+    import uuid
+    from OpenGL.GL import *  # noqa: F401,F403
+    from OpenGL.GLU import *  # noqa: F401,F403
+    from hotrodprintingpress import GrandPrintingPress
+    pygame.font.init()
+except Exception:
+    print(
+        "\n"
+        "+-----------------------------------------------------------------------+\n"
+        "| Imports failed. Run setup_env or setup_env_dev and select every    |\n"
+        "| project and module you plan to use. Missing packages mean setup was |\n"
+        "| skipped or incomplete.                                             |\n"
+        "+-----------------------------------------------------------------------+\n"
+    )
+    raise
+# --- END HEADER ---
 class Console:
     def __init__(self, dt, local_state, width=800, height=600, font_size=72):
         """

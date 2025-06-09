@@ -1,11 +1,25 @@
-import pygame
-import pymunk
-import pymunk.pygame_util
-import pybullet as p
-import pybullet_data
-import time
-import math
-import numpy as np
+from __future__ import annotations
+
+try:
+    import pygame
+    import pymunk
+    import pymunk.pygame_util
+    import pybullet as p
+    import pybullet_data
+    import time
+    import math
+    import numpy as np
+except Exception:
+    print(
+        "\n"
+        "+-----------------------------------------------------------------------+\n"
+        "| Imports failed. Run setup_env or setup_env_dev and select every    |\n"
+        "| project and module you plan to use. Missing packages mean setup was |\n"
+        "| skipped or incomplete.                                             |\n"
+        "+-----------------------------------------------------------------------+\n"
+    )
+    raise
+# --- END HEADER ---
 
 # ===========================
 # Constants and Configuration
