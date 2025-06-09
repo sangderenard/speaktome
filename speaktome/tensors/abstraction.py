@@ -202,86 +202,83 @@ class AbstractTensorOperations(ABC):
 
     # --- Operator routing ---
     @abstractmethod
-    def _apply_operator(self, op: str, *args, **kwargs):
-        """
-        Centralized operator dispatch. Backends must implement.
-        Example: op='add', args=(other,)
-        """
+    def _apply_operator(self, op: str, left: Any, right: Any):
+        """Apply an arithmetic operator to ``left`` and ``right``."""
         pass
 
     def __add__(self, other):
-        return self._apply_operator('add', other)
+        return self._apply_operator('add', self, other)
 
     def __sub__(self, other):
-        return self._apply_operator('sub', other)
+        return self._apply_operator('sub', self, other)
 
     def __mul__(self, other):
-        return self._apply_operator('mul', other)
+        return self._apply_operator('mul', self, other)
 
     def __truediv__(self, other):
-        return self._apply_operator('truediv', other)
+        return self._apply_operator('truediv', self, other)
 
     def __floordiv__(self, other):
-        return self._apply_operator('floordiv', other)
+        return self._apply_operator('floordiv', self, other)
 
     def __mod__(self, other):
-        return self._apply_operator('mod', other)
+        return self._apply_operator('mod', self, other)
 
     def __pow__(self, other):
-        return self._apply_operator('pow', other)
+        return self._apply_operator('pow', self, other)
 
     def __matmul__(self, other):
-        return self._apply_operator('matmul', other)
+        return self._apply_operator('matmul', self, other)
 
     # Reverse operators
     def __radd__(self, other):
-        return self._apply_operator('radd', other)
+        return self._apply_operator('radd', other, self)
 
     def __rsub__(self, other):
-        return self._apply_operator('rsub', other)
+        return self._apply_operator('rsub', other, self)
 
     def __rmul__(self, other):
-        return self._apply_operator('rmul', other)
+        return self._apply_operator('rmul', other, self)
 
     def __rtruediv__(self, other):
-        return self._apply_operator('rtruediv', other)
+        return self._apply_operator('rtruediv', other, self)
 
     def __rfloordiv__(self, other):
-        return self._apply_operator('rfloordiv', other)
+        return self._apply_operator('rfloordiv', other, self)
 
     def __rmod__(self, other):
-        return self._apply_operator('rmod', other)
+        return self._apply_operator('rmod', other, self)
 
     def __rpow__(self, other):
-        return self._apply_operator('rpow', other)
+        return self._apply_operator('rpow', other, self)
 
     def __rmatmul__(self, other):
-        return self._apply_operator('rmatmul', other)
+        return self._apply_operator('rmatmul', other, self)
 
     # In-place operators
     def __iadd__(self, other):
-        return self._apply_operator('iadd', other)
+        return self._apply_operator('iadd', self, other)
 
     def __isub__(self, other):
-        return self._apply_operator('isub', other)
+        return self._apply_operator('isub', self, other)
 
     def __imul__(self, other):
-        return self._apply_operator('imul', other)
+        return self._apply_operator('imul', self, other)
 
     def __itruediv__(self, other):
-        return self._apply_operator('itruediv', other)
+        return self._apply_operator('itruediv', self, other)
 
     def __ifloordiv__(self, other):
-        return self._apply_operator('ifloordiv', other)
+        return self._apply_operator('ifloordiv', self, other)
 
     def __imod__(self, other):
-        return self._apply_operator('imod', other)
+        return self._apply_operator('imod', self, other)
 
     def __ipow__(self, other):
-        return self._apply_operator('ipow', other)
+        return self._apply_operator('ipow', self, other)
 
     def __imatmul__(self, other):
-        return self._apply_operator('imatmul', other)
+        return self._apply_operator('imatmul', self, other)
 
 # Remove stray demo/test code (stacked = ..., values, idxs = ...)
 

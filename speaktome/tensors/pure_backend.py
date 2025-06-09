@@ -31,12 +31,15 @@ class PurePythonTensorOperations(AbstractTensorOperations):
         # ###############################################################
         pass
 
-    def _apply_operator(self, op: str, other):
-        # Only support operations with other Python-list tensors or scalars
-        if isinstance(other, list):
-            return self._elementwise_op(op, self, other)
-        else:
-            return self._elementwise_op_scalar(op, self, other)
+    def _apply_operator(self, op: str, left: Any, right: Any):
+        """Dispatch basic arithmetic for nested lists."""
+        if isinstance(right, list) and isinstance(left, list):
+            return self._elementwise_op(op, left, right)
+        if isinstance(right, list):
+            return self._elementwise_op_scalar(op, right, left)  # right is list, treat left as scalar
+        if isinstance(left, list):
+            return self._elementwise_op_scalar(op, left, right)
+        return self._apply_scalar_op(op, left, right)
 
     def _elementwise_op(self, op: str, a, b):
         # Recursively apply op to nested lists

@@ -20,6 +20,44 @@ class PyTorchTensorOperations(AbstractTensorOperations):
             raise RuntimeError("PyTorch is required for this backend")
         self.default_device = torch.device(default_device)
 
+    def _apply_operator(self, op: str, left: Any, right: Any):
+        """Delegate arithmetic ops to PyTorch tensors."""
+        a = left
+        b = right
+        if op in ("add", "iadd"):
+            return a + b
+        if op == "radd":
+            return b + a
+        if op in ("sub", "isub"):
+            return a - b
+        if op == "rsub":
+            return b - a
+        if op in ("mul", "imul"):
+            return a * b
+        if op == "rmul":
+            return b * a
+        if op in ("truediv", "itruediv"):
+            return a / b
+        if op == "rtruediv":
+            return b / a
+        if op in ("floordiv", "ifloordiv"):
+            return torch.floor_divide(a, b)
+        if op == "rfloordiv":
+            return torch.floor_divide(b, a)
+        if op in ("mod", "imod"):
+            return a % b
+        if op == "rmod":
+            return b % a
+        if op in ("pow", "ipow"):
+            return a ** b
+        if op == "rpow":
+            return b ** a
+        if op in ("matmul", "imatmul"):
+            return a @ b
+        if op == "rmatmul":
+            return b @ a
+        raise NotImplementedError(f"Operator {op} not implemented for PyTorch backend.")
+
     def full(self, size, fill_value, dtype, device):
         return torch.full(size, fill_value, dtype=dtype, device=device or self.default_device)
 

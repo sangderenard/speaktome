@@ -20,6 +20,44 @@ class NumPyTensorOperations(AbstractTensorOperations):
     def __init__(self, track_time: bool = False):
         super().__init__(track_time=track_time)
 
+    def _apply_operator(self, op: str, left: Any, right: Any):
+        """Apply arithmetic operators on NumPy arrays."""
+        a = np.array(left) if not isinstance(left, np.ndarray) else left
+        b = np.array(right) if not isinstance(right, np.ndarray) else right
+        if op in ("add", "iadd"):
+            return a + b
+        if op == "radd":
+            return b + a
+        if op in ("sub", "isub"):
+            return a - b
+        if op == "rsub":
+            return b - a
+        if op in ("mul", "imul"):
+            return a * b
+        if op == "rmul":
+            return b * a
+        if op in ("truediv", "itruediv"):
+            return a / b
+        if op == "rtruediv":
+            return b / a
+        if op in ("floordiv", "ifloordiv"):
+            return np.floor_divide(a, b)
+        if op == "rfloordiv":
+            return np.floor_divide(b, a)
+        if op in ("mod", "imod"):
+            return np.mod(a, b)
+        if op == "rmod":
+            return np.mod(b, a)
+        if op in ("pow", "ipow"):
+            return np.power(a, b)
+        if op == "rpow":
+            return np.power(b, a)
+        if op in ("matmul", "imatmul"):
+            return a @ b
+        if op == "rmatmul":
+            return b @ a
+        raise NotImplementedError(f"Operator {op} not implemented for NumPy backend.")
+
     def _torch_dtype_to_numpy(self, dtype):
         if torch is None:
             return dtype
