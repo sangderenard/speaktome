@@ -3,6 +3,7 @@
 import os
 import ctypes
 import ctypes.util
+import json
 from cffi import FFI
 from typing import Any, Tuple, Optional, List
 
@@ -231,6 +232,17 @@ class CTensorOperations(AbstractTensorOperations):
         if dim == 1:
             return [[row[i] for i in indices] for row in tensor]
         raise NotImplementedError("index_select only implemented for dim 0 or 1")
+
+    def save(self, tensor: Any, filepath: str) -> None:
+        """Persist ``tensor`` as JSON at ``filepath``."""
+        with open(filepath, "w") as f:
+            json.dump(self.tolist(tensor), f)
+
+    def load(self, filepath: str, dtype: Any, device: Any) -> Any:
+        """Load tensor data from ``filepath`` using :func:`tensor_from_list`."""
+        with open(filepath, "r") as f:
+            data = json.load(f)
+        return self.tensor_from_list(data, dtype or self.float_dtype, device)
 
     @property
     def long_dtype(self) -> Any:
