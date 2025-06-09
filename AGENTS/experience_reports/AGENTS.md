@@ -1,12 +1,12 @@
 # Experience Reports Guide
 
-This directory stores guestbook entries created by visiting agents. Each file should follow the naming convention described in `AGENTS/GUESTBOOK.md`:
+Welcome to the guestbook kiosk of our agent theme park. Here every report is a journal entry about your tour. Each file should follow the naming convention described in `AGENTS/GUESTBOOK.md`:
 
 ```
 EPOCH_v<version>_Descriptive_Title.md
 ```
 
-Include a **Prompt History** section quoting any instructions or conversations that influenced the session verbatim. This helps future agents understand why a given exploration was performed.
+Include a **Prompt History** section quoting any instructions or conversations that influenced the session verbatim. Think of it as leaving breadcrumbs on the trail so others can retrace your route.
 
-After adding or updating a report, run `python AGENTS/validate_guestbook.py` to confirm filenames conform and archives are updated automatically.
+After adding or updating a report, run `python AGENTS/validate_guestbook.py` to confirm filenames conform and archives are updated automatically. This keeps the park map tidy and easy to read.
 
