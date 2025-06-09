@@ -6,12 +6,25 @@ from __future__ import annotations
 from typing import Any
 from speaktome.tensors.abstraction import AbstractTensorOperations
 
+from .ruler import Ruler
+
 
 class GrandPrintingPress:
     """Compose tensor glyphs and apply complex post-processing."""
 
-    def __init__(self, tensor_ops: AbstractTensorOperations) -> None:
+    def __init__(
+        self,
+        tensor_ops: AbstractTensorOperations,
+        page_size: tuple[int, int] = (512, 512),
+        dpi: int = 300,
+    ) -> None:
         self.tensor_ops = tensor_ops
+        self.page_size = page_size
+        self.ruler = Ruler(dpi)
+        height, width = page_size
+        self.canvas = tensor_ops.zeros(
+            (height, width), dtype=tensor_ops.float_dtype, device=None
+        )
         # ########## STUB: GrandPrintingPress.__init__ ##########
         # PURPOSE: Initialize resources for managing glyph libraries, kernel
         #          pipelines, and output buffers.
@@ -26,10 +39,15 @@ class GrandPrintingPress:
         #   - Load or generate default glyph libraries.
         #   - Establish kernel registry and composition interface.
         # NOTES: This starter implementation merely stores ``tensor_ops`` for
-        #        future use.
+        #        future use and allocates a blank canvas.
         # ###################################################################
 
-    def print_glyph(self, glyph: Any, position: tuple[int, int]) -> Any:
+    def print_glyph(
+        self,
+        glyph: Any,
+        position: tuple[float, float],
+        unit: str = "mm",
+    ) -> Any:
         """Apply a glyph tensor at the given position."""
         # ########## STUB: GrandPrintingPress.print_glyph ##########
         # PURPOSE: Render ``glyph`` onto an internal canvas at ``position``.
@@ -43,7 +61,24 @@ class GrandPrintingPress:
         #   - Implement placement and blending logic.
         #   - Expose kernel hooks for custom effects.
         # ###################################################################
-        raise NotImplementedError
+        y_idx, x_idx = self.ruler.coordinates_to_tensor(position[0], position[1], unit)
+        g_height, g_width = self.tensor_ops.shape(glyph)
+        c_height, c_width = self.tensor_ops.shape(self.canvas)
+
+        end_y = min(y_idx + g_height, c_height)
+        end_x = min(x_idx + g_width, c_width)
+        if end_y <= y_idx or end_x <= x_idx:
+            return self.canvas
+
+        sub_glyph = glyph[: end_y - y_idx, : end_x - x_idx]
+        for row in range(self.tensor_ops.shape(sub_glyph)[0]):
+            indices_dim0 = [y_idx + row] * (end_x - x_idx)
+            indices_dim1 = list(range(x_idx, end_x))
+            values = self.tensor_ops.tolist(sub_glyph[row])
+            self.tensor_ops.assign_at_indices(
+                self.canvas, indices_dim0, indices_dim1, values
+            )
+        return self.canvas
 
     def finalize_page(self) -> Any:
         """Return the completed tensor page."""
@@ -58,4 +93,4 @@ class GrandPrintingPress:
         #   - Implement post-processing pipeline.
         #   - Define format of the returned tensor.
         # ###################################################################
-        raise NotImplementedError
+        return self.tensor_ops.clamp(self.canvas, 0.0, 1.0)
