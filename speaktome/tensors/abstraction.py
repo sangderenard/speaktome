@@ -1,7 +1,8 @@
 from abc import ABC, abstractmethod
-from typing import Any, Tuple, Optional, List, Union, Callable
+from typing import Any, Tuple, Optional, List, Union, Callable, Dict, Deque
 import math
 import time
+from collections import deque
 
 from .faculty import Faculty, DEFAULT_FACULTY
 from .. import config
@@ -14,6 +15,45 @@ try:
     import numpy as np
 except ModuleNotFoundError:  # pragma: no cover - optional dependency
     np = None  # type: ignore
+
+CONVERSION_REGISTRY: Dict[Tuple[type, type], Callable[["AbstractTensorOperations", Any, "AbstractTensorOperations"], Any]] = {}
+
+OPS_CACHE: Dict[type, "AbstractTensorOperations"] = {}
+
+def register_conversion(src_cls: type, tgt_cls: type, func: Callable[["AbstractTensorOperations", Any, "AbstractTensorOperations"], Any]) -> None:
+    """Register a direct tensor conversion function."""
+    CONVERSION_REGISTRY[(src_cls, tgt_cls)] = func
+
+def _get_ops_for_class(cls: type) -> "AbstractTensorOperations":
+    if cls in OPS_CACHE:
+        return OPS_CACHE[cls]
+    if cls.__name__.startswith("PyTorch"):
+        ops = get_tensor_operations(Faculty.TORCH)
+    elif cls.__name__.startswith("NumPy"):
+        ops = get_tensor_operations(Faculty.NUMPY)
+    elif cls.__name__.startswith("PurePython"):
+        ops = get_tensor_operations(Faculty.PURE_PYTHON)
+    elif cls.__name__.startswith("JAX"):
+        ops = get_tensor_operations(Faculty.NUMPY)  # approximate
+    else:
+        ops = get_tensor_operations()
+    OPS_CACHE[cls] = ops
+    return ops
+
+def _find_conversion_path(src_cls: type, tgt_cls: type) -> List[Tuple[type, type]]:
+    if src_cls == tgt_cls:
+        return []
+    q: Deque[Tuple[type, List[Tuple[type, type]]]] = deque([(src_cls, [])])
+    seen = {src_cls}
+    while q:
+        cur, path = q.popleft()
+        if cur == tgt_cls:
+            return path
+        for (a, b), _ in CONVERSION_REGISTRY.items():
+            if a == cur and b not in seen:
+                q.append((b, path + [(a, b)]))
+                seen.add(b)
+    return []
 
 class AbstractTensorOperations(ABC):
     def __init__(self, track_time: bool = False) -> None:
@@ -160,6 +200,26 @@ class AbstractTensorOperations(ABC):
     def index_select(self, tensor: Any, dim: int, indices: Any) -> Any:
         pass
 
+    def to_backend(self, tensor: Any, other: "AbstractTensorOperations") -> Any:
+        """Convert ``tensor`` to ``other`` backend using registered paths."""
+        if type(self) is type(other):
+            return self.clone(tensor)
+        path = _find_conversion_path(type(self), type(other))
+        if not path:
+            return default_to_backend(self, tensor, other)
+        current_tensor = tensor
+        current_ops: AbstractTensorOperations = self
+        for src_cls, tgt_cls in path:
+            func = CONVERSION_REGISTRY.get((src_cls, tgt_cls))
+            if func is None:
+                return default_to_backend(self, tensor, other)
+            next_ops = other if tgt_cls is type(other) else _get_ops_for_class(tgt_cls)
+            current_tensor = func(current_ops, current_tensor, next_ops)
+            current_ops = next_ops
+        if current_ops is not other:
+            current_tensor = default_to_backend(current_ops, current_tensor, other)
+        return current_tensor
+
 
     # --- Persistence helpers ---
     @abstractmethod
@@ -291,6 +351,26 @@ def _flatten(data):
     return [item for sublist in data for item in _flatten(sublist)]
 
 
+def default_to_backend(
+    source_ops: "AbstractTensorOperations", tensor: Any, target_ops: "AbstractTensorOperations"
+) -> Any:
+    """Fallback conversion using :meth:`tolist` and :meth:`tensor_from_list`."""
+    if type(source_ops) is type(target_ops):
+        return source_ops.clone(tensor)
+    data = source_ops.tolist(tensor)
+    dtype = None
+    device = None
+    try:
+        dtype = source_ops.get_dtype(tensor)
+    except Exception:
+        pass
+    try:
+        device = source_ops.get_device(tensor)
+    except Exception:
+        pass
+    return target_ops.tensor_from_list(data, dtype=dtype, device=device)
+
+
 def get_tensor_operations(faculty: Faculty | None = None, *, track_time: bool = False) -> AbstractTensorOperations:
     """Return a tensor operations backend based on the faculty tier."""
 
@@ -306,5 +386,33 @@ def get_tensor_operations(faculty: Faculty | None = None, *, track_time: bool = 
         return CTensorOperations(track_time=track_time)
     from .pure_backend import PurePythonTensorOperations
     return PurePythonTensorOperations(track_time=track_time)
+
+
+# --- Conversion registration ---
+try:
+    from .torch_backend import PyTorchTensorOperations
+except Exception:  # pragma: no cover - optional backend
+    PyTorchTensorOperations = None  # type: ignore
+try:
+    from .numpy_backend import NumPyTensorOperations
+except Exception:  # pragma: no cover - optional backend
+    NumPyTensorOperations = None  # type: ignore
+from .pure_backend import PurePythonTensorOperations
+
+if np is not None and NumPyTensorOperations is not None:
+    register_conversion(NumPyTensorOperations, PurePythonTensorOperations,
+                        lambda s, t, o: o.tensor_from_list(t.tolist(), dtype=None, device=None))
+    register_conversion(PurePythonTensorOperations, NumPyTensorOperations,
+                        lambda s, t, o: o.tensor_from_list(t, dtype=None, device=None))
+
+if torch is not None and PyTorchTensorOperations is not None and NumPyTensorOperations is not None:
+    register_conversion(PyTorchTensorOperations, NumPyTensorOperations,
+                        lambda s, t, o: t.detach().cpu().numpy())
+    register_conversion(NumPyTensorOperations, PyTorchTensorOperations,
+                        lambda s, t, o: o.to_device(o.tensor_from_list(t.tolist(), dtype=None, device=None), o.default_device))
+    register_conversion(PyTorchTensorOperations, PurePythonTensorOperations,
+                        lambda s, t, o: o.tensor_from_list(t.detach().cpu().tolist(), dtype=None, device=None))
+    register_conversion(PurePythonTensorOperations, PyTorchTensorOperations,
+                        lambda s, t, o: o.tensor_from_list(t, dtype=None, device=o.default_device))
 
 
