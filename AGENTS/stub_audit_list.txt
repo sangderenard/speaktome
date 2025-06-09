@@ -50,6 +50,7 @@
 ./tests/test_faculty.py
 ./tests/test_format_test_digest.py
 ./tests/test_tensor_backends.py
+./tests/test_lookahead_controller.py
 ./tests/test_retirement_manager.py
 ./tests/test_snap_beam_path.py
 ./tests/test_validate_guestbook.py
