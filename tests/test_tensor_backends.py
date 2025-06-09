@@ -1,19 +1,33 @@
+#!/usr/bin/env python3
 """Comprehensive tensor backend checks."""
+from __future__ import annotations
 
-import importlib.util
-import logging
-import pytest
+try:
+    import importlib.util
+    import logging
+    import pytest
+    import itertools
 
-from speaktome.tensors import (
-    PurePythonTensorOperations,
-    NumPyTensorOperations,
-    PyTorchTensorOperations,
-    JAXTensorOperations,
-)
-from speaktome.tensors.faculty import detect_faculty
+    from speaktome.tensors import (
+        PurePythonTensorOperations,
+        NumPyTensorOperations,
+        PyTorchTensorOperations,
+        JAXTensorOperations,
+    )
+    from speaktome.tensors.faculty import detect_faculty
 
-from speaktome.tensors.pure_backend import PurePythonTensorOperations # For isinstance check
-import itertools
+    from speaktome.tensors.pure_backend import PurePythonTensorOperations  # For isinstance check
+except Exception:
+    print(
+        "\n"
+        "+-----------------------------------------------------------------------+\n"
+        "| Imports failed. Run setup_env or setup_env_dev and select every    |\n"
+        "| project and module you plan to use. Missing packages mean setup was |\n"
+        "| skipped or incomplete.                                             |\n"
+        "+-----------------------------------------------------------------------+\n"
+    )
+    raise
+# --- END HEADER ---
 
 logger = logging.getLogger(__name__)
 

@@ -26,12 +26,25 @@ NOTES: This script is intentionally conservative. It is meant to help
     `--delete` to confirm nothing important was lost.
 #######################################################################
 """
+from __future__ import annotations
 
-import argparse
-import hashlib
-import os
-import shutil
-from pathlib import Path
+try:
+    import argparse
+    import hashlib
+    import os
+    import shutil
+    from pathlib import Path
+except Exception:
+    print(
+        "\n"
+        "+-----------------------------------------------------------------------+\n"
+        "| Imports failed. Run setup_env or setup_env_dev and select every    |\n"
+        "| project and module you plan to use. Missing packages mean setup was |\n"
+        "| skipped or incomplete.                                             |\n"
+        "+-----------------------------------------------------------------------+\n"
+    )
+    raise
+# --- END HEADER ---
 
 
 def compute_sha1(path: Path) -> str:

@@ -1,20 +1,26 @@
 #!/usr/bin/env python3
-"""Run all class ``test()`` methods across faculty tiers.
-
-This script imports every class detected by ``dump_headers.py`` and
-executes its ``test`` method if present.  Each faculty tier is forced via
-``SPEAKTOME_FACULTY`` in a subprocess to ensure isolation.
-"""
-
+"""Run all class ``test()`` methods across faculty tiers."""
 from __future__ import annotations
 
-import json
-import os
-import subprocess
-import sys
-from pathlib import Path
+try:
+    import json
+    import os
+    import subprocess
+    import sys
+    from pathlib import Path
 
-from speaktome.tensors.faculty import Faculty, FORCE_ENV
+    from speaktome.tensors.faculty import Faculty, FORCE_ENV
+except Exception:
+    print(
+        "\n"
+        "+-----------------------------------------------------------------------+\n"
+        "| Imports failed. Run setup_env or setup_env_dev and select every    |\n"
+        "| project and module you plan to use. Missing packages mean setup was |\n"
+        "| skipped or incomplete.                                             |\n"
+        "+-----------------------------------------------------------------------+\n"
+    )
+    raise
+# --- END HEADER ---
 
 
 # ########## STUB: recursive test runner ##########
