@@ -95,7 +95,16 @@ ffi.cdef("""
         void* user_data);
 """)
 
-C_SOURCE = """
+from pathlib import Path
+
+# Attempt to load the C implementation from a standalone source file so it can
+# be compiled ahead of time. Fall back to the inlined version if the file is
+# missing. This paves the way for alternative build systems like Zig.
+SOURCE_PATH = Path(__file__).with_name("ctensor_ops.c")
+if SOURCE_PATH.exists():
+    C_SOURCE = SOURCE_PATH.read_text()
+else:
+    C_SOURCE = """
     #include <math.h>
     #include <stdlib.h>
     #include <stddef.h>
@@ -492,7 +501,32 @@ C_SOURCE = """
     }
 """
 
-C = ffi.verify(C_SOURCE)
+_prebuilt = os.environ.get("SPEAKTOME_CTENSOR_LIB")
+if _prebuilt and os.path.exists(_prebuilt):
+    C = ffi.dlopen(_prebuilt)
+else:
+    C = ffi.verify(C_SOURCE)
+
+# ########## STUB: build_ctensor_with_zig ##########
+# PURPOSE: Compile ``ctensor_ops.c`` into a shared library using the Zig
+#          toolchain for faster startup and optional precompiled binaries.
+# EXPECTED BEHAVIOR: When implemented, this function will invoke Zig's
+#          C compiler, output a platform-specific shared object, and return
+#          the path. The resulting binary may be cached inside the virtual
+#          environment and loaded via ``ffi.dlopen``.
+# INPUTS: ``source_path`` (str) pointing to ``ctensor_ops.c`` and an
+#         ``out_dir`` for the compiled artifact.
+# OUTPUTS: Path to the compiled library.
+# KEY ASSUMPTIONS/DEPENDENCIES: Requires the ``ziglang`` package which
+#         bundles the Zig binary. Compilation occurs only if no prebuilt
+#         library is supplied via ``SPEAKTOME_CTENSOR_LIB``.
+# TODO:
+#   - Implement the Zig command invocation.
+#   - Add caching logic to avoid recompilation.
+# NOTES: This stub is the first step toward supporting non-CFFI builds.
+# ###########################################################################
+def build_ctensor_with_zig(source_path: str, out_dir: str) -> str:
+    raise NotImplementedError("Zig build not yet implemented.")
 
 class CTensor:
     """C-backed tensor using cffi buffer."""

@@ -40,7 +40,8 @@ jax = [
 ]
 ctensor = [
   "cffi>=1.15",         # C backend helpers
-  "setuptools>=61"      # required for CFFI builds
+  "setuptools>=61",     # required for CFFI builds
+  "ziglang>=0.14"       # optional Zig compiler for prebuilt binaries
 ]
 numpy = [
   "numpy>=1.26"        # standard NumPy backend
