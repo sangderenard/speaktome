@@ -446,22 +446,10 @@ class BeamSearch:
             # These parents should be removed from `self.active_leaf_indices` later if they are not updated with new children.
             # The main logic of updating `active_leaf_indices` will handle this: parents are removed, new children are added.
             # If a parent has no new children added, it's implicitly no longer an active leaf.
-            # ########## STUB: failed_parent_retirement ##########
-            # PURPOSE: finalize how failed parents should be removed from the
-            #          active leaf list when all lookahead children are pruned.
-            # EXPECTED BEHAVIOR: This will ensure failed parent beams do not
-            #          linger as active leaves, preventing wasted computation.
-            # INPUTS: ``pruned_original_parent_beam_idxs_to_retire`` list from
-            #          LookaheadController.
-            # OUTPUTS: Updates ``self.active_leaf_indices`` accordingly.
-            # KEY ASSUMPTIONS/DEPENDENCIES: Should coordinate with
-            #          ``LookaheadController`` and any beam retirement policies.
-            # TODO:
-            #   - Implement removal logic and adjust tests.
-            #   - Verify integration with retirement manager.
-            # NOTES: Currently deferred to the main update logic; this stub
-            #        tracks the missing dedicated handling.
-            # ###################################################################
+            # Parents with no surviving lookahead children should be removed
+            # from ``self.active_leaf_indices``.  The
+            # ``pruned_original_parent_beam_idxs_to_retire`` list contains these
+            # failed parents.
             failed_parents = [
                 idx for idx in pruned_original_parent_beam_idxs_to_retire
                 if idx in self.tree.leaf_node_indices

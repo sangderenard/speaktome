@@ -7,7 +7,10 @@ from .abstraction import (
 from .torch_backend import PyTorchTensorOperations
 from .numpy_backend import NumPyTensorOperations
 from .pure_backend import PurePythonTensorOperations
-from .jax_backend import JAXTensorOperations
+try:
+    from .jax_backend import JAXTensorOperations
+except Exception:  # pragma: no cover - optional backend
+    JAXTensorOperations = None  # type: ignore
 try:
     from .c_backend import CTensorOperations
 except Exception:  # pragma: no cover - optional backend
@@ -19,8 +22,10 @@ __all__ = [
     "PyTorchTensorOperations",
     "NumPyTensorOperations",
     "PurePythonTensorOperations",
-    "JAXTensorOperations",
 ]
+
+if JAXTensorOperations is not None:
+    __all__.append("JAXTensorOperations")
 
 if CTensorOperations is not None:
     __all__.append("CTensorOperations")
