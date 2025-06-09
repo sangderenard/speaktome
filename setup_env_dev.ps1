@@ -80,13 +80,29 @@ function Install-Speaktome-Extras {
 
 Install-Speaktome-Extras
 
-
-Safe-Run { & $venvPython AGENTS/tools/dump_headers.py speaktome --markdown }
-Safe-Run { & $venvPython AGENTS/tools/stubfinder.py speaktome }
-Safe-Run { & $venvPython AGENTS/tools/list_contributors.py }
-Safe-Run { & $venvPython AGENTS/tools/preview_doc.py AGENTS/AGENT_CONSTITUTION.md }
-Safe-Run { & $venvPython AGENTS/tools/preview_doc.py AGENTS.md }
-Safe-Run { & $venvPython AGENTS/tools/preview_doc.py LICENSE }
-Safe-Run { & $venvPython AGENTS/tools/preview_doc.py AGENTS/CODING_STANDARDS.md }
-Safe-Run { & $venvPython AGENTS/tools/preview_doc.py AGENTS/CONTRIBUTING.md }
-Safe-Run { & $venvPython AGENTS/tools/preview_doc.py AGENTS/PROJECT_OVERVIEW.md }
+# Optionally run document dump with user confirmation and countdown
+Write-Host ""
+$docdump = $null
+Write-Host "Run document dump (headers, stubs, docs)? [Y/n] (auto-yes in 10s): "
+for ($i=10; $i -gt 0; $i--) {
+    if ($Host.UI.RawUI.KeyAvailable) {
+        $key = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+        $docdump = $key.Character
+        break
+    }
+    Start-Sleep -Seconds 1
+}
+if (-not $docdump) { $docdump = "Y" }
+if ($docdump -match "^[Yy]$") {
+    Safe-Run { & $venvPython AGENTS/tools/dump_headers.py speaktome --markdown }
+    Safe-Run { & $venvPython AGENTS/tools/stubfinder.py speaktome }
+    Safe-Run { & $venvPython AGENTS/tools/list_contributors.py }
+    Safe-Run { & $venvPython AGENTS/tools/preview_doc.py AGENTS/AGENT_CONSTITUTION.md }
+    Safe-Run { & $venvPython AGENTS/tools/preview_doc.py AGENTS.md }
+    Safe-Run { & $venvPython AGENTS/tools/preview_doc.py LICENSE }
+    Safe-Run { & $venvPython AGENTS/tools/preview_doc.py AGENTS/CODING_STANDARDS.md }
+    Safe-Run { & $venvPython AGENTS/tools/preview_doc.py AGENTS/CONTRIBUTING.md }
+    Safe-Run { & $venvPython AGENTS/tools/preview_doc.py AGENTS/PROJECT_OVERVIEW.md }
+} else {
+    Write-Host "Document dump skipped."
+}

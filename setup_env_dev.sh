@@ -79,21 +79,21 @@ install_speaktome_extras() {
   cd "$OLD_DIR"
 }
 install_speaktome_extras
-# Run Python commands using the venv's interpreter
-safe_run "$VENV_PYTHON" AGENTS/tools/dump_headers.py speaktome --markdown
-safe_run "$VENV_PYTHON" AGENTS/tools/stubfinder.py speaktome
-safe_run "$VENV_PYTHON" AGENTS/tools/list_contributors.py
 
-# Display important documentation
-safe_run "$VENV_PYTHON" AGENTS/tools/preview_doc.py AGENTS/AGENT_CONSTITUTION.md
-safe_run "$VENV_PYTHON" AGENTS/tools/preview_doc.py AGENTS.md
-
-# Show license
-safe_run "$VENV_PYTHON" AGENTS/tools/preview_doc.py LICENSE
-
-# Show coding standards
-safe_run "$VENV_PYTHON" AGENTS/tools/preview_doc.py AGENTS/CODING_STANDARDS.md
-safe_run "$VENV_PYTHON" AGENTS/tools/preview_doc.py AGENTS/CONTRIBUTING.md
-
-# Show project overview
-safe_run "$VENV_PYTHON" AGENTS/tools/preview_doc.py AGENTS/PROJECT_OVERVIEW.md
+# Optionally run document dump with user confirmation and countdown
+echo
+read -t 10 -p "Run document dump (headers, stubs, docs)? [Y/n] (auto-yes in 10s): " docdump
+docdump=${docdump:-Y}
+if [[ "$docdump" =~ ^[Yy]$ ]]; then
+  safe_run "$VENV_PYTHON" AGENTS/tools/dump_headers.py speaktome --markdown
+  safe_run "$VENV_PYTHON" AGENTS/tools/stubfinder.py speaktome
+  safe_run "$VENV_PYTHON" AGENTS/tools/list_contributors.py
+  safe_run "$VENV_PYTHON" AGENTS/tools/preview_doc.py AGENTS/AGENT_CONSTITUTION.md
+  safe_run "$VENV_PYTHON" AGENTS/tools/preview_doc.py AGENTS.md
+  safe_run "$VENV_PYTHON" AGENTS/tools/preview_doc.py LICENSE
+  safe_run "$VENV_PYTHON" AGENTS/tools/preview_doc.py AGENTS/CODING_STANDARDS.md
+  safe_run "$VENV_PYTHON" AGENTS/tools/preview_doc.py AGENTS/CONTRIBUTING.md
+  safe_run "$VENV_PYTHON" AGENTS/tools/preview_doc.py AGENTS/PROJECT_OVERVIEW.md
+else
+  echo "Document dump skipped."
+fi
