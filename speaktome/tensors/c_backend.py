@@ -132,14 +132,24 @@ class CTensor:
     """C-backed tensor using cffi buffer."""
     def __init__(self, shape: Tuple[int, ...], buffer=None):
         self.shape = shape
-        self.size = -1
+        self.size = 1
+        for dim in shape:
+            self.size *= dim
         self.buffer = buffer if buffer is not None else ffi.new("double[]", self.size)
 
     def as_c_ptr(self):
         return self.buffer
 
     def tolist(self):
-        return [self.buffer[i] for i in range(self.size)]
+        def build(offset: int, shp: Tuple[int, ...]):
+            if not shp:
+                return float(self.buffer[offset])
+            step = 1
+            for s in shp[1:]:
+                step *= s
+            return [build(offset + i * step, shp[1:]) for i in range(shp[0])]
+
+        return build(0, self.shape)
 
     @classmethod
     def from_list(cls, data: list, shape: Tuple[int, ...]):
@@ -151,7 +161,7 @@ class CTensor:
             else:
                 flat.append(float(x))
         flatten(data)
-        buf = ffi.new("double[]", flat)
+        buf = ffi.new("double[]", [float(x) for x in flat])
         return cls(shape, buf)
 
 class CTensorOperations(AbstractTensorOperations):
@@ -238,12 +248,220 @@ class CTensorOperations(AbstractTensorOperations):
     def to_device(self, tensor: CTensor, device: Any) -> CTensor:
         return tensor  # No-op for now
 
+    def arange(
+        self,
+        start: int,
+        end: Optional[int] = None,
+        step: int = 1,
+        device: Any = None,
+        dtype: Any = None,
+    ) -> CTensor:
+        data = list(range(start)) if end is None else list(range(start, end, step))
+        return CTensor.from_list(data, (len(data),))
+
+    def pow(self, tensor: Any, exponent: float) -> CTensor:
+        if not isinstance(tensor, CTensor):
+            tensor = CTensor.from_list(tensor, _get_shape(tensor))
+        out = CTensor(tensor.shape)
+        for i in range(tensor.size):
+            out.buffer[i] = tensor.buffer[i] ** exponent
+        return out
+
+    def sqrt(self, tensor: Any) -> CTensor:
+        if not isinstance(tensor, CTensor):
+            tensor = CTensor.from_list(tensor, _get_shape(tensor))
+        out = CTensor(tensor.shape)
+        for i in range(tensor.size):
+            out.buffer[i] = math.sqrt(tensor.buffer[i])
+        return out
+
+    def tensor_from_list(self, data: List[Any], dtype: Any, device: Any) -> CTensor:
+        shape = _get_shape(data)
+        return CTensor.from_list(data, shape)
+
+    def shape(self, tensor: CTensor) -> Tuple[int, ...]:
+        return tensor.shape
+
+    def numel(self, tensor: CTensor) -> int:
+        return tensor.size
+
+    def mean(self, tensor: Any, dim: Optional[int] = None) -> Any:
+        if not isinstance(tensor, CTensor):
+            tensor = CTensor.from_list(tensor, _get_shape(tensor))
+        values = _flatten(tensor.tolist())
+        if dim is None:
+            return sum(values) / len(values) if values else 0.0
+        # ########## STUB: CTensorOperations.mean_dim ##########
+        # PURPOSE: Placeholder for dimension-wise mean on CTensors.
+        # EXPECTED BEHAVIOR: Compute mean along the specified dimension.
+        # INPUTS: ``tensor`` CTensor, ``dim`` dimension index
+        # OUTPUTS: CTensor or float representing the mean.
+        # KEY ASSUMPTIONS/DEPENDENCIES: Requires proper shape traversal.
+        # TODO:
+        #   - Implement mean over arbitrary dimensions.
+        # NOTES: Current implementation only handles ``dim=None``.
+        # ############################################################
+        raise NotImplementedError("mean(dim) not implemented for C backend")
+
+    def less(self, tensor: Any, value: Any) -> list:
+        if not isinstance(tensor, CTensor):
+            tensor = CTensor.from_list(tensor, _get_shape(tensor))
+        return [tensor.buffer[i] < value for i in range(tensor.size)]
+
+    def view_flat(self, tensor: Any) -> list:
+        if not isinstance(tensor, CTensor):
+            tensor = CTensor.from_list(tensor, _get_shape(tensor))
+        return _flatten(tensor.tolist())
+
+    def select_by_indices(self, tensor: CTensor, indices_dim0: Any, indices_dim1: Any) -> Any:
+        # ########## STUB: CTensorOperations.select_by_indices ##########
+        # PURPOSE: Gather elements from ``tensor`` using two index arrays.
+        # EXPECTED BEHAVIOR: Return a 1D CTensor of selected values.
+        # INPUTS: ``tensor`` CTensor, ``indices_dim0`` list, ``indices_dim1`` list.
+        # OUTPUTS: CTensor with values from ``tensor[indices_dim0[i], indices_dim1[i]]``.
+        # KEY ASSUMPTIONS/DEPENDENCIES: Requires stride calculations.
+        # TODO:
+        #   - Implement efficient index selection.
+        # NOTES: Complex indexing left for future work.
+        # ############################################################
+        raise NotImplementedError("select_by_indices not implemented for C backend")
+
+    def log_softmax(self, tensor: CTensor, dim: int) -> Any:
+        # ########## STUB: CTensorOperations.log_softmax ##########
+        # PURPOSE: Compute log softmax along ``dim``.
+        # EXPECTED BEHAVIOR: Returns a CTensor of same shape with log probabilities.
+        # INPUTS: ``tensor`` CTensor, ``dim`` dimension index.
+        # OUTPUTS: CTensor with log softmax values.
+        # KEY ASSUMPTIONS/DEPENDENCIES: Would require exponential and reduction ops.
+        # TODO:
+        #   - Implement stable log softmax in C.
+        # NOTES: Placeholder due to implementation complexity.
+        # ############################################################
+        raise NotImplementedError("log_softmax not implemented for C backend")
+
+    def pad(self, tensor: CTensor, pad: Tuple[int, ...], value: float = 0) -> Any:
+        # ########## STUB: CTensorOperations.pad ##########
+        # PURPOSE: Pad ``tensor`` with ``value`` according to ``pad`` spec.
+        # EXPECTED BEHAVIOR: Return new CTensor with additional elements.
+        # INPUTS: ``tensor`` CTensor, padding tuple.
+        # OUTPUTS: Padded CTensor.
+        # KEY ASSUMPTIONS/DEPENDENCIES: Requires dynamic shape manipulation.
+        # TODO:
+        #   - Implement generic padding logic for all dimensions.
+        # NOTES: Currently unsupported.
+        # ############################################################
+        raise NotImplementedError("pad not implemented for C backend")
+
+    def topk(self, tensor: CTensor, k: int, dim: int) -> Tuple[Any, Any]:
+        # ########## STUB: CTensorOperations.topk ##########
+        # PURPOSE: Return the top ``k`` values and their indices along ``dim``.
+        # EXPECTED BEHAVIOR: Similar to numpy.take_along_axis with sorting.
+        # INPUTS: ``tensor`` CTensor, ``k`` int, ``dim`` dimension index.
+        # OUTPUTS: Tuple of (values CTensor, indices list).
+        # KEY ASSUMPTIONS/DEPENDENCIES: Requires sorting capabilities.
+        # TODO:
+        #   - Implement efficient top-k selection.
+        # NOTES: Complex due to absence of vectorized sort in this backend.
+        # ############################################################
+        raise NotImplementedError("topk not implemented for C backend")
+
+    def repeat_interleave(self, tensor: CTensor, repeats: int, dim: Optional[int] = None) -> Any:
+        # ########## STUB: CTensorOperations.repeat_interleave ##########
+        # PURPOSE: Repeat each element in ``tensor`` ``repeats`` times along ``dim``.
+        # EXPECTED BEHAVIOR: New CTensor with expanded dimension.
+        # INPUTS: CTensor, repeats int, optional dimension.
+        # OUTPUTS: CTensor with repeated values.
+        # KEY ASSUMPTIONS/DEPENDENCIES: Requires advanced slicing helpers.
+        # TODO:
+        #   - Implement axis-aware repetition.
+        # NOTES: Only full flattening supported currently.
+        # ############################################################
+        raise NotImplementedError("repeat_interleave not implemented for C backend")
+
+    def assign_at_indices(
+        self,
+        tensor_to_modify: CTensor,
+        indices_dim0: Any,
+        indices_dim1: Any,
+        values_to_assign: Any,
+    ) -> None:
+        # ########## STUB: CTensorOperations.assign_at_indices ##########
+        # PURPOSE: In-place assignment into ``tensor_to_modify`` at specified indices.
+        # EXPECTED BEHAVIOR: Modifies tensor values according to index lists.
+        # INPUTS: target CTensor, two index lists, values list.
+        # OUTPUTS: None (in-place modification).
+        # KEY ASSUMPTIONS/DEPENDENCIES: Requires index math support.
+        # TODO:
+        #   - Implement multi-dimensional indexing.
+        # NOTES: Stubbed pending full CTensor infrastructure.
+        # ############################################################
+        raise NotImplementedError("assign_at_indices not implemented for C backend")
+
+    def increment_at_indices(self, tensor_to_modify: CTensor, mask: Any) -> None:
+        # ########## STUB: CTensorOperations.increment_at_indices ##########
+        # PURPOSE: Increment elements of ``tensor_to_modify`` where ``mask`` is True.
+        # EXPECTED BEHAVIOR: Element-wise increment using a boolean mask.
+        # INPUTS: target CTensor, boolean mask list.
+        # OUTPUTS: None (in-place update).
+        # KEY ASSUMPTIONS/DEPENDENCIES: Requires broadcasting rules.
+        # TODO:
+        #   - Implement efficient masked increment.
+        # NOTES: Stub to signal incomplete feature.
+        # ############################################################
+        raise NotImplementedError("increment_at_indices not implemented for C backend")
+
+    def boolean_mask_select(self, tensor: CTensor, mask: Any) -> Any:
+        # ########## STUB: CTensorOperations.boolean_mask_select ##########
+        # PURPOSE: Select values from ``tensor`` where ``mask`` is True.
+        # EXPECTED BEHAVIOR: Return CTensor or list of filtered values.
+        # INPUTS: CTensor, mask list.
+        # OUTPUTS: CTensor containing selected elements.
+        # KEY ASSUMPTIONS/DEPENDENCIES: Requires shape-aware masking.
+        # TODO:
+        #   - Implement boolean masking for CTensors.
+        # NOTES: Not yet supported in C backend.
+        # ############################################################
+        raise NotImplementedError("boolean_mask_select not implemented for C backend")
+
+    def index_select(self, tensor: CTensor, dim: int, indices: Any) -> Any:
+        # ########## STUB: CTensorOperations.index_select ##########
+        # PURPOSE: Select entries along ``dim`` using ``indices``.
+        # EXPECTED BEHAVIOR: Mirror numpy.take along the specified dimension.
+        # INPUTS: CTensor, dimension index, index list.
+        # OUTPUTS: CTensor with gathered values.
+        # KEY ASSUMPTIONS/DEPENDENCIES: Requires advanced indexing support.
+        # TODO:
+        #   - Implement general index selection.
+        # NOTES: Current design does not provide necessary helpers.
+        # ############################################################
+        raise NotImplementedError("index_select not implemented for C backend")
+
     def stack(self, tensors: list, dim: int = 0) -> Any:
-        # Not implemented for C backend in this example
+        # ########## STUB: CTensorOperations.stack ##########
+        # PURPOSE: Concatenate a sequence of CTensors along a new dimension.
+        # EXPECTED BEHAVIOR: Should return a CTensor representing ``tensors``
+        #     stacked along ``dim``.
+        # INPUTS: list of CTensors, dimension index.
+        # OUTPUTS: New CTensor with increased rank.
+        # KEY ASSUMPTIONS/DEPENDENCIES: Requires advanced shape handling.
+        # TODO:
+        #   - Implement shape validation and memory allocation logic.
+        # NOTES: Current C backend lacks generic tensor helpers.
+        # ############################################################
         raise NotImplementedError("stack not implemented for C backend")
 
     def cat(self, tensors: list, dim: int = 0) -> Any:
-        # Not implemented for C backend in this example
+        # ########## STUB: CTensorOperations.cat ##########
+        # PURPOSE: Concatenate CTensors along an existing dimension.
+        # EXPECTED BEHAVIOR: Should join ``tensors`` on ``dim`` similar to
+        #     numpy.concatenate.
+        # INPUTS: list of CTensors, dimension index.
+        # OUTPUTS: New CTensor with combined size.
+        # KEY ASSUMPTIONS/DEPENDENCIES: Requires complex stride math.
+        # TODO:
+        #   - Implement concatenation across arbitrary dimensions.
+        # NOTES: Placeholder until a more complete C tensor API exists.
+        # ############################################################
         raise NotImplementedError("cat not implemented for C backend")
 
     def get_device(self, tensor: CTensor) -> str:
@@ -299,4 +517,5 @@ class CTensorOperations(AbstractTensorOperations):
         """Simple self-check calling ``sqrt`` from ``libm``."""
         ops = CTensorOperations()
         result = ops.sqrt([4.0, 9.0])
+        assert [round(x, 1) for x in result.tolist()] == [2.0, 3.0]
 
