@@ -102,7 +102,16 @@ def validate(root: Path, *, rewrite: bool = False) -> int:
                 indent = " " * (cls.col_offset + 4)
                 new_lines: list[str] = []
                 if miss_head:
-                    new_lines.append(f"{indent}HEADER = \"TODO\"")
+                    new_lines.append(f"{indent}try:")
+                    new_lines.append(f"{indent}    HEADER = \"TODO\"")
+                    new_lines.append(f"{indent}except Exception as exc:")
+                    new_lines.append(
+                        f"{indent}    print('Did you run setup_env_dev with the correct codebases and groups?')"
+                    )
+                    new_lines.append(
+                        f"{indent}    print('Is your virtual environment active or are you calling the .venv python binary?')"
+                    )
+                    new_lines.append(f"{indent}    raise")
                 if miss_test:
                     new_lines.append(f"{indent}@staticmethod")
                     new_lines.append(f"{indent}def test() -> None:")
@@ -126,7 +135,19 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    sys.exit(validate(args.path, rewrite=args.rewrite))
+    try:
+        exit_code = validate(args.path, rewrite=args.rewrite)
+    except Exception as exc:  # pragma: no cover - unexpected failure
+        print(
+            "[AGENT_ACTIONABLE_ERROR] validate_headers failed: "
+            f"{exc}.\n"
+            "Have you run setup_env_dev with the right selection of codebases"
+            " and groups?\n"
+            "Is your virtual environment active or are you calling the .venv"
+            " python binary?"
+        )
+        sys.exit(1)
+    sys.exit(exit_code)
 
 
 if __name__ == "__main__":
