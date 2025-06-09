@@ -244,22 +244,41 @@ class PurePythonTensorOperations(AbstractTensorOperations):
         return [self.log_softmax(sublist, dim=-1) for sublist in tensor]
 
     def topk(self, tensor: Any, k: int, dim: int) -> Tuple[Any, Any]:
-        if dim != -1 and dim != len(_get_shape(tensor)) - 1:
-            raise NotImplementedError("topk only implemented for last dimension")
-        if not isinstance(tensor, list):
+        """Return the top ``k`` values and indices along ``dim`` using pure Python."""
+        shape = _get_shape(tensor)
+        if not shape:
             return [tensor], [0]
-        if not isinstance(tensor[0], list):
-            indexed = sorted([(v, i) for i, v in enumerate(tensor)], reverse=True)[:k]
+
+        if dim < 0:
+            dim += len(shape)
+        if dim < 0 or dim >= len(shape):
+            raise ValueError("dim out of range")
+
+        if len(shape) == 1:
+            indexed = sorted(((v, i) for i, v in enumerate(tensor)), reverse=True)[:k]
             values = [v for v, _ in indexed]
             indices = [i for _, i in indexed]
             return values, indices
-        topk_values = []
-        topk_indices = []
-        for sublist in tensor:
-            values, idxs = self.topk(sublist, k, dim=-1)
-            topk_values.append(values)
-            topk_indices.append(idxs)
-        return topk_values, topk_indices
+
+        if dim == 0:
+            transposed = list(zip(*tensor))
+            col_vals: List[List[Any]] = []
+            col_idxs: List[List[Any]] = []
+            for col in transposed:
+                vals, idxs = self.topk(list(col), k, dim=0)
+                col_vals.append(vals)
+                col_idxs.append(idxs)
+            values = [list(v) for v in zip(*col_vals)] if col_vals else []
+            indices = [list(i) for i in zip(*col_idxs)] if col_idxs else []
+            return values, indices
+
+        values = []
+        indices = []
+        for sub in tensor:
+            vals, idxs = self.topk(sub, k, dim - 1)
+            values.append(vals)
+            indices.append(idxs)
+        return values, indices
 
     def pad(self, tensor: Any, pad: Tuple[int, ...], value: float = 0) -> Any:
         if len(pad) != 4:
