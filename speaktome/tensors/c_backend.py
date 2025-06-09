@@ -63,11 +63,13 @@ ffi.cdef("""
     void floor_div_const(const double* a, double b, double* out, int n);
     void rfloor_div_const(const double* a, double b, double* out, int n);
     void sqrt_double(const double* a, double* out, int n);
+    void mean_dim(const double* a, double* out, const int* shape, int ndim, int dim);
     void gather_pairs_2d(const double* a, const int* rows, const int* cols,
                          double* out, int n_pairs, int stride);
     double sum_double(const double* a, int n);
     void create_arange(double start, double step, int n, double* out);
     void topk_double(const double* a, int n, int k, int* indices, double* out);
+
 """)
 
 C_SOURCE = """
@@ -133,6 +135,25 @@ C_SOURCE = """
     void sqrt_double(const double* a, double* out, int n) {
         for (int i = 0; i < n; ++i) out[i] = sqrt(a[i]);
     }
+
+    void mean_dim(const double* a, double* out, const int* shape, int ndim, int dim) {
+        int before = 1;
+        for (int i = 0; i < dim; ++i) before *= shape[i];
+        int axis = shape[dim];
+        int after = 1;
+        for (int i = dim + 1; i < ndim; ++i) after *= shape[i];
+        int out_index = 0;
+        for (int b = 0; b < before; ++b) {
+            for (int c = 0; c < after; ++c) {
+                double sum = 0.0;
+                for (int j = 0; j < axis; ++j) {
+                    int idx = (b * axis + j) * after + c;
+                    sum += a[idx];
+                }
+                out[out_index++] = sum / axis;
+            }
+        }
+
     void gather_pairs_2d(const double* a, const int* rows, const int* cols,
                          double* out, int n_pairs, int stride) {
         for (int i = 0; i < n_pairs; ++i) {
@@ -177,6 +198,7 @@ C_SOURCE = """
             }
         }
         free(used);
+
     }
 """
 
@@ -350,19 +372,21 @@ class CTensorOperations(AbstractTensorOperations):
             tensor = CTensor.from_list(tensor, _get_shape(tensor))
         values = _flatten(tensor.tolist())
         if dim is None:
-            s = C.sum_double(tensor.as_c_ptr(), tensor.size)
-            return s / tensor.size if tensor.size else 0.0
-        # ########## STUB: CTensorOperations.mean_dim ##########
-        # PURPOSE: Placeholder for dimension-wise mean on CTensors.
-        # EXPECTED BEHAVIOR: Compute mean along the specified dimension.
-        # INPUTS: ``tensor`` CTensor, ``dim`` dimension index
-        # OUTPUTS: CTensor or float representing the mean.
-        # KEY ASSUMPTIONS/DEPENDENCIES: Requires proper shape traversal.
-        # TODO:
-        #   - Implement mean over arbitrary dimensions.
-        # NOTES: Current implementation only handles ``dim=None``.
-        # ############################################################
-        raise NotImplementedError("mean(dim) not implemented for C backend")
+            return sum(values) / len(values) if values else 0.0
+
+        shape = tensor.shape
+        if dim < 0:
+            dim += len(shape)
+        if dim < 0 or dim >= len(shape):
+            raise ValueError("dim out of range")
+
+        out_shape = shape[:dim] + shape[dim + 1 :]
+        out = CTensor(out_shape if out_shape else ())
+        shape_arr = ffi.new("int[]", list(shape))
+        C.mean_dim(tensor.as_c_ptr(), out.as_c_ptr(), shape_arr, len(shape), dim)
+        if not out_shape:
+            return out.buffer[0]
+        return out
 
     def less(self, tensor: Any, value: Any) -> list:
         if not isinstance(tensor, CTensor):
