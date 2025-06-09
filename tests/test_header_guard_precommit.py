@@ -8,6 +8,7 @@ import AGENTS.tools.header_guard_precommit as hg
 def test_check_try_header_pass(tmp_path: Path) -> None:
     path = tmp_path / "ok.py"
     path.write_text(
+        "from __future__ import annotations\n"
         "try:\n    import os\nexcept Exception:\n    print('warn')\n# --- END HEADER ---\n"
     )
     assert hg.check_try_header(path) == []

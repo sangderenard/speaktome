@@ -1,3 +1,6 @@
+"""Pre-commit hook enforcing HEADER, tests, and the end sentinel."""
+from __future__ import annotations
+
 ENV_SETUP_BOX = (
     "\n"
     "+-----------------------------------------------------------------------+\n"
@@ -8,7 +11,6 @@ ENV_SETUP_BOX = (
 )
 
 try:
-    """Pre-commit hook enforcing HEADER, tests, and the end sentinel."""
     import sys
     import subprocess
     import ast
@@ -29,12 +31,17 @@ If the pre-commit hook caught your changes, here's a friendly checklist:
 1. Every Python file needs:
    - A `HEADER` (as docstring or constant)
    - A `@staticmethod test()` method in each class
-   - Imports and header content wrapped in a `try` block
+   - `from __future__ import annotations` before the `try` block
+   - Imports wrapped in a `try` block
    - An `except` block printing guidance about running `setup_env_dev` and activating the virtual environment
    - A `# --- END HEADER ---` sentinel after the `except` block
 
 2. Example structure:
    ```python
+   #!/usr/bin/env python3
+   \"\"\"Optional module docstring.\"\"\"
+   from __future__ import annotations
+
    try:
        import sys
        import your_modules
@@ -128,20 +135,27 @@ def check_end_header(filepath: Path) -> list[str]:
 
 
 def check_try_header(filepath: Path) -> list[str]:
-    """Verify the header starts with ``try:`` and includes an ``except`` block."""
+    """Verify header ordering and presence of ``__future__`` and ``try`` blocks."""
     sentinel = "# --- END HEADER ---"
     with open(filepath, encoding="utf-8") as f:
         lines = f.readlines()
 
     try_idx = next((i for i, ln in enumerate(lines) if ln.strip().startswith("try:")), None)
     sentinel_idx = next((i for i, ln in enumerate(lines) if ln.strip() == sentinel), None)
+    future_idx = next((i for i, ln in enumerate(lines) if ln.strip().startswith("from __future__")), None)
     except_idx = next(
-        (i for i, ln in enumerate(lines) if ln.strip().startswith("except") and (sentinel_idx is None or i < sentinel_idx)),
+        (
+            i
+            for i, ln in enumerate(lines)
+            if ln.strip().startswith("except") and (sentinel_idx is None or i < sentinel_idx)
+        ),
         None,
     )
 
     errors = []
-    if try_idx is None or try_idx > 1:
+    if future_idx is None or (try_idx is not None and future_idx > try_idx):
+        errors.append("Missing '__future__' import before try block")
+    if try_idx is None or (future_idx is not None and try_idx <= future_idx):
         errors.append("Missing 'try:' at start of header")
     if except_idx is None:
         errors.append("Missing 'except' block for header")

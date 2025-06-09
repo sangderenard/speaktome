@@ -1,6 +1,7 @@
+from __future__ import annotations
+
 try:
     # Standard library imports
-    from __future__ import annotations
     from typing import List, Tuple, Callable, Any, Set, TYPE_CHECKING
 
     if TYPE_CHECKING:  # pragma: no cover - type hints only

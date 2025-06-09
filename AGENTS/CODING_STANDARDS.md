@@ -70,13 +70,17 @@ path.
 
 ## Standard Header End Comment
 
-Every Python file should begin with a short explanatory header wrapped in a
-``try`` block. Imports may appear inside this block. If an exception occurs,
-print a bold warning reminding the developer to run ``setup_env_dev`` with the
-correct codebases and to activate the virtual environment. After the ``except``
-block, include the sentinel line:
+Every Python file should begin with an optional shebang and module docstring
+followed by ``from __future__ import annotations``. All imports then occur inside
+a ``try`` block. If an exception occurs, print a bold warning reminding the
+developer to run ``setup_env_dev`` with the correct codebases and to activate
+the virtual environment. After the ``except`` block, include the sentinel line:
 
 ```python
+#!/usr/bin/env python3
+"""Optional module description."""
+from __future__ import annotations
+
 try:
     import your_modules
 except Exception:
