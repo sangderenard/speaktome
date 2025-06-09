@@ -1,9 +1,16 @@
+#!/usr/bin/env python3
 """Run the test suite and collect stubbed tests."""
 from __future__ import annotations
 
-import argparse
-import pytest
-from pathlib import Path
+try:
+    import argparse
+    import pytest
+    from pathlib import Path
+
+    from AGENTS.tools.header_utils import ENV_SETUP_BOX
+except Exception:
+    print(ENV_SETUP_BOX)
+    raise
 # --- END HEADER ---
 
 
