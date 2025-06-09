@@ -35,7 +35,7 @@ fi
 safe_run $VENV_PYTHON -m pip install --upgrade pip
 safe_run $VENV_PIP install -r requirements.txt -r requirements-dev.txt
 
-EXTRAS=0
+NOEXTRAS=0
 ML=0        # flag for full ML extras (transformers, torch_geometric)
 FORCE_GPU=0
 PREFETCH=0
@@ -43,7 +43,7 @@ CODEBASES="speaktome,AGENTS/tools,time_sync"
 
 for arg in "$@"; do
   case $arg in
-    --extras|--full) EXTRAS=1 ;;
+    --noextras)       NOEXTRAS=1 ;;
     --ml)             ML=1      ;;  # install ML extras too
     --gpu)            FORCE_GPU=1 ;;
     --prefetch)       PREFETCH=1 ;;
@@ -57,17 +57,17 @@ case ",${CODEBASES}," in
   *) CODEBASES="${CODEBASES},time_sync" ;;
 esac
 
-if [ $EXTRAS -eq 1 ]; then
+if [ $NOEXTRAS -eq 0 ]; then
   safe_run $VENV_PIP install .[plot]
   if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
     echo "Installing CPU-only torch (CI environment)"
-    safe_run $VENV_PIP install torch==1.13.1+cpu --index-url https://download.pytorch.org/whl/cpu
+    safe_run $VENV_PIP install torch==1.13.1+cpu -f https://download.pytorch.org/whl/torch_stable.html
   elif [ $FORCE_GPU -eq 1 ]; then
     echo "Installing GPU-enabled torch"
     safe_run $VENV_PIP install torch --index-url https://download.pytorch.org/whl/cu118
   else
     echo "Installing CPU-only torch (default)"
-    safe_run $VENV_PIP install torch==1.13.1+cpu --index-url https://download.pytorch.org/whl/cpu
+    safe_run $VENV_PIP install torch==1.13.1+cpu -f https://download.pytorch.org/whl/torch_stable.html
   fi
   if [ $ML -eq 1 ]; then
     echo "Installing ML extras"

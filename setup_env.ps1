@@ -2,7 +2,7 @@
 # No Unicode. All pip/python commands run inside venv unless -NoVenv is used.
 
 param(
-    [switch]$extras,
+    [switch]$NoExtras,
     [switch]$ml,
     [switch]$gpu,
     [switch]$prefetch,
@@ -46,19 +46,19 @@ if (-not $NoVenv) {
 # 2. Install core + dev requirements
 Safe-Run { & $venvPython -m pip install --upgrade pip }
 Safe-Run { & $venvPip install -r requirements.txt -r requirements-dev.txt }
-if ($extras) {
+if (-not $NoExtras) {
     Safe-Run { & $venvPip install .[plot] }
 
     # 3. Handle CPU vs GPU torch & optional ML extras
     if ($env:GITHUB_ACTIONS -eq 'true') {
         Write-Host 'Installing CPU-only torch (CI environment)'
-        Safe-Run { & $venvPip install torch==1.13.1+cpu --index-url https://download.pytorch.org/whl/cpu }
+        Safe-Run { & $venvPip install torch==1.13.1+cpu -f https://download.pytorch.org/whl/torch_stable.html }
     } elseif ($gpu) {
         Write-Host 'Installing GPU-enabled torch'
         Safe-Run { & $venvPip install torch --index-url https://download.pytorch.org/whl/cu118 }
     } else {
         Write-Host 'Installing CPU-only torch (default)'
-        Safe-Run { & $venvPip install torch==1.13.1+cpu --index-url https://download.pytorch.org/whl/cpu }
+        Safe-Run { & $venvPip install torch==1.13.1+cpu -f https://download.pytorch.org/whl/torch_stable.html }
     }
 
     if ($ml) {
