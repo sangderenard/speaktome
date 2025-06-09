@@ -1,6 +1,7 @@
 # Testing Guidelines
 
-This directory holds the automated test suite. Use `pytest -v` to run all tests.
+This directory holds the automated test suite. Use `./.venv/bin/pytest -v`
+(or `.venv\Scripts\pytest.exe -v` on Windows) to run all tests.
 
 ## Stub Tests
 Some tests are marked with the `stub` marker when a realistic implementation
