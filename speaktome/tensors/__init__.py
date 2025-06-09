@@ -1,5 +1,5 @@
+#!/usr/bin/env python3
 """Tensor backends and abstraction layer."""
-
 from __future__ import annotations
 
 try:
@@ -11,6 +11,7 @@ try:
     from .torch_backend import PyTorchTensorOperations
     from .numpy_backend import NumPyTensorOperations
     from .pure_backend import PurePythonTensorOperations
+
     try:
         from .jax_backend import JAXTensorOperations
     except Exception:  # pragma: no cover - optional backend
@@ -20,16 +21,10 @@ try:
     except Exception:  # pragma: no cover - optional backend
         CTensorOperations = None  # type: ignore
 except Exception:
-    print(
-        "\n"
-        "+-----------------------------------------------------------------------+\n"
-        "| Imports failed. Run setup_env or setup_env_dev and select every    |\n"
-        "| project and module you plan to use. Missing packages mean setup was |\n"
-        "| skipped or incomplete.                                             |\n"
-        "+-----------------------------------------------------------------------+\n"
-    )
+    print(ENV_SETUP_BOX)
     raise
 # --- END HEADER ---
+
 
 __all__ = [
     "AbstractTensorOperations",

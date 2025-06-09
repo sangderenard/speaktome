@@ -1,3 +1,6 @@
+#!/usr/bin/env python3
+"""Scorer n-gram diversity tests."""
+
 from __future__ import annotations
 
 try:

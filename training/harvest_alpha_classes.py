@@ -1,22 +1,25 @@
 #!/usr/bin/env python3
-"""Harvest Python classes from the Alpha archive.
-
-This utility scans the `training/archive/Alpha` directory for all `.py` files
-and copies them into a new flat directory. Each file is renamed using its
-modification timestamp in epoch seconds followed by the alphabetically sorted
-class names contained within the source file. Duplicate files are detected by
-SHA256 hash and skipped. The goal is to quickly compare class definitions
-across the archive while preserving temporal information.
-"""
-
+"""Harvest Python classes from the Alpha archive."""
 from __future__ import annotations
 
-import argparse
-import ast
-import hashlib
-import shutil
-from pathlib import Path
-from typing import Iterable, List, Dict
+try:
+    import argparse
+    import ast
+    import hashlib
+    import shutil
+    from pathlib import Path
+    from typing import Iterable, List, Dict
+except Exception:
+    print(
+        "\n"
+        "+-----------------------------------------------------------------------+\n"
+        "| Imports failed. Run setup_env or setup_env_dev and select every    |\n"
+        "| project and module you plan to use. Missing packages mean setup was |\n"
+        "| skipped or incomplete.                                             |\n"
+        "+-----------------------------------------------------------------------+\n"
+    )
+    raise
+# --- END HEADER ---
 
 # Determine the script's directory to make default paths relative to it
 SCRIPT_DIRECTORY = Path(__file__).resolve().parent

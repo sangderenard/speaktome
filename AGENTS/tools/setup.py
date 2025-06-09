@@ -1,4 +1,5 @@
-
+#!/usr/bin/env python3
+"""Setup script for SPEAKTOME agent tools."""
 from __future__ import annotations
 
 try:

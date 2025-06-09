@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+"""Tests for building CTensor with Zig."""
 from __future__ import annotations
 
 try:

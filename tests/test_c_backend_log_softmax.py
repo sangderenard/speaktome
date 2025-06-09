@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """CTensorOperations.log_softmax behaviour."""
 
 from __future__ import annotations

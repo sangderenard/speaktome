@@ -1,15 +1,5 @@
 #!/usr/bin/env python3
-"""Static header validation utility for the SPEAKTOME project.
-
-This script walks the ``speaktome/`` package and checks that every class
-defines a ``HEADER`` attribute or docstring and provides a
-``@staticmethod`` ``test()`` method.  Any violations are printed with the
-``[AGENT_ACTIONABLE_ERROR]`` tag for easy parsing.
-
-When invoked with ``--rewrite`` it will inject a minimal ``HEADER`` and
-``test`` stub into classes that are missing them.
-"""
-
+"""Static header validation utility for the SPEAKTOME project."""
 from __future__ import annotations
 
 try:
