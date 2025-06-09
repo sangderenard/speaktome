@@ -212,6 +212,7 @@ class JAXTensorOperations(AbstractTensorOperations):
     def index_select(self, tensor: Any, dim: int, indices: Any) -> Any:
         return jnp.take(self._to_jnp(tensor), indices, axis=dim)
 
+
     # --- Persistence helpers ---
     def save(self, tensor: Any, filepath: str) -> None:
         import numpy as np

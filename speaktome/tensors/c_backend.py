@@ -272,3 +272,4 @@ class CTensorOperations(AbstractTensorOperations):
         """Simple self-check calling ``sqrt`` from ``libm``."""
         ops = CTensorOperations()
         result = ops.sqrt([4.0, 9.0])
+
