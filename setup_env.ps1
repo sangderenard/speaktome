@@ -7,7 +7,7 @@ param(
     [switch]$gpu,
     [switch]$prefetch,
     [switch]$NoVenv,
-    [string[]]$Codebases = @(".")
+    [string[]]$Codebases = @("speaktome", "AGENTS/tools", "time_sync")
 )
 
 # Always include the time_sync codebase
@@ -60,7 +60,7 @@ if ($extras) {
 }
 
 # Install package in editable mode so changes are picked up automatically
-Safe-Run { & $venvPip install -e . }
+Safe-Run { & $venvPip install -e speaktome }
 
 # Install additional codebases in editable mode
 foreach ($cb in $Codebases) {
