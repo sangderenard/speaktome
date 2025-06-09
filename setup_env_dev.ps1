@@ -80,57 +80,12 @@ function Install-Speaktome-Extras {
         Write-Host "Warning: Failed to install SpeakToMe in editable mode. Error: $($_.Exception.Message)"
     }
 
-    $optionalGroups = @("plot", "ml", "dev")
-    foreach ($group in $optionalGroups) {
-        $response = $null
-        Write-Host "Install optional group '$group'? [y/N] (auto-skip in 3s): " -NoNewline
-        for ($i=3; $i -gt 0; $i--) {
-            if ($Host.UI.RawUI.KeyAvailable) {
-                $key = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
-                $response = $key.Character
-                break
-            }
-            Start-Sleep -Seconds 1
-        }
-        if (-not $response) { $response = 'N' }
-        if ($response -match '^[Yy]$') {
-            Write-Host "Attempting to install optional group: $group"
-            try {
-                & $venvPip "install" ".[$group]"
-            } catch {
-                Write-Host "Warning: Failed to install optional group: $group. Error: $($_.Exception.Message)"
-            }
-        } else {
-            Write-Host "Skipping optional group: $group"
-        }
-    }
-
-    $backendGroups = @("numpy", "jax", "ctensor")
-    foreach ($group in $backendGroups) {
-        $response = $null
-        Write-Host "Install backend group '$group'? Install if you plan to run the corresponding abstract tensor backend. [y/N] (auto-skip in 3s): " -NoNewline
-        for ($i=3; $i -gt 0; $i--) {
-            if ($Host.UI.RawUI.KeyAvailable) {
-                $key = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
-                $response = $key.Character
-                break
-            }
-            Start-Sleep -Seconds 1
-        }
-        if (-not $response) { $response = 'N' }
-        if ($response -match '^[Yy]$') {
-            Write-Host "Attempting to install backend group: $group"
-            try {
-                & $venvPip "install" ".[$group]"
-            } catch {
-                Write-Host "Warning: Failed to install backend group: $group. Error: $($_.Exception.Message)"
-            }
-        } else {
-            Write-Host "Skipping backend group: $group"
-        }
-    }
-
     Pop-Location
+
+    Write-Host "Launching codebase/group selection tool..."
+    $env:PIP_CMD = $venvPip
+    & $venvPython AGENTS/tools/dev_group_menu.py --install
+    Remove-Item Env:PIP_CMD
 }
 
 Install-Speaktome-Extras
@@ -154,8 +109,7 @@ function Show-Menu {
         Write-Host " 7) Preview CODING_STANDARDS.md"
         Write-Host " 8) Preview CONTRIBUTING.md"
         Write-Host " 9) Preview PROJECT_OVERVIEW.md"
-        Write-Host "10) speaktome codebase menu (run python AGENTS/tools/dev_group_menu.py)"
-        Write-Host "11) time_sync codebase menu (run python AGENTS/tools/dev_group_menu.py)"
+        Write-Host "10) Launch dev group menu"
         Write-Host " q) Quit"
         Write-Host -NoNewline "Select option: "
         $choice = Read-InputWithTimeout $Timeout
@@ -170,8 +124,7 @@ function Show-Menu {
             '7' { Write-Host "Preview CODING_STANDARDS.md"; Safe-Run { & $venvPython AGENTS/tools/preview_doc.py AGENTS/CODING_STANDARDS.md }; $Timeout = 60 }
             '8' { Write-Host "Preview CONTRIBUTING.md"; Safe-Run { & $venvPython AGENTS/tools/preview_doc.py AGENTS/CONTRIBUTING.md }; $Timeout = 60 }
             '9' { Write-Host "Preview PROJECT_OVERVIEW.md"; Safe-Run { & $venvPython AGENTS/tools/preview_doc.py AGENTS/PROJECT_OVERVIEW.md }; $Timeout = 60 }
-            '10' { Write-Host "speaktome codebase menu (run python AGENTS/tools/dev_group_menu.py)"; Safe-Run { & $venvPython AGENTS/tools/dev_group_menu.py }; $Timeout = 60 }
-            '11' { Write-Host "time_sync codebase menu (run python AGENTS/tools/dev_group_menu.py)"; Safe-Run { & $venvPython AGENTS/tools/dev_group_menu.py }; $Timeout = 60 }
+            '10' { Write-Host "Launching dev group menu"; Safe-Run { & $venvPython AGENTS/tools/dev_group_menu.py }; $Timeout = 60 }
             'q' { Write-Host "Exiting."; break }
             'Q' { Write-Host "Exiting."; break }
             default { Write-Host "Unknown choice: $choice" }
