@@ -3,6 +3,16 @@
     #include <stdlib.h>
     #include <stddef.h>
 
+    // Forward declarations for later functions so that Zig's C compiler
+    // does not fail due to implicit declarations.
+    void for_each_cell_along_dim(
+        const double* data,
+        const int* shape,
+        int ndim,
+        int batch_dim,
+        void (*callback)(const double*, int, int, void*),
+        void* user_data);
+
     typedef struct {
         double* out;
         int dim_size;
@@ -209,17 +219,6 @@
             ctx->out[*ctx->out_index + i] = log(e / sum);
         }
         *ctx->out_index += ctx->axis;
-    }
-
-    void log_softmax_dim(
-        const double* a,
-        double* out,
-        const int* shape,
-        int ndim,
-        int dim) {
-        int out_idx = 0;
-        log_softmax_ctx ctx = {out, shape[dim], &out_idx};
-        for_each_cell_along_dim(a, shape, ndim, dim, log_softmax_callback, &ctx);
     }
 
     void pad_double_nd(const double* input, double* output, const int* shape,

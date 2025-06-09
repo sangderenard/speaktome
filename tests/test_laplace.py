@@ -1,7 +1,8 @@
 """Tests for the Laplace builder."""
 # --- END HEADER ---
 
-import torch
+import pytest
+torch = pytest.importorskip('torch')
 from laplace.laplace.builder import GridDomain, RectangularTransform, BuildLaplace3D
 
 
