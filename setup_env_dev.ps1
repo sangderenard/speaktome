@@ -128,7 +128,7 @@ function Read-InputWithTimeout([int]$seconds) {
 }
 
 function Show-Menu {
-    param([int]$Timeout = 60)
+    param([int]$Timeout = 5)
     while ($true) {
         Write-Host "`nDeveloper info menu (timeout $Timeout s):"
         Write-Host " 1) Dump headers"
@@ -140,20 +140,24 @@ function Show-Menu {
         Write-Host " 7) Preview CODING_STANDARDS.md"
         Write-Host " 8) Preview CONTRIBUTING.md"
         Write-Host " 9) Preview PROJECT_OVERVIEW.md"
+        Write-Host "10) speaktome codebase menu (run python AGENTS/tools/dev_group_menu.py)"
+        Write-Host "11) time_sync codebase menu (run python AGENTS/tools/dev_group_menu.py)"
         Write-Host " q) Quit"
         Write-Host -NoNewline "Select option: "
         $choice = Read-InputWithTimeout $Timeout
         if (-not $choice) { Write-Host "No input in $Timeout seconds. Exiting."; break }
         switch ($choice) {
-            '1' { Write-Host "Running dump_headers"; Safe-Run { & $venvPython AGENTS/tools/dump_headers.py speaktome --markdown } }
-            '2' { Write-Host "Running stubfinder"; Safe-Run { & $venvPython AGENTS/tools/stubfinder.py speaktome } }
-            '3' { Write-Host "Running list_contributors"; Safe-Run { & $venvPython AGENTS/tools/list_contributors.py } }
-            '4' { Write-Host "Preview AGENT_CONSTITUTION.md"; Safe-Run { & $venvPython AGENTS/tools/preview_doc.py AGENTS/AGENT_CONSTITUTION.md } }
-            '5' { Write-Host "Preview AGENTS.md"; Safe-Run { & $venvPython AGENTS/tools/preview_doc.py AGENTS.md } }
-            '6' { Write-Host "Preview LICENSE"; Safe-Run { & $venvPython AGENTS/tools/preview_doc.py LICENSE } }
-            '7' { Write-Host "Preview CODING_STANDARDS.md"; Safe-Run { & $venvPython AGENTS/tools/preview_doc.py AGENTS/CODING_STANDARDS.md } }
-            '8' { Write-Host "Preview CONTRIBUTING.md"; Safe-Run { & $venvPython AGENTS/tools/preview_doc.py AGENTS/CONTRIBUTING.md } }
-            '9' { Write-Host "Preview PROJECT_OVERVIEW.md"; Safe-Run { & $venvPython AGENTS/tools/preview_doc.py AGENTS/PROJECT_OVERVIEW.md } }
+            '1' { Write-Host "Running dump_headers"; Safe-Run { & $venvPython AGENTS/tools/dump_headers.py speaktome --markdown }; $Timeout = 60 }
+            '2' { Write-Host "Running stubfinder"; Safe-Run { & $venvPython AGENTS/tools/stubfinder.py speaktome }; $Timeout = 60 }
+            '3' { Write-Host "Running list_contributors"; Safe-Run { & $venvPython AGENTS/tools/list_contributors.py }; $Timeout = 60 }
+            '4' { Write-Host "Preview AGENT_CONSTITUTION.md"; Safe-Run { & $venvPython AGENTS/tools/preview_doc.py AGENTS/AGENT_CONSTITUTION.md }; $Timeout = 60 }
+            '5' { Write-Host "Preview AGENTS.md"; Safe-Run { & $venvPython AGENTS/tools/preview_doc.py AGENTS.md }; $Timeout = 60 }
+            '6' { Write-Host "Preview LICENSE"; Safe-Run { & $venvPython AGENTS/tools/preview_doc.py LICENSE }; $Timeout = 60 }
+            '7' { Write-Host "Preview CODING_STANDARDS.md"; Safe-Run { & $venvPython AGENTS/tools/preview_doc.py AGENTS/CODING_STANDARDS.md }; $Timeout = 60 }
+            '8' { Write-Host "Preview CONTRIBUTING.md"; Safe-Run { & $venvPython AGENTS/tools/preview_doc.py AGENTS/CONTRIBUTING.md }; $Timeout = 60 }
+            '9' { Write-Host "Preview PROJECT_OVERVIEW.md"; Safe-Run { & $venvPython AGENTS/tools/preview_doc.py AGENTS/PROJECT_OVERVIEW.md }; $Timeout = 60 }
+            '10' { Write-Host "speaktome codebase menu (run python AGENTS/tools/dev_group_menu.py)"; Safe-Run { & $venvPython AGENTS/tools/dev_group_menu.py }; $Timeout = 60 }
+            '11' { Write-Host "time_sync codebase menu (run python AGENTS/tools/dev_group_menu.py)"; Safe-Run { & $venvPython AGENTS/tools/dev_group_menu.py }; $Timeout = 60 }
             'q' { Write-Host "Exiting."; break }
             'Q' { Write-Host "Exiting."; break }
             default { Write-Host "Unknown choice: $choice" }
@@ -163,3 +167,4 @@ function Show-Menu {
 }
 
 Show-Menu
+Write-Host "For advanced codebase/group selection, run: python AGENTS/tools/dev_group_menu.py"

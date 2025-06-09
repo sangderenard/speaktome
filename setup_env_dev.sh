@@ -101,7 +101,7 @@ install_speaktome_extras
 
 # Interactive document menu with inactivity timeout
 dev_menu() {
-  local TIMEOUT=60 choice
+  local TIMEOUT=5 choice
   while true; do
     echo "\nDeveloper info menu (timeout ${TIMEOUT}s):"
     echo " 1) Dump headers"
@@ -116,18 +116,19 @@ dev_menu() {
     echo " q) Quit"
     read -r -t "$TIMEOUT" -p "Select option: " choice || { echo "No input in ${TIMEOUT}s. Exiting."; break; }
     case $choice in
-      1) echo "Running dump_headers"; safe_run "$VENV_PYTHON" AGENTS/tools/dump_headers.py speaktome --markdown ;;
-      2) echo "Running stubfinder"; safe_run "$VENV_PYTHON" AGENTS/tools/stubfinder.py speaktome ;;
-      3) echo "Running list_contributors"; safe_run "$VENV_PYTHON" AGENTS/tools/list_contributors.py ;;
-      4) echo "Preview AGENT_CONSTITUTION.md"; safe_run "$VENV_PYTHON" AGENTS/tools/preview_doc.py AGENTS/AGENT_CONSTITUTION.md ;;
-      5) echo "Preview AGENTS.md"; safe_run "$VENV_PYTHON" AGENTS/tools/preview_doc.py AGENTS.md ;;
-      6) echo "Preview LICENSE"; safe_run "$VENV_PYTHON" AGENTS/tools/preview_doc.py LICENSE ;;
-      7) echo "Preview CODING_STANDARDS.md"; safe_run "$VENV_PYTHON" AGENTS/tools/preview_doc.py AGENTS/CODING_STANDARDS.md ;;
-      8) echo "Preview CONTRIBUTING.md"; safe_run "$VENV_PYTHON" AGENTS/tools/preview_doc.py AGENTS/CONTRIBUTING.md ;;
-      9) echo "Preview PROJECT_OVERVIEW.md"; safe_run "$VENV_PYTHON" AGENTS/tools/preview_doc.py AGENTS/PROJECT_OVERVIEW.md ;;
+      1) echo "Running dump_headers"; safe_run "$VENV_PYTHON" AGENTS/tools/dump_headers.py speaktome --markdown; TIMEOUT=60 ;;
+      2) echo "Running stubfinder"; safe_run "$VENV_PYTHON" AGENTS/tools/stubfinder.py speaktome; TIMEOUT=60 ;;
+      3) echo "Running list_contributors"; safe_run "$VENV_PYTHON" AGENTS/tools/list_contributors.py; TIMEOUT=60 ;;
+      4) echo "Preview AGENT_CONSTITUTION.md"; safe_run "$VENV_PYTHON" AGENTS/tools/preview_doc.py AGENTS/AGENT_CONSTITUTION.md; TIMEOUT=60 ;;
+      5) echo "Preview AGENTS.md"; safe_run "$VENV_PYTHON" AGENTS/tools/preview_doc.py AGENTS.md; TIMEOUT=60 ;;
+      6) echo "Preview LICENSE"; safe_run "$VENV_PYTHON" AGENTS/tools/preview_doc.py LICENSE; TIMEOUT=60 ;;
+      7) echo "Preview CODING_STANDARDS.md"; safe_run "$VENV_PYTHON" AGENTS/tools/preview_doc.py AGENTS/CODING_STANDARDS.md; TIMEOUT=60 ;;
+      8) echo "Preview CONTRIBUTING.md"; safe_run "$VENV_PYTHON" AGENTS/tools/preview_doc.py AGENTS/CONTRIBUTING.md; TIMEOUT=60 ;;
+      9) echo "Preview PROJECT_OVERVIEW.md"; safe_run "$VENV_PYTHON" AGENTS/tools/preview_doc.py AGENTS/PROJECT_OVERVIEW.md; TIMEOUT=60 ;;
       q|Q) echo "Exiting."; break ;;
       *) echo "Unknown choice: $choice" ;;
     esac
   done
 }
 dev_menu
+echo "For advanced codebase/group selection, run: python AGENTS/tools/dev_group_menu.py"
