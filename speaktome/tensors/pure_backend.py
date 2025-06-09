@@ -37,6 +37,7 @@ from .abstraction import AbstractTensorOperations, _get_shape, _flatten
 
 # --- END HEADER ---
 
+
 class PurePythonTensorOperations(AbstractTensorOperations):
     """Educational tensor ops using nested Python lists."""
 
@@ -60,10 +61,15 @@ class PurePythonTensorOperations(AbstractTensorOperations):
 
     def _AbstractTensorOperations__apply_operator(self, op: str, left: Any, right: Any):
         """Dispatch basic arithmetic for nested lists."""
+        if op in {"matmul", "rmatmul", "imatmul"}:
+            a, b = (left, right) if op != "rmatmul" else (right, left)
+            return self._matmul(a, b)
         if isinstance(right, list) and isinstance(left, list):
             return self._elementwise_op(op, left, right)
         if isinstance(right, list):
-            return self._elementwise_op_scalar(op, right, left)  # right is list, treat left as scalar
+            return self._elementwise_op_scalar(
+                op, right, left
+            )  # right is list, treat left as scalar
         if isinstance(left, list):
             return self._elementwise_op_scalar(op, left, right)
         return self._apply_scalar_op(op, left, right)
@@ -80,21 +86,55 @@ class PurePythonTensorOperations(AbstractTensorOperations):
         return [self._elementwise_op_scalar(op, ai, scalar) for ai in a]
 
     def _apply_scalar_op(self, op: str, x, y):
-        if op in ('add', 'radd', 'iadd'):
+        if op in ("add", "radd", "iadd"):
             return x + y
-        if op in ('sub', 'rsub', 'isub'):
-            return x - y if op != 'rsub' else y - x
-        if op in ('mul', 'rmul', 'imul'):
+        if op in ("sub", "rsub", "isub"):
+            return x - y if op != "rsub" else y - x
+        if op in ("mul", "rmul", "imul"):
             return x * y
-        if op in ('truediv', 'rtruediv', 'itruediv'):
-            return x / y if op != 'rtruediv' else y / x
-        if op in ('floordiv', 'rfloordiv', 'ifloordiv'):
-            return x // y if op != 'rfloordiv' else y // x
-        if op in ('mod', 'rmod', 'imod'):
-            return x % y if op != 'rmod' else y % x
-        if op in ('pow', 'rpow', 'ipow'):
-            return x ** y if op != 'rpow' else y ** x
-        raise NotImplementedError(f"Operator {op} not implemented for pure Python backend.")
+        if op in ("truediv", "rtruediv", "itruediv"):
+            return x / y if op != "rtruediv" else y / x
+        if op in ("floordiv", "rfloordiv", "ifloordiv"):
+            return x // y if op != "rfloordiv" else y // x
+        if op in ("mod", "rmod", "imod"):
+            return x % y if op != "rmod" else y % x
+        if op in ("pow", "rpow", "ipow"):
+            return x**y if op != "rpow" else y**x
+        if op in ("matmul", "rmatmul", "imatmul"):
+            return self._matmul(x, y) if op != "rmatmul" else self._matmul(y, x)
+        raise NotImplementedError(
+            f"Operator {op} not implemented for pure Python backend."
+        )
+
+    def _matmul(self, a, b):
+        """Matrix multiplication for lists."""
+
+        def is_matrix(x):
+            return isinstance(x, list) and x and isinstance(x[0], list)
+
+        if is_matrix(a) and is_matrix(b):
+            rows, shared, cols = len(a), len(a[0]), len(b[0])
+            if len(b) != shared:
+                raise ValueError("matmul dimension mismatch")
+            return [
+                [sum(a[i][k] * b[k][j] for k in range(shared)) for j in range(cols)]
+                for i in range(rows)
+            ]
+        if is_matrix(a) and not is_matrix(b):
+            if len(a[0]) != len(b):
+                raise ValueError("matmul dimension mismatch")
+            return [sum(a[i][k] * b[k] for k in range(len(b))) for i in range(len(a))]
+        if not is_matrix(a) and is_matrix(b):
+            if len(a) != len(b):
+                raise ValueError("matmul dimension mismatch")
+            return [
+                sum(a[k] * b[k][j] for k in range(len(a))) for j in range(len(b[0]))
+            ]
+        if not is_matrix(a) and not is_matrix(b):
+            if len(a) != len(b):
+                raise ValueError("matmul dimension mismatch")
+            return sum(a[i] * b[i] for i in range(len(a)))
+        raise NotImplementedError("Unsupported types for matmul")
 
     # Creation ops
     def full(self, size: Tuple[int, ...], fill_value: Any, dtype: Any, device: Any):
@@ -122,7 +162,10 @@ class PurePythonTensorOperations(AbstractTensorOperations):
         for t in tensors:
             if _get_shape(t) != ref_shape:
                 raise ValueError("All tensors must have the same shape")
-        return [self.stack([t[i] for t in tensors], dim=dim - 1) for i in range(len(tensors[0]))]
+        return [
+            self.stack([t[i] for t in tensors], dim=dim - 1)
+            for i in range(len(tensors[0]))
+        ]
 
     def get_device(self, tensor: Any) -> Any:
         return "cpu_pure_python"
@@ -165,15 +208,23 @@ class PurePythonTensorOperations(AbstractTensorOperations):
             return list(range(start))
         return list(range(start, end, step))
 
-    def select_by_indices(self, tensor: Any, indices_dim0: Any, indices_dim1: Any) -> Any:
+    def select_by_indices(
+        self, tensor: Any, indices_dim0: Any, indices_dim1: Any
+    ) -> Any:
         if not isinstance(tensor, list) or not isinstance(tensor[0], list):
-            raise NotImplementedError("select_by_indices only supports 2D lists for now")
+            raise NotImplementedError(
+                "select_by_indices only supports 2D lists for now"
+            )
 
         selected_rows = [tensor[i] for i in indices_dim0]
         if isinstance(indices_dim1, list):
             if len(indices_dim0) != len(indices_dim1):
-                raise ValueError("Index lists must have same length for element-wise selection")
-            return [selected_rows[i][indices_dim1[i]] for i in range(len(selected_rows))]
+                raise ValueError(
+                    "Index lists must have same length for element-wise selection"
+                )
+            return [
+                selected_rows[i][indices_dim1[i]] for i in range(len(selected_rows))
+            ]
         elif isinstance(indices_dim1, slice):
             return [row[indices_dim1] for row in selected_rows]
         else:
@@ -237,7 +288,9 @@ class PurePythonTensorOperations(AbstractTensorOperations):
             return result
         if dim == 1:
             if not all(len(t) == len(tensors[0]) for t in tensors):
-                raise ValueError("Tensors must have same number of rows for dim 1 concatenation")
+                raise ValueError(
+                    "Tensors must have same number of rows for dim 1 concatenation"
+                )
             result = []
             for i in range(len(tensors[0])):
                 combined = []
@@ -247,7 +300,9 @@ class PurePythonTensorOperations(AbstractTensorOperations):
             return result
         raise NotImplementedError("cat only implemented for dim 0 and 1")
 
-    def repeat_interleave(self, tensor: Any, repeats: int, dim: Optional[int] = None) -> Any:
+    def repeat_interleave(
+        self, tensor: Any, repeats: int, dim: Optional[int] = None
+    ) -> Any:
         if dim is None or dim == 0:
             if not isinstance(tensor, list):
                 return [tensor] * repeats
@@ -255,17 +310,31 @@ class PurePythonTensorOperations(AbstractTensorOperations):
             for item in tensor:
                 result.extend([item] * repeats)
             return result
-        raise NotImplementedError("repeat_interleave only implemented for dim 0 or None")
+        raise NotImplementedError(
+            "repeat_interleave only implemented for dim 0 or None"
+        )
 
     def view_flat(self, tensor: Any) -> Any:
         return _flatten(tensor)
 
-    def assign_at_indices(self, tensor_to_modify: Any, indices_dim0: Any, indices_dim1: Any, values_to_assign: Any):
-        if not isinstance(tensor_to_modify, list) or not isinstance(tensor_to_modify[0], list):
-            raise NotImplementedError("assign_at_indices only supports 2D lists for now")
+    def assign_at_indices(
+        self,
+        tensor_to_modify: Any,
+        indices_dim0: Any,
+        indices_dim1: Any,
+        values_to_assign: Any,
+    ):
+        if not isinstance(tensor_to_modify, list) or not isinstance(
+            tensor_to_modify[0], list
+        ):
+            raise NotImplementedError(
+                "assign_at_indices only supports 2D lists for now"
+            )
         if not isinstance(indices_dim0, list) or not isinstance(indices_dim1, list):
             raise ValueError("indices_dim0 and indices_dim1 must be lists")
-        if len(indices_dim0) != len(indices_dim1) or len(indices_dim0) != len(values_to_assign):
+        if len(indices_dim0) != len(indices_dim1) or len(indices_dim0) != len(
+            values_to_assign
+        ):
             raise ValueError("Index lists and values list must have same length")
         for i in range(len(indices_dim0)):
             row_idx = indices_dim0[i]
@@ -274,13 +343,24 @@ class PurePythonTensorOperations(AbstractTensorOperations):
             tensor_to_modify[row_idx][col_idx] = value
 
     def increment_at_indices(self, tensor_to_modify: Any, mask: Any):
-        if not isinstance(tensor_to_modify, list) or not isinstance(mask, list) or len(tensor_to_modify) != len(mask):
-            raise NotImplementedError("increment_at_indices only supports flat lists with boolean mask")
+        if (
+            not isinstance(tensor_to_modify, list)
+            or not isinstance(mask, list)
+            or len(tensor_to_modify) != len(mask)
+        ):
+            raise NotImplementedError(
+                "increment_at_indices only supports flat lists with boolean mask"
+            )
         for i in range(len(tensor_to_modify)):
             if mask[i]:
                 tensor_to_modify[i] += 1
 
-    def clamp(self, tensor: Any, min_val: Optional[float] = None, max_val: Optional[float] = None) -> Any:
+    def clamp(
+        self,
+        tensor: Any,
+        min_val: Optional[float] = None,
+        max_val: Optional[float] = None,
+    ) -> Any:
         if isinstance(tensor, list):
             return [self.clamp(item, min_val, max_val) for item in tensor]
         value = tensor
@@ -311,7 +391,7 @@ class PurePythonTensorOperations(AbstractTensorOperations):
     def pow(self, tensor: Any, exponent: float) -> Any:
         if isinstance(tensor, list):
             return [self.pow(item, exponent) for item in tensor]
-        return tensor ** exponent
+        return tensor**exponent
 
     def sqrt(self, tensor: Any) -> Any:
         if isinstance(tensor, list):
@@ -322,8 +402,14 @@ class PurePythonTensorOperations(AbstractTensorOperations):
         return data
 
     def boolean_mask_select(self, tensor: Any, mask: Any) -> Any:
-        if not isinstance(tensor, list) or not isinstance(mask, list) or len(tensor) != len(mask):
-            raise NotImplementedError("boolean_mask_select only supports flat lists with boolean mask")
+        if (
+            not isinstance(tensor, list)
+            or not isinstance(mask, list)
+            or len(tensor) != len(mask)
+        ):
+            raise NotImplementedError(
+                "boolean_mask_select only supports flat lists with boolean mask"
+            )
         return [tensor[i] for i in range(len(tensor)) if mask[i]]
 
     def tolist(self, tensor: Any) -> List[Any]:
@@ -340,7 +426,6 @@ class PurePythonTensorOperations(AbstractTensorOperations):
         if dim == 1:
             return [[row[i] for i in indices] for row in tensor]
         raise NotImplementedError("index_select only implemented for dim 0 or 1")
-
 
     def save(self, tensor: Any, filepath: str) -> None:
         with open(filepath, "w") as f:
