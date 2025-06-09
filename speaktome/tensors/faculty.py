@@ -1,9 +1,13 @@
+#!/usr/bin/env python3
+"""Faculty levels for runtime resources."""
 from __future__ import annotations
 
-"""Faculty levels for runtime resources."""
-
-import os
-from enum import Enum, auto
+try:
+    import os
+    from enum import Enum, auto
+except Exception:
+    print(ENV_SETUP_BOX)
+    raise
 # --- END HEADER ---
 
 
