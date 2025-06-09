@@ -365,7 +365,25 @@ class CTensorOperations(AbstractTensorOperations):
         #   - Implement efficient top-k selection.
         # NOTES: Complex due to absence of vectorized sort in this backend.
         # ############################################################
-        raise NotImplementedError("topk not implemented for C backend")
+        if dim < 0:
+            dim += len(tensor.shape)
+        if dim != len(tensor.shape) - 1:
+            raise NotImplementedError(
+                "topk only implemented for the last dimension"
+            )
+
+        if len(tensor.shape) != 1:
+            raise NotImplementedError("topk only implemented for 1D tensors")
+
+        data = tensor.tolist()
+        indexed = sorted(
+            [(i, v) for i, v in enumerate(data)], key=lambda x: x[1], reverse=True
+        )[:k]
+        values = [v for _, v in indexed]
+        indices = [i for i, _ in indexed]
+        return CTensor.from_list(values, (len(values),)), CTensor.from_list(
+            indices, (len(indices),)
+        )
 
     def repeat_interleave(self, tensor: CTensor, repeats: int, dim: Optional[int] = None) -> Any:
         # ########## STUB: CTensorOperations.repeat_interleave ##########
