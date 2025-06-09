@@ -415,4 +415,35 @@ if torch is not None and PyTorchTensorOperations is not None and NumPyTensorOper
     register_conversion(PurePythonTensorOperations, PyTorchTensorOperations,
                         lambda s, t, o: o.tensor_from_list(t, dtype=None, device=o.default_device))
 
+try:
+    from .jax_backend import JAXTensorOperations
+except Exception:  # pragma: no cover - optional backend
+    JAXTensorOperations = None  # type: ignore
+
+if (
+    np is not None
+    and NumPyTensorOperations is not None
+    and JAXTensorOperations is not None
+):
+    register_conversion(JAXTensorOperations, NumPyTensorOperations,
+                        lambda s, t, o: o.tensor_from_list(list(np.asarray(t)), dtype=None, device=None))
+    register_conversion(NumPyTensorOperations, JAXTensorOperations,
+                        lambda s, t, o: o.tensor_from_list(t.tolist(), dtype=None, device=None))
+
+if (
+    torch is not None
+    and PyTorchTensorOperations is not None
+    and JAXTensorOperations is not None
+):
+    register_conversion(PyTorchTensorOperations, JAXTensorOperations,
+                        lambda s, t, o: o.tensor_from_list(t.detach().cpu().tolist(), dtype=None, device=o.default_device))
+    register_conversion(JAXTensorOperations, PyTorchTensorOperations,
+                        lambda s, t, o: o.to_device(o.tensor_from_list(list(np.asarray(t)), dtype=None, device=None), o.default_device))
+
+if JAXTensorOperations is not None:
+    register_conversion(JAXTensorOperations, PurePythonTensorOperations,
+                        lambda s, t, o: o.tensor_from_list(list(np.asarray(t)), dtype=None, device=None))
+    register_conversion(PurePythonTensorOperations, JAXTensorOperations,
+                        lambda s, t, o: o.tensor_from_list(t, dtype=None, device=None))
+
 
