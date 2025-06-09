@@ -144,6 +144,11 @@ def check_try_header(filepath: Path) -> list[str]:
         None,
     )
 
+    env_print = False
+    if except_idx is not None:
+        search_end = sentinel_idx if sentinel_idx is not None else len(lines)
+        env_print = any("print(ENV_SETUP_BOX)" in ln for ln in lines[except_idx:search_end])
+
     errors = []
     if not lines or not lines[0].startswith("#!"):
         errors.append("Missing shebang")
@@ -160,6 +165,8 @@ def check_try_header(filepath: Path) -> list[str]:
         errors.append("Missing 'try:' at start of header")
     if except_idx is None:
         errors.append("Missing 'except' block for header")
+    elif not env_print:
+        errors.append("Missing 'print(ENV_SETUP_BOX)' in except block")
     return errors
 
 def main():
