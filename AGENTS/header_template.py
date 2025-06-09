@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 try:
+    from AGENTS.tools.header_utils import ENV_SETUP_BOX
     import your_modules
 except Exception:
-    print("ENV_SETUP_BOX")
+    print(ENV_SETUP_BOX)
     raise
 # --- END HEADER ---

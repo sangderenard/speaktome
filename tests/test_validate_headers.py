@@ -1,12 +1,19 @@
+#!/usr/bin/env python3
 """Tests for the header validation utility."""
+from __future__ import annotations
 
-import logging
-from importlib import reload
-from pathlib import Path
+try:
+    import logging
+    from importlib import reload
+    from pathlib import Path
 
-import pytest
+    import pytest
 
-import AGENTS.tools.validate_headers as vh
+    import AGENTS.tools.validate_headers as vh
+    from AGENTS.tools.header_utils import ENV_SETUP_BOX
+except Exception:
+    print(ENV_SETUP_BOX)
+    raise
 # --- END HEADER ---
 
 logger = logging.getLogger(__name__)

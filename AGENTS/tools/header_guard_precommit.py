@@ -1,16 +1,8 @@
 """Pre-commit hook enforcing HEADER, tests, and the end sentinel."""
 from __future__ import annotations
 
-ENV_SETUP_BOX = (
-    "\n"
-    "+-----------------------------------------------------------------------+\n"
-    "| Imports failed. Run setup_env or setup_env_dev and select every    |\n"
-    "| project and module you plan to use. Missing packages mean setup was |\n"
-    "| skipped or incomplete.                                             |\n"
-    "+-----------------------------------------------------------------------+\n"
-)
-
 try:
+    from .header_utils import ENV_SETUP_BOX
     import sys
     import subprocess
     import ast
@@ -135,7 +127,7 @@ def check_end_header(filepath: Path) -> list[str]:
 
 
 def check_try_header(filepath: Path) -> list[str]:
-    """Verify header ordering and presence of ``__future__`` and ``try`` blocks."""
+    """Verify header elements such as shebang, docstring, and ``try`` block."""
     sentinel = "# --- END HEADER ---"
     with open(filepath, encoding="utf-8") as f:
         lines = f.readlines()
@@ -153,6 +145,15 @@ def check_try_header(filepath: Path) -> list[str]:
     )
 
     errors = []
+    if not lines or not lines[0].startswith("#!"):
+        errors.append("Missing shebang")
+    try:
+        tree = ast.parse("".join(lines), filename=str(filepath))
+        if not ast.get_docstring(tree):
+            errors.append("Missing module docstring")
+    except Exception as exc:  # pragma: no cover - parse failure
+        errors.append(f"Parse error: {exc}")
+        return errors
     if future_idx is None or (try_idx is not None and future_idx > try_idx):
         errors.append("Missing '__future__' import before try block")
     if try_idx is None or (future_idx is not None and try_idx <= future_idx):

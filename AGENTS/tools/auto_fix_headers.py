@@ -6,26 +6,12 @@ try:
     import re
     import sys
     from pathlib import Path
+    from .header_utils import ENV_SETUP_BOX
 except Exception:
-    print(
-        "\n"
-        "+-----------------------------------------------------------------------+\n"
-        "| Imports failed. Run setup_env or setup_env_dev and select every    |\n"
-        "| project and module you plan to use. Missing packages mean setup was |\n"
-        "| skipped or incomplete.                                             |\n"
-        "+-----------------------------------------------------------------------+\n"
-    )
+    print(ENV_SETUP_BOX)
     raise
 # --- END HEADER ---
 
-ENV_SETUP_BOX = (
-    "\n"
-    "+-----------------------------------------------------------------------+\n"
-    "| Imports failed. Run setup_env or setup_env_dev and select every    |\n"
-    "| project and module you plan to use. Missing packages mean setup was |\n"
-    "| skipped or incomplete.                                             |\n"
-    "+-----------------------------------------------------------------------+\n"
-)
 
 EXCLUDE_DIRS = {
     'archive',
@@ -103,14 +89,7 @@ def fix_file(path: Path) -> None:
         break
 
     out_lines.append("except Exception:")
-    out_lines.append("    print(")
-    out_lines.append("        \"\\n\"")
-    out_lines.append("        \"+-----------------------------------------------------------------------+\\n\"")
-    out_lines.append("        \"| Imports failed. Run setup_env or setup_env_dev and select every    |\\n\"")
-    out_lines.append("        \"| project and module you plan to use. Missing packages mean setup was |\\n\"")
-    out_lines.append("        \"| skipped or incomplete.                                             |\\n\"")
-    out_lines.append("        \"+-----------------------------------------------------------------------+\\n\"")
-    out_lines.append("    )")
+    out_lines.append("    print(ENV_SETUP_BOX)")
     out_lines.append("    raise")
     out_lines.append(HEADER_SENTINEL)
 

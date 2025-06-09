@@ -70,11 +70,11 @@ path.
 
 ## Standard Header End Comment
 
-Every Python file should begin with an optional shebang and module docstring
-followed by ``from __future__ import annotations``. All imports then occur inside
-a ``try`` block. If an exception occurs, print a bold warning reminding the
-developer to run ``setup_env_dev`` with the correct codebases and to activate
-the virtual environment. After the ``except`` block, include the sentinel line:
+Every Python file should begin with a shebang and module docstring followed by
+``from __future__ import annotations``. All subsequent imports must appear in a
+``try`` block. If an exception occurs, print the shared ``ENV_SETUP_BOX``
+message from ``AGENTS.tools.header_utils``. After the ``except`` block, include
+the sentinel line:
 
 ```python
 #!/usr/bin/env python3
@@ -82,6 +82,7 @@ the virtual environment. After the ``except`` block, include the sentinel line:
 from __future__ import annotations
 
 try:
+    from AGENTS.tools.header_utils import ENV_SETUP_BOX
     import your_modules
 except Exception:
     print(ENV_SETUP_BOX)
