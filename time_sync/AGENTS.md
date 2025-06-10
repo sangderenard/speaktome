@@ -4,7 +4,11 @@ This project provides simple functions for adjusting system time using an enviro
 
 ## Optional Dependency Groups
 
-This codebase defines no optional dependency groups in its `pyproject.toml`.
+An optional "gui" group installs `pygame` for the demo window:
+
+```bash
+python -m pip install time_sync[gui]
+```
 
 ## Non-Interactive Setup Example
 
