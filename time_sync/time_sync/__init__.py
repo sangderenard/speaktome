@@ -31,7 +31,8 @@ from .console import (
 )
 from ..frame_buffer import PixelFrameBuffer # Changed from AsciiFrameBuffer
 from ..render_thread import render_loop
-from ..draw import draw_diff
+from ..draw import draw_diff, flexible_subunit_kernel
+from ..subunit_window import SubunitWindow
 from . import _internet  # exported for tests
 from .render_backend import RenderingBackend
 
@@ -52,6 +53,8 @@ __all__ = [
     "PixelFrameBuffer", # Changed from AsciiFrameBuffer
     "render_loop",
     "draw_diff",
+    "flexible_subunit_kernel",
+    "SubunitWindow",
     "_internet",
     "RenderingBackend",
 ]

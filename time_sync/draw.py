@@ -17,8 +17,53 @@ except Exception:
 # Default ASCII ramp used if no specific ramp is provided to drawing functions.
 DEFAULT_DRAW_ASCII_RAMP = " .:░▒▓█"
 
+
+def flexible_subunit_kernel(
+    subunit_data: np.ndarray,
+    ramp: str,
+    mode: str = "ascii",
+) -> str | np.ndarray:
+    """Return a representation for ``subunit_data`` based on ``mode``.
+
+    Parameters
+    ----------
+    subunit_data:
+        Pixel array representing one character cell. Shape ``(H, W, 3)``.
+    ramp:
+        ASCII ramp string ordered from darkest to brightest.
+    mode:
+        ``"ascii"``  -> return a single character.
+        ``"raw"``    -> return the pixel array untouched.
+        ``"hybrid"`` -> return a small image of the ASCII character.
+    """
+    if mode == "raw":
+        return subunit_data
+    char = default_subunit_to_char_kernel(subunit_data, ramp)
+    if mode == "ascii":
+        return char
+    if mode == "hybrid":
+        try:
+            from PIL import Image, ImageDraw, ImageFont
+        except Exception:
+            return subunit_data
+        h, w = subunit_data.shape[:2]
+        img = Image.new("RGB", (w, h), (0, 0, 0))
+        draw = ImageDraw.Draw(img)
+        font_size = max(1, min(w, h))
+        try:
+            font = ImageFont.truetype("DejaVuSansMono.ttf", font_size)
+        except Exception:
+            font = ImageFont.load_default()
+        bbox = draw.textbbox((0, 0), char, font=font)
+        x = (w - (bbox[2] - bbox[0])) // 2
+        y = (h - (bbox[3] - bbox[1])) // 2
+        draw.text((x, y), char, fill=(255, 255, 255), font=font)
+        return np.array(img)
+    raise ValueError(f"Unknown mode: {mode}")
+
 def default_subunit_to_char_kernel(
-    subunit_data: np.ndarray, ramp: str
+    subunit_data: np.ndarray,
+    ramp: str = DEFAULT_DRAW_ASCII_RAMP,
 ) -> str:
     """
     Stub kernel function to map a subunit of pixel data to a single character.
