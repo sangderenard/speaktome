@@ -13,3 +13,4 @@ Each Markdown file documents a distinct idea or design direction.
 - `Runtime_Compilation_and_Dynamic_Linking.md`
 - `Laplace_Project_Framework.md`
 - `Tensor_Printing_Class.md`
+- `ASCII_Render_Pipeline.md`
