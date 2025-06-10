@@ -15,6 +15,7 @@ try:
     import threading
     import sys
     import numpy as np
+    from colorama import Style, Fore, Back  # For colored terminal output
 except Exception:
     import sys
     print(ENV_SETUP_BOX)
@@ -24,7 +25,7 @@ except Exception:
 from time_sync import (
     get_offset, sync_offset,
     print_analog_clock, print_digital_clock,
-    init_colorama_for_windows, reset_cursor_to_top, full_clear_and_reset_cursor
+    init_colorama_for_windows, reset_cursor_to_top, full_clear_and_reset_cursor,
 )
 from time_sync.theme_manager import ThemeManager, ClockTheme # Ensure this import works
 from time_sync.frame_buffer import PixelFrameBuffer 
@@ -34,6 +35,7 @@ from time_sync.ascii_digits import (
     compose_ascii_digits,
     ASCII_RAMP_BLOCK,
 )
+from time_sync.draw import draw_text_overlay # Import the new text drawing function
 from PIL import Image
 import queue
 
@@ -207,30 +209,6 @@ def interactive_configure_mode(
     print(f"Exited {clock_identifier} clock configuration mode.")
 
 
-def render_simple_text_to_pixel_array(
-    text: str,
-    target_pixel_width: int,
-    target_pixel_height: int,
-    font_size: int = 12, # Smaller default for simple text lines
-    text_color: tuple[int,int,int,int] = (200,200,200,255), # Light grey
-    bg_color: tuple[int,int,int,int] = (0,0,0,0), # Transparent background for PIL image
-    theme_manager: ThemeManager | None = None,
-    ) -> np.ndarray:
-    """Renders a single line of text to a pixel array."""
-    # Use compose_ascii_digits to leverage its text-to-image capabilities
-    pixel_array = compose_ascii_digits(
-        text,
-        font_size=font_size,
-        text_color_on_image=text_color,
-        # No shadow, no outline for simple text by default
-        shadow_color_on_image=(0,0,0,0), outline_thickness=0,
-        as_pixel_array=True,
-        target_pixel_width=target_pixel_width,
-        target_pixel_height=target_pixel_height,
-        ascii_ramp=theme_manager.get_current_ascii_ramp() if theme_manager else ASCII_RAMP_BLOCK,
-        theme_manager=theme_manager,
-    )
-    return pixel_array
 def input_thread_fn(input_queue, stop_event):
     if os.name == 'nt': # Windows specific logic
         import msvcrt
@@ -252,17 +230,40 @@ def input_thread_fn(input_queue, stop_event):
             if key:
                 input_queue.put(key)
 
-KEY_MAPPINGS_PATH = os.path.join(os.path.dirname(__file__), "key_mappings.json")
+# Path to key mappings JSON
+KEY_MAPPINGS_PATH = os.path.join(os.path.dirname(__file__), "time_sync", "key_mappings.json")
 
+# Or for more robustness, add debugging:
 def load_key_mappings(path: str = KEY_MAPPINGS_PATH) -> dict:
     try:
         with open(path, 'r') as f:
-            return json.load(f)
-    except Exception as e:
-        print(f"Error loading key mappings from {path}: {e}. Using empty map.")
+            mappings = json.load(f)
+            print(f"Successfully loaded key mappings from {path}")
+            return mappings
+    except FileNotFoundError:
+        print(f"Key mappings file not found at {path}")
+        # Try alternate locations
+        alt_paths = [
+            os.path.join(os.path.dirname(__file__), "key_mappings.json"),
+            os.path.join(os.path.dirname(__file__), "time_sync", "key_mappings.json"),
+            os.path.join(os.path.dirname(__file__), "..", "time_sync", "key_mappings.json")
+        ]
+        for alt_path in alt_paths:
+            try:
+                with open(alt_path, 'r') as f:
+                    mappings = json.load(f)
+                    print(f"Found key mappings at alternate path: {alt_path}")
+                    return mappings
+            except FileNotFoundError:
+                continue
+        print("Could not find key_mappings.json in any expected location")
         return {}
-
-
+    except json.JSONDecodeError as e:
+        print(f"Error parsing key mappings JSON from {path}: {e}")
+        return {}
+    except Exception as e:
+        print(f"Unexpected error loading key mappings from {path}: {e}")
+        return {}
 def main() -> None:
     """Run the clock demo until interrupted."""
     global PIXEL_BUFFER_SCALE, TEXT_FIELD_SCALE # Allow modification by keys
@@ -355,7 +356,7 @@ def main() -> None:
     TEXT_FIELD_SCALE = args.initial_text_field_scale
     
     # Base dimensions for 1.0 scale
-    BASE_FB_ROWS = 45 
+    BASE_FB_ROWS = 35 # Reduced to make space for text overlays
     BASE_FB_COLS = 120
 
     init_colorama_for_windows()
@@ -455,7 +456,7 @@ def main() -> None:
     def compose_full_frame(system_time_obj, internet_time_obj, stopwatch_td_obj, offset_val):
         current_fb_rows, current_fb_cols = get_scaled_fb_dims()
         # Initialize buffer with black pixels
-        buf = np.full((current_fb_rows, current_fb_cols, 3), [0,0,0], dtype=np.uint8)
+        buf = np.full((current_fb_rows, current_fb_cols, 3), [0,0,0], dtype=np.uint8) # This buffer is ONLY for the clocks now
         row = 0
         available_width = current_fb_cols # Pixel width
         spacer_color = [5,5,10] # Dark spacer
@@ -475,7 +476,7 @@ def main() -> None:
         fast_digital_format = get_format_string_for_key(current_fast_digital_format_key)
 
         if display_state["analog_clocks"]:
-            # Scale analog row height based on PIXEL_BUFFER_SCALE and TEXT_FIELD_SCALE
+            # Scale analog row pixel height based on TEXT_FIELD_SCALE (char height) and PIXEL_BUFFER_SCALE (pixel density)
             # Base character height for analog might be around 15-20 chars
             base_analog_char_h = 15 
             analog_row_pixel_height = int(base_analog_char_h * TEXT_FIELD_SCALE * (PIXEL_BUFFER_SCALE * 1.5)) # Heuristic for char cell to pixel
@@ -531,7 +532,7 @@ def main() -> None:
             if row < current_fb_rows: buf[row, :available_width] = spacer_color; row += spacer_height
 
         if display_state["slow_digital_clock"]:
-            digital_slow_params = clock_configs["slow_digital"].copy()
+            digital_slow_params = clock_configs["slow_digital"].copy() # Use specific config
             base_digital_char_h = digital_slow_params.get("target_ascii_height", 7)
             digital_row_pixel_height = int(base_digital_char_h * TEXT_FIELD_SCALE * (PIXEL_BUFFER_SCALE * 1.5)) # Heuristic
             digital_slow_params["target_ascii_height"] = int(base_digital_char_h * TEXT_FIELD_SCALE) # Text field scale
@@ -557,7 +558,7 @@ def main() -> None:
             if row < current_fb_rows: buf[row, :available_width] = spacer_color; row += spacer_height
 
         if display_state["fast_digital_clock"]:
-            digital_fast_params = clock_configs["fast_digital"].copy()
+            digital_fast_params = clock_configs["fast_digital"].copy() # Use specific config
             base_digital_char_h = digital_fast_params.get("target_ascii_height", 7)
             digital_row_pixel_height = int(base_digital_char_h * TEXT_FIELD_SCALE * (PIXEL_BUFFER_SCALE * 1.5))
             digital_fast_params["target_ascii_height"] = int(base_digital_char_h * TEXT_FIELD_SCALE)
@@ -582,64 +583,8 @@ def main() -> None:
                 row += place_h
             if row < current_fb_rows: buf[row, :available_width] = spacer_color; row += spacer_height
 
-        if display_state["stopwatch"]:
-            base_text_char_h = 3
-            text_pixel_h = int(base_text_char_h * TEXT_FIELD_SCALE * (PIXEL_BUFFER_SCALE*1.2)) # Heuristic
-            font_sz = int(10 * PIXEL_BUFFER_SCALE)
-            if row + text_pixel_h <= current_fb_rows:
-                sw_arr = render_simple_text_to_pixel_array(
-                    f"Stopwatch: {stopwatch_td_obj.total_seconds():09.3f}", # Format timedelta
-                    available_width,
-                    text_pixel_h,
-                    font_size=font_sz,
-                    theme_manager=theme_manager,
-                )
-                buf[row:row+text_pixel_h, :available_width] = sw_arr
-                row += text_pixel_h + spacer_height 
-                if row < current_fb_rows: buf[row-spacer_height, :available_width] = spacer_color 
-
-        if display_state["offset_info"]:
-            base_text_char_h = 3
-            text_pixel_h = int(base_text_char_h * TEXT_FIELD_SCALE * (PIXEL_BUFFER_SCALE*1.2))
-            font_sz = int(10 * PIXEL_BUFFER_SCALE)
-            if row + text_pixel_h <= current_fb_rows:
-                off_arr = render_simple_text_to_pixel_array(
-                    f"Offset: {_dt.timedelta(seconds=offset_val)}",
-                    available_width,
-                    text_pixel_h,
-                    font_size=font_sz,
-                    theme_manager=theme_manager,
-                )
-                buf[row:row+text_pixel_h, :available_width] = off_arr
-                row += text_pixel_h
-        
-        if display_state["legend"]:
-            base_legend_char_h = 1
-            legend_pixel_h_per_line = int(base_legend_char_h * TEXT_FIELD_SCALE * (PIXEL_BUFFER_SCALE*1.0)) # Heuristic
-            legend_font_sz = int(8 * PIXEL_BUFFER_SCALE)
-            max_legend_lines = (current_fb_rows - row) // legend_pixel_h_per_line
-            
-            legend_parts = []
-            for action, mapping in key_mappings.items():
-                keys_str = "/".join(mapping["keys"])
-                legend_parts.append(f"{keys_str}: {mapping['description']}")
-            
-            # Simple two-column layout for legend
-            num_legend_items = len(legend_parts)
-            col1_items = legend_parts[:(num_legend_items + 1) // 2]
-            col2_items = legend_parts[(num_legend_items + 1) // 2:]
-
-            legend_lines_to_render = max(len(col1_items), len(col2_items))
-            
-            for i in range(min(legend_lines_to_render, max_legend_lines)):
-                line_text_parts = []
-                # Scale ljust based on text field scale
-                ljust_val = int(30 * TEXT_FIELD_SCALE) 
-                if i < len(col1_items): line_text_parts.append(col1_items[i].ljust(ljust_val)) 
-                if i < len(col2_items): line_text_parts.append(col2_items[i])
-                legend_line_text = "  ".join(line_text_parts)
-                legend_line_arr = render_simple_text_to_pixel_array(legend_line_text, available_width, legend_pixel_h_per_line, font_size=legend_font_sz, theme_manager=theme_manager)
-                buf[row + i * legend_pixel_h_per_line : row + (i+1) * legend_pixel_h_per_line, :available_width] = legend_line_arr
+        # Stopwatch, Offset, and Legend are now drawn as text overlays AFTER the pixel buffer
+        # So they are NOT rendered into 'buf' here.
 
         return buf
 
@@ -672,20 +617,122 @@ def main() -> None:
     )
     render_thread.start()
 
+    # Start the input thread AFTER the render thread
     full_clear_and_reset_cursor()
     input_buffer = ""
     input_queue = queue.Queue()
     input_thread = threading.Thread(target=input_thread_fn, args=(input_queue, stop_event), daemon=True)
     input_thread.start()
 
+    # Calculate the starting row for text overlays (1-indexed for terminal)
+    # This is the row immediately after the pixel buffer ends.
+    text_overlay_start_row = get_scaled_fb_dims()[0] + 1
+    current_text_overlay_row = text_overlay_start_row
+
+    # For periodic keyframe redraw
+    KEYFRAME_INTERVAL_SECONDS = 30  # Redraw everything every 30 seconds
+    last_keyframe_time = time.perf_counter()
+
     try:
         while True:
+            # --- Drawing Phase ---
+            # The render_thread updates the framebuffer's render buffer.
+            # The main loop gets the diff from the framebuffer and draws it.
+            
+            # Get changed pixels from the framebuffer
             diff_pixels = framebuffer.get_diff_and_promote()
             changed = [
                 (y, x, np.array([[color]], dtype=np.uint8))
                 for y, x, color in diff_pixels
             ]
-            draw_diff(changed, active_ascii_ramp=theme_manager.get_current_ascii_ramp())
+            # Draw the changed pixels (the clocks)
+            # If diff_pixels is empty but a redraw was forced, 'changed' will also be empty.
+            # The draw_diff will still be called, but it won't do much if 'changed' is empty.
+            # The key is that get_diff_and_promote() would have returned all pixels if forced.
+            # However, the current draw_diff takes 'changed_subunits' which are already diffed.
+            # The PixelFrameBuffer.get_diff_and_promote() now returns all pixels if forced.
+            # So, `diff_pixels` will contain all pixels, and thus `changed` will too.
+            # We need to pass the correct char_cell_pixel_height/width to draw_diff
+            # These should correspond to the pixel dimensions of a single character cell
+            # as used by the rendering functions (print_analog_clock, print_digital_clock).
+            # This is complex because different elements might use different effective pixel sizes per char.
+            # For simplicity, let's assume a base 1:1 mapping for now, or derive from scale.
+            # A better approach might be to have render_fn return the rendered pixel array AND the effective
+            # pixel dimensions per character cell for the main clock area.
+            # For now, let's assume 1:1 pixel to char cell mapping for the main buffer drawing.
+            draw_diff(changed, 
+                      char_cell_pixel_height=1, # Assuming 1 pixel = 1 char cell for buffer drawing
+                      char_cell_pixel_width=1,  # Assuming 1 pixel = 1 char cell for buffer drawing
+                      active_ascii_ramp=theme_manager.get_current_ascii_ramp())
+
+            # --- Text Overlay Drawing Phase ---
+            # Draw text elements directly as overlays below the pixel buffer
+            current_text_overlay_row = text_overlay_start_row
+            available_cols = get_scaled_fb_dims()[1] # Use scaled width for text overlays
+
+            # Clear the text overlay area before drawing new text
+            # This prevents old text from lingering if new text is shorter
+            text_overlay_height = BASE_FB_ROWS - BASE_FB_ROWS # Calculate total height needed for overlays
+            # This calculation is tricky as text height depends on content and scale.
+            # A simpler approach is to clear a fixed number of lines at the bottom.
+            # Let's clear enough lines for Stopwatch (1), Offset (1), Legend (approx 10 lines).
+            # Total ~12 lines. BASE_FB_ROWS is 35, so 45 total. Need ~10 lines below buffer.
+            # Let's clear from text_overlay_start_row to the end of the terminal.
+            # This requires knowing terminal height, which is hard.
+            # Alternative: Clear a fixed number of lines based on max possible overlays.
+            # Stopwatch (1) + Offset (1) + Legend (approx 10) = ~12 lines.
+            # Let's clear 15 lines from text_overlay_start_row.
+            clear_lines_count = 15
+            for r in range(text_overlay_start_row, text_overlay_start_row + clear_lines_count):
+                 draw_text_overlay(r, 1, " " * available_cols, Style.RESET_ALL) # Clear line with spaces
+
+            # Reset row counter for drawing overlays
+            current_text_overlay_row = text_overlay_start_row
+
+            # Get current time objects for text overlays
+            elapsed = time.perf_counter() - start
+            offset = get_offset()
+            system = _dt.datetime.utcnow().replace(tzinfo=_dt.timezone.utc)
+            internet = system + _dt.timedelta(seconds=offset)
+            h, rem = divmod(int(elapsed * 1000), 3600 * 1000)
+            m, rem = divmod(rem, 60 * 1000)
+            s, ms = divmod(rem, 1000)
+            stopwatch_td = _dt.timedelta(hours=h, minutes=m, seconds=s, milliseconds=ms)
+
+            if display_state["stopwatch"]:
+                stopwatch_text = f"Stopwatch: {stopwatch_td.total_seconds():09.3f}"
+                draw_text_overlay(current_text_overlay_row, 1, stopwatch_text, Style.BRIGHT + Fore.YELLOW) # Example color
+                current_text_overlay_row += 1 # Move to next line
+
+            if display_state["offset_info"]:
+                offset_text = f"Offset: {_dt.timedelta(seconds=offset)}"
+                draw_text_overlay(current_text_overlay_row, 1, offset_text, Style.BRIGHT + Fore.CYAN) # Example color
+                current_text_overlay_row += 1 # Move to next line
+
+            if display_state["legend"]:
+                legend_start_col = 1
+                legend_col_width = available_cols // 2 # Split legend into two columns
+                
+                legend_parts = []
+                for action, mapping in key_mappings.items():
+                    keys_str = "/".join(mapping["keys"])
+                    legend_parts.append(f"{keys_str}: {mapping['description']}")
+                
+                num_legend_items = len(legend_parts)
+                col1_items = legend_parts[:(num_legend_items + 1) // 2]
+                col2_items = legend_parts[(num_legend_items + 1) // 2:]
+
+                for i in range(max(len(col1_items), len(col2_items))):
+                    if current_text_overlay_row > get_scaled_fb_dims()[0] + clear_lines_count: # Prevent drawing outside cleared area
+                         break
+                    line_text_parts = []
+                    # Use fixed ljust for text overlays, not scaled
+                    ljust_val = 30 
+                    if i < len(col1_items): line_text_parts.append(col1_items[i].ljust(ljust_val)) 
+                    if i < len(col2_items): line_text_parts.append(col2_items[i])
+                    legend_line_text = "  ".join(line_text_parts)
+                    draw_text_overlay(current_text_overlay_row, legend_start_col, legend_line_text, Style.RESET_ALL) # Default color
+                    current_text_overlay_row += 1 # Move to next line
 
             # Drain the input queue
             while not input_queue.empty():
@@ -696,6 +743,7 @@ def main() -> None:
             # We'll build a new buffer with unprocessed characters
             remaining_buffer = ""
             
+            action_processed_this_loop = False
             if not stop_event.is_set() and input_buffer: # Check raw input_buffer
                 for char_key_raw in input_buffer: # Iterate through raw characters from buffer
                     action_found = False
@@ -773,6 +821,7 @@ def main() -> None:
                                     print("No active clock to configure.") # Or a small message on screen
 
                             action_found = True
+                            action_processed_this_loop = True
                             break # Found action for this char_key
                     
                     if action_found:
@@ -783,6 +832,16 @@ def main() -> None:
                         remaining_buffer += char_key_raw
                 
                 input_buffer = remaining_buffer # Update buffer with unprocessed characters
+
+            # Trigger keyframe if an action was processed
+            if action_processed_this_loop:
+                framebuffer.force_full_redraw_next_frame()
+                # Also force redraw of text overlays? Not needed as they are redrawn every frame.
+            # Periodic keyframe trigger
+            current_loop_time = time.perf_counter()
+            if current_loop_time - last_keyframe_time >= KEYFRAME_INTERVAL_SECONDS:
+                framebuffer.force_full_redraw_next_frame()
+                last_keyframe_time = current_loop_time
 
             if stop_event.is_set(): # Check if we should break out of the main loop
                 break

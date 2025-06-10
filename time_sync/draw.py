@@ -5,7 +5,8 @@ from __future__ import annotations
 try:
     from AGENTS.tools.header_utils import ENV_SETUP_BOX
     import sys
-    import numpy as np    
+    import numpy as np  
+    from colorama import Style, Fore, Back  
 except Exception:
     import sys
     print(ENV_SETUP_BOX)
@@ -41,6 +42,16 @@ def default_subunit_to_char_kernel(
     char_index = min(len(ramp) - 1, int((avg_luminance / 255) * len(ramp)))
     return ramp[char_index]
 
+def draw_text_overlay(
+    row: int,
+    col: int,
+    text: str,
+    color_code: str = Style.RESET_ALL # Default to terminal default color
+) -> None:
+    """Draws text directly to the terminal at a specific 1-indexed row and column."""
+    # Use \x1b[<row>;<col>H for cursor positioning
+    sys.stdout.write(f"\x1b[{row};{col}H{color_code}{text}{Style.RESET_ALL}")
+    sys.stdout.flush()
 
 def draw_diff(
     changed_subunits: list[tuple[int, int, np.ndarray]], # List of (y_pixel, x_pixel, subunit_pixel_data)

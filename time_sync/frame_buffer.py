@@ -31,6 +31,7 @@ class PixelFrameBuffer:
         self.buffer_next = np.full(self.buffer_shape, self.default_pixel, dtype=np.uint8)
         self.buffer_display = np.full(self.buffer_shape, self.default_pixel, dtype=np.uint8)
         self.diff_threshold = max(0, diff_threshold) # Ensure threshold is not negative
+        self._force_full_diff_next_call = False
 
     def _resize(self, shape: tuple[int, int]): # No change, but type hint was missing -> None
         """Resize internal buffers to ``shape``."""
@@ -51,6 +52,10 @@ class PixelFrameBuffer:
         with self.lock:
             np.copyto(self.buffer_render, new_data)
 
+    def force_full_redraw_next_frame(self) -> None:
+        """Signals that the next call to get_diff_and_promote should return all pixels."""
+        self._force_full_diff_next_call = True
+
     def get_diff_and_promote(self) -> list[tuple[int, int, tuple[int, int, int]]]:
         """Return changed cells since last promotion.
 
@@ -62,16 +67,23 @@ class PixelFrameBuffer:
         with self.lock:
             np.copyto(self.buffer_next, self.buffer_render)
         
-        if self.diff_threshold == 0:
-            # Original behavior: any difference in any channel
-            diff_mask = np.any(self.buffer_next != self.buffer_display, axis=2)
+        if self._force_full_diff_next_call:
+            # Force all pixels to be considered changed
+            rows, cols, _ = self.buffer_shape
+            ys, xs = np.meshgrid(np.arange(rows), np.arange(cols), indexing='ij')
+            coords = np.stack([ys.ravel(), xs.ravel()], axis=1)
+            self._force_full_diff_next_call = False # Reset the flag
         else:
-            # Calculate sum of absolute differences for RGB channels
-            abs_diff = np.abs(self.buffer_next.astype(np.int16) - self.buffer_display.astype(np.int16))
-            sum_abs_diff = np.sum(abs_diff, axis=2)
-            diff_mask = sum_abs_diff > self.diff_threshold
-            
-        coords = np.argwhere(diff_mask)
+            if self.diff_threshold == 0:
+                # Original behavior: any difference in any channel
+                diff_mask = np.any(self.buffer_next != self.buffer_display, axis=2)
+            else:
+                # Calculate sum of absolute differences for RGB channels
+                abs_diff = np.abs(self.buffer_next.astype(np.int16) - self.buffer_display.astype(np.int16))
+                sum_abs_diff = np.sum(abs_diff, axis=2)
+                diff_mask = sum_abs_diff > self.diff_threshold
+            coords = np.argwhere(diff_mask)
+
         updates: list[tuple[int, int, tuple[int, int, int]]] = []
         for y, x in coords:
             pixel_val = self.buffer_next[y, x]
