@@ -32,47 +32,33 @@ except Exception:
     sys.exit(1)
 # --- END HEADER ---
 
-# --- Optional: Messaging (Pika/RabbitMQ) ---
-try:
-    import pika
-    PIKA_AVAILABLE = True
-except ImportError:
-    PIKA_AVAILABLE = False
+from .optional_dependencies import (
+    pika,
+    PIKA_AVAILABLE,
+    qtwidgets,
+    qtgui,
+    qtcore,
+    PYQT_AVAILABLE,
+    colorsys,
+    ssim,
+    COLOR_MIXING_AVAILABLE,
+    pynvml,
+    NVML_AVAILABLE,
+)
 
-# --- Optional: PyQt Feedback UI ---
-try:
-    from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QLabel, QSlider, QPushButton, QHBoxLayout
-    from PyQt5.QtGui import QPixmap, QImage, QFont
-    from PyQt5.QtCore import Qt, QTimer
-    PYQT_AVAILABLE = True
-except ImportError:
-    PYQT_AVAILABLE = False
-
-# --- Optional: Advanced Color Mixing, SSIM, Colorsys ---
-try:
-    import colorsys
-    from skimage.metrics import structural_similarity as ssim
-    COLOR_MIXING_AVAILABLE = True
-except ImportError:
-    COLOR_MIXING_AVAILABLE = False
-
-# --- Optional: GPU Memory Monitoring ---
-try:
-    import pynvml
-    pynvml.nvmlInit()
-    NVML_AVAILABLE = True
-except ImportError:
-    NVML_AVAILABLE = False
+channel = None
 
 # --- END IMPORT WALL ---
 
 device_id = 0
 # This function gets the free memory for a specific GPU
 def get_gpu_memory_utilization(device_id):
-    handle = pynvml.nvmlDeviceGetHandleByIndex(device_id)
-    info = pynvml.nvmlDeviceGetMemoryInfo(handle)
-    free_percentage = (info.free / info.total) * 100
-    return 100 - free_percentage
+    if NVML_AVAILABLE:
+        handle = pynvml.nvmlDeviceGetHandleByIndex(device_id)
+        info = pynvml.nvmlDeviceGetMemoryInfo(handle)
+        free_percentage = (info.free / info.total) * 100
+        return 100 - free_percentage
+    return 0
 
 def getconfig():
     server = False
@@ -168,11 +154,15 @@ def read_password_from_file(filename):
 
 def pika_keepalive(channel):
     """Function to send a heartbeat to RabbitMQ to keep the connection alive."""
+    if not PIKA_AVAILABLE:
+        return None
     try:
         while True:
-            channel.basic_publish(exchange='',
-                                routing_key='ascii_statistics_queue',
-                                body=json.dumps({'Keepalive message': 'Keepalive message'}))
+            channel.basic_publish(
+                exchange='',
+                routing_key='ascii_statistics_queue',
+                body=json.dumps({'Keepalive message': 'Keepalive message'})
+            )
             print("Keepalive message sent")
             time.sleep(10)
     except pika.exceptions.AMQPConnectionError as e:
@@ -180,9 +170,13 @@ def pika_keepalive(channel):
         return None
 
 def initialize_pika_connection(username, password):
+    if not PIKA_AVAILABLE:
+        return None
     try:
         credentials = pika.PlainCredentials(username, password)
-        connection = pika.BlockingConnection(pika.ConnectionParameters('localhost', 5672, '/', credentials))
+        connection = pika.BlockingConnection(
+            pika.ConnectionParameters('localhost', 5672, '/', credentials)
+        )
         channel = connection.channel()
         channel.queue_declare(queue='ascii_statistics_queue')
         return channel
@@ -190,13 +184,14 @@ def initialize_pika_connection(username, password):
         print(f"Failed to connect to RabbitMQ: {e}")
         return None
 pika_messaging = pika_messaging
-if pika_messaging:
+if pika_messaging and PIKA_AVAILABLE:
     username = pika_username
     password = pika_password if pika_password else read_password_from_file(pika_password_file)
     
     if username and password:
         channel = initialize_pika_connection(username, password)
         if channel:
+            globals()['channel'] = channel
             keepalive_thread = threading.Thread(target=pika_keepalive, args=(channel,))
             keepalive_thread.daemon = True
             keepalive_thread.start()
@@ -207,9 +202,13 @@ if pika_messaging:
     else:
         pika_messaging = False
         print("Username or password not provided or could not be read from the file.")
+else:
+    pika_messaging = False
 
 
 def pika_message(start_time, outer_epoch, teaching_epoch, epoch, subject, inner_epoch, outer_learning, learning_rate, total_loss, maximum_memory_utilization, pika_messaging):
+    if not (PIKA_AVAILABLE and pika_messaging):
+        return start_time
     pika_start = time.time()
     try:
         message_data = {
@@ -2530,16 +2529,6 @@ def tensorsToASCII(tensor_images, config, live=False):
     ascii_representations = structuredDataToASCII(structured_data, config)
     return renderArrayOfASCII(ascii_representations, config)
 
-from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QLabel, QSlider, QPushButton, QHBoxLayout
-from PyQt5.QtGui import QPixmap, QImage, QFont
-from PyQt5.QtCore import Qt, QTimer
-from skimage.metrics import structural_similarity as ssim
-
-import torch
-import torch.nn.functional as F
-from skimage.metrics import structural_similarity as ssim
-import numpy as np
-
 def compute_image_loss(image_tensor, processed_tensor, mode='average'):
     """
     Computes a combined loss score based on selected mode.
@@ -2559,14 +2548,19 @@ def compute_image_loss(image_tensor, processed_tensor, mode='average'):
     # MSE Loss
     mse_loss = F.mse_loss(image_tensor, processed_tensor)
 
-    # SSIM Loss - Ensure both images are 2D for ssim
-    if image_np.ndim == 3:  # For RGB or similar
-        image_np = image_np.mean(axis=0)  # Convert to grayscale
-    if processed_np.ndim == 3:
-        processed_np = processed_np.mean(axis=0)
-    
-    ssim_loss = ssim(image_np, processed_np, data_range=processed_np.max() - processed_np.min())
-    ssim_score = (ssim_loss + 1) / 2  # Normalize SSIM to range from 0 to 1
+    ssim_score = 0
+    if COLOR_MIXING_AVAILABLE and ssim is not None:
+        if image_np.ndim == 3:  # For RGB or similar
+            image_np = image_np.mean(axis=0)  # Convert to grayscale
+        if processed_np.ndim == 3:
+            processed_np = processed_np.mean(axis=0)
+
+        ssim_loss = ssim(
+            image_np,
+            processed_np,
+            data_range=processed_np.max() - processed_np.min(),
+        )
+        ssim_score = (ssim_loss + 1) / 2  # Normalize SSIM to range from 0 to 1
     
     
     # Cosine Similarity
@@ -2594,14 +2588,15 @@ def process_tensor(config, tensor, size=None):
         processed_tensor = resize_image(processed_tensor.unsqueeze(0).unsqueeze(0).float()/255, size)
     return processed_tensor
 
-class FeedbackWidget(QWidget):
-    def __init__(self, config, image_tensor, metadata):
-        super().__init__()
-        self.config = config
-        self.image_tensor = image_tensor
-        self.metadata = metadata
-        self.setWindowTitle(metadata.get('title', 'Feedback'))
-        self.initUI()
+if PYQT_AVAILABLE:
+    class FeedbackWidget(QWidget):
+        def __init__(self, config, image_tensor, metadata):
+            super().__init__()
+            self.config = config
+            self.image_tensor = image_tensor
+            self.metadata = metadata
+            self.setWindowTitle(metadata.get('title', 'Feedback'))
+            self.initUI()
 
     def initUI(self):
         layout = QVBoxLayout(self)
@@ -2688,16 +2683,19 @@ class FeedbackWidget(QWidget):
         self.slider_value = self.slider.value()
         self.close()
 
-def show_image_with_feedback(config, image_tensor, metadata):
-    app = QApplication(sys.argv)
-    feedback_widget = FeedbackWidget(config, image_tensor.squeeze(0), metadata)
-    if human_mode == 'semi-auto' or human_mode == 'manual':
-        feedback_widget.show()
-        app.exec_()
-    else:
-        return torch.tensor(float(feedback_widget.slider.value()), requires_grad=True, device = device)
-    
-    return torch.tensor(float(feedback_widget.slider_value), requires_grad=True, device=device)
+    def show_image_with_feedback(config, image_tensor, metadata):
+        app = QApplication(sys.argv)
+        feedback_widget = FeedbackWidget(config, image_tensor.squeeze(0), metadata)
+        if human_mode == 'semi-auto' or human_mode == 'manual':
+            feedback_widget.show()
+            app.exec_()
+        else:
+            return torch.tensor(float(feedback_widget.slider.value()), requires_grad=True, device=device)
+
+        return torch.tensor(float(feedback_widget.slider_value), requires_grad=True, device=device)
+else:
+    def show_image_with_feedback(*args, **kwargs):
+        raise RuntimeError("PyQt5 is required for human feedback UI")
 def collect_human_input(config, data, metadata, category, method = 'logits', slider_max=10000):
     """
     Collects human feedback and optionally returns a probability distribution.
@@ -2896,7 +2894,8 @@ elif server:
 else:
 
     default_config.metamodel = MetaModel()
-    default_config.metamodel = load_model(None, meta_model = default_config.metamodel)
-    train_model(default_config,  live)
-pynvml.nvmlShutdown()
+    default_config.metamodel = load_model(None, meta_model=default_config.metamodel)
+    train_model(default_config, live)
+if NVML_AVAILABLE:
+    pynvml.nvmlShutdown()
 
