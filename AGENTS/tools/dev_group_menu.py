@@ -62,9 +62,13 @@ def ask(prompt, timeout=3, default="n"):
 """Interactive dev environment setup with dynamic codebase discovery.
 
 This script presents a menu asking which codebases you want to work on and
-which optional dependency groups to install for each one. It can simply print
-the selections or install them automatically when ``--install`` is passed. Use
+which optional dependency groups to install for each one.  It can simply print
+the selections or install them automatically when ``--install`` is passed.  Use
 ``--json`` to output the selections in machine readable form.
+
+Agents may bypass all prompts by providing ``--codebases`` and ``--groups``
+arguments.  ``--list`` prints available codebases/groups while ``--show-active``
+reveals the path used to record selections.  See ``--help`` for examples.
 """
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -146,6 +150,33 @@ def interactive_selection() -> tuple[list[str], dict[str, dict[str, list[str]]]]
     return selected_codebases, selected
 
 
+def noninteractive_selection(
+    cb_arg: str | None, group_args: list[str] | None
+) -> tuple[list[str], dict[str, dict[str, list[str]]]]:
+    """Parse command line selections without prompting."""
+
+    selected_codebases = cb_arg.split(',') if cb_arg else list(CODEBASES)
+    for cb in selected_codebases:
+        if cb not in CODEBASES:
+            raise SystemExit(f"Unknown codebase: {cb}")
+
+    selected: dict[str, dict[str, list[str]]] = {cb: {} for cb in selected_codebases}
+    if group_args:
+        for spec in group_args:
+            if ':' not in spec:
+                raise SystemExit(f"Invalid group spec: {spec}")
+            cb, groups = spec.split(':', 1)
+            if cb not in CODEBASES:
+                raise SystemExit(f"Unknown codebase: {cb}")
+            for grp in groups.split(','):
+                if grp and grp in CODEBASES[cb]:
+                    selected.setdefault(cb, {})[grp] = list(CODEBASES[cb][grp])
+                elif grp:
+                    raise SystemExit(f"Unknown group '{grp}' for {cb}")
+
+    return selected_codebases, selected
+
+
 def install_selections(
     selections: dict[str, dict[str, list[str]]], *, pip_cmd: str = "pip"
 ) -> None:
@@ -164,6 +195,16 @@ def install_selections(
 def main(argv: list[str] | None = None) -> None:  # pragma: no cover - CLI
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
+        "--list",
+        action="store_true",
+        help="List available codebases and groups then exit",
+    )
+    parser.add_argument(
+        "--show-active",
+        action="store_true",
+        help="Print the active selection file path and exit",
+    )
+    parser.add_argument(
         "--json",
         action="store_true",
         help="Output selections as JSON instead of human readable text",
@@ -174,6 +215,17 @@ def main(argv: list[str] | None = None) -> None:  # pragma: no cover - CLI
         help="Install selected codebases and packages using $PIP_CMD",
     )
     parser.add_argument(
+        "--codebases",
+        metavar="LIST",
+        help="Comma-separated codebases for non-interactive mode",
+    )
+    parser.add_argument(
+        "--groups",
+        action="append",
+        metavar="CB:GRP1,GRP2",
+        help="Group selections for a codebase (repeatable)",
+    )
+    parser.add_argument(
         "--record",
         metavar="PATH",
         help="Write selections to PATH (default from SPEAKTOME_ACTIVE_FILE)",
@@ -182,7 +234,21 @@ def main(argv: list[str] | None = None) -> None:  # pragma: no cover - CLI
     )
     args = parser.parse_args(argv)
 
-    cbs, selections = interactive_selection()
+    if args.list:
+        for cb, groups in CODEBASES.items():
+            print(cb)
+            for grp in groups:
+                print(f"  - {grp}")
+        return
+
+    if args.show_active:
+        print(args.record or os.environ.get(ACTIVE_ENV, str(Path(tempfile.gettempdir()) / "speaktome_active.json")))
+        return
+
+    if args.codebases or args.groups:
+        cbs, selections = noninteractive_selection(args.codebases, args.groups)
+    else:
+        cbs, selections = interactive_selection()
 
     if args.install:
         pip_cmd = os.environ.get("PIP_CMD", "pip")
