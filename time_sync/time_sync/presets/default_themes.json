@@ -1,0 +1,75 @@
+{
+  "color_palettes": {
+    "cyberpunk": {
+      "text": [255, 0, 255, 255],
+      "outline": [0, 255, 255, 255],
+      "shadow": [255, 0, 128, 150],
+      "accent1": [0, 255, 128, 255],
+      "accent2": [128, 0, 255, 255],
+      "background": [10, 5, 20, 255]
+    },
+    "matrix": {
+      "text": [0, 255, 0, 255],
+      "outline": [0, 128, 0, 255],
+      "shadow": [0, 50, 0, 150],
+      "accent1": [144, 238, 144, 255],
+      "accent2": [0, 100, 0, 255],
+      "background": [0, 10, 0, 255]
+    },
+    "retro": {
+      "text": [255, 200, 0, 255],
+      "outline": [200, 100, 0, 255],
+      "shadow": [100, 50, 0, 150],
+      "accent1": [255, 140, 0, 255],
+      "accent2": [255, 69, 0, 255],
+      "background": [20, 10, 0, 255]
+    }
+  },
+  "effects_presets": {
+    "neon": {
+      "glow_radius": 3,
+      "glow_intensity": 0.7,
+      "outline_thickness": 2,
+      "shadow_offset": [3, 3],
+      "shadow_blur": 2
+    },
+    "crisp": {
+      "glow_radius": 0,
+      "glow_intensity": 0,
+      "outline_thickness": 1,
+      "shadow_offset": [1, 1],
+      "shadow_blur": 0
+    },
+    "dramatic": {
+      "glow_radius": 2,
+      "glow_intensity": 0.5,
+      "outline_thickness": 3,
+      "shadow_offset": [4, 4],
+      "shadow_blur": 3
+    }
+  },
+  "ascii_styles": {
+    "block": " .:░▒▓█",
+    "detailed": " .'`^\",:;Il!i><~+_-?][}{1)(|\\/tfjrxnuvczXYUJCLQ0OZmwqpdbkhao*#MW&8%B@$",
+    "minimal": ".:-=+*#%@",
+    "dots": "․⁚⁖⁘⁙",
+    "shapes": "○◔◑◕●"
+  },
+  "post_processing": {
+    "high_contrast": {
+      "brightness": 1.2,
+      "contrast": 1.4,
+      "saturation": 1.2
+    },
+    "soft": {
+      "brightness": 0.9,
+      "contrast": 0.8,
+      "saturation": 0.9
+    },
+    "monochrome": {
+      "brightness": 1.0,
+      "contrast": 1.2,
+      "saturation": 0.0
+    }
+  }
+}

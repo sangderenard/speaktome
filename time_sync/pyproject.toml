@@ -13,6 +13,7 @@ authors = [{ name = "Time Sync Authors" }]
 dependencies = [
     "ntplib",  # Network Time Protocol client library
     "colorama",
+    "pillow",
 ]
 
 [tool.setuptools.packages.find]
