@@ -11,6 +11,9 @@ function Safe-Run([ScriptBlock]$cmd) {
 
 # Run the regular setup script with forwarded arguments
 $scriptRoot = $PSScriptRoot
+$activeFile = $env:SPEAKTOME_ACTIVE_FILE
+if (-not $activeFile) { $activeFile = Join-Path ([System.IO.Path]::GetTempPath()) 'speaktome_active.json' }
+$env:SPEAKTOME_ACTIVE_FILE = $activeFile
 $useVenv = $true
 foreach ($arg in $args) {
     if ($arg -eq '--no-venv' -or $arg -eq '-no-venv') { $useVenv = $false }
@@ -99,7 +102,7 @@ function Show-Menu {
             '6' { Write-Host "Preview CODING_STANDARDS.md"; Safe-Run { & $venvPython AGENTS/tools/preview_doc.py AGENTS/CODING_STANDARDS.md }; $Timeout = 10 }
             '7' { Write-Host "Preview CONTRIBUTING.md"; Safe-Run { & $venvPython AGENTS/tools/preview_doc.py AGENTS/CONTRIBUTING.md }; $Timeout = 10 }
             '8' { Write-Host "Preview PROJECT_OVERVIEW.md"; Safe-Run { & $venvPython AGENTS/tools/preview_doc.py AGENTS/PROJECT_OVERVIEW.md }; $Timeout = 10 }
-            '9' { Write-Host "Launching dev group menu"; Safe-Run { & $venvPython AGENTS/tools/dev_group_menu.py }; $Timeout = 10 }
+            '9' { Write-Host "Launching dev group menu"; Safe-Run { & $venvPython AGENTS/tools/dev_group_menu.py --record $activeFile }; $Timeout = 10 }
             'q' { Write-Host "Exiting."; break }
             default { Write-Host "Unknown choice: $choice" }
         }
@@ -109,3 +112,4 @@ function Show-Menu {
 
 Show-Menu
 Write-Host "For advanced codebase/group selection, run: python AGENTS/tools/dev_group_menu.py"
+Write-Host "Selections recorded to $activeFile"
