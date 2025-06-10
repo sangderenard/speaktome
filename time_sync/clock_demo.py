@@ -27,16 +27,19 @@ from time_sync import (
     print_analog_clock, print_digital_clock,
     init_colorama_for_windows, reset_cursor_to_top, full_clear_and_reset_cursor,
 )
-from time_sync.theme_manager import ThemeManager, ClockTheme # Ensure this import works
-from time_sync.render_backend import RenderingBackend
-from time_sync.frame_buffer import PixelFrameBuffer 
+from time_sync.time_sync.theme_manager import (
+    ThemeManager,
+    ClockTheme,
+)
+from time_sync.time_sync.render_backend import RenderingBackend
+from time_sync.frame_buffer import PixelFrameBuffer
 from time_sync.render_thread import render_loop
 from time_sync.draw import draw_diff
-from time_sync.ascii_digits import (
+from time_sync.time_sync.ascii_digits import (
     compose_ascii_digits,
     ASCII_RAMP_BLOCK,
 )
-from time_sync.draw import draw_text_overlay # Import the new text drawing function
+from time_sync.draw import draw_text_overlay  # Import the new text drawing function
 from PIL import Image
 import queue
 

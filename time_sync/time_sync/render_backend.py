@@ -66,15 +66,19 @@ class RenderingBackend:
         image = self.apply_post_processing(image)
         return image
 
-    # ########## STUB: list_available_operations ##########
-    # PURPOSE: Catalog additional Pillow-based image transformations that could
-    #          be exposed to the clock program. This function will eventually
-    #          return metadata describing each operation and its parameters.
-    # EXPECTED BEHAVIOR: Provide structured information about filters such as
-    #          rotation, flips, posterization, etc., allowing users to compose
-    #          custom pipelines.
-    # TODO:
-    #   - Implement discovery and registration of available operations.
-    #   - Design a serialization format so themes can reference them.
     def list_available_operations(self) -> list[str]:
-        raise NotImplementedError
+        """Return a curated list of extra Pillow operations."""
+        # This implementation merely exposes a handful of common transforms.
+        # Future versions may inspect PIL dynamically and provide richer
+        # metadata for configuration files.
+        return [
+            "rotate",
+            "transpose_left_right",
+            "transpose_top_bottom",
+            "blur",
+            "sharpen",
+            "posterize",
+            "resize",
+            "crop",
+            "color_enhance",
+        ]
