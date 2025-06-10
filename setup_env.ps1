@@ -82,3 +82,9 @@ if (-not $calledByDev) {
 
 Write-Host "Environment setup complete. Activate with '.venv\Scripts\Activate.ps1' on Windows or 'source .venv/bin/activate' on Unix-like systems"
 Write-Host "Selections recorded to $activeFile"
+try {
+    $torchInfo = & $venvPython -c "import importlib,sys;spec=importlib.util.find_spec('torch');print('missing' if spec is None else __import__('torch').__version__)"
+} catch {
+    $torchInfo = 'missing'
+}
+Write-Host "Torch = $torchInfo"

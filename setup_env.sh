@@ -84,5 +84,15 @@ fi
 
 echo "Environment setup complete."
 echo "[OK] Environment ready. Activate with 'source .venv/bin/activate'."
-echo "   * Torch = $(python -c 'import torch; print(torch.__version__, torch.version.cuda if torch.cuda.is_available() else "N/A")')"
+TORCH_INFO=$($VENV_PYTHON - <<'PY'
+import importlib, sys
+spec = importlib.util.find_spec("torch")
+if spec is None:
+    sys.exit(0)
+import torch
+cuda = torch.version.cuda if torch.cuda.is_available() else "CPU"
+print(f"{torch.__version__} {cuda}")
+PY
+)
+echo "   * Torch = ${TORCH_INFO:-missing}"
 echo "Selections recorded to $SPEAKTOME_ACTIVE_FILE"

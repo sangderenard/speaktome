@@ -2,6 +2,8 @@
 # --- END HEADER ---
 
 import pytest
+
+pytestmark = pytest.mark.requires_torch
 torch = pytest.importorskip('torch')
 from laplace.laplace.builder import GridDomain, RectangularTransform, BuildLaplace3D
 

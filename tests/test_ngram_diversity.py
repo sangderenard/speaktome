@@ -5,6 +5,7 @@ from __future__ import annotations
 
 try:
     import pytest
+    pytestmark = pytest.mark.requires_torch
 
     torch = pytest.importorskip("torch", reason="requires PyTorch")
     from speaktome.core.scorer import Scorer
