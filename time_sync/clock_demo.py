@@ -120,6 +120,7 @@ def interactive_configure_mode(
     clock_identifier: str,  # e.g., "slow_analog", "fast_digital"
     initial_config: dict,
     theme_manager: ThemeManager,  # Pass theme_manager for backdrop access
+    key_mappings: dict,
 ):
     """Interactive mode for configuring clock appearance."""
     config = initial_config.copy()
@@ -130,7 +131,17 @@ def interactive_configure_mode(
     print(f"Entering {clock_identifier} clock configuration mode...")
     current_backdrop = theme_manager.current_theme.current_backdrop_path
     print(f"Using backdrop: {current_backdrop if current_backdrop else 'None'}")
-    print("Press 's' to save, 'q' to quit without saving.")
+    config_mappings = {
+        action: mapping
+        for action, mapping in key_mappings.items()
+        if action.startswith("config_")
+    }
+    legend_parts = [
+        f"{'/'.join(m['keys'])}: {m['description']}" for m in config_mappings.values()
+    ]
+    print("Press the following keys:")
+    for part in legend_parts:
+        print(part)
     time.sleep(1)
 
     adjustment_step = 2
@@ -162,13 +173,11 @@ def interactive_configure_mode(
             )
             print("\n--- Current Analog Config ---")
             rect = config.get("clock_drawing_rect_on_canvas", "Not set")
-            print(f"Drawing Rect (x,y,w,h): {rect} (Use Arrow keys to move)")
-            print(f"Resize Rect: Width (J/L), Height (I/K)")
+            print(f"Drawing Rect (x,y,w,h): {rect}")
             print(
-                f"ASCII Diameter: {config.get('target_ascii_diameter', 'Default')} (+/-)"
+                f"ASCII Diameter: {config.get('target_ascii_diameter', 'Default')}"
             )
-            print(f"Canvas Size PX: {config.get('canvas_size_px', 'Default')} (c/C)")
-            help_text = "[Arrows]:Move [J/L]:Width [I/K]:Height [+/-]:ASCII Dia. [c/C]:Canvas Px [s]:Save [q]:Quit"
+            print(f"Canvas Size PX: {config.get('canvas_size_px', 'Default')}")
 
         elif clock_type == "digital":
             print_digital_clock(
@@ -181,17 +190,39 @@ def interactive_configure_mode(
             print(f"ASCII Width: {config.get('target_ascii_width', 'Default')} (←/→)")
             print(f"ASCII Height: {config.get('target_ascii_height', 'Default')} (↑/↓)")
             print(f"Font Size: {config.get('font_size', 'Default')} (+/-)")
-            help_text = "[←→]: ASCII Width [↑↓]: ASCII Height [+/-]: Font Size [s]:Save [q]:Quit"
 
-        print(f"\n{help_text}")
+        print()
+        for part in legend_parts:
+            print(part)
 
         key = getch_timeout(0.15)  # Shorter timeout for better responsiveness
         if key is None:
             continue
 
-        if key == "q":
+        action = None
+        if key == "\x1b":
+            next_key1 = getch_timeout(0.1)
+            if next_key1 == "[":
+                next_key2 = getch_timeout(0.1)
+                arrow_map = {"D": "LEFT", "C": "RIGHT", "A": "UP", "B": "DOWN"}
+                token = arrow_map.get(next_key2)
+                if token:
+                    for act, mapping in config_mappings.items():
+                        if token in mapping["keys"]:
+                            action = act
+                            break
+        else:
+            for act, mapping in config_mappings.items():
+                if key in mapping["keys"]:
+                    action = act
+                    break
+
+        if action is None:
+            continue
+
+        if action == "config_quit":
             break
-        elif key == "s":
+        elif action == "config_save":
             save_config_to_json(config, clock_identifier)
             print("Configuration saved. Exiting config mode.")
             time.sleep(1)
@@ -200,71 +231,56 @@ def interactive_configure_mode(
         if clock_type == "analog":
             rect = list(
                 config.get("clock_drawing_rect_on_canvas", [20, 20, 80, 80])
-            )  # Default if not set
-            if key == "\x1b":  # Arrow key prefix
-                next_key1 = getch_timeout(0.1)
-                if next_key1 == "[":
-                    next_key2 = getch_timeout(0.1)
-                    if next_key2 == "D":
-                        rect[0] -= adjustment_step  # Left
-                    elif next_key2 == "C":
-                        rect[0] += adjustment_step  # Right
-                    elif next_key2 == "A":
-                        rect[1] -= adjustment_step  # Up
-                    elif next_key2 == "B":
-                        rect[1] += adjustment_step  # Down
-            elif key == "L":
-                rect[2] += adjustment_step  # Resize width + (Shift+Right)
-            elif key == "J":
-                rect[2] -= adjustment_step  # Resize width - (Shift+Left)
-            elif key == "I":
-                rect[3] -= adjustment_step  # Resize height - (Shift+Up)
-            elif key == "K":
-                rect[3] += adjustment_step  # Resize height + (Shift+Down)
+            )
+            if action == "config_left":
+                rect[0] -= adjustment_step
+            elif action == "config_right":
+                rect[0] += adjustment_step
+            elif action == "config_up":
+                rect[1] -= adjustment_step
+            elif action == "config_down":
+                rect[1] += adjustment_step
+            elif action == "config_width_increase":
+                rect[2] += adjustment_step
+            elif action == "config_width_decrease":
+                rect[2] -= adjustment_step
+            elif action == "config_height_decrease":
+                rect[3] -= adjustment_step
+            elif action == "config_height_increase":
+                rect[3] += adjustment_step
 
-            config["clock_drawing_rect_on_canvas"] = tuple(
-                max(0, val) for val in rect
-            )  # Ensure non-negative
+            config["clock_drawing_rect_on_canvas"] = tuple(max(0, val) for val in rect)
 
-            if key == "+":
-                config["target_ascii_diameter"] = (
-                    config.get("target_ascii_diameter", 22) + 1
-                )
-            elif key == "-":
+            if action == "config_ascii_diameter_increase":
+                config["target_ascii_diameter"] = config.get("target_ascii_diameter", 22) + 1
+            elif action == "config_ascii_diameter_decrease":
                 config["target_ascii_diameter"] = max(
                     5, config.get("target_ascii_diameter", 22) - 1
                 )
-            elif key == "C":
+            elif action == "config_canvas_increase":
                 config["canvas_size_px"] = config.get("canvas_size_px", 120) + 10
-            elif key == "c":
+            elif action == "config_canvas_decrease":
                 config["canvas_size_px"] = max(
                     20, config.get("canvas_size_px", 120) - 10
                 )
 
         elif clock_type == "digital":
-            if key == "\x1b":  # Arrow key prefix
-                next_key1 = getch_timeout(0.1)
-                if next_key1 == "[":
-                    next_key2 = getch_timeout(0.1)
-                    if next_key2 == "D":
-                        config["target_ascii_width"] = max(
-                            10, config.get("target_ascii_width", 60) - adjustment_step
-                        )  # Left
-                    elif next_key2 == "C":
-                        config["target_ascii_width"] = (
-                            config.get("target_ascii_width", 60) + adjustment_step
-                        )  # Right
-                    elif next_key2 == "A":
-                        config["target_ascii_height"] = max(
-                            3, config.get("target_ascii_height", 7) - 1
-                        )  # Up
-                    elif next_key2 == "B":
-                        config["target_ascii_height"] = (
-                            config.get("target_ascii_height", 7) + 1
-                        )  # Down
-            elif key == "+":
+            if action == "config_left":
+                config["target_ascii_width"] = max(
+                    10, config.get("target_ascii_width", 60) - adjustment_step
+                )
+            elif action == "config_right":
+                config["target_ascii_width"] = config.get("target_ascii_width", 60) + adjustment_step
+            elif action == "config_up":
+                config["target_ascii_height"] = max(
+                    3, config.get("target_ascii_height", 7) - 1
+                )
+            elif action == "config_down":
+                config["target_ascii_height"] = config.get("target_ascii_height", 7) + 1
+
+            if action == "config_font_increase":
                 config["font_size"] = config.get("font_size", 40) + adjustment_step
-            elif key == "-":
+            elif action == "config_font_decrease":
                 config["font_size"] = max(
                     8, config.get("font_size", 40) - adjustment_step
                 )
@@ -556,7 +572,10 @@ def main() -> None:
             temp_theme_manager.current_theme.current_backdrop_path = args.backdrops[0]
 
         interactive_configure_mode(
-            args.configure, clock_configs[args.configure], temp_theme_manager
+            args.configure,
+            clock_configs[args.configure],
+            temp_theme_manager,
+            key_mappings,
         )
         return  # Exit after configuration mode
 
@@ -1217,6 +1236,7 @@ def main() -> None:
                                         clock_to_config,
                                         clock_configs[clock_to_config],
                                         theme_manager,
+                                        key_mappings,
                                     )
                                     # Resume render thread
                                     stop_event.clear()
