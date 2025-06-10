@@ -10,8 +10,9 @@ try:
 except ModuleNotFoundError:  # pragma: no cover - optional dependency
     torch = None  # type: ignore
 except Exception:
+    import sys
     print(ENV_SETUP_BOX)
-    raise
+    sys.exit(1)
 # --- END HEADER ---
 
 class AbstractModelWrapper(ABC):

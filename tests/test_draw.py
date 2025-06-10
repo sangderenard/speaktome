@@ -1,5 +1,14 @@
-import numpy as np
-from time_sync.draw import (
+from __future__ import annotations
+
+try:
+    from AGENTS.tools.header_utils import ENV_SETUP_BOX
+    import numpy as np
+    from time_sync.draw import (
+except Exception:
+    import sys
+    print(ENV_SETUP_BOX)
+    sys.exit(1)
+# --- END HEADER ---
     get_changed_subunits,
     default_subunit_to_char_kernel,
     flexible_subunit_kernel,

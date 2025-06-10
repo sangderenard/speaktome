@@ -46,20 +46,13 @@ def _guess_codebase(path: Path) -> str:
 def _load_active() -> tuple[list[str], dict[str, dict[str, list[str]]]]:
     if ACTIVE_FILE.exists():
         try:
+            from AGENTS.tools.header_utils import ENV_SETUP_BOX
             data = json.loads(ACTIVE_FILE.read_text())
             return data.get("codebases", []), data.get("packages", {})
         except Exception:
-            pass
-    return [], {}
-
-spec = importlib.util.spec_from_file_location(
-    "pretty_logger",
-    Path(__file__).resolve().parents[1] / "AGENTS" / "tools" / "pretty_logger.py",
-)
-pretty_mod = importlib.util.module_from_spec(spec)
-assert spec.loader
-spec.loader.exec_module(pretty_mod)
-PrettyLogger = pretty_mod.PrettyLogger
+            import sys
+            print(ENV_SETUP_BOX)
+            sys.exit(1)
 # --- END HEADER ---
 
 class StdoutTee:

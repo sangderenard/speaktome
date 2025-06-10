@@ -28,6 +28,7 @@
 # tensor operations.
 
 try:
+    from AGENTS.tools.header_utils import ENV_SETUP_BOX
     from typing import Any, Tuple, List, Optional, Union
 
     import torch
@@ -36,17 +37,9 @@ except ModuleNotFoundError:
     torch = None  # type: ignore
     F = None  # type: ignore
 except Exception:
-    print(
-        "\n"
-        "+-----------------------------------------------------------------------+\n"
-        "| Imports failed. Run setup_env or setup_env_dev and select every    |\n"
-        "| project and module you plan to use. Missing packages mean setup was |\n"
-        "| skipped or incomplete.                                             |\n"
-        "+-----------------------------------------------------------------------+\n"
-    )
-    raise
-
-from .abstraction import AbstractTensorOperations
+    import sys
+    print(ENV_SETUP_BOX)
+    sys.exit(1)
 # --- END HEADER ---
 
 class PyTorchTensorOperations(AbstractTensorOperations):

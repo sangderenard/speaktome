@@ -32,16 +32,14 @@ from __future__ import annotations
 from typing import Any, Tuple, List, Optional
 
 try:
+    from AGENTS.tools.header_utils import ENV_SETUP_BOX
     import jax
     import jax.numpy as jnp
     from jax import lax
 except ModuleNotFoundError:  # pragma: no cover - optional dependency
-    jax = None  # type: ignore
-    jnp = None  # type: ignore
-    lax = None  # type: ignore
-
-from .abstraction import AbstractTensorOperations
-
+    import sys
+    print(ENV_SETUP_BOX)
+    sys.exit(1)
 # --- END HEADER ---
 
 class JAXTensorOperations(AbstractTensorOperations):

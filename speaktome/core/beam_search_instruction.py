@@ -1,4 +1,5 @@
 try:
+    from AGENTS.tools.header_utils import ENV_SETUP_BOX
     # Standard library imports
     from typing import Any, Callable, Dict, List, Optional, Tuple, TYPE_CHECKING
 
@@ -10,15 +11,9 @@ try:
     # Local application/library specific imports
     from .scorer import Scorer  # Assuming Scorer is in scorer.py
 except Exception:
-    print(
-        "\n"
-        "+-----------------------------------------------------------------------+\n"
-        "| Imports failed. Run setup_env or setup_env_dev and select every    |\n"
-        "| project and module you plan to use. Missing packages mean setup was |\n"
-        "| skipped or incomplete.                                             |\n"
-        "+-----------------------------------------------------------------------+\n"
-    )
-    raise
+    import sys
+    print(ENV_SETUP_BOX)
+    sys.exit(1)
 # --- END HEADER ---
 
 class BeamSearchInstruction:

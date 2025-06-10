@@ -9,6 +9,7 @@ prints the top ``k`` results after ``d`` lookahead steps.
 from __future__ import annotations
 
 try:
+    from AGENTS.tools.header_utils import ENV_SETUP_BOX
     import argparse
     from typing import Any, Dict
 
@@ -31,8 +32,9 @@ try:
     )
     from .core.lookahead_controller import LookaheadController, LookaheadConfig
 except Exception:
+    import sys
     print(ENV_SETUP_BOX)
-    raise
+    sys.exit(1)
 # --- END HEADER ---
 
 VOCAB = TokenVocabulary("abcdefghijklmnopqrstuvwxyz ")

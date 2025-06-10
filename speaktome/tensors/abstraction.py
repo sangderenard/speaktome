@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 try:
+    from AGENTS.tools.header_utils import ENV_SETUP_BOX
     from abc import ABC, abstractmethod
     from typing import Any, Tuple, Optional, List, Union, Callable, Dict, Deque
     import math
@@ -17,8 +18,9 @@ except ModuleNotFoundError:
     torch = None  # type: ignore
     np = None  # type: ignore
 except Exception:
+    import sys
     print(ENV_SETUP_BOX)
-    raise
+    sys.exit(1)
 # --- END HEADER ---
 
 CONVERSION_REGISTRY: Dict[Tuple[type, type], Callable[["AbstractTensorOperations", Any, "AbstractTensorOperations"], Any]] = {}

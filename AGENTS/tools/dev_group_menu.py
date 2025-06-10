@@ -11,6 +11,7 @@ import tempfile
 from pathlib import Path
 
 try:
+    from AGENTS.tools.header_utils import ENV_SETUP_BOX
     import tomllib
 except ModuleNotFoundError:  # Python < 3.11
     import tomli as tomllib
@@ -25,38 +26,9 @@ if os.name == 'nt':  # Windows
             try:
                 result.append(msvcrt.getch().decode())
             except Exception:
-                result.append(None)
-        
-        thread = threading.Thread(target=input_thread)
-        thread.daemon = True
-        thread.start()
-        thread.join(timeout)
-        return result[0] if result else None
-
-else:  # Unix
-    import select
-    import termios
-    import tty
-    
-    def getch_timeout(timeout):
-        """Get a single character with timeout on Unix."""
-        fd = sys.stdin.fileno()
-        old_settings = termios.tcgetattr(fd)
-        try:
-            tty.setraw(sys.stdin.fileno())
-            if select.select([sys.stdin], [], [], timeout)[0]:
-                return sys.stdin.read(1)
-            return None
-        finally:
-            termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
-
-def ask(prompt, timeout=3, default="n"):
-    """Cross-platform input with timeout."""
-    print(prompt, end='', flush=True)
-    result = getch_timeout(timeout)
-    print()  # Move to next line
-    return result.lower() if result else default
-
+                import sys
+                print(ENV_SETUP_BOX)
+                sys.exit(1)
 # --- END HEADER ---
 
 """Interactive dev environment setup with dynamic codebase discovery.

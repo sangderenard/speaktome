@@ -4,21 +4,16 @@
 from __future__ import annotations
 
 try:
+    from AGENTS.tools.header_utils import ENV_SETUP_BOX
     import pytest
     pytestmark = pytest.mark.requires_torch
 
     torch = pytest.importorskip("torch", reason="requires PyTorch")
     from speaktome.core.scorer import Scorer
 except Exception:
-    print(
-        "\n"
-        "+-----------------------------------------------------------------------+\n"
-        "| Imports failed. Run setup_env or setup_env_dev and select every    |\n"
-        "| project and module you plan to use. Missing packages mean setup was |\n"
-        "| skipped or incomplete.                                             |\n"
-        "+-----------------------------------------------------------------------+\n"
-    )
-    raise
+    import sys
+    print(ENV_SETUP_BOX)
+    sys.exit(1)
 # --- END HEADER ---
 
 

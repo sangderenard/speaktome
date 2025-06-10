@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 try:
+    from AGENTS.tools.header_utils import ENV_SETUP_BOX
     import os
     from enum import Enum, auto
 except Exception:
+    import sys
     print(ENV_SETUP_BOX)
-    raise
+    sys.exit(1)
 # --- END HEADER ---
 
 

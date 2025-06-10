@@ -1,7 +1,16 @@
-from time_sync.frame_buffer import PixelFrameBuffer
-import numpy as np
+from __future__ import annotations
 
-
+try:
+    from AGENTS.tools.header_utils import ENV_SETUP_BOX
+    from time_sync.frame_buffer import PixelFrameBuffer
+    import numpy as np
+    
+    
+except Exception:
+    import sys
+    print(ENV_SETUP_BOX)
+    sys.exit(1)
+# --- END HEADER ---
 def test_framebuffer_diff_basic():
     fb = PixelFrameBuffer((2, 3))
     frame = np.zeros((2, 3, 3), dtype=np.uint8)

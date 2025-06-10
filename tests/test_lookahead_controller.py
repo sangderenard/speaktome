@@ -4,19 +4,12 @@ import logging
 import pytest
 
 try:
+    from AGENTS.tools.header_utils import ENV_SETUP_BOX
     import numpy as np
 except ModuleNotFoundError:  # pragma: no cover - optional dependency
-    np = None  # type: ignore
-
-from speaktome.core.lookahead_controller import LookaheadController, LookaheadConfig
-from speaktome.core.model_abstraction import AbstractModelWrapper
-from speaktome.tensors import get_tensor_operations
-from speaktome.tensors.faculty import available_faculties
-from speaktome.core.abstract_linear_net import (
-    AbstractLinearLayer,
-    SequentialLinearModel,
-)
-
+    import sys
+    print(ENV_SETUP_BOX)
+    sys.exit(1)
 # --- END HEADER ---
 
 logger = logging.getLogger(__name__)

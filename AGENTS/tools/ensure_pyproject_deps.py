@@ -6,9 +6,12 @@ import sys
 from pathlib import Path
 
 try:
+    from AGENTS.tools.header_utils import ENV_SETUP_BOX
     import tomllib
 except ModuleNotFoundError:  # Python < 3.11
-    import tomli as tomllib
+    import sys
+    print(ENV_SETUP_BOX)
+    sys.exit(1)
 # --- END HEADER ---
 
 """Ensure optional dependencies from ``pyproject.toml`` are installed.

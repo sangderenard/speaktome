@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 try:
+    from AGENTS.tools.header_utils import ENV_SETUP_BOX
     # Standard library imports
     from typing import List, Tuple, Callable, Any, Set, TYPE_CHECKING
 
@@ -9,15 +10,9 @@ try:
     from ..tensors import AbstractTensorOperations
     from .model_abstraction import AbstractModelWrapper
 except Exception:
-    print(
-        "\n"
-        "+-----------------------------------------------------------------------+\n"
-        "| Imports failed. Run setup_env or setup_env_dev and select every    |\n"
-        "| project and module you plan to use. Missing packages mean setup was |\n"
-        "| skipped or incomplete.                                             |\n"
-        "+-----------------------------------------------------------------------+\n"
-    )
-    raise
+    import sys
+    print(ENV_SETUP_BOX)
+    sys.exit(1)
 # --- END HEADER ---
 
 

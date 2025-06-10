@@ -12,17 +12,32 @@ from __future__ import annotations
 import ast
 import json
 import sys
+import os
 from pathlib import Path
 
 END_MARKER = "# --- END HEADER ---"
 
 
+EXCLUDE_DIRS = {
+    "archive",
+    "third_party",
+    "laplace",
+    "training",
+    "tensor printing",
+    "tensor_printing",
+}
+
+
 def find_py_files(root: Path) -> list[Path]:
     """Yield Python files under ``root`` ignoring ``.venv`` and ``.git``."""
-    for path in root.rglob("*.py"):
-        if any(part in {".venv", ".git"} for part in path.parts):
+    for dirpath, dirnames, filenames in os.walk(root):
+        parts = Path(dirpath).parts
+        if any(d in parts for d in EXCLUDE_DIRS | {".venv", ".git"}):
+            dirnames[:] = []
             continue
-        yield path
+        for name in filenames:
+            if name.endswith(".py"):
+                yield Path(dirpath) / name
 
 
 def collect_class_info(pyfile: Path) -> list[dict[str, object]]:

@@ -30,6 +30,7 @@
 from typing import Any, Tuple, List, Optional
 
 try:
+    from AGENTS.tools.header_utils import ENV_SETUP_BOX
     import numpy as np
 except ModuleNotFoundError:  # pragma: no cover - optional dependency
     np = None  # type: ignore
@@ -37,10 +38,9 @@ except ModuleNotFoundError:  # pragma: no cover - optional dependency
 try:
     import torch
 except ModuleNotFoundError:  # pragma: no cover - optional dependency
-    torch = None  # type: ignore
-
-from .abstraction import AbstractTensorOperations
-
+    import sys
+    print(ENV_SETUP_BOX)
+    sys.exit(1)
 # --- END HEADER ---
 
 class NumPyTensorOperations(AbstractTensorOperations):

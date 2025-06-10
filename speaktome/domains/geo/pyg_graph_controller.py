@@ -1,4 +1,5 @@
 try:
+    from AGENTS.tools.header_utils import ENV_SETUP_BOX
     # Standard library imports
     from typing import Optional, List, TYPE_CHECKING
 
@@ -19,15 +20,9 @@ try:
     from ...core.beam_tree_visualizer import BeamTreeVisualizer
     from ...config import get_sentence_transformer_model
 except Exception:
-    print(
-        "\n"
-        "+-----------------------------------------------------------------------+\n"
-        "| Imports failed. Run setup_env or setup_env_dev and select every    |\n"
-        "| project and module you plan to use. Missing packages mean setup was |\n"
-        "| skipped or incomplete.                                             |\n"
-        "+-----------------------------------------------------------------------+\n"
-    )
-    raise
+    import sys
+    print(ENV_SETUP_BOX)
+    sys.exit(1)
 # --- END HEADER ---
 class PyGGraphController:
     def __init__(self, beam_search: BeamSearch, pygeomind_model: Optional[PyGeoMind] = None, human_in_control: bool = False):
