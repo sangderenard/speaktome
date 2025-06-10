@@ -7,5 +7,6 @@ This document lists the independent project directories maintained in this repos
 - **tensor_printing** — experimental Grand Printing Press package.
 - **time_sync** — system clock offset helpers.
 - **AGENTS/tools** — shared helper scripts for repository management.
+- **fontmapper** — ASCII rendering and font mapping experiments.
 
 Additional codebases can be added here as the repository grows.
