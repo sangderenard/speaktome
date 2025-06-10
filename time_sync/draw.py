@@ -5,8 +5,9 @@ from __future__ import annotations
 try:
     from AGENTS.tools.header_utils import ENV_SETUP_BOX
     import sys
-    import numpy as np  
-    from colorama import Style, Fore, Back  
+    import numpy as np
+    from colorama import Style, Fore, Back
+    from time_sync.ascii_kernel_classifier import AsciiKernelClassifier
 except Exception:
     import sys
     print(ENV_SETUP_BOX)
@@ -61,31 +62,33 @@ def flexible_subunit_kernel(
         return np.array(img)
     raise ValueError(f"Unknown mode: {mode}")
 
+# Module-level cache for classifier and ramp
+_classifier_cache = {
+    "ramp": None,
+    "classifier": None,
+}
+
 def default_subunit_to_char_kernel(
     subunit_data: np.ndarray,
     ramp: str = DEFAULT_DRAW_ASCII_RAMP,
 ) -> str:
     """
-    Stub kernel function to map a subunit of pixel data to a single character.
-    This basic stub averages the subunit and returns a character from the given ramp based on luminance.
+    Kernel function to map a subunit of pixel data to a single character.
+    Uses AsciiKernelClassifier to select the best character by sum of absolute differences.
     """
-    if subunit_data.size == 0:
-        return " " # Should not happen with valid subunits
-    
-    # Assuming subunit_data is (H, W, 3) for RGB
-    # For simplicity, convert to grayscale and average luminance
-    if subunit_data.ndim == 3 and subunit_data.shape[2] == 3:
-        # A simple grayscale conversion: (R+G+B)/3
-        luminance_map = np.mean(subunit_data, axis=2)
-    elif subunit_data.ndim == 2: # Already grayscale
-        luminance_map = subunit_data
-    else: # Fallback for unexpected shapes
-        return "?"
-        
-    avg_luminance = np.mean(luminance_map)
-        
-    char_index = min(len(ramp) - 1, int((avg_luminance / 255) * len(ramp)))
-    return ramp[char_index]
+    # If ramp changed, regenerate classifier and reference images
+    if _classifier_cache["ramp"] != ramp or _classifier_cache["classifier"] is None:
+        classifier = AsciiKernelClassifier(ramp)
+        classifier.set_font("DejaVuSansMono.ttf", 16, (16, 16))
+        _classifier_cache["ramp"] = ramp
+        _classifier_cache["classifier"] = classifier
+    else:
+        classifier = _classifier_cache["classifier"]
+
+    # Prepare batch of one for compatibility
+    subunit_batch = np.expand_dims(subunit_data, axis=0)
+    result = classifier.classify_batch(subunit_batch)
+    return result["chars"][0]
 
 def draw_text_overlay(
     row: int,

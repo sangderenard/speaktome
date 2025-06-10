@@ -1,0 +1,71 @@
+PORT: 8000
+TRAINING_IMAGES_DIRECTORY: trainingimages
+batch_size: 50000
+chars_per_preview: 1
+charset: ''
+complexity: 0
+config_file: config.yaml
+conv1_out: 32
+conv2_out: 64
+demo_image: ''
+demo_images: 1
+demo_loss_function: psnr
+device: cpu
+dropout: 0.15
+epochs: 1000
+epochs_per_preview: 10
+font_files:
+- consola.ttf
+font_size: 12
+general_model_path: model2.pth
+gradient_loss_function: psnr
+hitl: 1
+human_mode: auto
+image_batch_limit: 2500000
+image_height: 500
+image_width: 375
+implemented_shapes:
+- triangle
+- filled_triangle
+- circle
+- filled_circle
+- square
+- filled_square
+interactive: ''
+learning_rate: 0.01
+linear_out: 1024
+live: 1
+max_size:
+- 375
+- 500
+metamodel_path: metamodel15.pth
+model_base: ''
+model_name: model
+model_path: ''
+pika_messaging: 1
+pika_password: ''
+pika_password_file: password.txt
+pika_username: sangderenard
+quick_test: 0
+refresh_rate: 50
+tensor_list:
+  COMPLEXITY_LEVEL: 0
+  override_alternating_outer_learning: 0
+  override_category_epochs: 0
+  override_category_lr: 0
+  override_complexity: 0
+  override_demo_epochs: 0
+  override_demo_lr: 0
+  override_gradient_epochs: 0
+  override_gradient_lr: 0
+  override_homework_epochs: 0
+  override_image_epochs: 0
+  override_image_lr: 0
+  override_meta_model_learning: 0
+  override_outer_learning: 0
+  override_outer_lr: 0
+training_categories: 1
+training_gradients: 1
+training_images: 1
+training_images_path: ./images
+training_loss_function: psnr

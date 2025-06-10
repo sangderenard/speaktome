@@ -353,6 +353,38 @@ def load_key_mappings(path: str = KEY_MAPPINGS_PATH) -> dict:
         return {}
 
 
+
+
+
+class InputDispatcher:
+    """
+    Dispatches input events to action handlers.
+    Ready for future parallelization.
+    """
+
+    def __init__(self, action_handlers, key_mappings):
+        self.action_handlers = action_handlers
+        self.key_mappings = key_mappings
+
+    def dispatch(self, input_buffer):
+        change_occured = False  # Track if any change occurred
+        # Split input_buffer into chars and dispatch each
+        for char_key_raw in input_buffer:
+            change_occured = change_occured or self.handle_key(char_key_raw)
+
+        return change_occured  # Return True if any key was handled
+
+    def handle_key(self, char_key_raw):
+        # Only normal mode for now; extend for config as needed
+        for action, mapping in self.key_mappings.get("normal", {}).items():
+            if char_key_raw in mapping["keys"]:
+                handler = self.action_handlers["normal"].get(action)
+                if handler:
+                    handler()
+                    return True  # Indicate a change occurred
+                break
+
+
 def main() -> None:
     """Run the clock demo until interrupted."""
     global PIXEL_BUFFER_SCALE, TEXT_FIELD_SCALE  # Allow modification by keys
@@ -923,6 +955,233 @@ def main() -> None:
     KEYFRAME_INTERVAL_SECONDS = 30  # Redraw everything every 30 seconds
     last_keyframe_time = time.perf_counter()
 
+    def quit():
+        stop_event.set()
+
+    def toggle_legend():
+        display_state["legend"] = not display_state["legend"]
+
+    def cycle_ascii_style_forward():
+        theme_manager.cycle_ascii_style()
+
+    def cycle_ascii_style_backward():
+        theme_manager.cycle_ascii_style(-1)
+
+    def cycle_palette_forward():
+        theme_manager.cycle_palette(1)
+
+    def cycle_palette_backward():
+        theme_manager.cycle_palette(-1)
+
+    def cycle_effects_forward():
+        theme_manager.cycle_effects_preset(1)
+
+    def cycle_effects_backward():
+        theme_manager.cycle_effects_preset(-1)
+
+    def cycle_post_processing_forward():
+        theme_manager.cycle_post_processing_preset(1)
+
+    def cycle_post_processing_backward():
+        theme_manager.cycle_post_processing_preset(-1)
+
+    def toggle_clock_inversion():
+        theme_manager.toggle_clock_inversion()
+
+    def toggle_backdrop_inversion():
+        theme_manager.toggle_backdrop_inversion()
+
+    def cycle_backdrop_forward():
+        theme_manager.cycle_backdrop(args.backdrops or [], 1)
+
+    def cycle_backdrop_backward():
+        theme_manager.cycle_backdrop(args.backdrops or [], -1)
+
+    def enter_config_mode():
+        # Example: just print for now
+        print("Config mode entered (implement mode stack as needed)")
+
+    def cycle_config_focus():
+        print("Cycle config focus (implement focus logic as needed)")
+
+    # --- Config mode handlers for analog ---
+    def config_quit():
+        print("Config quit (implement config quit logic)")
+
+    def config_save():
+        print("Config save (implement config save logic)")
+
+    def config_left():
+        # Move analog clock rect left
+        for clock in ["slow_analog", "fast_analog"]:
+            rect = list(clock_configs[clock].get("clock_drawing_rect_on_canvas", [20, 20, 80, 80]))
+            rect[0] -= 2
+            clock_configs[clock]["clock_drawing_rect_on_canvas"] = tuple(max(0, val) for val in rect)
+        print("Analog clock rect moved left")
+
+    def config_right():
+        for clock in ["slow_analog", "fast_analog"]:
+            rect = list(clock_configs[clock].get("clock_drawing_rect_on_canvas", [20, 20, 80, 80]))
+            rect[0] += 2
+            clock_configs[clock]["clock_drawing_rect_on_canvas"] = tuple(max(0, val) for val in rect)
+        print("Analog clock rect moved right")
+
+    def config_up():
+        for clock in ["slow_analog", "fast_analog"]:
+            rect = list(clock_configs[clock].get("clock_drawing_rect_on_canvas", [20, 20, 80, 80]))
+            rect[1] -= 2
+            clock_configs[clock]["clock_drawing_rect_on_canvas"] = tuple(max(0, val) for val in rect)
+        print("Analog clock rect moved up")
+
+    def config_down():
+        for clock in ["slow_analog", "fast_analog"]:
+            rect = list(clock_configs[clock].get("clock_drawing_rect_on_canvas", [20, 20, 80, 80]))
+            rect[1] += 2
+            clock_configs[clock]["clock_drawing_rect_on_canvas"] = tuple(max(0, val) for val in rect)
+        print("Analog clock rect moved down")
+
+    def config_width_increase():
+        for clock in ["slow_analog", "fast_analog"]:
+            rect = list(clock_configs[clock].get("clock_drawing_rect_on_canvas", [20, 20, 80, 80]))
+            rect[2] += 2
+            clock_configs[clock]["clock_drawing_rect_on_canvas"] = tuple(max(0, val) for val in rect)
+        print("Analog clock width increased")
+
+    def config_width_decrease():
+        for clock in ["slow_analog", "fast_analog"]:
+            rect = list(clock_configs[clock].get("clock_drawing_rect_on_canvas", [20, 20, 80, 80]))
+            rect[2] = max(2, rect[2] - 2)
+            clock_configs[clock]["clock_drawing_rect_on_canvas"] = tuple(max(0, val) for val in rect)
+        print("Analog clock width decreased")
+
+    def config_height_increase():
+        for clock in ["slow_analog", "fast_analog"]:
+            rect = list(clock_configs[clock].get("clock_drawing_rect_on_canvas", [20, 20, 80, 80]))
+            rect[3] += 2
+            clock_configs[clock]["clock_drawing_rect_on_canvas"] = tuple(max(0, val) for val in rect)
+        print("Analog clock height increased")
+
+    def config_height_decrease():
+        for clock in ["slow_analog", "fast_analog"]:
+            rect = list(clock_configs[clock].get("clock_drawing_rect_on_canvas", [20, 20, 80, 80]))
+            rect[3] = max(2, rect[3] - 2)
+            clock_configs[clock]["clock_drawing_rect_on_canvas"] = tuple(max(0, val) for val in rect)
+        print("Analog clock height decreased")
+
+    def config_ascii_diameter_increase():
+        for clock in ["slow_analog", "fast_analog"]:
+            clock_configs[clock]["target_ascii_diameter"] = clock_configs[clock].get("target_ascii_diameter", 22) + 1
+        print("Analog ASCII diameter increased")
+
+    def config_ascii_diameter_decrease():
+        for clock in ["slow_analog", "fast_analog"]:
+            clock_configs[clock]["target_ascii_diameter"] = max(5, clock_configs[clock].get("target_ascii_diameter", 22) - 1)
+        print("Analog ASCII diameter decreased")
+
+    def config_canvas_increase():
+        for clock in ["slow_analog", "fast_analog"]:
+            clock_configs[clock]["canvas_size_px"] = clock_configs[clock].get("canvas_size_px", 120) + 10
+        print("Analog canvas size increased")
+
+    def config_canvas_decrease():
+        for clock in ["slow_analog", "fast_analog"]:
+            clock_configs[clock]["canvas_size_px"] = max(20, clock_configs[clock].get("canvas_size_px", 120) - 10)
+        print("Analog canvas size decreased")
+
+    # --- Config mode handlers for digital ---
+    def config_font_increase():
+        for clock in ["slow_digital", "fast_digital"]:
+            clock_configs[clock]["font_size"] = clock_configs[clock].get("font_size", 40) + 2
+        print("Digital font size increased")
+
+    def config_font_decrease():
+        for clock in ["slow_digital", "fast_digital"]:
+            clock_configs[clock]["font_size"] = max(8, clock_configs[clock].get("font_size", 40) - 2)
+        print("Digital font size decreased")
+
+    def config_left():
+        for clock in ["slow_digital", "fast_digital"]:
+            clock_configs[clock]["target_ascii_width"] = max(10, clock_configs[clock].get("target_ascii_width", 60) - 2)
+        print("Digital ASCII width decreased")
+
+    def config_right():
+        for clock in ["slow_digital", "fast_digital"]:
+            clock_configs[clock]["target_ascii_width"] = clock_configs[clock].get("target_ascii_width", 60) + 2
+        print("Digital ASCII width increased")
+
+    def config_up():
+        for clock in ["slow_digital", "fast_digital"]:
+            clock_configs[clock]["target_ascii_height"] = max(3, clock_configs[clock].get("target_ascii_height", 7) - 1)
+        print("Digital ASCII height decreased")
+
+    def config_down():
+        for clock in ["slow_digital", "fast_digital"]:
+            clock_configs[clock]["target_ascii_height"] = clock_configs[clock].get("target_ascii_height", 7) + 1
+        print("Digital ASCII height increased")
+
+
+    action_handlers = {
+        "normal": {
+            "quit": quit,
+            "toggle_legend": toggle_legend,
+            "cycle_ascii_style_forward": cycle_ascii_style_forward,
+            "cycle_ascii_style_backward": cycle_ascii_style_backward,
+            "cycle_palette_forward": cycle_palette_forward,
+            "cycle_palette_backward": cycle_palette_backward,
+            "cycle_effects_forward": cycle_effects_forward,
+            "cycle_effects_backward": cycle_effects_backward,
+            "cycle_post_processing_forward": cycle_post_processing_forward,
+            "cycle_post_processing_backward": cycle_post_processing_backward,
+            "toggle_clock_inversion": toggle_clock_inversion,
+            "toggle_backdrop_inversion": toggle_backdrop_inversion,
+            "cycle_backdrop_forward": cycle_backdrop_forward,
+            "cycle_backdrop_backward": cycle_backdrop_backward,
+            "enter_config_mode": enter_config_mode,
+            "cycle_config_focus": cycle_config_focus,
+        },
+        "config": {
+            "analog": {
+                "config_quit": config_quit,
+                "config_save": config_save,
+                "config_left": config_left,
+                "config_right": config_right,
+                "config_up": config_up,
+                "config_down": config_down,
+                "config_width_increase": config_width_increase,
+                "config_width_decrease": config_width_decrease,
+                "config_height_increase": config_height_increase,
+                "config_height_decrease": config_height_decrease,
+                "config_ascii_diameter_increase": config_ascii_diameter_increase,
+                "config_ascii_diameter_decrease": config_ascii_diameter_decrease,
+                "config_canvas_increase": config_canvas_increase,
+                "config_canvas_decrease": config_canvas_decrease,
+            },
+            "digital": {
+                "config_quit": config_quit,
+                "config_save": config_save,
+                "config_left": config_left,
+                "config_right": config_right,
+                "config_up": config_up,
+                "config_down": config_down,
+                "config_font_increase": config_font_increase,
+                "config_font_decrease": config_font_decrease,
+            }
+        }
+    }
+
+    # ----------------------------------------------------------------------
+    # Generic stub for any missing handler functions
+    def missing_handler_stub(*args, **kwargs):
+        print("Warning: Called a missing handler stub. Please implement this action.")
+    # ----------------------------------------------------------------------
+
+    # Example: If you add a new action but forget to define it, do:
+    # action_handlers["normal"]["new_action"] = missing_handler_stub
+    # or for config:
+    # action_handlers["config"]["analog"]["new_config_action"] = missing_handler_stub
+
+    input_dispatcher = InputDispatcher(action_handlers, key_mappings)
+
     try:
         while True:
             # Recalculate overlay start row in case scaling changed
@@ -1067,211 +1326,8 @@ def main() -> None:
                 key = input_queue.get()
                 input_buffer += key
 
-            # Process characters from the raw input_buffer
-            # We'll build a new buffer with unprocessed characters
-            remaining_buffer = ""
-
-            action_processed_this_loop = False
-            if not stop_event.is_set() and input_buffer:  # Check raw input_buffer
-                for (
-                    char_key_raw
-                ) in input_buffer:  # Iterate through raw characters from buffer
-                    action_found = False
-                    for action, mapping in key_mappings.items():
-                        if char_key_raw in mapping["keys"]:  # Compare raw char_key_raw
-                            # --- Execute action ---
-                            if action == "quit":
-                                stop_event.set()
-                            elif action == "toggle_legend":
-                                display_state["legend"] = not display_state["legend"]
-                            elif action == "cycle_ascii_style_forward":
-                                theme_manager.cycle_ascii_style()
-                            elif action == "cycle_ascii_style_backward":
-                                theme_manager.cycle_ascii_style(-1)
-                            elif action == "cycle_palette_forward":
-                                theme_manager.cycle_palette(1)
-                            elif action == "cycle_palette_backward":
-                                theme_manager.cycle_palette(-1)
-                            elif action == "cycle_effects_forward":
-                                theme_manager.cycle_effects_preset(1)
-                            elif action == "cycle_effects_backward":
-                                theme_manager.cycle_effects_preset(-1)
-                            elif action == "cycle_post_processing_forward":
-                                theme_manager.cycle_post_processing_preset(1)
-                            elif action == "cycle_post_processing_backward":
-                                theme_manager.cycle_post_processing_preset(-1)
-                            elif action == "toggle_clock_inversion":
-                                theme_manager.toggle_clock_inversion()
-                            elif action == "toggle_backdrop_inversion":
-                                theme_manager.toggle_backdrop_inversion()
-
-                            elif action == "cycle_slow_analog_units_forward":
-                                current_slow_analog_units_key = (
-                                    theme_manager.cycle_time_unit_set(
-                                        current_slow_analog_units_key, 1
-                                    )
-                                )
-                            elif action == "cycle_slow_analog_units_backward":
-                                current_slow_analog_units_key = (
-                                    theme_manager.cycle_time_unit_set(
-                                        current_slow_analog_units_key, -1
-                                    )
-                                )
-                            elif action == "cycle_fast_analog_units_forward":
-                                current_fast_analog_units_key = (
-                                    theme_manager.cycle_time_unit_set(
-                                        current_fast_analog_units_key, 1
-                                    )
-                                )
-                            elif action == "cycle_fast_analog_units_backward":
-                                current_fast_analog_units_key = (
-                                    theme_manager.cycle_time_unit_set(
-                                        current_fast_analog_units_key, -1
-                                    )
-                                )
-
-                            elif action == "cycle_slow_digital_units_forward":
-                                current_slow_digital_units_key = (
-                                    theme_manager.cycle_time_unit_set(
-                                        current_slow_digital_units_key, 1
-                                    )
-                                )
-                            elif action == "cycle_slow_digital_units_backward":
-                                current_slow_digital_units_key = (
-                                    theme_manager.cycle_time_unit_set(
-                                        current_slow_digital_units_key, -1
-                                    )
-                                )
-                            elif action == "cycle_fast_digital_units_forward":
-                                current_fast_digital_units_key = (
-                                    theme_manager.cycle_time_unit_set(
-                                        current_fast_digital_units_key, 1
-                                    )
-                                )
-                            elif action == "cycle_fast_digital_units_backward":
-                                current_fast_digital_units_key = (
-                                    theme_manager.cycle_time_unit_set(
-                                        current_fast_digital_units_key, -1
-                                    )
-                                )
-
-                            elif action == "cycle_slow_digital_format_forward":
-                                current_slow_digital_format_key = (
-                                    theme_manager.cycle_digital_format_key(
-                                        current_slow_digital_format_key, 1
-                                    )
-                                )
-                            elif action == "cycle_slow_digital_format_backward":
-                                current_slow_digital_format_key = (
-                                    theme_manager.cycle_digital_format_key(
-                                        current_slow_digital_format_key, -1
-                                    )
-                                )
-                            elif action == "cycle_fast_digital_format_forward":
-                                current_fast_digital_format_key = (
-                                    theme_manager.cycle_digital_format_key(
-                                        current_fast_digital_format_key, 1
-                                    )
-                                )
-                            elif action == "cycle_fast_digital_format_backward":
-                                current_fast_digital_format_key = (
-                                    theme_manager.cycle_digital_format_key(
-                                        current_fast_digital_format_key, -1
-                                    )
-                                )
-
-                            elif action == "toggle_analog_clocks":
-                                display_state["analog_clocks"] = not display_state[
-                                    "analog_clocks"
-                                ]
-                            elif action == "toggle_slow_digital_clock":
-                                display_state["slow_digital_clock"] = not display_state[
-                                    "slow_digital_clock"
-                                ]
-                            elif action == "toggle_fast_digital_clock":
-                                display_state["fast_digital_clock"] = not display_state[
-                                    "fast_digital_clock"
-                                ]
-                            elif action == "toggle_stopwatch":
-                                display_state["stopwatch"] = not display_state[
-                                    "stopwatch"
-                                ]
-                            elif action == "toggle_offset_info":
-                                display_state["offset_info"] = not display_state[
-                                    "offset_info"
-                                ]
-
-                            elif action == "increase_buffer_scale":
-                                PIXEL_BUFFER_SCALE = min(3.0, PIXEL_BUFFER_SCALE + 0.1)
-                            elif action == "decrease_buffer_scale":
-                                PIXEL_BUFFER_SCALE = max(0.2, PIXEL_BUFFER_SCALE - 0.1)
-                            elif action == "increase_text_field_scale":
-                                TEXT_FIELD_SCALE = min(3.0, TEXT_FIELD_SCALE + 0.1)
-                            elif action == "decrease_text_field_scale":
-                                TEXT_FIELD_SCALE = max(0.2, TEXT_FIELD_SCALE - 0.1)
-                            elif action == "cycle_backdrop_forward":
-                                theme_manager.cycle_backdrop(args.backdrops or [], 1)
-                            elif action == "cycle_backdrop_backward":
-                                theme_manager.cycle_backdrop(args.backdrops or [], -1)
-                            elif action == "enter_config_mode":
-                                # Determine which clock to configure (e.g., based on active ones or a sub-menu)
-                                # For simplicity, let's say it configures "slow_analog" if active, else prompts
-                                active_clocks_for_config = []
-                                if display_state["analog_clocks"]:
-                                    active_clocks_for_config.append("slow_analog")
-                                    active_clocks_for_config.append("fast_analog")
-                                if display_state["slow_digital_clock"]:
-                                    active_clocks_for_config.append("slow_digital")
-                                if display_state["fast_digital_clock"]:
-                                    active_clocks_for_config.append("fast_digital")
-
-                                if active_clocks_for_config:
-                                    # Simple: configure the first one in the list, or implement a selection mechanism
-                                    clock_to_config = active_clocks_for_config[0]
-                                    # Pause render thread during config mode might be good
-                                    stop_event.set()  # Signal render thread to pause/stop
-                                    render_thread.join(timeout=0.5)
-                                    full_clear_and_reset_cursor()
-                                    interactive_configure_mode(
-                                        clock_to_config,
-                                        clock_configs[clock_to_config],
-                                        theme_manager,
-                                        key_mappings,
-                                    )
-                                    # Resume render thread
-                                    stop_event.clear()
-                                    render_thread = threading.Thread(
-                                        target=render_loop,
-                                        args=(
-                                            framebuffer,
-                                            lambda: render_fn(framebuffer),
-                                            10,
-                                            stop_event,
-                                        ),
-                                        daemon=True,
-                                    )
-                                    render_thread.start()
-                                    full_clear_and_reset_cursor()  # Clear config screen
-                                else:
-                                    print(
-                                        "No active clock to configure."
-                                    )  # Or a small message on screen
-
-                            action_found = True
-                            action_processed_this_loop = True
-                            break  # Found action for this char_key
-
-                    if action_found:
-                        if stop_event.is_set():
-                            break  # If quit was pressed, exit cmd processing
-                        # Character was processed, do not add to remaining_buffer
-                    else:
-                        # If the character didn't match any action, keep it
-                        remaining_buffer += char_key_raw
-
-                input_buffer = (
-                    remaining_buffer  # Update buffer with unprocessed characters
-                )
+            input_dispatcher.dispatch(input_buffer)
+            input_buffer = ""  # Clear after dispatch
 
             # Trigger keyframe if an action was processed
             if action_processed_this_loop:
@@ -1305,3 +1361,6 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
+
+
