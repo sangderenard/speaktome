@@ -121,6 +121,31 @@ python AGENTS/tools/dev_group_menu.py --install \
     --groups speaktome:dev
 ```
 
+### Running Python Modules
+
+Always run Python scripts from the repository root so editable imports resolve
+correctly. Activate the virtual environment created by the setup scripts before
+invoking any module:
+
+```bash
+# one-time setup
+bash setup_env.sh --extras --prefetch  # or: bash setup_env_dev.sh --extras --prefetch
+source .venv/bin/activate
+
+# execute any module
+python -m speaktome.speaktome -s "Hello"
+python -m testing.lookahead_demo
+```
+
+`setup_env.sh` installs core dependencies and an editable copy of the package.
+`setup_env_dev.sh` extends this with development tools and automatically scans
+for stubs. These scripts also offer a menu for selecting optional dependency
+groups so your environment matches other collaborators. Skipping them or
+installing packages by hand often leads to `ModuleNotFoundError` or version
+conflicts because the editable install was never completed. In short: **run a
+setup script first, activate the environment, then use `python -m` from the repo
+root**.
+
 
 ## Running SpeakToMe
 
