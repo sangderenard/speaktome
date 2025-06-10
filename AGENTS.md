@@ -18,6 +18,9 @@ Any reusable Python scripts or binary utilities meant for agents must live in
 easy to discover and maintain.
 
 For deeper historical context, read through all prior reports. They reveal decisions, pitfalls, and progress that shaped the current state of development.
+If you are tempted to install packages manually with `pip`, stop and read
+`AGENTS_DO_NOT_PIP_MANUALLY.md` first. The provided setup scripts manage
+dependencies for you and explain how optional groups work.
 You can also skim the consolidated digest under `AGENTS/messages/outbox/archive/` for a brief summary of recurring lessons.
 
 If you crave an immediate, exhaustive overview, run this one-liner. It will

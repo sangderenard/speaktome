@@ -5,6 +5,9 @@
 
 set -uo pipefail
 
+# Resolve repository root so this script works from any directory
+SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 ACTIVE_FILE=${SPEAKTOME_ACTIVE_FILE:-/tmp/speaktome_active.json}
 export SPEAKTOME_ACTIVE_FILE="$ACTIVE_FILE"
 
