@@ -1,36 +1,4 @@
 #!/usr/bin/env python3
-# Standard library imports
-import argparse
-import json
-import os
-import re
-import subprocess
-import sys
-import threading
-import tempfile
-from pathlib import Path
-
-try:
-    from AGENTS.tools.header_utils import ENV_SETUP_BOX
-    import tomllib
-except ModuleNotFoundError:  # Python < 3.11
-    import tomli as tomllib
-
-# Platform-specific input handling
-if os.name == 'nt':  # Windows
-    import msvcrt
-    def getch_timeout(timeout):
-        """Get a single character with timeout on Windows."""
-        result = []
-        def input_thread():
-            try:
-                result.append(msvcrt.getch().decode())
-            except Exception:
-                import sys
-                print(ENV_SETUP_BOX)
-                sys.exit(1)
-# --- END HEADER ---
-
 """Interactive dev environment setup with dynamic codebase discovery.
 
 This script presents a menu asking which codebases you want to work on and
@@ -42,6 +10,45 @@ Agents may bypass all prompts by providing ``--codebases`` and ``--groups``
 arguments.  ``--list`` prints available codebases/groups while ``--show-active``
 reveals the path used to record selections.  See ``--help`` for examples.
 """
+from __future__ import annotations
+
+try:
+    # Standard library imports
+    import argparse
+    import json
+    import os
+    import re
+    import subprocess
+    import sys
+    import threading
+    import tempfile
+    from pathlib import Path
+    from AGENTS.tools.header_utils import ENV_SETUP_BOX
+    import tomllib
+except ModuleNotFoundError:  # Python < 3.11
+    import tomli as tomllib
+except Exception:
+    import sys
+    from AGENTS.tools.header_utils import ENV_SETUP_BOX
+    print(ENV_SETUP_BOX)
+    sys.exit(1)
+
+# Platform-specific input handling
+if os.name == 'nt':  # Windows
+    import msvcrt
+
+    def getch_timeout(timeout):
+        """Get a single character with timeout on Windows."""
+        result = []
+
+        def input_thread():
+            try:
+                result.append(msvcrt.getch().decode())
+            except Exception:
+                import sys
+                print(ENV_SETUP_BOX)
+                sys.exit(1)
+# --- END HEADER ---
 
 ROOT = Path(__file__).resolve().parents[2]
 REGISTRY = ROOT / "AGENTS" / "CODEBASE_REGISTRY.md"
@@ -73,9 +80,10 @@ def extract_group_packages(toml_path: Path) -> dict[str, list[str]]:
     return data.get("project", {}).get("optional-dependencies", {})
 
 
-def build_codebase_groups() -> dict[str, dict[str, list[str]]]:
-    """Return mapping of codebase name to group->packages."""
+def build_codebase_groups() -> tuple[dict[str, dict[str, list[str]]], dict[str, Path]]:
+    """Return mapping of codebase name to group->packages and name->path."""
     mapping: dict[str, dict[str, list[str]]] = {}
+    paths: dict[str, Path] = {}
     for cb_path in discover_codebases(REGISTRY):
         groups: dict[str, list[str]] = {}
         for toml_file in cb_path.rglob("pyproject.toml"):
@@ -83,10 +91,11 @@ def build_codebase_groups() -> dict[str, dict[str, list[str]]]:
             if groups:
                 break
         mapping[cb_path.name] = groups
-    return mapping
+        paths[cb_path.name] = cb_path
+    return mapping, paths
 
 
-CODEBASES = build_codebase_groups()
+CODEBASES, CODEBASE_PATHS = build_codebase_groups()
 
 
 def interactive_selection() -> tuple[list[str], dict[str, dict[str, list[str]]]]:
@@ -154,14 +163,23 @@ def install_selections(
 ) -> None:
     """Install selected packages for each codebase using ``pip_cmd``."""
 
+    env = os.environ.copy()
+    env.setdefault("PYTHONPATH", str(ROOT))
+    env.setdefault("PIP_NO_BUILD_ISOLATION", "1")
     for cb, groups in selections.items():
-        cb_path = ROOT / cb
+        cb_path = CODEBASE_PATHS.get(cb, ROOT / cb)
         if not cb_path.is_dir():
             continue
-        subprocess.run([pip_cmd, "install", "-e", str(cb_path)], check=False)
+        subprocess.run([
+            pip_cmd,
+            "install",
+            "--no-build-isolation",
+            "-e",
+            str(cb_path),
+        ], check=False, env=env)
         for pkgs in groups.values():
             for pkg in pkgs:
-                subprocess.run([pip_cmd, "install", pkg], check=False)
+                subprocess.run([pip_cmd, "install", pkg], check=False, env=env)
 
 
 def main(argv: list[str] | None = None) -> None:  # pragma: no cover - CLI
