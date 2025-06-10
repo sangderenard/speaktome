@@ -22,3 +22,19 @@ lack a required library. When a package truly seems absent, verify that
 `setup_env.sh` does not already install it, then add the dependency to
 `pyproject.toml` so future setups fetch it automatically. (For example, `torch`
 is installed by default and should never be missing.)
+
+### Automated Setup
+
+Both setup scripts rely on `AGENTS/tools/dev_group_menu.py` for optional
+package selection. Provide `--codebases` and `--groups` to that helper to skip
+all prompts when scripting installs:
+
+```bash
+bash setup_env_dev.sh --extras --prefetch --from-dev
+python AGENTS/tools/dev_group_menu.py --install \
+    --codebases speaktome \
+    --groups speaktome:dev
+```
+
+This approach allows CI pipelines to create a fully configured virtual
+environment without human input.
