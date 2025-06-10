@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 try:
+    import os
     import re
     from pathlib import Path
     from .header_utils import ENV_SETUP_BOX
@@ -19,6 +20,8 @@ EXCLUDE_DIRS = {
     "third_party",
     "laplace",
     "training",
+    "tensor printing",
+    "tensor_printing",
 }
 
 
@@ -42,12 +45,29 @@ def should_skip(path: Path) -> bool:
     return False
 
 
+def iter_py_files(root: Path):
+    """Yield Python files skipping directories in ``EXCLUDE_DIRS``."""
+    for dirpath, dirnames, filenames in os.walk(root):
+        parts = Path(dirpath).parts
+        if any(d in parts for d in EXCLUDE_DIRS):
+            dirnames[:] = []
+            continue
+        for name in filenames:
+            if name.endswith(".py"):
+                yield Path(dirpath) / name
+
+
 def fix_file(path: Path) -> None:
     text = path.read_text(encoding="utf-8")
     if HEADER_SENTINEL in text:
         if all(
             token in text
-            for token in ("import sys", "print(ENV_SETUP_BOX)", "sys.exit(1)")
+            for token in (
+                "import sys",
+                "print(ENV_SETUP_BOX)",
+                "sys.exit(1)",
+                "from AGENTS.tools.header_utils import ENV_SETUP_BOX",
+            )
         ):
             return
         lines = text.splitlines()
@@ -58,24 +78,44 @@ def fix_file(path: Path) -> None:
         if sentinel_idx is None:
             return
         except_idx = None
+        try_idx = None
         for i in range(sentinel_idx - 1, -1, -1):
             if lines[i].strip().startswith("except"):
                 except_idx = i
+                break
+        for i in range(sentinel_idx):
+            if lines[i].strip().startswith("try:"):
+                try_idx = i
                 break
         if except_idx is None:
             return
         insert_idx = except_idx + 1
         indent = " " * (len(lines[except_idx]) - len(lines[except_idx].lstrip()) + 4)
         region = lines[except_idx:sentinel_idx]
-        block: list[str] = []
-        if not any("import sys" in ln for ln in region):
-            block.append(f"{indent}import sys")
-        if not any("print(ENV_SETUP_BOX)" in ln for ln in region):
-            block.append(f"{indent}print(ENV_SETUP_BOX)")
-        if not any("sys.exit(1)" in ln for ln in region):
-            block.append(f"{indent}sys.exit(1)")
-        if block:
-            lines[insert_idx:insert_idx] = block
+        modified = False
+        header_lines = [
+            f"{indent}import sys",
+            f"{indent}print(ENV_SETUP_BOX)",
+            f"{indent}sys.exit(1)",
+        ]
+        if lines[insert_idx:sentinel_idx] != header_lines:
+            lines[insert_idx:sentinel_idx] = header_lines
+            modified = True
+        if try_idx is not None:
+            try_region = lines[try_idx:except_idx]
+            if not any(
+                "from AGENTS.tools.header_utils import ENV_SETUP_BOX" in ln
+                for ln in try_region
+            ):
+                indent_try = " " * (
+                    len(lines[try_idx]) - len(lines[try_idx].lstrip()) + 4
+                )
+                lines.insert(
+                    try_idx + 1,
+                    f"{indent_try}from AGENTS.tools.header_utils import ENV_SETUP_BOX",
+                )
+                modified = True
+        if modified:
             Path(path).write_text("\n".join(lines) + "\n", encoding="utf-8")
         return
 
@@ -115,6 +155,7 @@ def fix_file(path: Path) -> None:
     out_lines.append("from __future__ import annotations")
     out_lines.append("")
     out_lines.append("try:")
+    out_lines.append("    from AGENTS.tools.header_utils import ENV_SETUP_BOX")
 
     # Move imports into try block
     while idx < len(lines):
@@ -141,7 +182,7 @@ def fix_file(path: Path) -> None:
 
 def main() -> None:
     root = Path(".")
-    for path in root.rglob("*.py"):
+    for path in iter_py_files(root):
         if should_skip(path):
             continue
         fix_file(path)

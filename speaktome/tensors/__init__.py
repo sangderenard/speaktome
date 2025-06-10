@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 try:
+    from AGENTS.tools.header_utils import ENV_SETUP_BOX
     from .abstraction import (
         AbstractTensorOperations,
         get_tensor_operations,
@@ -21,8 +22,9 @@ try:
     except Exception:  # pragma: no cover - optional backend
         CTensorOperations = None  # type: ignore
 except Exception:
+    import sys
     print(ENV_SETUP_BOX)
-    raise
+    sys.exit(1)
 # --- END HEADER ---
 
 

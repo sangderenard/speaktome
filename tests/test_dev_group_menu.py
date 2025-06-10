@@ -1,10 +1,19 @@
-import json
-import os
-import subprocess
-import sys
-from pathlib import Path
+from __future__ import annotations
 
-
+try:
+    from AGENTS.tools.header_utils import ENV_SETUP_BOX
+    import json
+    import os
+    import subprocess
+    import sys
+    from pathlib import Path
+    
+    
+except Exception:
+    import sys
+    print(ENV_SETUP_BOX)
+    sys.exit(1)
+# --- END HEADER ---
 def run_menu(args, env=None):
     return subprocess.run(
         [sys.executable, 'AGENTS/tools/dev_group_menu.py', *args],

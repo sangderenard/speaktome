@@ -9,8 +9,9 @@ try:
     from .model_abstraction import AbstractModelWrapper
     from ..tensors.abstraction import AbstractTensorOperations
 except Exception:
+    import sys
     print(ENV_SETUP_BOX)
-    raise
+    sys.exit(1)
 # --- END HEADER ---
 
 

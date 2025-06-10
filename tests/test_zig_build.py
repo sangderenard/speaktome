@@ -12,8 +12,9 @@ try:
     from AGENTS.tools.header_utils import ENV_SETUP_BOX
     from speaktome.tensors import c_backend
 except Exception:
+    import sys
     print(ENV_SETUP_BOX)
-    raise
+    sys.exit(1)
 # --- END HEADER ---
 
 zig_available = importlib.util.find_spec("ziglang") is not None

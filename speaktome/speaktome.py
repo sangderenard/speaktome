@@ -5,6 +5,7 @@ import argparse
 # Third-party imports
 from .tensors.faculty import Faculty, DEFAULT_FACULTY
 try:
+    from AGENTS.tools.header_utils import ENV_SETUP_BOX
     import torch
 except ModuleNotFoundError:  # pragma: no cover - runtime message only
     torch = None
@@ -16,21 +17,9 @@ try:
     from transformers import PreTrainedTokenizer
     TRANSFORMERS_AVAILABLE = True
 except ModuleNotFoundError:  # pragma: no cover - runtime message only
-    PreTrainedTokenizer = None  # type: ignore
-    TRANSFORMERS_AVAILABLE = False
-    print("Transformers is not installed. Running CPU-only demo mode.")
-
-from .util.lazy_loader import lazy_import
-if TYPE_CHECKING:
-    from torch_geometric.data import Data as PyGData
-    import torch_geometric.nn as pyg_nn
-    from sentence_transformers import SentenceTransformer
-
-# Local application/library specific imports
-# Please adjust these import paths if your project structure differs.
-# Import configuration dynamically to allow device changes at runtime
-from . import config
-from .config import get_sentence_transformer_model, GPU_LIMIT, LENGTH_LIMIT
+    import sys
+    print(ENV_SETUP_BOX)
+    sys.exit(1)
 # --- END HEADER ---
 
 

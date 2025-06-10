@@ -1,4 +1,5 @@
 try:
+    from AGENTS.tools.header_utils import ENV_SETUP_BOX
     # Standard library imports
     from typing import Dict, List, Optional, Tuple, Any, TYPE_CHECKING
 
@@ -18,15 +19,9 @@ try:
         get_tensor_operations,
     )
 except Exception:
-    print(
-        "\n"
-        "+-----------------------------------------------------------------------+\n"
-        "| Imports failed. Run setup_env or setup_env_dev and select every    |\n"
-        "| project and module you plan to use. Missing packages mean setup was |\n"
-        "| skipped or incomplete.                                             |\n"
-        "+-----------------------------------------------------------------------+\n"
-    )
-    raise
+    import sys
+    print(ENV_SETUP_BOX)
+    sys.exit(1)
 # --- END HEADER ---
 
 class CompressedBeamTree:

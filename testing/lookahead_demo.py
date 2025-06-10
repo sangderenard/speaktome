@@ -1,26 +1,12 @@
 import types
 import sys
 try:
+    from AGENTS.tools.header_utils import ENV_SETUP_BOX
     import numpy as np
 except ModuleNotFoundError:  # pragma: no cover - optional dependency
-    np = None  # type: ignore
-
-# Provide dummy sentence_transformers module so speaktome.config imports succeed
-stub_st = types.ModuleType("sentence_transformers")
-stub_st.SentenceTransformer = object
-sys.modules.setdefault("sentence_transformers", stub_st)
-
-stub_tx = types.ModuleType("transformers")
-class _DummyTok: pass
-stub_tx.PreTrainedTokenizer = _DummyTok
-sys.modules.setdefault("transformers", stub_tx)
-
-from speaktome import Faculty, DEFAULT_FACULTY
-from speaktome.tensors import (
-    get_tensor_operations,
-)
-from speaktome.model_abstraction import AbstractModelWrapper
-from speaktome.lookahead_controller import LookaheadController, LookaheadConfig
+    import sys
+    print(ENV_SETUP_BOX)
+    sys.exit(1)
 # --- END HEADER ---
 
 class DummyModel(AbstractModelWrapper):
