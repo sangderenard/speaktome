@@ -8,6 +8,7 @@ from typing import List, Tuple, Optional
 # --- END HEADER ---
 
 from colorama import Fore, Style
+import numpy as np
 
 try:
     from PIL import Image, ImageDraw, ImageFont
@@ -520,3 +521,10 @@ def print_analog_clock(
         bg_alpha_threshold=10
     )
     print(ascii_art)
+
+
+def render_ascii_to_array(text: str, **kwargs) -> np.ndarray:
+    """Return ASCII art for ``text`` as a ``numpy.ndarray``."""
+    ascii_str = compose_ascii_digits(text, **kwargs)
+    rows = ascii_str.splitlines()
+    return np.array([list(row) for row in rows], dtype="<U1")

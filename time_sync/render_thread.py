@@ -1,0 +1,30 @@
+#!/usr/bin/env python3
+"""Background thread for producing ASCII frames."""
+from __future__ import annotations
+
+try:
+    from AGENTS.tools.header_utils import ENV_SETUP_BOX
+    import numpy as np
+    import threading
+    import time
+    from typing import Callable
+    from .frame_buffer import AsciiFrameBuffer
+except Exception:
+    import sys
+    print(ENV_SETUP_BOX)
+    sys.exit(1)
+# --- END HEADER ---
+
+
+def render_loop(
+    framebuffer: AsciiFrameBuffer,
+    render_fn: Callable[[], np.ndarray],
+    fps: float,
+    stop_event: threading.Event,
+) -> None:
+    """Continuously render frames until ``stop_event`` is set."""
+    delay = 1.0 / max(fps, 0.1)
+    while not stop_event.is_set():
+        ascii_frame = render_fn()
+        framebuffer.update_render(ascii_frame)
+        time.sleep(delay)
