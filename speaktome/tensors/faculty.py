@@ -4,21 +4,21 @@ from __future__ import annotations
 
 try:
     import os
-    from enum import Enum, auto
+    from enum import IntEnum
 except Exception:
     print(ENV_SETUP_BOX)
     raise
 # --- END HEADER ---
 
 
-class Faculty(Enum):
+class Faculty(IntEnum):
     """Available compute/resource tiers."""
 
-    PURE_PYTHON = auto()  # No third-party numerical libs
-    NUMPY = auto()  # Research demo of algorithm
-    TORCH = auto()  # Performant production faculty
-    PYGEO = auto()  # NN programmable smart search
-    CTENSOR = auto()  # Experimental C backend
+    PURE_PYTHON = 1  # No third-party numerical libs
+    NUMPY = 2  # Research demo of algorithm
+    TORCH = 3  # Performant production faculty
+    PYGEO = 4  # NN programmable smart search
+    CTENSOR = 5  # Experimental C backend
 
 
 

@@ -10,6 +10,8 @@ import sys
 import types
 import pytest
 
+pytest.importorskip('torch', reason='speaktome class tests require torch')
+
 from speaktome.util.cli_permutations import CLIArgumentMatrix
 from speaktome.util.token_vocab import TokenVocabulary
 from speaktome.tensors.faculty import DEFAULT_FACULTY, Faculty

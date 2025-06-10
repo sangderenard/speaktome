@@ -3,6 +3,8 @@
 import logging
 import pytest
 
+pytest.importorskip('torch', reason='lookahead controller requires torch')
+
 try:
     import numpy as np
 except ModuleNotFoundError:  # pragma: no cover - optional dependency
