@@ -247,6 +247,8 @@ def compose_ascii_digits(
     as_pixel_array: bool = False,
     target_pixel_width: Optional[int] = None,
     target_pixel_height: Optional[int] = None,
+    ascii_ramp: str = ASCII_RAMP_BLOCK,
+    theme_manager: Optional[ThemeManager] = None,
 ) -> str | np.ndarray:
     if not PIL_AVAILABLE:
         return f"Pillow not available. Text: {text}"
@@ -304,6 +306,11 @@ def compose_ascii_digits(
     else: # Fallback for bitmap fonts or no outline
         draw.text((base_x, base_y), text, font=font, fill=text_color_on_image)
 
+    if theme_manager:
+        image = theme_manager.apply_effects(image)
+        image = theme_manager.apply_theme(image)
+        ascii_ramp = theme_manager.get_current_ascii_ramp()
+
     if as_pixel_array:
         px_w = target_pixel_width or target_ascii_width
         px_h = target_pixel_height or target_ascii_height
@@ -313,7 +320,7 @@ def compose_ascii_digits(
 
     return _image_to_ascii_colored(
         image,
-        ramp=ASCII_RAMP_BLOCK,
+        ramp=ascii_ramp,
         ascii_bg_fill=final_ascii_bg_fill,
         target_ascii_width=target_ascii_width,
         target_ascii_height=target_ascii_height,
@@ -369,6 +376,8 @@ def print_digital_clock(
         as_pixel_array=as_pixel,
         target_pixel_width=params["target_ascii_width"],
         target_pixel_height=params["target_ascii_height"],
+        ascii_ramp=theme_manager.get_current_ascii_ramp() if theme_manager else ASCII_RAMP_BLOCK,
+        theme_manager=theme_manager,
         **params,
     )
     if as_pixel:

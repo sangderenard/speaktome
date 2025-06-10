@@ -141,3 +141,21 @@ class ThemeManager:
             self.current_theme.post_processing = post_processing
         else:
             print(f"Post-processing preset '{pp_name}' not found.")
+
+    def get_palette_names(self) -> List[str]:
+        """Return the available palette names."""
+        return list(self.presets.get("color_palettes", {}).keys())
+
+    def cycle_palette(self, step: int = 1) -> str:
+        """Cycle the active palette forward or backward by ``step``."""
+        names = self.get_palette_names()
+        if not names:
+            return ""
+        current = self.current_theme.palette.get("name", names[0])
+        try:
+            idx = names.index(current)
+        except ValueError:
+            idx = 0
+        new_idx = (idx + step) % len(names)
+        self.set_palette(names[new_idx])
+        return names[new_idx]

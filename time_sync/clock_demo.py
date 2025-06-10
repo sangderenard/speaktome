@@ -27,7 +27,11 @@ from time_sync.theme_manager import ThemeManager, ClockTheme # Ensure this impor
 from time_sync.frame_buffer import PixelFrameBuffer
 from time_sync.render_thread import render_loop
 from time_sync.draw import draw_diff
-from time_sync.ascii_digits import compose_ascii_digits # Used for rendering text to pixel array
+from time_sync.ascii_digits import (
+    compose_ascii_digits,
+    ASCII_RAMP_BLOCK,
+)
+from PIL import Image
 
 # Platform-specific input handling (adapted from AGENTS/tools/dev_group_menu.py)
 if os.name == 'nt':  # Windows
@@ -202,7 +206,8 @@ def render_simple_text_to_pixel_array(
     target_pixel_height: int,
     font_size: int = 12, # Smaller default for simple text lines
     text_color: tuple[int,int,int,int] = (200,200,200,255), # Light grey
-    bg_color: tuple[int,int,int,int] = (0,0,0,0) # Transparent background for PIL image
+    bg_color: tuple[int,int,int,int] = (0,0,0,0), # Transparent background for PIL image
+    theme_manager: ThemeManager | None = None,
     ) -> np.ndarray:
     """Renders a single line of text to a pixel array."""
     # Use compose_ascii_digits to leverage its text-to-image capabilities
@@ -214,7 +219,9 @@ def render_simple_text_to_pixel_array(
         shadow_color_on_image=(0,0,0,0), outline_thickness=0,
         as_pixel_array=True,
         target_pixel_width=target_pixel_width,
-        target_pixel_height=target_pixel_height
+        target_pixel_height=target_pixel_height,
+        ascii_ramp=theme_manager.get_current_ascii_ramp() if theme_manager else ASCII_RAMP_BLOCK,
+        theme_manager=theme_manager,
     )
     return pixel_array
 def main() -> None:
@@ -327,6 +334,9 @@ def main() -> None:
         presets_file_path = "time_sync/presets/default_themes.json"
 
     theme_manager = ThemeManager(presets_path=presets_file_path)
+    theme_manager.set_palette(args.theme)
+    theme_manager.set_effects(args.effects)
+    theme_manager.set_post_processing(args.post_processing)
     
     # Initialize clock parameters by merging defaults with command-line args
     analog_params = default_analog_config.copy()
@@ -394,6 +404,8 @@ def main() -> None:
                 as_pixel_array=True,
                 target_pixel_width=target_w,
                 target_pixel_height=target_h,
+                ascii_ramp=theme_manager.get_current_ascii_ramp(),
+                theme_manager=theme_manager,
                 **net_params
             )
             h, w, _ = net_arr.shape
@@ -406,7 +418,13 @@ def main() -> None:
         if args.show_stopwatch:
             text_h = 3 # Small height for single line text
             if row + text_h <= fb_rows:
-                sw_arr = render_simple_text_to_pixel_array(f"Stopwatch: {stopwatch}", available_width, text_h, font_size=10)
+                sw_arr = render_simple_text_to_pixel_array(
+                    f"Stopwatch: {stopwatch}",
+                    available_width,
+                    text_h,
+                    font_size=10,
+                    theme_manager=theme_manager,
+                )
                 buf[row:row+text_h, :available_width] = sw_arr
                 row += text_h
                 if row < fb_rows: buf[row, :available_width] = [10,10,10]; row +=1
@@ -414,7 +432,13 @@ def main() -> None:
         if args.show_offset:
             text_h = 3
             if row + text_h <= fb_rows:
-                off_arr = render_simple_text_to_pixel_array(f"Offset: {_dt.timedelta(seconds=offset)}", available_width, text_h, font_size=10)
+                off_arr = render_simple_text_to_pixel_array(
+                    f"Offset: {_dt.timedelta(seconds=offset)}",
+                    available_width,
+                    text_h,
+                    font_size=10,
+                    theme_manager=theme_manager,
+                )
                 buf[row:row+text_h, :available_width] = off_arr
                 row += text_h
 
@@ -431,7 +455,11 @@ def main() -> None:
         s, ms = divmod(rem, 1000)
         stopwatch = f"{h:02}:{m:02}:{s:02}.{ms:03}"
 
-        return compose_full_frame(system, internet, stopwatch, offset)
+        frame = compose_full_frame(system, internet, stopwatch, offset)
+        img = Image.fromarray(frame, mode="RGB")
+        img = theme_manager.apply_effects(img)
+        img = theme_manager.apply_theme(img)
+        return np.array(img)
 
     render_thread = threading.Thread(
         target=render_loop,
@@ -441,6 +469,7 @@ def main() -> None:
     render_thread.start()
 
     full_clear_and_reset_cursor()
+    input_buffer = ""
     try:
         while True:
             diff_pixels = framebuffer.get_diff_and_promote()
@@ -449,22 +478,36 @@ def main() -> None:
                 for y, x, color in diff_pixels
             ]
             draw_diff(changed)
-            key = getch_timeout(args.refresh_rate)
-            if key:
-                if key.lower() == 'q':
-                    stop_event.set()
+            while True:
+                key = getch_timeout(0)
+                if not key:
                     break
-                elif key.lower() == 'a':
+                input_buffer += key
+
+            running = True
+            for char in input_buffer:
+                if char.lower() == 'q':
+                    stop_event.set()
+                    running = False
+                    break
+                if char.lower() == 'a':
                     theme_manager.cycle_ascii_style()
-                elif key.lower() == 'i':
+                elif char.lower() == 'i':
                     theme_manager.toggle_clock_inversion()
-                elif key.lower() == 'b':
+                elif char.lower() == 'b':
                     theme_manager.toggle_backdrop_inversion()
-            else:
-                time.sleep(args.refresh_rate)
+                elif char == 't':
+                    theme_manager.cycle_palette(1)
+                elif char == 'T':
+                    theme_manager.cycle_palette(-1)
+            input_buffer = ""
+            if not running:
+                break
+            time.sleep(args.refresh_rate)
 
     except KeyboardInterrupt:
         stop_event.set()
+    finally:
         full_clear_and_reset_cursor()
         print("Demo stopped.")
         final_offset = get_offset()
