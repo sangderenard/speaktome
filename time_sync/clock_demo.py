@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""Demonstrate time synchronization with analog and digital clocks."""
+"""Demonstrate time synchronization with analog and digital clocks.
+
+The demo runs until ``q`` or ``quit`` is received on standard input.
+"""
 from __future__ import annotations
 
 try:
@@ -484,22 +487,23 @@ def main() -> None:
                     break
                 input_buffer += key
 
+            cmd = input_buffer.strip().lower()
             running = True
-            for char in input_buffer:
-                if char.lower() == 'q':
-                    stop_event.set()
-                    running = False
-                    break
-                if char.lower() == 'a':
-                    theme_manager.cycle_ascii_style()
-                elif char.lower() == 'i':
-                    theme_manager.toggle_clock_inversion()
-                elif char.lower() == 'b':
-                    theme_manager.toggle_backdrop_inversion()
-                elif char == 't':
-                    theme_manager.cycle_palette(1)
-                elif char == 'T':
-                    theme_manager.cycle_palette(-1)
+            if cmd in {"q", "quit", "exit"}:
+                stop_event.set()
+                running = False
+            elif cmd:
+                for char in cmd:
+                    if char == 'a':
+                        theme_manager.cycle_ascii_style()
+                    elif char == 'i':
+                        theme_manager.toggle_clock_inversion()
+                    elif char == 'b':
+                        theme_manager.toggle_backdrop_inversion()
+                    elif char == 't':
+                        theme_manager.cycle_palette(1)
+                    elif char == 'T':
+                        theme_manager.cycle_palette(-1)
             input_buffer = ""
             if not running:
                 break
@@ -508,6 +512,8 @@ def main() -> None:
     except KeyboardInterrupt:
         stop_event.set()
     finally:
+        stop_event.set()
+        render_thread.join(timeout=2.0)
         full_clear_and_reset_cursor()
         print("Demo stopped.")
         final_offset = get_offset()
