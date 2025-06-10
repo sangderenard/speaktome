@@ -229,7 +229,7 @@ def compose_ascii_digits(
     text: str,
     font_size: int = 32,
     target_ascii_width: int = 60,
-    target_ascii_height: int = 12,
+    target_ascii_height: int = 5,
     text_color_on_image: Tuple[int,int,int,int] = (255,255,255,255), # White opaque for main text
     shadow_color_on_image: Tuple[int,int,int,int] = (0,0,0,100), # Semi-transparent black for shadow
     outline_color_on_image: Tuple[int,int,int,int] = (0,0,0,200), # Opaque black for outline
@@ -307,9 +307,15 @@ def print_digital_clock(
     time: _dt.datetime,
     backdrop_image_path: Optional[str] = None,
     theme_manager: Optional[ThemeManager] = None,
-    **override_params
-) -> None:
-    """Print ``time`` in HH:MM:SS format as pretty, colored ASCII art."""
+    *,
+    as_array: bool = False,
+    **override_params,
+) -> Optional[np.ndarray]:
+    """Return or print ``time`` in HH:MM:SS format as colored ASCII art.
+
+    When ``as_array`` is ``True`` the function returns a ``numpy.ndarray``
+    representing the ASCII art instead of printing to ``stdout``.
+    """
     digits_str = time.strftime("%H:%M:%S")
     
     if not PIL_AVAILABLE:
@@ -357,9 +363,14 @@ def print_digital_clock(
     final_image_str = compose_ascii_digits(
         digits_str,
         backdrop_image_path=backdrop_image_path,
-        **params
+        **params,
     )
-    print(final_image_str) # This call needs to be updated if compose_ascii_digits changes ramp
+    if as_array:
+        rows = final_image_str.splitlines()
+        return np.array([list(row) for row in rows], dtype="<U1")
+    print(final_image_str)
+    print(digits_str)
+    return None
 
 
 def print_analog_clock(
@@ -376,8 +387,10 @@ def print_analog_clock(
     backdrop_image_path: Optional[str] = None,
     final_ascii_bg_fill: str = Fore.BLACK + " ", # Black background for ASCII
     theme_manager: Optional[ThemeManager] = None,
+    *,
+    as_array: bool = False,
     **override_params
-) -> None:
+) -> Optional[np.ndarray]:
     if not PIL_AVAILABLE:
         print(Fore.RED + "Pillow library not installed. Cannot display enhanced analog clock." + Style.RESET_ALL)
         print(Style.BRIGHT + Fore.MAGENTA + time.strftime("%H:%M:%S") + " (Analog)" + Style.RESET_ALL)
@@ -516,11 +529,15 @@ def print_analog_clock(
         image_to_convert,
         ramp=ascii_ramp_to_use,
         ascii_bg_fill=params["final_ascii_bg_fill"],
-        target_ascii_width=int(params["target_ascii_diameter"] * 1.8), # Adjust for char aspect
+        target_ascii_width=int(params["target_ascii_diameter"] * 1.8),  # Adjust for char aspect
         target_ascii_height=params["target_ascii_diameter"],
-        bg_alpha_threshold=10
+        bg_alpha_threshold=10,
     )
+    if as_array:
+        rows = ascii_art.splitlines()
+        return np.array([list(row) for row in rows], dtype="<U1")
     print(ascii_art)
+    return None
 
 
 def render_ascii_to_array(text: str, **kwargs) -> np.ndarray:

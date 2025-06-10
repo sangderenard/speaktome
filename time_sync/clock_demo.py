@@ -319,112 +319,7 @@ def main() -> None:
     if args.digital_backdrop or args.backdrop:
         digital_params["backdrop_image_path"] = args.digital_backdrop if args.digital_backdrop is not None else args.backdrop
 
-    # Set up framebuffer and render thread for digital internet clock
-    fb_shape = (default_digital_config.get("target_ascii_height", 7), default_digital_config.get("target_ascii_width", 60))
-    framebuffer = AsciiFrameBuffer(fb_shape)
-    stop_event = threading.Event()
-    show_diff = False
-
-    def render_fn():
-        # Render internet time as ASCII ndarray for framebuffer
-        now_dt = _dt.datetime.utcnow().replace(tzinfo=_dt.timezone.utc) + _dt.timedelta(seconds=get_offset())
-        return render_ascii_to_array(
-            now_dt.strftime("%H:%M:%S"),
-            **default_digital_config
-        )
-
-    render_thread = threading.Thread(
-        target=render_loop,
-        args=(framebuffer, render_fn, 10, stop_event),
-        daemon=True
-    )
-    render_thread.start()
-
-    try:
-        while True:
-            elapsed = time.perf_counter() - start
-            offset = get_offset()
-            system = _dt.datetime.utcnow().replace(tzinfo=_dt.timezone.utc)
-            internet = system + _dt.timedelta(seconds=offset)
-
-            h, rem = divmod(int(elapsed * 1000), 3600 * 1000)
-            m, rem = divmod(rem, 60 * 1000)
-            s, ms = divmod(rem, 1000)
-            stopwatch = f"{h:02}:{m:02}:{s:02}.{ms:03}"
-
-            reset_cursor_to_top()
-
-            # Analog clock and system digital clock as before
-            if args.show_analog:
-                print_analog_clock(
-                    internet,
-                    theme_manager=theme_manager,
-                    **analog_params
-                )
-                print()
-            if args.show_digital_system:
-                print_digital_clock(
-                    system, 
-                    theme_manager=theme_manager,
-                    **digital_params
-                )
-                print()
-
-            # --- Use framebuffer for internet digital clock ---
-            if args.show_digital_internet:
-                diff = framebuffer.get_diff_and_promote()
-                draw_diff(diff)
-
-            if args.show_stopwatch:
-                print(f"Stopwatch: {stopwatch}")
-            if args.show_offset:
-                print(f"Offset: {_dt.timedelta(seconds=offset)}")
-
-            key = getch_timeout(args.refresh_rate)
-            if key:
-                if key.lower() == 'q':
-                    stop_event.set()
-                    break
-                elif key.lower() == 'd':
-                    show_diff = not show_diff
-                # ...existing theme/effects/post-processing switching...
-                elif key.lower() == 'a':
-                    theme_manager.cycle_ascii_style()
-                elif key.lower() == 'i':
-                    theme_manager.toggle_clock_inversion()
-                elif key.lower() == 'b':
-                    theme_manager.toggle_backdrop_inversion()
-                elif key.lower() == 't':
-                    palettes = list(theme_manager.presets["color_palettes"].keys())
-                    idx = palettes.index(theme_manager.current_theme.palette.get("name", args.theme)) if "name" in theme_manager.current_theme.palette else palettes.index(args.theme)
-                    next_palette = palettes[(idx + 1) % len(palettes)]
-                    theme_manager.current_theme.palette = theme_manager.presets["color_palettes"][next_palette]
-                    theme_manager.current_theme.palette["name"] = next_palette
-                elif key.lower() == 'e':
-                    effects = list(theme_manager.presets["effects_presets"].keys())
-                    idx = effects.index(theme_manager.current_theme.effects.get("name", args.effects)) if "name" in theme_manager.current_theme.effects else effects.index(args.effects)
-                    next_effect = effects[(idx + 1) % len(effects)]
-                    theme_manager.current_theme.effects = theme_manager.presets["effects_presets"][next_effect]
-                    theme_manager.current_theme.effects["name"] = next_effect
-                elif key.lower() == 'p':
-                    posts = list(theme_manager.presets["post_processing"].keys())
-                    idx = posts.index(theme_manager.current_theme.post_processing.get("name", args.post_processing)) if "name" in theme_manager.current_theme.post_processing else posts.index(args.post_processing)
-                    next_post = posts[(idx + 1) % len(posts)]
-                    theme_manager.current_theme.post_processing = theme_manager.presets["post_processing"][next_post]
-                    theme_manager.current_theme.post_processing["name"] = next_post
-            else:
-                time.sleep(args.refresh_rate)
-
-    except KeyboardInterrupt:
-        stop_event.set()
-        full_clear_and_reset_cursor()
-        print("Demo stopped.")
-        print(f"Final system time: {system.strftime('%H:%M:%S')}")
-        print(f"Final internet time: {internet.strftime('%H:%M:%S')}")
-        print(f"Offset: {_dt.timedelta(seconds=offset)}")
-
     # --- FRAMEBUFFER COMPOSITION ---
-    # Determine framebuffer size (big enough for all widgets)
     fb_rows = 40
     fb_cols = 80
     framebuffer = AsciiFrameBuffer((fb_rows, fb_cols))
@@ -477,30 +372,42 @@ def main() -> None:
 
         return buf
 
+    def render_fn():
+        elapsed = time.perf_counter() - start
+        offset = get_offset()
+        system = _dt.datetime.utcnow().replace(tzinfo=_dt.timezone.utc)
+        internet = system + _dt.timedelta(seconds=offset)
+
+        h, rem = divmod(int(elapsed * 1000), 3600 * 1000)
+        m, rem = divmod(rem, 60 * 1000)
+        s, ms = divmod(rem, 1000)
+        stopwatch = f"{h:02}:{m:02}:{s:02}.{ms:03}"
+
+        return compose_full_frame(system, internet, stopwatch, offset)
+
+    render_thread = threading.Thread(
+        target=render_loop,
+        args=(framebuffer, render_fn, 10, stop_event),
+        daemon=True,
+    )
+    render_thread.start()
+
+    full_clear_and_reset_cursor()
     try:
         while True:
-            elapsed = time.perf_counter() - start
-            offset = get_offset()
-            system = _dt.datetime.utcnow().replace(tzinfo=_dt.timezone.utc)
-            internet = system + _dt.timedelta(seconds=offset)
-
-            h, rem = divmod(int(elapsed * 1000), 3600 * 1000)
-            m, rem = divmod(rem, 60 * 1000)
-            s, ms = divmod(rem, 1000)
-            stopwatch = f"{h:02}:{m:02}:{s:02}.{ms:03}"
-
-            # Compose the full frame as a 2D array
-            full_frame = compose_full_frame(system, internet, stopwatch, offset)
-            framebuffer.update_render(full_frame)
             diff = framebuffer.get_diff_and_promote()
             draw_diff(diff)
-
             key = getch_timeout(args.refresh_rate)
             if key:
                 if key.lower() == 'q':
                     stop_event.set()
                     break
-                # ...rest of your key handling...
+                elif key.lower() == 'a':
+                    theme_manager.cycle_ascii_style()
+                elif key.lower() == 'i':
+                    theme_manager.toggle_clock_inversion()
+                elif key.lower() == 'b':
+                    theme_manager.toggle_backdrop_inversion()
             else:
                 time.sleep(args.refresh_rate)
 
@@ -508,9 +415,12 @@ def main() -> None:
         stop_event.set()
         full_clear_and_reset_cursor()
         print("Demo stopped.")
-        print(f"Final system time: {system.strftime('%H:%M:%S')}")
-        print(f"Final internet time: {internet.strftime('%H:%M:%S')}")
-        print(f"Offset: {_dt.timedelta(seconds=offset)}")
+        final_offset = get_offset()
+        final_system = _dt.datetime.utcnow().replace(tzinfo=_dt.timezone.utc)
+        final_internet = final_system + _dt.timedelta(seconds=final_offset)
+        print(f"Final system time: {final_system.strftime('%H:%M:%S')}")
+        print(f"Final internet time: {final_internet.strftime('%H:%M:%S')}")
+        print(f"Offset: {_dt.timedelta(seconds=final_offset)}")
 
 
 if __name__ == "__main__":
