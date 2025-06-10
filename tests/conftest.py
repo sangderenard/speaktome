@@ -98,6 +98,7 @@ def pytest_addoption(parser: pytest.Parser) -> None:
 
 def pytest_configure(config: pytest.Config) -> None:
     config.addinivalue_line("markers", "stub: placeholder test requiring implementation")
+    config.addinivalue_line("markers", "requires_torch: skip if PyTorch is unavailable")
 
     log_dir = Path("testing/logs")
     log_dir.mkdir(parents=True, exist_ok=True)
@@ -261,6 +262,9 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
 
     skip_stub = pytest.mark.skip(reason="stub skipped via --skip-stubs")
     skip_inactive = pytest.mark.skip(reason="inactive codebase")
+    skip_torch = pytest.mark.skip(
+        reason=f"[FACULTY_SKIP] Requires TORCH, active: {DEFAULT_FACULTY.name}"
+    )
 
     for item in items:
         if config.getoption("--skip-stubs") and 'stub' in item.keywords:
@@ -270,6 +274,9 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
             codebase = _guess_codebase(Path(item.fspath))
             if codebase not in active:
                 item.add_marker(skip_inactive)
+
+        if 'requires_torch' in item.keywords and DEFAULT_FACULTY < Faculty.TORCH:
+            item.add_marker(skip_torch)
 
 
 @pytest.fixture(scope="session")

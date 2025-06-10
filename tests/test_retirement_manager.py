@@ -4,6 +4,7 @@ import logging
 import types
 import pytest
 
+pytestmark = pytest.mark.requires_torch
 pytest.importorskip('torch', reason='Retirement manager requires torch for tensors')
 import torch
 from speaktome.core.beam_retirement_manager import BeamRetirementManager
