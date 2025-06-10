@@ -11,11 +11,46 @@ import time
 from pathlib import Path
 import sys
 import os  # For FORCE_ENV
+import re
 import importlib.util
 from io import StringIO
+import json
 
 # Import faculty components for logging
 from speaktome.tensors.faculty import DEFAULT_FACULTY, FORCE_ENV, Faculty
+
+ROOT = Path(__file__).resolve().parents[1]
+ACTIVE_FILE = Path(os.environ.get("SPEAKTOME_ACTIVE_FILE", "/tmp/speaktome_active.json"))
+
+def _discover_codebases(registry: Path) -> list[str]:
+    pattern = re.compile(r"- \*\*(.+?)\*\*")
+    if not registry.exists():
+        return []
+    cbs = []
+    for line in registry.read_text().splitlines():
+        m = pattern.match(line.strip())
+        if m:
+            cbs.append(m.group(1))
+    return cbs
+
+CODEBASES = _discover_codebases(ROOT / "AGENTS" / "CODEBASE_REGISTRY.md")
+
+def _guess_codebase(path: Path) -> str:
+    text = path.read_text(errors="ignore")
+    for cb in CODEBASES:
+        mod = cb.replace("/", ".")
+        if f"import {mod}" in text or f"from {mod}" in text:
+            return cb
+    return "speaktome"
+
+def _load_active() -> tuple[list[str], dict[str, dict[str, list[str]]]]:
+    if ACTIVE_FILE.exists():
+        try:
+            data = json.loads(ACTIVE_FILE.read_text())
+            return data.get("codebases", []), data.get("packages", {})
+        except Exception:
+            pass
+    return [], {}
 
 spec = importlib.util.spec_from_file_location(
     "pretty_logger",
@@ -100,6 +135,12 @@ def pytest_configure(config: pytest.Config) -> None:
     md_handler.setFormatter(logging.Formatter("%(message)s"))
     pretty_logger.logger.addHandler(md_handler)
     config._speaktome_pretty_logger = pretty_logger
+
+    active_codebases, active_packages = _load_active()
+    config._active_codebases = set(active_codebases)
+    with pretty_logger.context("Active Selections"):
+        pretty_logger.info(f"Codebases: {active_codebases or 'ALL'}")
+        pretty_logger.info(f"Packages: {list(active_packages.keys())}")
 
     # --- Enhanced Log Header & Faculty Information ---
     log_header_intro = f"""
@@ -215,14 +256,20 @@ def pytest_unconfigure(config: pytest.Config) -> None:
 
 
 def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
-    """Optionally skip tests marked ``stub``."""
-    if not config.getoption("--skip-stubs"):
-        return
+    """Optionally skip tests based on stubs or inactive codebases."""
+    active = getattr(config, "_active_codebases", set())
 
     skip_stub = pytest.mark.skip(reason="stub skipped via --skip-stubs")
+    skip_inactive = pytest.mark.skip(reason="inactive codebase")
+
     for item in items:
-        if 'stub' in item.keywords:
+        if config.getoption("--skip-stubs") and 'stub' in item.keywords:
             item.add_marker(skip_stub)
+
+        if active:
+            codebase = _guess_codebase(Path(item.fspath))
+            if codebase not in active:
+                item.add_marker(skip_inactive)
 
 
 @pytest.fixture(scope="session")

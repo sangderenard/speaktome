@@ -8,6 +8,8 @@ set -uo pipefail
 # changing directories with pushd. This allows the script to be invoked
 # from anywhere while still locating `.venv`.
 SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ACTIVE_FILE=${SPEAKTOME_ACTIVE_FILE:-/tmp/speaktome_active.json}
+export SPEAKTOME_ACTIVE_FILE="$ACTIVE_FILE"
 
 safe_run() {
   "$@"
@@ -89,7 +91,7 @@ install_speaktome_extras() {
   cd "$OLD_DIR"
 
   echo "Launching codebase/group selection tool..."
-  PIP_CMD="$VENV_PIP" "$VENV_PYTHON" "$SCRIPT_ROOT/AGENTS/tools/dev_group_menu.py" --install
+  PIP_CMD="$VENV_PIP" "$VENV_PYTHON" "$SCRIPT_ROOT/AGENTS/tools/dev_group_menu.py" --install --record "$SPEAKTOME_ACTIVE_FILE"
 }
 install_speaktome_extras
 
@@ -126,3 +128,4 @@ dev_menu() {
 }
 dev_menu
 echo "For advanced codebase/group selection, run: python AGENTS/tools/dev_group_menu.py"
+echo "Selections recorded to $SPEAKTOME_ACTIVE_FILE"

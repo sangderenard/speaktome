@@ -5,6 +5,9 @@
 
 set -uo pipefail
 
+ACTIVE_FILE=${SPEAKTOME_ACTIVE_FILE:-/tmp/speaktome_active.json}
+export SPEAKTOME_ACTIVE_FILE="$ACTIVE_FILE"
+
 USE_VENV=1
 for arg in "$@"; do
   case $arg in
@@ -73,9 +76,10 @@ done
 
 if [ $CALLED_BY_DEV -eq 0 ]; then
   echo "Launching codebase/group selection tool for editable installs..."
-  PIP_CMD="$VENV_PIP" "$VENV_PYTHON" "$SCRIPT_ROOT/AGENTS/tools/dev_group_menu.py" --install
+  PIP_CMD="$VENV_PIP" "$VENV_PYTHON" "$SCRIPT_ROOT/AGENTS/tools/dev_group_menu.py" --install --record "$SPEAKTOME_ACTIVE_FILE"
 fi
 
 echo "Environment setup complete."
 echo "[OK] Environment ready. Activate with 'source .venv/bin/activate'."
 echo "   * Torch = $(python -c 'import torch; print(torch.__version__, torch.version.cuda if torch.cuda.is_available() else "N/A")')"
+echo "Selections recorded to $SPEAKTOME_ACTIVE_FILE"

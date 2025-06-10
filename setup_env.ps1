@@ -10,6 +10,12 @@ param(
     [string[]]$Codebases = @("speaktome", "AGENTS/tools", "time_sync")
 )
 
+$activeFile = $env:SPEAKTOME_ACTIVE_FILE
+if (-not $activeFile) {
+    $activeFile = Join-Path ([System.IO.Path]::GetTempPath()) 'speaktome_active.json'
+}
+$env:SPEAKTOME_ACTIVE_FILE = $activeFile
+
 # Always include the time_sync codebase
 if (-not ($Codebases -contains 'time_sync')) {
     $Codebases += 'time_sync'
@@ -70,8 +76,9 @@ foreach ($arg in $args) {
 if (-not $calledByDev) {
     Write-Host "Launching codebase/group selection tool for editable installs..."
     $env:PIP_CMD = $venvPip
-    & $venvPython (Join-Path $PSScriptRoot "AGENTS\tools\dev_group_menu.py") --install
+    & $venvPython (Join-Path $PSScriptRoot "AGENTS\tools\dev_group_menu.py") --install --record $activeFile
     Remove-Item Env:PIP_CMD
 }
 
 Write-Host "Environment setup complete. Activate with '.venv\Scripts\Activate.ps1' on Windows or 'source .venv/bin/activate' on Unix-like systems"
+Write-Host "Selections recorded to $activeFile"

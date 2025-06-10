@@ -7,6 +7,7 @@ import re
 import subprocess
 import sys
 import threading
+import tempfile
 from pathlib import Path
 
 try:
@@ -68,6 +69,7 @@ the selections or install them automatically when ``--install`` is passed. Use
 
 ROOT = Path(__file__).resolve().parents[2]
 REGISTRY = ROOT / "AGENTS" / "CODEBASE_REGISTRY.md"
+ACTIVE_ENV = "SPEAKTOME_ACTIVE_FILE"
 
 
 def discover_codebases(registry_path: Path) -> list[Path]:
@@ -125,7 +127,10 @@ def interactive_selection() -> tuple[list[str], dict[str, dict[str, list[str]]]]
         selected[cb] = {}
         for group, pkgs in groups.items():
             if (
-                ask(f"Install group '{group}' for '{cb}'? [y/N] (auto-skip in 3s): ")
+                ask(
+                    f"Install group '{group}' for '{cb}'? [Y/n] (auto-accept in 3s): ",
+                    default="y",
+                )
                 == "y"
             ):
                 selected[cb][group] = []
@@ -168,6 +173,13 @@ def main(argv: list[str] | None = None) -> None:  # pragma: no cover - CLI
         action="store_true",
         help="Install selected codebases and packages using $PIP_CMD",
     )
+    parser.add_argument(
+        "--record",
+        metavar="PATH",
+        help="Write selections to PATH (default from SPEAKTOME_ACTIVE_FILE)",
+        nargs="?",
+        const=os.environ.get(ACTIVE_ENV, str(Path(tempfile.gettempdir()) / "speaktome_active.json")),
+    )
     args = parser.parse_args(argv)
 
     cbs, selections = interactive_selection()
@@ -175,6 +187,13 @@ def main(argv: list[str] | None = None) -> None:  # pragma: no cover - CLI
     if args.install:
         pip_cmd = os.environ.get("PIP_CMD", "pip")
         install_selections(selections, pip_cmd=pip_cmd)
+
+    if args.record:
+        path = Path(args.record)
+        try:
+            path.write_text(json.dumps({"codebases": cbs, "packages": selections}))
+        except OSError as exc:  # pragma: no cover - file write errors
+            print(f"[WARN] Could not write selections to {path}: {exc}")
 
     if args.json:
         print(json.dumps({"codebases": cbs, "packages": selections}))
