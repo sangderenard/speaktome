@@ -32,7 +32,10 @@ from .console import (
 from ..frame_buffer import PixelFrameBuffer # Changed from AsciiFrameBuffer
 from ..render_thread import render_loop
 from ..draw import draw_diff, flexible_subunit_kernel
-from ..subunit_window import SubunitWindow
+try:
+    from ..subunit_window import SubunitWindow
+except Exception:  # pragma: no cover - optional
+    SubunitWindow = None  # type: ignore
 from . import _internet  # exported for tests
 from .render_backend import RenderingBackend
 

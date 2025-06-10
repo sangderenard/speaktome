@@ -16,6 +16,11 @@ dependencies = [
     "pillow",
 ]
 
+[project.optional-dependencies]
+gui = [
+    "pygame>=2",
+]
+
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["time_sync*"]
