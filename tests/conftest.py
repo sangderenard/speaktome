@@ -22,6 +22,25 @@ from speaktome.tensors.faculty import DEFAULT_FACULTY, FORCE_ENV, Faculty
 ROOT = Path(__file__).resolve().parents[1]
 ACTIVE_FILE = Path(os.environ.get("SPEAKTOME_ACTIVE_FILE", "/tmp/speaktome_active.json"))
 
+def _venv_marker_ok() -> bool:
+    """Return True if pytest is allowed based on setup markers."""
+    expected = ROOT / ".venv"
+    if expected not in Path(sys.executable).resolve().parents:
+        return False
+    env = os.environ.get("VIRTUAL_ENV")
+    if not env or Path(env).resolve() != expected:
+        return False
+    marker = Path(env) / "pytest_enabled"
+    if not marker.exists():
+        return False
+    if not ACTIVE_FILE.exists():
+        return False
+    try:
+        data = json.loads(ACTIVE_FILE.read_text())
+        return bool(data.get("codebases"))
+    except Exception:
+        return False
+
 def _discover_codebases(registry: Path) -> list[str]:
     pattern = re.compile(r"- \*\*(.+?)\*\*")
     if not registry.exists():
@@ -90,6 +109,16 @@ def pytest_addoption(parser: pytest.Parser) -> None:
     )
 
 def pytest_configure(config: pytest.Config) -> None:
+    if not _venv_marker_ok():
+        from AGENTS.tools.header_utils import ENV_SETUP_BOX
+        msg = (
+            f"{ENV_SETUP_BOX}\n"
+            "PyTest disabled. Run setup_env_dev and select a codebase before running tests.\n"
+            "See AGENTS/CODEBASES_AND_ENVIRONMENT.md for environment setup instructions.\n"
+            "CL or headless agents must follow those steps to enable pytest."
+        )
+        sys.stderr.write(msg + "\n")
+        pytest.exit("environment not configured", returncode=1)
     config.addinivalue_line("markers", "stub: placeholder test requiring implementation")
     config.addinivalue_line("markers", "requires_torch: skip if PyTorch is unavailable")
 

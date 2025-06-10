@@ -129,3 +129,28 @@ dev_menu() {
 dev_menu
 echo "For advanced codebase/group selection, run: python AGENTS/tools/dev_group_menu.py"
 echo "Selections recorded to $SPEAKTOME_ACTIVE_FILE"
+
+# Mark the environment so pytest knows setup completed with at least one codebase
+PYTEST_MARKER="$SCRIPT_ROOT/.venv/pytest_enabled"
+if [ -f "$SPEAKTOME_ACTIVE_FILE" ]; then
+  if "$VENV_PYTHON" - <<'PY'
+import json, os, sys
+path = os.environ.get("SPEAKTOME_ACTIVE_FILE")
+try:
+    data = json.load(open(path))
+    if data.get("codebases"):
+        sys.exit(0)
+except Exception:
+    pass
+sys.exit(1)
+PY
+  then
+    touch "$PYTEST_MARKER"
+  else
+    rm -f "$PYTEST_MARKER"
+    echo "Warning: No codebases recorded; pytest will remain disabled." >&2
+  fi
+else
+  rm -f "$PYTEST_MARKER"
+  echo "Warning: Active selection file not found; pytest will remain disabled." >&2
+fi
