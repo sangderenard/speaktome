@@ -13,7 +13,9 @@ from time_sync import (
     set_offset,
     sync_offset,
     print_digital_clock,
+    RenderingBackend,
 )
+from time_sync.time_sync.theme_manager import ThemeManager
 
 # --- END HEADER ---
 
@@ -52,3 +54,9 @@ def test_print_digital_clock(capsys):
     print_digital_clock(time)
     captured = capsys.readouterr().out
     assert "12" in captured
+
+
+def test_list_available_operations():
+    rb = RenderingBackend(ThemeManager())
+    ops = rb.list_available_operations()
+    assert "rotate" in ops
