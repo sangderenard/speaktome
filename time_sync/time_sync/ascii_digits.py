@@ -20,6 +20,7 @@ try:
     from PIL import Image, ImageDraw, ImageFont
     PIL_AVAILABLE = True
     from .theme_manager import ThemeManager
+    from .render_backend import RenderingBackend
 except ImportError:
     PIL_AVAILABLE = False
 
@@ -250,6 +251,7 @@ def compose_ascii_digits(
     target_pixel_height: Optional[int] = None,
     ascii_ramp: str = ASCII_RAMP_BLOCK,
     theme_manager: Optional[ThemeManager] = None,
+    render_backend: Optional[RenderingBackend] = None,
     # Parameters for when compose_ascii_digits is used for arbitrary text, not just time
     # These would typically be simpler than full clock effects.
 ) -> str | np.ndarray:
@@ -309,7 +311,11 @@ def compose_ascii_digits(
     else: # Fallback for bitmap fonts or no outline
         draw.text((base_x, base_y), text, font=font, fill=text_color_on_image)
 
-    if theme_manager:
+    if render_backend:
+        image = render_backend.process(image)
+        if theme_manager:
+            ascii_ramp = theme_manager.get_current_ascii_ramp()
+    elif theme_manager:
         image = theme_manager.apply_effects(image)
         image = theme_manager.apply_theme(image)
         ascii_ramp = theme_manager.get_current_ascii_ramp()
@@ -337,6 +343,7 @@ def print_digital_clock(
     arbitrary_text: Optional[str] = None, # If provided, this text is rendered directly
     backdrop_image_path: Optional[str] = None,
     theme_manager: Optional[ThemeManager] = None,
+    render_backend: Optional[RenderingBackend] = None,
     *,
     as_array: bool = False,
     as_pixel: bool = False,
@@ -409,6 +416,7 @@ def print_digital_clock(
         target_pixel_height=params["target_ascii_height"],
         ascii_ramp=theme_manager.get_current_ascii_ramp() if theme_manager else ASCII_RAMP_BLOCK,
         theme_manager=theme_manager,
+        render_backend=render_backend,
         **params,
     )
     if as_pixel:
@@ -439,6 +447,7 @@ def print_analog_clock(
     final_ascii_bg_fill: str = Fore.BLACK + " ", # Black background for ASCII
     theme_manager: Optional[ThemeManager] = None,
     active_units_override: Optional[List[TimeUnit]] = None, # Override theme's units
+    render_backend: Optional[RenderingBackend] = None,
     *,
     as_array: bool = False,
     as_pixel: bool = False,
@@ -594,7 +603,11 @@ def print_analog_clock(
     image_to_convert = base_canvas_image
     ascii_ramp_to_use = ASCII_RAMP_BLOCK # Default
 
-    if theme_manager:
+    if render_backend:
+        image_to_convert = render_backend.process(image_to_convert)
+        if theme_manager:
+            ascii_ramp_to_use = theme_manager.get_current_ascii_ramp()
+    elif theme_manager:
         image_to_convert = theme_manager.apply_effects(image_to_convert)
         image_to_convert = theme_manager.apply_theme(image_to_convert) # Handles invert_clock
         ascii_ramp_to_use = theme_manager.get_current_ascii_ramp()
