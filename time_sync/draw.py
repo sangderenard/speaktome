@@ -5,6 +5,8 @@ from __future__ import annotations
 try:
     from AGENTS.tools.header_utils import ENV_SETUP_BOX
     import sys
+    import numpy as np
+    from time_sync.time_sync.ascii_digits import ASCII_RAMP_BLOCK
 except Exception:
     import sys
     print(ENV_SETUP_BOX)
@@ -12,7 +14,9 @@ except Exception:
 # --- END HEADER ---
 
 
-def default_subunit_to_char_kernel(subunit_data: np.ndarray, ramp) -> str:
+def default_subunit_to_char_kernel(
+    subunit_data: np.ndarray, ramp: str = ASCII_RAMP_BLOCK
+) -> str:
     """
     Stub kernel function to map a subunit of pixel data to a single character.
     This basic stub averages the subunit and returns a block character based on luminance.
@@ -88,7 +92,6 @@ def draw_diff(
     sys.stdout.flush()
 
 
-import numpy as np
 from typing import List, Tuple
 
 def get_changed_subunits(
