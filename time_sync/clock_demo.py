@@ -35,26 +35,11 @@ from time_sync.ascii_digits import (
     ASCII_RAMP_BLOCK,
 )
 from PIL import Image
+import queue
 
 # Platform-specific input handling (adapted from AGENTS/tools/dev_group_menu.py)
 if os.name == 'nt':  # Windows
-    import msvcrt
-    import threading
-    def getch_timeout(timeout_seconds: float) -> str | None:
-        """Get a single character with timeout on Windows."""
-        result_char = [None] # Use a list to pass by reference
-        def _input_thread():
-            try:
-                result_char[0] = msvcrt.getch().decode(errors='ignore')
-            except Exception:
-                result_char[0] = None # Or some other indicator
-        
-        thread = threading.Thread(target=_input_thread)
-        thread.daemon = True
-        thread.start()
-        thread.join(timeout_seconds)
-        return result_char[0]
-
+    pass # Windows specific input will be handled directly in input_thread_fn
 else:  # Unix-like
     import select
     import sys
@@ -227,6 +212,27 @@ def render_simple_text_to_pixel_array(
         theme_manager=theme_manager,
     )
     return pixel_array
+def input_thread_fn(input_queue, stop_event):
+    if os.name == 'nt': # Windows specific logic
+        import msvcrt
+        while not stop_event.is_set():
+            if msvcrt.kbhit(): # Check if a key is pressed
+                try:
+                    key_bytes = msvcrt.getch()
+                    # Handle special keys like arrows if necessary, they might be multi-byte
+                    # For now, decode simply.
+                    key = key_bytes.decode(errors='ignore')
+                    if key: # Ensure key is not empty or None before putting
+                        input_queue.put(key)
+                except Exception:
+                    pass # Ignore decode errors or other issues with getch
+            time.sleep(0.01) # Small sleep to prevent busy-waiting at 100% CPU
+    else: # Unix-like specific logic (uses the getch_timeout defined above for Unix)
+        while not stop_event.is_set():
+            key = getch_timeout(0.01) # Poll frequently using the Unix getch_timeout
+            if key:
+                input_queue.put(key)
+
 def main() -> None:
     """Run the clock demo until interrupted."""
     parser = argparse.ArgumentParser(description="Live clock demo with various displays.")
@@ -403,7 +409,7 @@ def main() -> None:
             target_w = net_params.get("target_ascii_width", 60)
 
             net_arr = compose_ascii_digits(
-                internet.strftime("%H:%M:%S"),
+                internet.strftime("%H:%M:%S.%ms"),
                 as_pixel_array=True,
                 target_pixel_width=target_w,
                 target_pixel_height=target_h,
@@ -473,6 +479,10 @@ def main() -> None:
 
     full_clear_and_reset_cursor()
     input_buffer = ""
+    input_queue = queue.Queue()
+    input_thread = threading.Thread(target=input_thread_fn, args=(input_queue, stop_event), daemon=True)
+    input_thread.start()
+
     try:
         while True:
             diff_pixels = framebuffer.get_diff_and_promote()
@@ -481,31 +491,41 @@ def main() -> None:
                 for y, x, color in diff_pixels
             ]
             draw_diff(changed)
-            while True:
-                key = getch_timeout(0)
-                if not key:
-                    break
+
+            # Drain the input queue
+            while not input_queue.empty():
+                key = input_queue.get()
                 input_buffer += key
 
             cmd = input_buffer.strip().lower()
-            running = True
-            if cmd in {"q", "quit", "exit"}:
-                stop_event.set()
-                running = False
-            elif cmd:
-                for char in cmd:
-                    if char == 'a':
-                        theme_manager.cycle_ascii_style()
-                    elif char == 'i':
-                        theme_manager.toggle_clock_inversion()
-                    elif char == 'b':
-                        theme_manager.toggle_backdrop_inversion()
-                    elif char == 't':
-                        theme_manager.cycle_palette(1)
-                    elif char == 'T':
-                        theme_manager.cycle_palette(-1)
-            input_buffer = ""
-            if not running:
+            
+            if not stop_event.is_set(): # Only process input if not already stopping
+                if cmd in {"q", "quit", "exit"}: # Exact match for multi-char quit
+                    stop_event.set()
+                elif cmd: # If there's any command and it's not a multi-char quit
+                    for char_from_cmd in cmd:
+                        char_lower = char_from_cmd.lower() # Process char by char
+                        if char_lower == 'q': # Single 'q' also quits
+                            stop_event.set()
+                            break # Stop processing further characters in cmd
+                        elif char_lower == 'a':
+                            theme_manager.cycle_ascii_style()
+                        elif char_lower == 'i':
+                            theme_manager.toggle_clock_inversion()
+                        elif char_lower == 'b':
+                            theme_manager.toggle_backdrop_inversion()
+                        elif char_lower == 't':
+                            theme_manager.cycle_palette(1)
+                        elif char_lower == 'T':
+                            theme_manager.cycle_palette(-1)
+                    
+                    # If, after processing cmd, we are still running, clear the buffer
+                    if not stop_event.is_set():
+                        input_buffer = ""
+                else: # cmd was empty or just whitespace
+                    input_buffer = ""
+
+            if stop_event.is_set(): # Check if we should break out of the main loop
                 break
             time.sleep(args.refresh_rate)
 
@@ -513,6 +533,7 @@ def main() -> None:
         stop_event.set()
     finally:
         stop_event.set()
+        input_thread.join(timeout=2.0)
         render_thread.join(timeout=2.0)
         full_clear_and_reset_cursor()
         print("Demo stopped.")

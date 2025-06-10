@@ -19,7 +19,7 @@ import numpy as np
 try:
     from PIL import Image, ImageDraw, ImageFont
     PIL_AVAILABLE = True
-    from .theme_manager import ThemeManager # Assuming theme_manager.py is in the same directory
+    from .theme_manager import ThemeManager
 except ImportError:
     PIL_AVAILABLE = False
 
@@ -27,6 +27,7 @@ except ImportError:
 ASCII_RAMP_BLOCK = " .:░▒▓█" # Using block characters for a more solid look
 ASCII_RAMP_DETAILED = " .'`^\",:;Il!i><~+_-?][}{1)(|\\/tfjrxnuvczXYUJCLQ0OZmwqpdbkhao*#MW&8%B@$"
 
+from .time_units import TimeUnit # Import TimeUnit
 # Palette of Colorama colors and their approximate RGB values
 # (R, G, B) values are 0-255
 COLORAMA_PALETTE: List[Tuple[str, Tuple[int, int, int]]] = [
@@ -249,6 +250,8 @@ def compose_ascii_digits(
     target_pixel_height: Optional[int] = None,
     ascii_ramp: str = ASCII_RAMP_BLOCK,
     theme_manager: Optional[ThemeManager] = None,
+    # Parameters for when compose_ascii_digits is used for arbitrary text, not just time
+    # These would typically be simpler than full clock effects.
 ) -> str | np.ndarray:
     if not PIL_AVAILABLE:
         return f"Pillow not available. Text: {text}"
@@ -329,13 +332,16 @@ def compose_ascii_digits(
 
 def print_digital_clock(
     time: _dt.datetime,
+    active_units: Optional[List[TimeUnit]] = None, # List of TimeUnits to display
+    display_format_template: Optional[str] = None, # e.g., "{hours}:{minutes}"
+    arbitrary_text: Optional[str] = None, # If provided, this text is rendered directly
     backdrop_image_path: Optional[str] = None,
     theme_manager: Optional[ThemeManager] = None,
     *,
     as_array: bool = False,
     as_pixel: bool = False,
     **override_params,
-) -> Optional[np.ndarray]:
+) -> str | np.ndarray | None: # Return type can be string or array
     """Return or print ``time`` in HH:MM:SS format.
 
     By default, the result is printed as colored ASCII art. When ``as_array``
@@ -343,12 +349,7 @@ def print_digital_clock(
     RGB pixel array is returned instead.
     """
     digits_str = time.strftime("%H:%M:%S")
-    
-    if not PIL_AVAILABLE:
-        print(Fore.RED + "Pillow library not installed. Cannot display enhanced digital clock." + Style.RESET_ALL)
-        print(Style.BRIGHT + Fore.CYAN + digits_str + Style.RESET_ALL) # Simple fallback
-        return
-
+   
     # Configuration for the digital clock appearance
     # Start with defaults, override with override_params (from JSON), then theme (for colors)
     params = {
@@ -363,12 +364,33 @@ def print_digital_clock(
         "final_ascii_bg_fill": Fore.BLACK + " "
     }
     params.update(override_params)
-
+    
     if theme_manager and theme_manager.current_theme.palette:
         palette = theme_manager.current_theme.palette
         params["text_color_on_image"] = tuple(palette.get("text", params["text_color_on_image"]))
         params["outline_color_on_image"] = tuple(palette.get("outline", params["outline_color_on_image"]))
         params["shadow_color_on_image"] = tuple(palette.get("shadow", params["shadow_color_on_image"]))
+        # Use theme's active units and format string if not overridden
+        if active_units is None: active_units = theme_manager.current_theme.active_time_units
+        if display_format_template is None: display_format_template = theme_manager.current_theme.digital_format_string
+
+    if arbitrary_text is not None:
+        digits_str = arbitrary_text
+    elif active_units and display_format_template:
+        format_values = {}
+        for unit in active_units:
+            format_values[unit.name] = unit.format_value(time)
+        try:
+            digits_str = display_format_template.format(**format_values)
+        except KeyError as e:
+            print(f"Warning: KeyError in digital_format_string '{display_format_template}': {e}. Using default time.")
+            digits_str = time.strftime("%H:%M:%S") # Fallback
+    elif isinstance(time, _dt.datetime): # Fallback to default H:M:S for datetime
+        digits_str = time.strftime("%H:%M:%S.%f")[:-3] # HH:MM:SS.ms
+
+    if not PIL_AVAILABLE:
+        # If not returning array/pixel, print simple text
+        return digits_str if (as_array or as_pixel) else print(Fore.CYAN + digits_str + Style.RESET_ALL)
 
     result = compose_ascii_digits(
         digits_str,
@@ -381,17 +403,20 @@ def print_digital_clock(
         **params,
     )
     if as_pixel:
-        return result  # type: ignore[return-value]
+        return result # np.ndarray
     if as_array:
-        rows = result.splitlines()  # type: ignore[arg-type]
+        # Result is already a string from compose_ascii_digits if not as_pixel
+        rows = result.splitlines() if isinstance(result, str) else []
         return np.array([list(row) for row in rows], dtype="<U1")
-    print(result)
-    print(digits_str)
-    return None
+    
+    # If not returning as array or pixel, print the composed ASCII (which might be colored)
+    if isinstance(result, str):
+        print(result)
+    return None # Or return the string `result` if that's preferred for direct printing
 
 
 def print_analog_clock(
-    time: _dt.datetime,
+    time_obj: _dt.datetime | _dt.timedelta, # Can be datetime or timedelta
     canvas_size_px: int = 120, # Pixel dimensions of the internal canvas for drawing
     target_ascii_diameter: int = 22, # Approximate diameter of the clock in ASCII characters
     face_color_on_image: Tuple[int,int,int,int] = (70, 70, 70, 255),
@@ -404,6 +429,7 @@ def print_analog_clock(
     backdrop_image_path: Optional[str] = None,
     final_ascii_bg_fill: str = Fore.BLACK + " ", # Black background for ASCII
     theme_manager: Optional[ThemeManager] = None,
+    active_units_override: Optional[List[TimeUnit]] = None, # Override theme's units
     *,
     as_array: bool = False,
     as_pixel: bool = False,
@@ -417,8 +443,12 @@ def print_analog_clock(
     """
     if not PIL_AVAILABLE:
         print(Fore.RED + "Pillow library not installed. Cannot display enhanced analog clock." + Style.RESET_ALL)
-        print(Style.BRIGHT + Fore.MAGENTA + time.strftime("%H:%M:%S") + " (Analog)" + Style.RESET_ALL)
+        if isinstance(time_obj, _dt.datetime):
+            print(Style.BRIGHT + Fore.MAGENTA + time_obj.strftime("%H:%M:%S") + " (Analog)" + Style.RESET_ALL)
+        else:
+            print(Style.BRIGHT + Fore.MAGENTA + str(time_obj) + " (Analog)" + Style.RESET_ALL)
         return
+
 
     params = {
         "canvas_size_px": canvas_size_px,
@@ -434,14 +464,22 @@ def print_analog_clock(
     }
     params.update(override_params)
 
+    active_units = active_units_override
     if theme_manager and theme_manager.current_theme.palette:
         palette = theme_manager.current_theme.palette
         # Example: map theme palette keys to analog clock parts
         params["face_color_on_image"] = tuple(palette.get("outline", params["face_color_on_image"]))
         params["marks_color_on_image"] = tuple(palette.get("text", params["marks_color_on_image"]))
-        params["hour_hand_color_on_image"] = tuple(palette.get("accent1", params["hour_hand_color_on_image"]))
-        params["minute_hand_color_on_image"] = tuple(palette.get("accent2", params["minute_hand_color_on_image"]))
-        params["second_hand_color_on_image"] = tuple(palette.get("shadow", params["second_hand_color_on_image"])) # Reusing shadow for seconds
+        # Hand colors will be fetched per-unit later
+        if active_units is None:
+            active_units = theme_manager.current_theme.active_time_units
+
+    # Fallback if no units are defined/passed
+    if not active_units:
+        # Create a default H, M, S unit list if none provided
+        # This part would ideally use definitions from time_units.py or theme_manager
+        print("Warning: No active_units provided for analog clock. Display will be empty.")
+        active_units = []
 
     # Create the base canvas: either from backdrop or a new transparent image
     if backdrop_image_path:
@@ -512,20 +550,26 @@ def print_analog_clock(
         mark_width = major_mark_stroke_width if is_major_mark else minor_mark_stroke_width
         draw_on.line((x1, y1, x2, y2), fill=params["marks_color_on_image"], width=mark_width)
 
-    # Hands
-    h_angle = math.radians((time.hour % 12 + time.minute / 60) * 30 - 90)
-    m_angle = math.radians((time.minute + time.second / 60) * 6 - 90)
-    s_angle = math.radians(time.second * 6 - 90)
+    # Draw hands based on active_units
+    default_hand_color_tuple = (200, 200, 200, 255) # Default off-white for hands
+    for unit in active_units:
+        current_value = unit.get_value(time_obj)
+        # Angle: (current_value / max_value_for_full_cycle) * 360 degrees.
+        # Offset by -90 degrees because 0 degrees is to the right.
+        angle_rad = math.radians((current_value / unit.max_value) * 360 - 90)
 
-    h_len = current_radius * 0.55
-    draw_on.line((current_center_x, current_center_y, current_center_x + int(h_len * math.cos(h_angle)), current_center_y + int(h_len * math.sin(h_angle))),
-              fill=params["hour_hand_color_on_image"], width=hour_hand_stroke_width)
-    m_len = current_radius * 0.75
-    draw_on.line((current_center_x, current_center_y, current_center_x + int(m_len * math.cos(m_angle)), current_center_y + int(m_len * math.sin(m_angle))),
-              fill=params["minute_hand_color_on_image"], width=minute_hand_stroke_width)
-    s_len = current_radius * 0.8
-    draw_on.line((current_center_x, current_center_y, current_center_x + int(s_len * math.cos(s_angle)), current_center_y + int(s_len * math.sin(s_angle))),
-              fill=params["second_hand_color_on_image"], width=second_hand_stroke_width)
+        hand_len = current_radius * unit.hand_length_factor
+        # Ensure hand_width is at least 1 pixel
+        hand_width = max(1, int(effective_diameter_for_elements * unit.hand_width_factor))
+        
+        hand_color = default_hand_color_tuple # Fallback
+        if theme_manager and theme_manager.current_theme.palette.get(unit.hand_color_key):
+            hand_color = tuple(theme_manager.current_theme.palette[unit.hand_color_key])
+
+        draw_on.line((current_center_x, current_center_y,
+                      current_center_x + int(hand_len * math.cos(angle_rad)),
+                      current_center_y + int(hand_len * math.sin(angle_rad))),
+                     fill=hand_color, width=hand_width)
 
     # Center dot
     draw_on.ellipse((current_center_x - center_dot_radius_px, current_center_y - center_dot_radius_px, 

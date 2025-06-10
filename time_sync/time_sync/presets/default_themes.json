@@ -71,5 +71,42 @@
       "contrast": 1.2,
       "saturation": 0.0
     }
+  },
+  "time_units_definitions": {
+    "hours_12_cycle": {
+      "max_value": 12, "accessor_key": "dt_hour12_float", "format_template": "{value:02.0f}",
+      "hand_length_factor": 0.5, "hand_width_factor": 0.06, "hand_color_key": "hour_hand_color"
+    },
+    "minutes_60_cycle": {
+      "max_value": 60, "accessor_key": "dt_minute_float", "format_template": "{value:02.0f}",
+      "hand_length_factor": 0.75, "hand_width_factor": 0.04, "hand_color_key": "minute_hand_color"
+    },
+    "seconds_60_cycle": {
+      "max_value": 60, "accessor_key": "dt_second_float", "format_template": "{value:02.0f}",
+      "hand_length_factor": 0.9, "hand_width_factor": 0.02, "hand_color_key": "second_hand_color"
+    },
+    "milliseconds_1000_cycle": {
+      "max_value": 1000, "accessor_key": "dt_millisecond_float", "format_template": "{value:03.0f}",
+      "hand_length_factor": 0.9, "hand_width_factor": 0.01, "hand_color_key": "subsecond_hand_color"
+    },
+    "stopwatch_total_seconds_60_cycle": {
+      "max_value": 60, "accessor_key": "td_seconds_float", "format_template": "{value:05.2f}",
+      "hand_length_factor": 0.9, "hand_width_factor": 0.02, "hand_color_key": "second_hand_color"
+    },
+    "stopwatch_total_minutes_60_cycle": {
+      "max_value": 60, "accessor_key": "td_minutes_float", "format_template": "{value:02.0f}",
+      "hand_length_factor": 0.75, "hand_width_factor": 0.04, "hand_color_key": "minute_hand_color"
+    },
+    "stopwatch_total_hours_24_cycle": {
+      "max_value": 24, "accessor_key": "td_hours_float", "format_template": "{value:02.0f}",
+      "hand_length_factor": 0.5, "hand_width_factor": 0.06, "hand_color_key": "hour_hand_color"
+    }
+  },
+  "time_unit_sets": {
+    "default_analog": ["hours_12_cycle", "minutes_60_cycle", "seconds_60_cycle"],
+    "default_digital_hms": ["hours_12_cycle", "minutes_60_cycle", "seconds_60_cycle"],
+    "digital_hms_ms": ["hours_12_cycle", "minutes_60_cycle", "seconds_60_cycle", "milliseconds_1000_cycle"],
+    "stopwatch_analog_ms": ["stopwatch_total_minutes_60_cycle", "stopwatch_total_seconds_60_cycle"],
+    "stopwatch_digital_hms_ms": ["stopwatch_total_hours_24_cycle", "stopwatch_total_minutes_60_cycle", "stopwatch_total_seconds_60_cycle"]
   }
 }

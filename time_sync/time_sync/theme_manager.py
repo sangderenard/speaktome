@@ -14,6 +14,7 @@ except Exception:
     print(ENV_SETUP_BOX)
     sys.exit(1)
 # --- END HEADER ---
+from .time_units import TimeUnit # Import the new TimeUnit class
 
 @dataclass
 class ClockTheme:
@@ -21,26 +22,49 @@ class ClockTheme:
     effects: dict
     ascii_style: str
     post_processing: dict
+    active_time_units: List[TimeUnit] = field(default_factory=list) # For analog/digital
+    digital_format_string: str = "{hours_12_cycle}:{minutes_60_cycle}:{seconds_60_cycle}" # Example
     invert_clock: bool = False
     invert_backdrop: bool = False
 
+# Determine the directory of the current module to reliably locate presets
+_MODULE_DIR = os.path.dirname(os.path.abspath(__file__))
+DEFAULT_PRESETS_PATH = os.path.join(_MODULE_DIR, "presets", "default_themes.json")
+
 class ThemeManager:
-    def __init__(self, presets_path: str = "presets/default_themes.json"):
+    def __init__(self, presets_path: str = DEFAULT_PRESETS_PATH):
         self.presets_path = presets_path
-        self.current_theme = ClockTheme({}, {}, "block", {})
+        self.current_theme = ClockTheme({}, {}, "block", {}, [])
         self._load_presets()
+        if not self.current_theme.active_time_units: # Ensure a default set of units
+            self.set_time_unit_set("default_analog") # Or some other sensible default
 
     def _load_presets(self) -> None:
+        """Loads presets from the JSON file.
+        Initializes self.presets to an empty structure if loading fails.
+        """
+        empty_presets = {"color_palettes": {}, "effects_presets": {},
+                         "ascii_styles": {}, "post_processing": {},
+                         "time_units_definitions": {}, "time_unit_sets": {}}
         try:
+            if not os.path.exists(self.presets_path):
+                print(f"Error loading presets: File not found at '{self.presets_path}'")
+                self.presets = empty_presets
+                return
+
             with open(self.presets_path, 'r', encoding='utf-8') as f:
                 self.presets = json.load(f)
+        except json.JSONDecodeError as e:
+            print(f"Error loading presets: Could not decode JSON from '{self.presets_path}'. Error: {e}")
+            self.presets = empty_presets
         except Exception as e:
-            print(f"Error loading presets: {e}")
-            self.presets = {"color_palettes": {}, "effects_presets": {}, 
-                          "ascii_styles": {}, "post_processing": {}}
+            # Catch other potential errors like IO errors after file exists check
+            print(f"Error loading presets: An unexpected error occurred with '{self.presets_path}'. Error: {e}")
+            self.presets = empty_presets
 
     def apply_theme(self, image: Image.Image) -> Image.Image:
         """Apply current theme's post-processing to image"""
+        # Ensure image is in a mode that supports enhancement (e.g., RGB)
         if self.current_theme.invert_clock:
             image = Image.eval(image, lambda x: 255 - x)
         
@@ -49,9 +73,12 @@ class ThemeManager:
             brightness = pp.get("brightness", 1.0)
             contrast = pp.get("contrast", 1.0)
             saturation = pp.get("saturation", 1.0)
-            
-            image = ImageEnhance.Brightness(image).enhance(brightness)
-            image = ImageEnhance.Contrast(image).enhance(contrast)
+
+            enhancer = ImageEnhance.Brightness(image)
+            image = enhancer.enhance(brightness)
+            enhancer = ImageEnhance.Contrast(image)
+            image = enhancer.enhance(contrast)
+            enhancer = ImageEnhance.Color(image) # For saturation
             image = ImageEnhance.Color(image).enhance(saturation)
 
         return image
@@ -159,3 +186,29 @@ class ThemeManager:
         new_idx = (idx + step) % len(names)
         self.set_palette(names[new_idx])
         return names[new_idx]
+
+    def get_time_unit_definitions(self) -> Dict[str, TimeUnit]:
+        """Returns all defined TimeUnit objects."""
+        defs = self.presets.get("time_units_definitions", {})
+        return {name: TimeUnit.from_dict(name, data) for name, data in defs.items()}
+
+    def set_time_unit_set(self, set_name: str) -> None:
+        """Sets the active time units based on a predefined set name."""
+        unit_sets = self.presets.get("time_unit_sets", {})
+        unit_names_in_set = unit_sets.get(set_name)
+
+        if unit_names_in_set:
+            all_defined_units = self.get_time_unit_definitions()
+            active_units = []
+            for unit_name in unit_names_in_set:
+                if unit_name in all_defined_units:
+                    active_units.append(all_defined_units[unit_name])
+                else:
+                    print(f"Warning: Time unit '{unit_name}' in set '{set_name}' not defined.")
+            self.current_theme.active_time_units = active_units[:5] # Max 5 units
+        else:
+            print(f"Time unit set '{set_name}' not found. Using current or empty.")
+
+    def set_digital_format_string(self, format_str: str) -> None:
+        """Sets the format string for digital displays."""
+        self.current_theme.digital_format_string = format_str

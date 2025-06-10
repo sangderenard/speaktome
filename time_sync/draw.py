@@ -44,49 +44,49 @@ def default_subunit_to_char_kernel(
 
 
 def draw_diff(
-    changed_subunits: list[tuple[int, int, np.ndarray]], # List of (y, x, subunit_pixel_data)
+    changed_subunits: list[tuple[int, int, np.ndarray]], # List of (y_pixel, x_pixel, subunit_pixel_data)
+    char_cell_pixel_height: int = 1, # The height of a character cell in pixels
+    char_cell_pixel_width: int = 1,  # The width of a character cell in pixels
     subunit_to_char_kernel: callable[[np.ndarray], str] = default_subunit_to_char_kernel,
     base_row: int = 1, 
     base_col: int = 1
 ) -> None:
     """Render changed subunits using a kernel to map subunit data to characters.
     
-    `y`, `x` in `changed_subunits` are 0-indexed pixel coordinates of the subunit's top-left.
+    `y_pixel`, `x_pixel` in `changed_subunits` are 0-indexed top-left pixel coordinates of the subunit.
+    `char_cell_pixel_height` and `char_cell_pixel_width` define the dimensions of a single
+    character cell in terms of pixels. The `subunit_data` for each entry in `changed_subunits`
+    is expected to match these dimensions (or be a part of a larger image from which these
+    coordinates are derived). The `subunit_to_char_kernel` converts this `subunit_data`
+    (representing one character cell's worth of pixels) into a single display character.
     `base_row`, `base_col` are 1-indexed for ANSI terminal compatibility.
     """
-    # This function now assumes that each subunit corresponds to one character cell.
-    # The (y,x) coordinates from get_changed_subunits are pixel coordinates.
-    # We need to determine which character cell these correspond to.
-    # For simplicity, this example assumes subunit_height and subunit_width
-    # from get_changed_subunits implicitly define the character cell size.
-    # A more robust solution would pass subunit_height/width or derive char_x, char_y.
+    if char_cell_pixel_height <= 0: char_cell_pixel_height = 1
+    if char_cell_pixel_width <= 0: char_cell_pixel_width = 1
 
     for y_pixel, x_pixel, subunit_data in changed_subunits:
-        # This is a simplification: assumes (y_pixel, x_pixel) can directly map to terminal rows/cols.
-        # In reality, you'd divide y_pixel by subunit_height and x_pixel by subunit_width
-        # to get the character cell coordinates if subunits are larger than 1x1 pixel.
-        # For this example, let's assume each subunit IS a character cell's pixel data.
-        # The (y_pixel, x_pixel) are thus the top-left of the character cell.
+        # y_pixel, x_pixel are the top-left pixel coordinates of the subunit.
+        # This subunit (subunit_data) is converted to a single character by the kernel.
+        # Divide by character cell dimensions (in pixels) to get character cell coordinates.
+        char_y = y_pixel // char_cell_pixel_height
+        char_x = x_pixel // char_cell_pixel_width
         
         char_to_draw = subunit_to_char_kernel(subunit_data)
         
         # Determine average color of the subunit for foreground/background
-        # This is a very basic approach; more sophisticated coloring could be used.
         if subunit_data.ndim == 3 and subunit_data.shape[2] == 3: # RGB
             avg_color = np.mean(subunit_data, axis=(0, 1)).astype(int)
             r, g, b = avg_color[0], avg_color[1], avg_color[2]
-            # Example: use average color as background, fixed foreground (e.g., white)
-            # Or, derive foreground based on contrast with average background.
-            # For this example, let's set background to average and print the char.
-            # A more advanced kernel could return (char, fg_color, bg_color).
+            # Use average color as background, fixed white foreground.
+            # A more advanced kernel could return (char, fg_color_tuple, bg_color_tuple).
             ansi_color_bg = f"\x1b[48;2;{r};{g};{b}m"
             ansi_color_fg = "\x1b[38;2;255;255;255m" # White foreground
         else: # Grayscale or other
             ansi_color_bg = "" # No specific background color
             ansi_color_fg = "" # No specific foreground color
 
-        terminal_row = base_row + y_pixel # Assuming y_pixel is the target row
-        terminal_col = base_col + x_pixel # Assuming x_pixel is the target col
+        terminal_row = base_row + char_y
+        terminal_col = base_col + char_x
 
         sys.stdout.write(f"\x1b[{terminal_row};{terminal_col}H{ansi_color_bg}{ansi_color_fg}{char_to_draw}\x1b[0m")
     sys.stdout.flush()
