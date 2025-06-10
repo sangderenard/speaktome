@@ -20,16 +20,24 @@ def test_detect_faculty_enum() -> None:
     assert isinstance(fac, Faculty)
 
 
-def test_detect_faculty_pure_python() -> None:
+def test_detect_faculty_pure_python(monkeypatch) -> None:
     """Verify the fallback when no numerical libraries are present."""
-    import importlib.util
-    if importlib.util.find_spec('numpy') is not None:
-        pytest.skip('numpy installed')
+    import builtins
+
     with mock.patch.dict(sys.modules):
-        # Ensure these modules are treated as not imported for this test
-        sys.modules.pop('torch_geometric', None)
-        sys.modules.pop('torch', None)
-        sys.modules.pop('numpy', None)
+        # Remove any already imported numerical libraries
+        sys.modules.pop("torch_geometric", None)
+        sys.modules.pop("torch", None)
+        sys.modules.pop("numpy", None)
+
+        original_import = builtins.__import__
+
+        def fake_import(name, globals=None, locals=None, fromlist=(), level=0):
+            if name in {"torch", "torch_geometric", "numpy"}:
+                raise ModuleNotFoundError
+            return original_import(name, globals, locals, fromlist, level)
+
+        monkeypatch.setattr(builtins, "__import__", fake_import)
         assert detect_faculty() == Faculty.PURE_PYTHON
 
 
