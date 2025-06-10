@@ -629,6 +629,11 @@ def main() -> None:
         frame = compose_full_frame(system, internet, stopwatch_td, offset)
         img = Image.fromarray(frame, mode="RGB")
         img = render_backend.process(img)
+        if img.mode != "RGB":
+            # RenderingBackend may produce an RGBA image when effects use
+            # transparency. Convert back to RGB so PixelFrameBuffer receives
+            # the expected three-channel data.
+            img = img.convert("RGB")
         return np.array(img)
 
     render_thread = threading.Thread(
