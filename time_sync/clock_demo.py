@@ -27,7 +27,7 @@ from time_sync import (
     init_colorama_for_windows, reset_cursor_to_top, full_clear_and_reset_cursor
 )
 from time_sync.theme_manager import ThemeManager, ClockTheme # Ensure this import works
-from time_sync.frame_buffer import PixelFrameBuffer
+from time_sync.frame_buffer import PixelFrameBuffer 
 from time_sync.render_thread import render_loop
 from time_sync.draw import draw_diff
 from time_sync.ascii_digits import (
@@ -74,8 +74,11 @@ def parse_rect(rect_str: str) -> tuple[int, int, int, int] | None:
     raise argparse.ArgumentTypeError(f"Invalid rect format: '{rect_str}'. Expected 'x,y,width,height'.")
 
 
-def load_config_from_json(config_path: str) -> dict:
+def load_config_from_json(config_path: str, clock_identifier: Optional[str] = None) -> dict:
     """Loads configuration from a JSON file."""
+    if clock_identifier:
+        config_path = f"{clock_identifier}_config.json"
+
     if os.path.exists(config_path):
         try:
             with open(config_path, 'r') as f:
@@ -86,8 +89,9 @@ def load_config_from_json(config_path: str) -> dict:
             print(f"Warning: Error loading {config_path}: {e}. Using defaults.")
     return {}
 
-def save_config_to_json(config_path: str, config_data: dict) -> None:
+def save_config_to_json(config_data: dict, clock_identifier: str) -> None:
     """Saves configuration to a JSON file."""
+    config_path = f"{clock_identifier}_config.json"
     try:
         with open(config_path, 'w') as f:
             json.dump(config_data, f, indent=4)
@@ -95,14 +99,20 @@ def save_config_to_json(config_path: str, config_data: dict) -> None:
     except Exception as e:
         print(f"Error saving configuration to {config_path}: {e}")
 
-
-def interactive_configure_mode(clock_type: str, initial_config: dict, backdrop_path: str | None):
+def interactive_configure_mode(
+    clock_identifier: str, # e.g., "slow_analog", "fast_digital"
+    initial_config: dict, 
+    theme_manager: ThemeManager # Pass theme_manager for backdrop access
+    ):
     """Interactive mode for configuring clock appearance."""
     config = initial_config.copy()
-    config_path = f"{clock_type}_config.json" # analog_config.json or digital_config.json
+    
+    clock_type = "analog" if "analog" in clock_identifier else "digital"
+    is_fast_clock = "fast" in clock_identifier
 
-    print(f"Entering {clock_type} clock configuration mode...")
-    print(f"Using backdrop: {backdrop_path if backdrop_path else 'None'}")
+    print(f"Entering {clock_identifier} clock configuration mode...")
+    current_backdrop = theme_manager.current_theme.current_backdrop_path
+    print(f"Using backdrop: {current_backdrop if current_backdrop else 'None'}")
     print("Press 's' to save, 'q' to quit without saving.")
     time.sleep(1)
 
@@ -111,15 +121,21 @@ def interactive_configure_mode(clock_type: str, initial_config: dict, backdrop_p
     while True:
         full_clear_and_reset_cursor()
         current_time = _dt.datetime.utcnow().replace(tzinfo=_dt.timezone.utc) # Or use time_sync.now()
+        stopwatch_td = _dt.timedelta(seconds=time.perf_counter()) # Dummy stopwatch for config
 
-        print(f"--- {clock_type.upper()} CLOCK CONFIGURATION ---")
+        time_obj_for_config = stopwatch_td if is_fast_clock else current_time
+
+        print(f"--- {clock_identifier.upper()} CLOCK CONFIGURATION ---")
         if clock_type == "analog":
             # Ensure rect is a tuple if it exists
             rect = config.get("clock_drawing_rect_on_canvas")
             if isinstance(rect, list) and len(rect) == 4:
                 config["clock_drawing_rect_on_canvas"] = tuple(rect)
             
-            print_analog_clock(current_time, backdrop_image_path=backdrop_path, **config)
+            # Use theme_manager's current backdrop for preview
+            print_analog_clock(time_obj_for_config, 
+                               backdrop_image_path=theme_manager.current_theme.current_backdrop_path, 
+                               theme_manager=theme_manager, **config)
             print("\n--- Current Analog Config ---")
             rect = config.get("clock_drawing_rect_on_canvas", "Not set")
             print(f"Drawing Rect (x,y,w,h): {rect} (Use Arrow keys to move)")
@@ -129,7 +145,10 @@ def interactive_configure_mode(clock_type: str, initial_config: dict, backdrop_p
             help_text = "[Arrows]:Move [J/L]:Width [I/K]:Height [+/-]:ASCII Dia. [c/C]:Canvas Px [s]:Save [q]:Quit"
 
         elif clock_type == "digital":
-            print_digital_clock(current_time, backdrop_image_path=backdrop_path, **config)
+            print_digital_clock(time_obj_for_config, 
+                                backdrop_image_path=theme_manager.current_theme.current_backdrop_path,
+                                theme_manager=theme_manager, 
+                                **config)
             print("\n--- Current Digital Config ---")
             print(f"ASCII Width: {config.get('target_ascii_width', 'Default')} (←/→)")
             print(f"ASCII Height: {config.get('target_ascii_height', 'Default')} (↑/↓)")
@@ -145,7 +164,7 @@ def interactive_configure_mode(clock_type: str, initial_config: dict, backdrop_p
         if key == 'q':
             break
         elif key == 's':
-            save_config_to_json(config_path, config)
+            save_config_to_json(config, clock_identifier)
             print("Configuration saved. Exiting config mode.")
             time.sleep(1)
             break
@@ -185,7 +204,7 @@ def interactive_configure_mode(clock_type: str, initial_config: dict, backdrop_p
             elif key == '-': config["font_size"] = max(8, config.get("font_size", 40) - adjustment_step)
 
     full_clear_and_reset_cursor()
-    print(f"Exited {clock_type} clock configuration mode.")
+    print(f"Exited {clock_identifier} clock configuration mode.")
 
 
 def render_simple_text_to_pixel_array(
@@ -233,14 +252,36 @@ def input_thread_fn(input_queue, stop_event):
             if key:
                 input_queue.put(key)
 
+KEY_MAPPINGS_PATH = os.path.join(os.path.dirname(__file__), "key_mappings.json")
+
+def load_key_mappings(path: str = KEY_MAPPINGS_PATH) -> dict:
+    try:
+        with open(path, 'r') as f:
+            return json.load(f)
+    except Exception as e:
+        print(f"Error loading key mappings from {path}: {e}. Using empty map.")
+        return {}
+
+
 def main() -> None:
     """Run the clock demo until interrupted."""
+    global PIXEL_BUFFER_SCALE, TEXT_FIELD_SCALE # Allow modification by keys
+
     parser = argparse.ArgumentParser(description="Live clock demo with various displays.")
     parser.add_argument(
-        "--configure", choices=["analog", "digital"], help="Enter interactive configuration mode for the specified clock type."
+        "--configure", 
+        choices=["slow_analog", "fast_analog", "slow_digital", "fast_digital"], 
+        help="Enter interactive configuration mode for a specific clock instance."
     )
     parser.add_argument(
-        "--backdrop", type=str, help="Default backdrop image for all clocks if specific ones are not set."
+        "--backdrops", nargs='+', type=str, 
+        help="Space-separated list of backdrop image paths to cycle through. The first is default."
+    )
+    parser.add_argument(
+        "--initial-pixel-buffer-scale", type=float, default=1.0, help="Initial scale factor for the internal render buffer resolution."
+    )
+    parser.add_argument(
+        "--initial-text-field-scale", type=float, default=1.0, help="Initial scale factor for text field output size (characters)."
     )
     parser.add_argument(
         "--analog-backdrop", type=str, help="Path to an image file for the analog clock backdrop."
@@ -285,6 +326,20 @@ def main() -> None:
         "--ascii-style", choices=["block", "detailed", "minimal", "dots", "shapes"],
         default="detailed", help="Initial ASCII character style" # Changed default to detailed
     )
+    parser.add_argument(
+        "--slow-analog-units", type=str, default="default_analog", help="Time unit set for the slow analog clock."
+    )
+    parser.add_argument(
+        "--fast-analog-units", type=str, default="analog_fast_sms", help="Time unit set for the fast analog clock."
+    )
+    parser.add_argument(
+        "--slow-digital-units", type=str, default="default_digital_hms", help="Time unit set for the slow digital clock."
+    )
+    parser.add_argument(
+        "--fast-digital-units", type=str, default="digital_fast_sms", help="Time unit set for the fast digital clock."
+    )
+    parser.add_argument("--slow-digital-format", type=str, default="default_hms", help="Format key for slow digital clock.")
+    parser.add_argument("--fast-digital-format", type=str, default="fast_s_ms", help="Format key for fast digital clock.")
     parser.set_defaults(
         show_analog=True,
         show_digital_system=True,
@@ -294,21 +349,36 @@ def main() -> None:
     )
     args = parser.parse_args()
 
+    key_mappings = load_key_mappings()
+
+    PIXEL_BUFFER_SCALE = args.initial_pixel_buffer_scale
+    TEXT_FIELD_SCALE = args.initial_text_field_scale
+    
+    # Base dimensions for 1.0 scale
+    BASE_FB_ROWS = 45 
+    BASE_FB_COLS = 120
+
     init_colorama_for_windows()
 
     # Load configurations from JSON files
-    default_analog_config = load_config_from_json("analog_config.json")
-    default_digital_config = load_config_from_json("digital_config.json")
+    # These will serve as templates; specific instances can override
+    slow_analog_config = load_config_from_json("analog_config.json", "slow_analog")
+    fast_analog_config = load_config_from_json("analog_config.json", "fast_analog") # Start with base analog
+    slow_digital_config = load_config_from_json("digital_config.json", "slow_digital")
+    fast_digital_config = load_config_from_json("digital_config.json", "fast_digital") # Start with base digital
+
+    # Consolidate configs for easier access later if needed
+    clock_configs = {
+        "slow_analog": slow_analog_config, "fast_analog": fast_analog_config,
+        "slow_digital": slow_digital_config, "fast_digital": fast_digital_config
+    }
 
     if args.configure:
-        if args.configure == "analog":
-            # Determine backdrop for analog configuration
-            analog_config_backdrop = args.analog_backdrop if args.analog_backdrop is not None else args.backdrop
-            interactive_configure_mode("analog", default_analog_config, analog_config_backdrop)
-        elif args.configure == "digital":
-            # Determine backdrop for digital configuration
-            digital_config_backdrop = args.digital_backdrop if args.digital_backdrop is not None else args.backdrop
-            interactive_configure_mode("digital", default_digital_config, digital_config_backdrop)
+        # ThemeManager needs to be initialized for backdrop cycling in config mode
+        temp_theme_manager = ThemeManager(presets_path=os.path.join(os.path.dirname(__file__), "time_sync", "presets", "default_themes.json"))
+        if args.backdrops: temp_theme_manager.current_theme.current_backdrop_path = args.backdrops[0]
+        
+        interactive_configure_mode(args.configure, clock_configs[args.configure], temp_theme_manager)
         return # Exit after configuration mode
 
 
@@ -317,143 +387,263 @@ def main() -> None:
     start = time.perf_counter()
 
     # Initialize ThemeManager and set current theme from args
-    # Assuming presets/default_themes.json is relative to where clock_demo.py is run,
-    # or adjust path in ThemeManager.
-    # For a library, ThemeManager should ideally find its presets relative to its own location.
-    # For now, let's assume it's findable from the CWD or an adjusted path.
-    # Path to presets, assuming clock_demo.py is in time_sync/ and presets is in time_sync/time_sync/presets
     presets_file_path = os.path.join(os.path.dirname(__file__), "time_sync", "presets", "default_themes.json")
-    
-    # Try to find presets relative to the script or common project structures
-    # This helps if the script is run from different working directories.
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    
-    # Path 1: <script_dir>/time_sync/presets/default_themes.json (if clock_demo.py is in time_sync root)
-    path1 = os.path.join(script_dir, "time_sync", "presets", "default_themes.json")
-    # Path 2: <script_dir>/../presets/default_themes.json (if clock_demo.py is in time_sync/time_sync/ and presets is in time_sync/presets)
-    path2 = os.path.join(script_dir, "..", "presets", "default_themes.json")
-    # Path 3: presets/default_themes.json (if run from project root and presets is in project_root/presets)
-    path3 = "presets/default_themes.json"
-    # Path 4: time_sync/presets/default_themes.json (if run from project root and presets is in project_root/time_sync/presets)
-    path4 = "time_sync/presets/default_themes.json"
-
-    if not os.path.exists(presets_file_path) and os.path.exists("presets/default_themes.json"): # If run from repo root
-        presets_file_path = "presets/default_themes.json" 
-    elif not os.path.exists(presets_file_path) and os.path.exists("time_sync/presets/default_themes.json"): # If run from one level up
-        presets_file_path = "time_sync/presets/default_themes.json"
+    # Simplified path finding, assuming ThemeManager's default is usually correct
+    # or the user runs from a location where `time_sync/time_sync/presets` is valid.
 
     theme_manager = ThemeManager(presets_path=presets_file_path)
+    if args.backdrops:
+        theme_manager.current_theme.current_backdrop_path = args.backdrops[0]
+
     theme_manager.set_palette(args.theme)
     theme_manager.set_effects(args.effects)
     theme_manager.set_post_processing(args.post_processing)
-    
-    # Initialize clock parameters by merging defaults with command-line args
-    analog_params = default_analog_config.copy()
-    if args.analog_clock_rect:
-        analog_params["clock_drawing_rect_on_canvas"] = args.analog_clock_rect
-    if args.analog_backdrop or args.backdrop:
-        analog_params["backdrop_image_path"] = args.analog_backdrop if args.analog_backdrop is not None else args.backdrop
+    # Set initial ASCII style from args, then ThemeManager can cycle it
+    theme_manager.current_theme.ascii_style = args.ascii_style
 
-    digital_params = default_digital_config.copy()
-    if args.digital_backdrop or args.backdrop:
-        digital_params["backdrop_image_path"] = args.digital_backdrop if args.digital_backdrop is not None else args.backdrop
+    # Store current unit set and format keys, to be cycled by new controls
+    current_slow_analog_units_key = args.slow_analog_units
+    current_fast_analog_units_key = args.fast_analog_units
+    current_slow_digital_units_key = args.slow_digital_units
+    current_fast_digital_units_key = args.fast_digital_units
+    current_slow_digital_format_key = args.slow_digital_format
+    current_fast_digital_format_key = args.fast_digital_format
+    
+    # Helper to get a list of TimeUnit objects for a given set name
+    def get_time_units_for_set(set_name: str) -> list:
+        all_defined_units = theme_manager.get_time_unit_definitions()
+        unit_names_in_set = theme_manager.presets.get("time_unit_sets", {}).get(set_name, [])
+        units = [all_defined_units[name] for name in unit_names_in_set if name in all_defined_units]
+        if len(units) != len(unit_names_in_set):
+            print(f"Warning: Some units in set '{set_name}' were not found in definitions.")
+        return units[:5] # Max 5 units
+
+    # Helper to get a format string for a given key
+    def get_format_string_for_key(key_name: str) -> str:
+        return theme_manager.presets.get("digital_format_strings", {}).get(key_name, "{value}")
+
+    # Initial unit sets and format strings will be fetched inside compose_full_frame
+
+    # Initialize clock parameters by merging defaults with command-line args
+    # These are base parameters, specific clock instances might have their own loaded configs
+    base_analog_params = load_config_from_json("analog_config.json") 
+    if args.analog_clock_rect:
+        base_analog_params["clock_drawing_rect_on_canvas"] = args.analog_clock_rect
+    # Backdrop for analog_params is now handled by theme_manager.current_theme.current_backdrop_path
+
+    base_digital_params = load_config_from_json("digital_config.json")
+    # Backdrop for digital_params is now handled by theme_manager.current_theme.current_backdrop_path
 
     # --- FRAMEBUFFER COMPOSITION ---
-    fb_rows = 40
-    fb_cols = 120 # Pixel columns, can be wider than typical char cells
-    # For pixel buffer, fb_rows and fb_cols define the pixel resolution.
-    # Each "pixel" will be mapped to a terminal character cell by draw_diff.
-    framebuffer = PixelFrameBuffer((fb_rows, fb_cols))
+    def get_scaled_fb_dims():
+        return int(BASE_FB_ROWS * PIXEL_BUFFER_SCALE), int(BASE_FB_COLS * PIXEL_BUFFER_SCALE)
+
+    fb_rows, fb_cols = get_scaled_fb_dims()
+    framebuffer = PixelFrameBuffer((fb_rows, fb_cols), diff_threshold=20) # Initialized with scaled dims
     stop_event = threading.Event()
 
-    def compose_full_frame(system, internet, stopwatch, offset):
+    # Display state flags
+    display_state = {
+        "analog_clocks": args.show_analog,
+        "slow_digital_clock": args.show_digital_system,
+        "fast_digital_clock": args.show_digital_internet,
+        "stopwatch": args.show_stopwatch,
+        "offset_info": args.show_offset,
+        "legend": True # Show legend by default
+    }
+
+    def compose_full_frame(system_time_obj, internet_time_obj, stopwatch_td_obj, offset_val):
+        current_fb_rows, current_fb_cols = get_scaled_fb_dims()
         # Initialize buffer with black pixels
-        buf = np.full((fb_rows, fb_cols, 3), [0,0,0], dtype=np.uint8)
+        buf = np.full((current_fb_rows, current_fb_cols, 3), [0,0,0], dtype=np.uint8)
         row = 0
-        available_width = fb_cols
+        available_width = current_fb_cols # Pixel width
+        spacer_color = [5,5,10] # Dark spacer
+        spacer_height = 1
 
-        if args.show_analog:
-            analog_arr = print_analog_clock(
-                internet,
+        # Determine time objects for slow/fast clocks
+        slow_time_obj = internet_time_obj # Or system_time_obj
+        fast_time_obj = stopwatch_td_obj
+        
+        current_backdrop_path = theme_manager.current_theme.current_backdrop_path
+        # Fetch current unit sets and formats based on keys
+        slow_analog_units = get_time_units_for_set(current_slow_analog_units_key)
+        fast_analog_units = get_time_units_for_set(current_fast_analog_units_key)
+        slow_digital_units = get_time_units_for_set(current_slow_digital_units_key)
+        fast_digital_units = get_time_units_for_set(current_fast_digital_units_key)
+        slow_digital_format = get_format_string_for_key(current_slow_digital_format_key)
+        fast_digital_format = get_format_string_for_key(current_fast_digital_format_key)
+
+        if display_state["analog_clocks"]:
+            # Scale analog row height based on PIXEL_BUFFER_SCALE and TEXT_FIELD_SCALE
+            # Base character height for analog might be around 15-20 chars
+            base_analog_char_h = 15 
+            analog_row_pixel_height = int(base_analog_char_h * TEXT_FIELD_SCALE * (PIXEL_BUFFER_SCALE * 1.5)) # Heuristic for char cell to pixel
+            analog_width_each = available_width // 2
+            
+            # Slow Analog Clock (Left)
+            analog_slow_params = clock_configs["slow_analog"].copy()
+            analog_slow_params["target_ascii_diameter"] = int(base_analog_char_h * TEXT_FIELD_SCALE)
+            analog_slow_params["canvas_size_px"] = int(analog_slow_params["target_ascii_diameter"] * 7 * PIXEL_BUFFER_SCALE) # Scale canvas
+            analog_slow_params["backdrop_image_path"] = current_backdrop_path
+
+            slow_analog_arr = print_analog_clock(
+                slow_time_obj,
+                active_units_override=slow_analog_units,
                 theme_manager=theme_manager,
                 as_pixel=True,
-                **analog_params
+                **analog_slow_params
             )
-            h, w, _ = analog_arr.shape
-            place_w = min(w, available_width)
-            buf[row:row+h, :place_w] = analog_arr[:, :place_w]
-            row += h
-            # Add a small black spacer row if there's space
-            if row < fb_rows: buf[row, :available_width] = [10,10,10]; row +=1 # Dark grey spacer
+            if slow_analog_arr is not None:
+                h, w, _ = slow_analog_arr.shape
+                place_h = min(h, analog_row_pixel_height)
+                place_w = min(w, analog_width_each)
+                y_offset = (analog_row_pixel_height - place_h) // 2 
+                x_offset = (analog_width_each - place_w) // 2 # Center horizontally
+                if row + y_offset + place_h <= current_fb_rows:
+                    buf[row + y_offset : row + y_offset + place_h, 
+                        x_offset : x_offset + place_w] = slow_analog_arr[:place_h, :place_w]
 
-        if args.show_digital_system:
-            sys_arr = print_digital_clock(
-                system,
+            # Fast Analog Clock (Right)
+            analog_fast_params = clock_configs["fast_analog"].copy()
+            analog_fast_params["target_ascii_diameter"] = int(base_analog_char_h * TEXT_FIELD_SCALE)
+            analog_fast_params["canvas_size_px"] = int(analog_fast_params["target_ascii_diameter"] * 7 * PIXEL_BUFFER_SCALE)
+            analog_fast_params["backdrop_image_path"] = current_backdrop_path
+
+            fast_analog_arr = print_analog_clock(
+                fast_time_obj, # Stopwatch time
+                active_units_override=fast_analog_units,
                 theme_manager=theme_manager,
                 as_pixel=True,
-                **digital_params
+                **analog_fast_params
             )
-            h, w, _ = sys_arr.shape
-            place_w = min(w, available_width)
-            buf[row:row+h, :place_w] = sys_arr[:, :place_w]
-            row += h
-            if row < fb_rows: buf[row, :available_width] = [10,10,10]; row +=1
+            if fast_analog_arr is not None:
+                h, w, _ = fast_analog_arr.shape
+                place_h = min(h, analog_row_pixel_height)
+                place_w = min(w, analog_width_each)
+                y_offset = (analog_row_pixel_height - place_h) // 2
+                x_offset_fast = analog_width_each + (analog_width_each - place_w) // 2 
+                if row + y_offset + place_h <= current_fb_rows:
+                     buf[row + y_offset : row + y_offset + place_h, 
+                         x_offset_fast : x_offset_fast + place_w] = fast_analog_arr[:place_h, :place_w]
+            
+            row += analog_row_pixel_height
+            if row < current_fb_rows: buf[row, :available_width] = spacer_color; row += spacer_height
 
-        if args.show_digital_internet:
-            # Use compose_ascii_digits directly for pixel array
-            # Ensure default_digital_config has appropriate target_ascii_width/height
-            # which will be used as target_pixel_width/height
-            net_params = default_digital_config.copy()
-            # Example: define pixel dimensions for this specific text element
-            target_h = net_params.get("target_ascii_height", 7) 
-            target_w = net_params.get("target_ascii_width", 60)
-
-            net_arr = compose_ascii_digits(
-                internet.strftime("%H:%M:%S.%ms"),
-                as_pixel_array=True,
-                target_pixel_width=target_w,
-                target_pixel_height=target_h,
-                ascii_ramp=theme_manager.get_current_ascii_ramp(),
+        if display_state["slow_digital_clock"]:
+            digital_slow_params = clock_configs["slow_digital"].copy()
+            base_digital_char_h = digital_slow_params.get("target_ascii_height", 7)
+            digital_row_pixel_height = int(base_digital_char_h * TEXT_FIELD_SCALE * (PIXEL_BUFFER_SCALE * 1.5)) # Heuristic
+            digital_slow_params["target_ascii_height"] = int(base_digital_char_h * TEXT_FIELD_SCALE) # Text field scale
+            digital_slow_params["target_ascii_width"] = int(digital_slow_params.get("target_ascii_width", 60) * TEXT_FIELD_SCALE)
+            digital_slow_params["font_size"] = int(digital_slow_params.get("font_size", 40) * PIXEL_BUFFER_SCALE) # Font size scales with buffer
+            digital_slow_params["backdrop_image_path"] = current_backdrop_path
+            
+            slow_digital_arr = print_digital_clock(
+                slow_time_obj,
+                active_units=slow_digital_units,
+                display_format_template=slow_digital_format,
                 theme_manager=theme_manager,
-                **net_params
+                as_pixel=True,
+                **digital_slow_params
             )
-            h, w, _ = net_arr.shape
-            place_w = min(w, available_width)
-            if row + h <= fb_rows:
-                buf[row:row+h, :place_w] = net_arr[:, :place_w]
-                row += h
-                if row < fb_rows: buf[row, :available_width] = [10,10,10]; row +=1
+            if slow_digital_arr is not None:
+                h, w, _ = slow_digital_arr.shape
+                place_h = min(h, digital_row_pixel_height)
+                place_w = min(w, available_width)
+                if row + place_h <= current_fb_rows:
+                    buf[row:row+place_h, :place_w] = slow_digital_arr[:place_h, :place_w]
+                row += place_h
+            if row < current_fb_rows: buf[row, :available_width] = spacer_color; row += spacer_height
 
-        if args.show_stopwatch:
-            text_h = 3 # Small height for single line text
-            if row + text_h <= fb_rows:
+        if display_state["fast_digital_clock"]:
+            digital_fast_params = clock_configs["fast_digital"].copy()
+            base_digital_char_h = digital_fast_params.get("target_ascii_height", 7)
+            digital_row_pixel_height = int(base_digital_char_h * TEXT_FIELD_SCALE * (PIXEL_BUFFER_SCALE * 1.5))
+            digital_fast_params["target_ascii_height"] = int(base_digital_char_h * TEXT_FIELD_SCALE)
+            digital_fast_params["target_ascii_width"] = int(digital_fast_params.get("target_ascii_width", 60) * TEXT_FIELD_SCALE)
+            digital_fast_params["font_size"] = int(digital_fast_params.get("font_size", 40) * PIXEL_BUFFER_SCALE)
+            digital_fast_params["backdrop_image_path"] = current_backdrop_path
+
+            fast_digital_arr = print_digital_clock(
+                fast_time_obj, # Stopwatch time
+                active_units=fast_digital_units,
+                display_format_template=fast_digital_format,
+                theme_manager=theme_manager,
+                as_pixel=True,
+                **digital_fast_params
+            )
+            if fast_digital_arr is not None:
+                h, w, _ = fast_digital_arr.shape
+                place_h = min(h, digital_row_pixel_height)
+                place_w = min(w, available_width)
+                if row + place_h <= current_fb_rows:
+                    buf[row:row+place_h, :place_w] = fast_digital_arr[:place_h, :place_w]
+                row += place_h
+            if row < current_fb_rows: buf[row, :available_width] = spacer_color; row += spacer_height
+
+        if display_state["stopwatch"]:
+            base_text_char_h = 3
+            text_pixel_h = int(base_text_char_h * TEXT_FIELD_SCALE * (PIXEL_BUFFER_SCALE*1.2)) # Heuristic
+            font_sz = int(10 * PIXEL_BUFFER_SCALE)
+            if row + text_pixel_h <= current_fb_rows:
                 sw_arr = render_simple_text_to_pixel_array(
-                    f"Stopwatch: {stopwatch}",
+                    f"Stopwatch: {stopwatch_td_obj.total_seconds():09.3f}", # Format timedelta
                     available_width,
-                    text_h,
-                    font_size=10,
+                    text_pixel_h,
+                    font_size=font_sz,
                     theme_manager=theme_manager,
                 )
-                buf[row:row+text_h, :available_width] = sw_arr
-                row += text_h
-                if row < fb_rows: buf[row, :available_width] = [10,10,10]; row +=1
+                buf[row:row+text_pixel_h, :available_width] = sw_arr
+                row += text_pixel_h + spacer_height 
+                if row < current_fb_rows: buf[row-spacer_height, :available_width] = spacer_color 
 
-        if args.show_offset:
-            text_h = 3
-            if row + text_h <= fb_rows:
+        if display_state["offset_info"]:
+            base_text_char_h = 3
+            text_pixel_h = int(base_text_char_h * TEXT_FIELD_SCALE * (PIXEL_BUFFER_SCALE*1.2))
+            font_sz = int(10 * PIXEL_BUFFER_SCALE)
+            if row + text_pixel_h <= current_fb_rows:
                 off_arr = render_simple_text_to_pixel_array(
-                    f"Offset: {_dt.timedelta(seconds=offset)}",
+                    f"Offset: {_dt.timedelta(seconds=offset_val)}",
                     available_width,
-                    text_h,
-                    font_size=10,
+                    text_pixel_h,
+                    font_size=font_sz,
                     theme_manager=theme_manager,
                 )
-                buf[row:row+text_h, :available_width] = off_arr
-                row += text_h
+                buf[row:row+text_pixel_h, :available_width] = off_arr
+                row += text_pixel_h
+        
+        if display_state["legend"]:
+            base_legend_char_h = 1
+            legend_pixel_h_per_line = int(base_legend_char_h * TEXT_FIELD_SCALE * (PIXEL_BUFFER_SCALE*1.0)) # Heuristic
+            legend_font_sz = int(8 * PIXEL_BUFFER_SCALE)
+            max_legend_lines = (current_fb_rows - row) // legend_pixel_h_per_line
+            
+            legend_parts = []
+            for action, mapping in key_mappings.items():
+                keys_str = "/".join(mapping["keys"])
+                legend_parts.append(f"{keys_str}: {mapping['description']}")
+            
+            # Simple two-column layout for legend
+            num_legend_items = len(legend_parts)
+            col1_items = legend_parts[:(num_legend_items + 1) // 2]
+            col2_items = legend_parts[(num_legend_items + 1) // 2:]
+
+            legend_lines_to_render = max(len(col1_items), len(col2_items))
+            
+            for i in range(min(legend_lines_to_render, max_legend_lines)):
+                line_text_parts = []
+                # Scale ljust based on text field scale
+                ljust_val = int(30 * TEXT_FIELD_SCALE) 
+                if i < len(col1_items): line_text_parts.append(col1_items[i].ljust(ljust_val)) 
+                if i < len(col2_items): line_text_parts.append(col2_items[i])
+                legend_line_text = "  ".join(line_text_parts)
+                legend_line_arr = render_simple_text_to_pixel_array(legend_line_text, available_width, legend_pixel_h_per_line, font_size=legend_font_sz, theme_manager=theme_manager)
+                buf[row + i * legend_pixel_h_per_line : row + (i+1) * legend_pixel_h_per_line, :available_width] = legend_line_arr
 
         return buf
 
-    def render_fn():
+    def render_fn(framebuffer_ref): # Pass framebuffer to allow reinitialization
         elapsed = time.perf_counter() - start
         offset = get_offset()
         system = _dt.datetime.utcnow().replace(tzinfo=_dt.timezone.utc)
@@ -462,9 +652,14 @@ def main() -> None:
         h, rem = divmod(int(elapsed * 1000), 3600 * 1000)
         m, rem = divmod(rem, 60 * 1000)
         s, ms = divmod(rem, 1000)
-        stopwatch = f"{h:02}:{m:02}:{s:02}.{ms:03}"
+        stopwatch_td = _dt.timedelta(hours=h, minutes=m, seconds=s, milliseconds=ms)
 
-        frame = compose_full_frame(system, internet, stopwatch, offset)
+        # Check if framebuffer dimensions need to change due to scale factors
+        new_fb_rows, new_fb_cols = get_scaled_fb_dims()
+        if framebuffer_ref.buffer_shape[0] != new_fb_rows or framebuffer_ref.buffer_shape[1] != new_fb_cols:
+            framebuffer_ref._resize((new_fb_rows, new_fb_cols)) # Use internal resize
+
+        frame = compose_full_frame(system, internet, stopwatch_td, offset)
         img = Image.fromarray(frame, mode="RGB")
         img = theme_manager.apply_effects(img)
         img = theme_manager.apply_theme(img)
@@ -472,7 +667,7 @@ def main() -> None:
 
     render_thread = threading.Thread(
         target=render_loop,
-        args=(framebuffer, render_fn, 10, stop_event),
+        args=(framebuffer, lambda: render_fn(framebuffer), 10, stop_event), # Pass framebuffer to render_fn
         daemon=True,
     )
     render_thread.start()
@@ -490,40 +685,104 @@ def main() -> None:
                 (y, x, np.array([[color]], dtype=np.uint8))
                 for y, x, color in diff_pixels
             ]
-            draw_diff(changed)
+            draw_diff(changed, active_ascii_ramp=theme_manager.get_current_ascii_ramp())
 
             # Drain the input queue
             while not input_queue.empty():
                 key = input_queue.get()
                 input_buffer += key
 
-            cmd = input_buffer.strip().lower()
+            # Process characters from the raw input_buffer
+            # We'll build a new buffer with unprocessed characters
+            remaining_buffer = ""
             
-            if not stop_event.is_set(): # Only process input if not already stopping
-                if cmd in {"q", "quit", "exit"}: # Exact match for multi-char quit
-                    stop_event.set()
-                elif cmd: # If there's any command and it's not a multi-char quit
-                    for char_from_cmd in cmd:
-                        char_lower = char_from_cmd.lower() # Process char by char
-                        if char_lower == 'q': # Single 'q' also quits
-                            stop_event.set()
-                            break # Stop processing further characters in cmd
-                        elif char_lower == 'a':
-                            theme_manager.cycle_ascii_style()
-                        elif char_lower == 'i':
-                            theme_manager.toggle_clock_inversion()
-                        elif char_lower == 'b':
-                            theme_manager.toggle_backdrop_inversion()
-                        elif char_lower == 't':
-                            theme_manager.cycle_palette(1)
-                        elif char_lower == 'T':
-                            theme_manager.cycle_palette(-1)
+            if not stop_event.is_set() and input_buffer: # Check raw input_buffer
+                for char_key_raw in input_buffer: # Iterate through raw characters from buffer
+                    action_found = False
+                    for action, mapping in key_mappings.items():
+                        if char_key_raw in mapping["keys"]: # Compare raw char_key_raw
+                            # --- Execute action ---
+                            if action == "quit": stop_event.set()
+                            elif action == "toggle_legend": display_state["legend"] = not display_state["legend"]
+                            elif action == "cycle_ascii_style_forward": theme_manager.cycle_ascii_style() 
+                            elif action == "cycle_ascii_style_backward": theme_manager.cycle_ascii_style(-1)
+                            elif action == "cycle_palette_forward": theme_manager.cycle_palette(1)
+                            elif action == "cycle_palette_backward": theme_manager.cycle_palette(-1)
+                            elif action == "cycle_effects_forward": theme_manager.cycle_effects_preset(1)
+                            elif action == "cycle_effects_backward": theme_manager.cycle_effects_preset(-1)
+                            elif action == "cycle_post_processing_forward": theme_manager.cycle_post_processing_preset(1)
+                            elif action == "cycle_post_processing_backward": theme_manager.cycle_post_processing_preset(-1)
+                            elif action == "toggle_clock_inversion": theme_manager.toggle_clock_inversion() 
+                            elif action == "toggle_backdrop_inversion": theme_manager.toggle_backdrop_inversion() 
+                            
+                            elif action == "cycle_slow_analog_units_forward": current_slow_analog_units_key = theme_manager.cycle_time_unit_set(current_slow_analog_units_key, 1)
+                            elif action == "cycle_slow_analog_units_backward": current_slow_analog_units_key = theme_manager.cycle_time_unit_set(current_slow_analog_units_key, -1)
+                            elif action == "cycle_fast_analog_units_forward": current_fast_analog_units_key = theme_manager.cycle_time_unit_set(current_fast_analog_units_key, 1)
+                            elif action == "cycle_fast_analog_units_backward": current_fast_analog_units_key = theme_manager.cycle_time_unit_set(current_fast_analog_units_key, -1)
+                            
+                            elif action == "cycle_slow_digital_units_forward": current_slow_digital_units_key = theme_manager.cycle_time_unit_set(current_slow_digital_units_key, 1) 
+                            elif action == "cycle_slow_digital_units_backward": current_slow_digital_units_key = theme_manager.cycle_time_unit_set(current_slow_digital_units_key, -1) 
+                            elif action == "cycle_fast_digital_units_forward": current_fast_digital_units_key = theme_manager.cycle_time_unit_set(current_fast_digital_units_key, 1) 
+                            elif action == "cycle_fast_digital_units_backward": current_fast_digital_units_key = theme_manager.cycle_time_unit_set(current_fast_digital_units_key, -1) 
+
+                            elif action == "cycle_slow_digital_format_forward": current_slow_digital_format_key = theme_manager.cycle_digital_format_key(current_slow_digital_format_key, 1)
+                            elif action == "cycle_slow_digital_format_backward": current_slow_digital_format_key = theme_manager.cycle_digital_format_key(current_slow_digital_format_key, -1)
+                            elif action == "cycle_fast_digital_format_forward": current_fast_digital_format_key = theme_manager.cycle_digital_format_key(current_fast_digital_format_key, 1)
+                            elif action == "cycle_fast_digital_format_backward": current_fast_digital_format_key = theme_manager.cycle_digital_format_key(current_fast_digital_format_key, -1)
+
+                            elif action == "toggle_analog_clocks": display_state["analog_clocks"] = not display_state["analog_clocks"] 
+                            elif action == "toggle_slow_digital_clock": display_state["slow_digital_clock"] = not display_state["slow_digital_clock"] 
+                            elif action == "toggle_fast_digital_clock": display_state["fast_digital_clock"] = not display_state["fast_digital_clock"] 
+                            elif action == "toggle_stopwatch": display_state["stopwatch"] = not display_state["stopwatch"] 
+                            elif action == "toggle_offset_info": display_state["offset_info"] = not display_state["offset_info"] 
+
+                            elif action == "increase_buffer_scale": PIXEL_BUFFER_SCALE = min(3.0, PIXEL_BUFFER_SCALE + 0.1)
+                            elif action == "decrease_buffer_scale": PIXEL_BUFFER_SCALE = max(0.2, PIXEL_BUFFER_SCALE - 0.1)
+                            elif action == "increase_text_field_scale": TEXT_FIELD_SCALE = min(3.0, TEXT_FIELD_SCALE + 0.1)
+                            elif action == "decrease_text_field_scale": TEXT_FIELD_SCALE = max(0.2, TEXT_FIELD_SCALE - 0.1)
+                            elif action == "cycle_backdrop_forward": theme_manager.cycle_backdrop(args.backdrops or [], 1) 
+                            elif action == "cycle_backdrop_backward": theme_manager.cycle_backdrop(args.backdrops or [], -1) 
+                            elif action == "enter_config_mode":
+                                # Determine which clock to configure (e.g., based on active ones or a sub-menu)
+                                # For simplicity, let's say it configures "slow_analog" if active, else prompts
+                                active_clocks_for_config = []
+                                if display_state["analog_clocks"]:
+                                    active_clocks_for_config.append("slow_analog")
+                                    active_clocks_for_config.append("fast_analog")
+                                if display_state["slow_digital_clock"]: active_clocks_for_config.append("slow_digital")
+                                if display_state["fast_digital_clock"]: active_clocks_for_config.append("fast_digital")
+                                
+                                if active_clocks_for_config:
+                                    # Simple: configure the first one in the list, or implement a selection mechanism
+                                    clock_to_config = active_clocks_for_config[0]
+                                    # Pause render thread during config mode might be good
+                                    stop_event.set() # Signal render thread to pause/stop
+                                    render_thread.join(timeout=0.5)
+                                    full_clear_and_reset_cursor()
+                                    interactive_configure_mode(clock_to_config, clock_configs[clock_to_config], theme_manager)
+                                    # Resume render thread
+                                    stop_event.clear()
+                                    render_thread = threading.Thread(
+                                        target=render_loop,
+                                        args=(framebuffer, lambda: render_fn(framebuffer), 10, stop_event),
+                                        daemon=True,
+                                    )
+                                    render_thread.start()
+                                    full_clear_and_reset_cursor() # Clear config screen
+                                else:
+                                    print("No active clock to configure.") # Or a small message on screen
+
+                            action_found = True
+                            break # Found action for this char_key
                     
-                    # If, after processing cmd, we are still running, clear the buffer
-                    if not stop_event.is_set():
-                        input_buffer = ""
-                else: # cmd was empty or just whitespace
-                    input_buffer = ""
+                    if action_found:
+                        if stop_event.is_set(): break # If quit was pressed, exit cmd processing
+                        # Character was processed, do not add to remaining_buffer
+                    else:
+                        # If the character didn't match any action, keep it
+                        remaining_buffer += char_key_raw
+                
+                input_buffer = remaining_buffer # Update buffer with unprocessed characters
 
             if stop_event.is_set(): # Check if we should break out of the main loop
                 break

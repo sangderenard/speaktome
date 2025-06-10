@@ -5,8 +5,7 @@ from __future__ import annotations
 try:
     from AGENTS.tools.header_utils import ENV_SETUP_BOX
     import sys
-    import numpy as np
-    from time_sync.time_sync.ascii_digits import ASCII_RAMP_BLOCK
+    import numpy as np    
 except Exception:
     import sys
     print(ENV_SETUP_BOX)
@@ -14,12 +13,15 @@ except Exception:
 # --- END HEADER ---
 
 
+# Default ASCII ramp used if no specific ramp is provided to drawing functions.
+DEFAULT_DRAW_ASCII_RAMP = " .:░▒▓█"
+
 def default_subunit_to_char_kernel(
-    subunit_data: np.ndarray, ramp: str = ASCII_RAMP_BLOCK
+    subunit_data: np.ndarray, ramp: str
 ) -> str:
     """
     Stub kernel function to map a subunit of pixel data to a single character.
-    This basic stub averages the subunit and returns a block character based on luminance.
+    This basic stub averages the subunit and returns a character from the given ramp based on luminance.
     """
     if subunit_data.size == 0:
         return " " # Should not happen with valid subunits
@@ -35,10 +37,7 @@ def default_subunit_to_char_kernel(
         return "?"
         
     avg_luminance = np.mean(luminance_map)
-    
-    # Simple mapping to a character based on average luminance
-    # ASCII_RAMP_BLOCK = " .:░▒▓█" (example)
-    
+        
     char_index = min(len(ramp) - 1, int((avg_luminance / 255) * len(ramp)))
     return ramp[char_index]
 
@@ -48,6 +47,7 @@ def draw_diff(
     char_cell_pixel_height: int = 1, # The height of a character cell in pixels
     char_cell_pixel_width: int = 1,  # The width of a character cell in pixels
     subunit_to_char_kernel: callable[[np.ndarray], str] = default_subunit_to_char_kernel,
+    active_ascii_ramp: str = DEFAULT_DRAW_ASCII_RAMP, # The ASCII ramp to use for character conversion
     base_row: int = 1, 
     base_col: int = 1
 ) -> None:
@@ -71,7 +71,7 @@ def draw_diff(
         char_y = y_pixel // char_cell_pixel_height
         char_x = x_pixel // char_cell_pixel_width
         
-        char_to_draw = subunit_to_char_kernel(subunit_data)
+        char_to_draw = subunit_to_char_kernel(subunit_data, active_ascii_ramp)
         
         # Determine average color of the subunit for foreground/background
         if subunit_data.ndim == 3 and subunit_data.shape[2] == 3: # RGB

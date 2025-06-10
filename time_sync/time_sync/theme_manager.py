@@ -5,8 +5,8 @@ from __future__ import annotations
 try:
     from AGENTS.tools.header_utils import ENV_SETUP_BOX
     import json
-    import os
-    from dataclasses import dataclass
+    import os    
+    from dataclasses import dataclass, field
     from typing import Dict, List, Optional, Tuple
     from PIL import Image, ImageEnhance, ImageFilter
 except Exception:
@@ -23,8 +23,9 @@ class ClockTheme:
     ascii_style: str
     post_processing: dict
     active_time_units: List[TimeUnit] = field(default_factory=list) # For analog/digital
-    digital_format_string: str = "{hours_12_cycle}:{minutes_60_cycle}:{seconds_60_cycle}" # Example
+    digital_format_key: str = "default_hms" # Key to lookup in presets.digital_format_strings
     invert_clock: bool = False
+    current_backdrop_path: Optional[str] = None # Added for backdrop cycling
     invert_backdrop: bool = False
 
 # Determine the directory of the current module to reliably locate presets
@@ -37,14 +38,16 @@ class ThemeManager:
         self.current_theme = ClockTheme({}, {}, "block", {}, [])
         self._load_presets()
         if not self.current_theme.active_time_units: # Ensure a default set of units
-            self.set_time_unit_set("default_analog") # Or some other sensible default
+            self.set_time_unit_set("default_analog") 
+        if not self.current_theme.digital_format_key:
+            self.set_digital_format_key("default_hms")
 
     def _load_presets(self) -> None:
         """Loads presets from the JSON file.
         Initializes self.presets to an empty structure if loading fails.
         """
         empty_presets = {"color_palettes": {}, "effects_presets": {},
-                         "ascii_styles": {}, "post_processing": {},
+                         "ascii_styles": {}, "post_processing": {}, "digital_format_strings": {},
                          "time_units_definitions": {}, "time_unit_sets": {}}
         try:
             if not os.path.exists(self.presets_path):
@@ -187,6 +190,55 @@ class ThemeManager:
         self.set_palette(names[new_idx])
         return names[new_idx]
 
+    def get_effects_preset_names(self) -> List[str]:
+        return list(self.presets.get("effects_presets", {}).keys())
+
+    def cycle_effects_preset(self, step: int = 1) -> str:
+        names = self.get_effects_preset_names()
+        if not names: return ""
+        current = self.current_theme.effects.get("name", names[0])
+        try: idx = names.index(current)
+        except ValueError: idx = 0
+        new_idx = (idx + step) % len(names)
+        self.set_effects(names[new_idx])
+        return names[new_idx]
+
+    def get_post_processing_preset_names(self) -> List[str]:
+        return list(self.presets.get("post_processing", {}).keys())
+
+    def cycle_post_processing_preset(self, step: int = 1) -> str:
+        names = self.get_post_processing_preset_names()
+        if not names: return ""
+        current = self.current_theme.post_processing.get("name", names[0])
+        try: idx = names.index(current)
+        except ValueError: idx = 0
+        new_idx = (idx + step) % len(names)
+        self.set_post_processing(names[new_idx])
+        return names[new_idx]
+
+    def get_time_unit_set_names(self) -> List[str]:
+        return list(self.presets.get("time_unit_sets", {}).keys())
+
+    def cycle_time_unit_set(self, current_set_name: str, step: int = 1) -> str:
+        names = self.get_time_unit_set_names()
+        if not names: return current_set_name
+        try: idx = names.index(current_set_name)
+        except ValueError: idx = 0
+        new_idx = (idx + step) % len(names)
+        # self.set_time_unit_set(names[new_idx]) # This would set for current_theme.active_time_units
+        return names[new_idx] # Return the name, clock_demo will manage which clock uses it
+
+    def get_digital_format_key_names(self) -> List[str]:
+        return list(self.presets.get("digital_format_strings", {}).keys())
+
+    def cycle_digital_format_key(self, current_format_key: str, step: int = 1) -> str:
+        names = self.get_digital_format_key_names()
+        if not names: return current_format_key
+        try: idx = names.index(current_format_key)
+        except ValueError: idx = 0
+        new_idx = (idx + step) % len(names)
+        return names[new_idx] # Return the key name
+
     def get_time_unit_definitions(self) -> Dict[str, TimeUnit]:
         """Returns all defined TimeUnit objects."""
         defs = self.presets.get("time_units_definitions", {})
@@ -209,6 +261,29 @@ class ThemeManager:
         else:
             print(f"Time unit set '{set_name}' not found. Using current or empty.")
 
-    def set_digital_format_string(self, format_str: str) -> None:
-        """Sets the format string for digital displays."""
-        self.current_theme.digital_format_string = format_str
+    def set_digital_format_key(self, key_name: str) -> None:
+        """Sets the key for the digital format string to be used from presets."""
+        if key_name in self.presets.get("digital_format_strings", {}):
+            self.current_theme.digital_format_key = key_name
+        else:
+            print(f"Digital format key '{key_name}' not found. Using current or default.")
+
+    def get_current_digital_format_string(self) -> str:
+        """Gets the actual format string based on the current_theme.digital_format_key."""
+        formats = self.presets.get("digital_format_strings", {})
+        # Fallback to a simple H:M:S if the key or "default_hms" is not found
+        return formats.get(self.current_theme.digital_format_key, formats.get("default_hms", "{value:02.0f}:{value:02.0f}:{value:02.0f}"))
+
+    def cycle_backdrop(self, available_backdrop_paths: List[str], step: int = 1) -> Optional[str]:
+        if not available_backdrop_paths:
+            self.current_theme.current_backdrop_path = None
+            return None
+        
+        try:
+            current_idx = available_backdrop_paths.index(self.current_theme.current_backdrop_path) if self.current_theme.current_backdrop_path else -1
+        except ValueError:
+            current_idx = -1 # If current path not in list, start from beginning
+        
+        new_idx = (current_idx + step) % len(available_backdrop_paths)
+        self.current_theme.current_backdrop_path = available_backdrop_paths[new_idx]
+        return self.current_theme.current_backdrop_path

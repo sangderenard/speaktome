@@ -18,9 +18,11 @@ class PixelFrameBuffer:
     Each 'pixel' corresponds to a character cell in the terminal.
     """
 
-    def __init__(self, shape: tuple[int, int]):
+    def __init__(self, shape: tuple[int, int], diff_threshold: int = 0):
         """Allocate buffers for ``shape`` (rows, cols) and initialize contents.
         Buffers will store RGB data, so actual shape is (rows, cols, 3).
+        `diff_threshold`: Sum of absolute differences in RGB channels needed to mark a pixel as changed.
+                          0 means any difference. Max is 3 * 255 = 765.
         """
         self.lock = threading.Lock()
         self.buffer_shape = (shape[0], shape[1], 3) # rows, cols, RGB
@@ -28,8 +30,9 @@ class PixelFrameBuffer:
         self.buffer_render = np.full(self.buffer_shape, self.default_pixel, dtype=np.uint8)
         self.buffer_next = np.full(self.buffer_shape, self.default_pixel, dtype=np.uint8)
         self.buffer_display = np.full(self.buffer_shape, self.default_pixel, dtype=np.uint8)
+        self.diff_threshold = max(0, diff_threshold) # Ensure threshold is not negative
 
-    def _resize(self, shape: tuple[int, int]) -> None:
+    def _resize(self, shape: tuple[int, int]): # No change, but type hint was missing -> None
         """Resize internal buffers to ``shape``."""
         self.buffer_shape = (shape[0], shape[1], 3)
         self.buffer_render = np.full(self.buffer_shape, self.default_pixel, dtype=np.uint8)
@@ -59,8 +62,15 @@ class PixelFrameBuffer:
         with self.lock:
             np.copyto(self.buffer_next, self.buffer_render)
         
-        # Compare along the color channel axis. any() checks if any channel differs.
-        diff_mask = np.any(self.buffer_next != self.buffer_display, axis=2)
+        if self.diff_threshold == 0:
+            # Original behavior: any difference in any channel
+            diff_mask = np.any(self.buffer_next != self.buffer_display, axis=2)
+        else:
+            # Calculate sum of absolute differences for RGB channels
+            abs_diff = np.abs(self.buffer_next.astype(np.int16) - self.buffer_display.astype(np.int16))
+            sum_abs_diff = np.sum(abs_diff, axis=2)
+            diff_mask = sum_abs_diff > self.diff_threshold
+            
         coords = np.argwhere(diff_mask)
         updates: list[tuple[int, int, tuple[int, int, int]]] = []
         for y, x in coords:

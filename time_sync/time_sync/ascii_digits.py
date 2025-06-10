@@ -331,7 +331,7 @@ def compose_ascii_digits(
 
 
 def print_digital_clock(
-    time: _dt.datetime,
+    time: _dt.datetime | _dt.timedelta, # Allow timedelta
     active_units: Optional[List[TimeUnit]] = None, # List of TimeUnits to display
     display_format_template: Optional[str] = None, # e.g., "{hours}:{minutes}"
     arbitrary_text: Optional[str] = None, # If provided, this text is rendered directly
@@ -348,8 +348,15 @@ def print_digital_clock(
     is ``True`` a 2D unicode array is returned. When ``as_pixel`` is ``True`` an
     RGB pixel array is returned instead.
     """
-    digits_str = time.strftime("%H:%M:%S")
-   
+    # digits_str = time.strftime("%H:%M:%S") # This line was the source of the error
+    # Initial, type-aware assignment for digits_str
+    if isinstance(time, _dt.datetime):
+        digits_str = time.strftime("%H:%M:%S.%f")[:-3] # Default for datetime: HH:MM:SS.ms
+    elif isinstance(time, _dt.timedelta):
+        digits_str = str(time) # Default for timedelta
+    else:
+        digits_str = str(time) # Generic fallback for other types, if any
+
     # Configuration for the digital clock appearance
     # Start with defaults, override with override_params (from JSON), then theme (for colors)
     params = {
@@ -372,7 +379,8 @@ def print_digital_clock(
         params["shadow_color_on_image"] = tuple(palette.get("shadow", params["shadow_color_on_image"]))
         # Use theme's active units and format string if not overridden
         if active_units is None: active_units = theme_manager.current_theme.active_time_units
-        if display_format_template is None: display_format_template = theme_manager.current_theme.digital_format_string
+        if display_format_template is None: 
+            display_format_template = theme_manager.get_current_digital_format_string()
 
     if arbitrary_text is not None:
         digits_str = arbitrary_text
@@ -383,10 +391,11 @@ def print_digital_clock(
         try:
             digits_str = display_format_template.format(**format_values)
         except KeyError as e:
-            print(f"Warning: KeyError in digital_format_string '{display_format_template}': {e}. Using default time.")
-            digits_str = time.strftime("%H:%M:%S") # Fallback
-    elif isinstance(time, _dt.datetime): # Fallback to default H:M:S for datetime
-        digits_str = time.strftime("%H:%M:%S.%f")[:-3] # HH:MM:SS.ms
+            print(f"Warning: KeyError in digital_format_string '{display_format_template}': {e}. Using pre-set default time string.")
+            # digits_str already has a type-appropriate default from the initial assignment.
+            # No further assignment is needed here.
+    # The initial type-aware assignment for digits_str covers cases where
+    # arbitrary_text is None and (active_units or display_format_template is not sufficient).
 
     if not PIL_AVAILABLE:
         # If not returning array/pixel, print simple text
