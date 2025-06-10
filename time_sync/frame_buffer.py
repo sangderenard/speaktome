@@ -31,7 +31,7 @@ class PixelFrameBuffer:
         self.buffer_next = np.full(self.buffer_shape, self.default_pixel, dtype=np.uint8)
         self.buffer_display = np.full(self.buffer_shape, self.default_pixel, dtype=np.uint8)
         self.diff_threshold = max(0, diff_threshold) # Ensure threshold is not negative
-        self._force_full_diff_next_call = False
+        self._force_full_diff_next_call = True
 
     def __repr__(self) -> str:
         return (
@@ -45,6 +45,7 @@ class PixelFrameBuffer:
         self.buffer_render = np.full(self.buffer_shape, self.default_pixel, dtype=np.uint8)
         self.buffer_next = np.full(self.buffer_shape, self.default_pixel, dtype=np.uint8)
         self.buffer_display = np.full(self.buffer_shape, self.default_pixel, dtype=np.uint8)
+        self._force_full_diff_next_call = True
 
     def update_render(self, new_data: np.ndarray) -> None:
         """Update the render buffer with ``new_data``.

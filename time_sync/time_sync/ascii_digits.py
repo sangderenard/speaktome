@@ -404,6 +404,8 @@ def print_digital_clock(
     # The initial type-aware assignment for digits_str covers cases where
     # arbitrary_text is None and (active_units or display_format_template is not sufficient).
 
+    if theme_manager is None:
+        return digits_str if (as_array or as_pixel) else print(digits_str)
     if not PIL_AVAILABLE:
         # If not returning array/pixel, print simple text
         return digits_str if (as_array or as_pixel) else print(Fore.CYAN + digits_str + Style.RESET_ALL)
