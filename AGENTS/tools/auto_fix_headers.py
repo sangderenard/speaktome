@@ -51,7 +51,12 @@ def fix_file(path: Path) -> None:
         ):
             return
         lines = text.splitlines()
-        sentinel_idx = lines.index(HEADER_SENTINEL)
+        sentinel_idx = next(
+            (i for i, ln in enumerate(lines) if ln.strip() == HEADER_SENTINEL),
+            None,
+        )
+        if sentinel_idx is None:
+            return
         except_idx = None
         for i in range(sentinel_idx - 1, -1, -1):
             if lines[i].strip().startswith("except"):
