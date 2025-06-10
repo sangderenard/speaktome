@@ -21,7 +21,8 @@ It should not be possible to correctly use the provided virtual environment and
 lack a required library. When a package truly seems absent, verify that
 `setup_env.sh` does not already install it, then add the dependency to
 `pyproject.toml` so future setups fetch it automatically. (For example, `torch`
-is installed by default and should never be missing.)
+is installed by default and should never be missing.) **Do not attempt a manual
+`pip install`; rerun the setup script with the necessary groups instead.**
 
 ### Automated Setup
 
@@ -37,4 +38,5 @@ python AGENTS/tools/dev_group_menu.py --install \
 ```
 
 This approach allows CI pipelines to create a fully configured virtual
-environment without human input.
+environment without human input. Use the same invocation when running
+`python testing/test_hub.py` in headless or automated contexts.

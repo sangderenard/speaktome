@@ -158,6 +158,27 @@ _DIGITS_OLD = {
     ],
 }
 
+def _compose_digits_fallback(text: str) -> list[str]:
+    """Compose ASCII rows for ``text`` using ``_DIGITS_OLD``."""
+    grids = [_DIGITS_OLD.get(ch, _DIGITS_OLD[' ']) for ch in text]
+    rows = []
+    for i in range(len(_DIGITS_OLD['0'])):
+        row = ' '.join(grid[i] for grid in grids)
+        rows.append(row)
+    return rows
+
+
+def _ascii_rows_to_pixel(rows: list[str]) -> np.ndarray:
+    """Convert ASCII rows to a white pixel array."""
+    h = len(rows)
+    w = len(rows[0]) if rows else 0
+    arr = np.zeros((h, w, 3), dtype=np.uint8)
+    for y, row in enumerate(rows):
+        for x, ch in enumerate(row):
+            if ch != ' ':
+                arr[y, x] = [255, 255, 255]
+    return arr
+
 
 def _get_font(size: int) -> ImageFont.FreeTypeFont | ImageFont.ImageFont | None:
     if not PIL_AVAILABLE:
@@ -256,7 +277,10 @@ def compose_ascii_digits(
     # These would typically be simpler than full clock effects.
 ) -> str | np.ndarray:
     if not PIL_AVAILABLE:
-        return f"Pillow not available. Text: {text}"
+        rows = _compose_digits_fallback(text)
+        if as_pixel_array:
+            return _ascii_rows_to_pixel(rows)
+        return "\n".join(rows)
 
     font = _get_font(font_size)
     if not font: # Handle case where load_default also fails
@@ -407,8 +431,13 @@ def print_digital_clock(
     if theme_manager is None:
         return digits_str if (as_array or as_pixel) else print(digits_str)
     if not PIL_AVAILABLE:
-        # If not returning array/pixel, print simple text
-        return digits_str if (as_array or as_pixel) else print(Fore.CYAN + digits_str + Style.RESET_ALL)
+        rows = _compose_digits_fallback(digits_str)
+        if as_pixel:
+            return _ascii_rows_to_pixel(rows)
+        if as_array:
+            return np.array([list(r) for r in rows], dtype="<U1")
+        print("\n".join(rows))
+        return None
 
     result = compose_ascii_digits(
         digits_str,

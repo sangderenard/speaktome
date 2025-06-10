@@ -22,6 +22,9 @@ def test_detect_faculty_enum() -> None:
 
 def test_detect_faculty_pure_python() -> None:
     """Verify the fallback when no numerical libraries are present."""
+    import importlib.util
+    if importlib.util.find_spec('numpy') is not None:
+        pytest.skip('numpy installed')
     with mock.patch.dict(sys.modules):
         # Ensure these modules are treated as not imported for this test
         sys.modules.pop('torch_geometric', None)

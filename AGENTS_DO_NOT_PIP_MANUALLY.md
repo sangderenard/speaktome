@@ -19,4 +19,12 @@ python AGENTS/tools/dev_group_menu.py --install \
 
 If something is missing, re-run `setup_env_dev.sh` and select all relevant groups instead of hammering `pip install` by hand. This keeps the environment reproducible for everyone and avoids half-installed states.
 
-**In short:** read the setup scripts, don't bypass them.
+### Headless Testing
+
+When running tests in a non-interactive environment, first invoke the
+menu tool as shown above so every optional group you need is installed.
+After the environment is prepared, execute `python testing/test_hub.py` to
+run the suite. Never call `pip` directly to add extras for test runs.
+
+**In short:** read the setup scripts and use the headless menu variant
+instead of manual `pip` commands.
