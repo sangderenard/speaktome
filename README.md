@@ -108,6 +108,19 @@ On Windows run:
 powershell -ExecutionPolicy Bypass -File setup_env_dev.ps1 -extras -prefetch
 ```
 
+### Non-Interactive Setup
+For headless automation or CI environments, bypass the menus by invoking the
+group selection tool directly:
+
+```bash
+# create the environment
+bash setup_env_dev.sh --extras --prefetch --from-dev
+# install selected codebases and groups without prompts
+python AGENTS/tools/dev_group_menu.py --install \
+    --codebases speaktome \
+    --groups speaktome:dev
+```
+
 
 ## Running SpeakToMe
 
