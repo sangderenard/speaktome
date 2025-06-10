@@ -1,10 +1,16 @@
+#!/usr/bin/env python3
 """ASCII art utilities for rendering clock faces."""
-
 from __future__ import annotations
 
-import datetime as _dt
-import math
-from typing import List, Tuple, Optional
+try:
+    from AGENTS.tools.header_utils import ENV_SETUP_BOX
+    import datetime as _dt
+    import math
+    from typing import List, Tuple, Optional
+except Exception:
+    import sys
+    print(ENV_SETUP_BOX)
+    sys.exit(1)
 # --- END HEADER ---
 
 from colorama import Fore, Style
@@ -237,7 +243,11 @@ def compose_ascii_digits(
     shadow_offset: Tuple[int, int] = (2, 2), # (dx, dy) for shadow from text
     backdrop_image_path: Optional[str] = None,
     final_ascii_bg_fill: str = Fore.BLACK + Style.DIM + " ", # Used for transparent areas
-) -> str:
+    *,
+    as_pixel_array: bool = False,
+    target_pixel_width: Optional[int] = None,
+    target_pixel_height: Optional[int] = None,
+) -> str | np.ndarray:
     if not PIL_AVAILABLE:
         return f"Pillow not available. Text: {text}"
 
@@ -294,6 +304,13 @@ def compose_ascii_digits(
     else: # Fallback for bitmap fonts or no outline
         draw.text((base_x, base_y), text, font=font, fill=text_color_on_image)
 
+    if as_pixel_array:
+        px_w = target_pixel_width or target_ascii_width
+        px_h = target_pixel_height or target_ascii_height
+        return np.array(
+            image.resize((px_w, px_h), Image.Resampling.LANCZOS).convert("RGB")
+        )
+
     return _image_to_ascii_colored(
         image,
         ramp=ASCII_RAMP_BLOCK,
@@ -309,12 +326,14 @@ def print_digital_clock(
     theme_manager: Optional[ThemeManager] = None,
     *,
     as_array: bool = False,
+    as_pixel: bool = False,
     **override_params,
 ) -> Optional[np.ndarray]:
-    """Return or print ``time`` in HH:MM:SS format as colored ASCII art.
+    """Return or print ``time`` in HH:MM:SS format.
 
-    When ``as_array`` is ``True`` the function returns a ``numpy.ndarray``
-    representing the ASCII art instead of printing to ``stdout``.
+    By default, the result is printed as colored ASCII art. When ``as_array``
+    is ``True`` a 2D unicode array is returned. When ``as_pixel`` is ``True`` an
+    RGB pixel array is returned instead.
     """
     digits_str = time.strftime("%H:%M:%S")
     
@@ -344,31 +363,20 @@ def print_digital_clock(
         params["outline_color_on_image"] = tuple(palette.get("outline", params["outline_color_on_image"]))
         params["shadow_color_on_image"] = tuple(palette.get("shadow", params["shadow_color_on_image"]))
 
-    # Create the raw Pillow image using compose_ascii_digits's logic
-    # We need to call the internal image creation part of compose_ascii_digits
-    # For now, let's assume compose_ascii_digits is refactored or we replicate its image creation here.
-    # Simplified: Re-calling compose_ascii_digits which returns a string.
-    # Ideally, compose_ascii_digits would have a part that returns the image.
-    # Let's modify compose_ascii_digits to optionally return the image.
-
-    # This is a placeholder for getting the raw image.
-    # You'd refactor compose_ascii_digits to have an internal _create_image function
-    raw_image = Image.new("RGBA", (params["target_ascii_width"]*10, params["target_ascii_height"]*10)) # Dummy
-    # Actual image creation should happen here using params.
-    # For a quick test, we'll just use the string output and skip theme image effects for digital.
-    # TODO: Refactor compose_ascii_digits to allow image manipulation before ASCII conversion.
-    
-    # For now, we'll directly call compose_ascii_digits and it won't have image effects from theme_manager
-    # but will use the ASCII ramp.
-    final_image_str = compose_ascii_digits(
+    result = compose_ascii_digits(
         digits_str,
         backdrop_image_path=backdrop_image_path,
+        as_pixel_array=as_pixel,
+        target_pixel_width=params["target_ascii_width"],
+        target_pixel_height=params["target_ascii_height"],
         **params,
     )
+    if as_pixel:
+        return result  # type: ignore[return-value]
     if as_array:
-        rows = final_image_str.splitlines()
+        rows = result.splitlines()  # type: ignore[arg-type]
         return np.array([list(row) for row in rows], dtype="<U1")
-    print(final_image_str)
+    print(result)
     print(digits_str)
     return None
 
@@ -389,8 +397,15 @@ def print_analog_clock(
     theme_manager: Optional[ThemeManager] = None,
     *,
     as_array: bool = False,
+    as_pixel: bool = False,
     **override_params
 ) -> Optional[np.ndarray]:
+    """Return or print an analog clock representation for ``time``.
+
+    When ``as_pixel`` is ``True`` an RGB pixel array is returned. When
+    ``as_array`` is ``True`` a 2D unicode array is returned. Otherwise the
+    ASCII art is printed directly.
+    """
     if not PIL_AVAILABLE:
         print(Fore.RED + "Pillow library not installed. Cannot display enhanced analog clock." + Style.RESET_ALL)
         print(Style.BRIGHT + Fore.MAGENTA + time.strftime("%H:%M:%S") + " (Analog)" + Style.RESET_ALL)
@@ -525,6 +540,13 @@ def print_analog_clock(
     # Convert to ASCII. Character aspect ratio heuristic: width should be ~2x height for square look.
     # So, target_ascii_width = target_ascii_diameter * 2 (approx)
     # target_ascii_height = target_ascii_diameter
+    if as_pixel:
+        px_w = int(params["target_ascii_diameter"] * 1.8)
+        px_h = params["target_ascii_diameter"]
+        return np.array(
+            image_to_convert.resize((px_w, px_h), Image.Resampling.LANCZOS).convert("RGB")
+        )
+
     ascii_art = _image_to_ascii_colored(
         image_to_convert,
         ramp=ascii_ramp_to_use,

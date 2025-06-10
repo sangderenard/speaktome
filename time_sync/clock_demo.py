@@ -1,15 +1,22 @@
+#!/usr/bin/env python3
 """Demonstrate time synchronization with analog and digital clocks."""
-
 from __future__ import annotations
 
-import datetime as _dt
-import argparse
-import time
-import json
-import os
-import threading
-import sys
-import numpy as np
+try:
+    from AGENTS.tools.header_utils import ENV_SETUP_BOX
+    import datetime as _dt
+    import argparse
+    import time
+    import json
+    import os
+    import threading
+    import sys
+    import numpy as np
+except Exception:
+    import sys
+    print(ENV_SETUP_BOX)
+    sys.exit(1)
+# --- END HEADER ---
 
 from time_sync import (
     get_offset, sync_offset,
@@ -205,7 +212,7 @@ def render_simple_text_to_pixel_array(
         text_color_on_image=text_color,
         # No shadow, no outline for simple text by default
         shadow_color_on_image=(0,0,0,0), outline_thickness=0,
-        return_pixel_array_instead=True,
+        as_pixel_array=True,
         target_pixel_width=target_pixel_width,
         target_pixel_height=target_pixel_height
     )
@@ -350,13 +357,13 @@ def main() -> None:
             analog_arr = print_analog_clock(
                 internet,
                 theme_manager=theme_manager,
-                as_array=True,
+                as_pixel=True,
                 **analog_params
             )
-            h, w = analog_arr.shape
+            h, w, _ = analog_arr.shape
             place_w = min(w, available_width)
             buf[row:row+h, :place_w] = analog_arr[:, :place_w]
-            row += h 
+            row += h
             # Add a small black spacer row if there's space
             if row < fb_rows: buf[row, :available_width] = [10,10,10]; row +=1 # Dark grey spacer
 
@@ -364,10 +371,10 @@ def main() -> None:
             sys_arr = print_digital_clock(
                 system,
                 theme_manager=theme_manager,
-                as_array=True,
+                as_pixel=True,
                 **digital_params
             )
-            h, w = sys_arr.shape
+            h, w, _ = sys_arr.shape
             place_w = min(w, available_width)
             buf[row:row+h, :place_w] = sys_arr[:, :place_w]
             row += h
@@ -384,7 +391,7 @@ def main() -> None:
 
             net_arr = compose_ascii_digits(
                 internet.strftime("%H:%M:%S"),
-                return_pixel_array_instead=True,
+                as_pixel_array=True,
                 target_pixel_width=target_w,
                 target_pixel_height=target_h,
                 **net_params
@@ -436,8 +443,12 @@ def main() -> None:
     full_clear_and_reset_cursor()
     try:
         while True:
-            diff = framebuffer.get_diff_and_promote()
-            draw_diff(diff)
+            diff_pixels = framebuffer.get_diff_and_promote()
+            changed = [
+                (y, x, np.array([[color]], dtype=np.uint8))
+                for y, x, color in diff_pixels
+            ]
+            draw_diff(changed)
             key = getch_timeout(args.refresh_rate)
             if key:
                 if key.lower() == 'q':
