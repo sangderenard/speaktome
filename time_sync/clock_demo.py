@@ -28,6 +28,7 @@ from time_sync import (
     init_colorama_for_windows, reset_cursor_to_top, full_clear_and_reset_cursor,
 )
 from time_sync.theme_manager import ThemeManager, ClockTheme # Ensure this import works
+from time_sync.render_backend import RenderingBackend
 from time_sync.frame_buffer import PixelFrameBuffer 
 from time_sync.render_thread import render_loop
 from time_sync.draw import draw_diff
@@ -316,12 +317,24 @@ def main() -> None:
         default="cyberpunk", help="Color theme preset"
     )
     parser.add_argument(
-        "--effects", choices=["neon", "crisp", "dramatic"],
-        default="neon", help="Visual effects preset"
+        "--effects",
+        choices=[
+            "neon", "crisp", "dramatic", "ethereal", "crystalline", "ghostly",
+            "vivid", "soft_glow", "shadowed", "vintage_bright", "dreamlike",
+            "sketch",
+        ],
+        default="neon",
+        help="Visual effects preset"
     )
     parser.add_argument(
-        "--post-processing", choices=["high_contrast", "soft", "monochrome"],
-        default="high_contrast", help="Post-processing preset"
+        "--post-processing",
+        choices=[
+            "high_contrast", "soft", "monochrome", "vintage", "neon_glow",
+            "matrix_code", "cyberdream", "night_vision", "sepia_tone",
+            "cold_wave", "hot_warm", "comic_book", "vibrant", "low_light",
+        ],
+        default="high_contrast",
+        help="Post-processing preset"
     )
     parser.add_argument(
         "--ascii-style", choices=["block", "detailed", "minimal", "dots", "shapes"],
@@ -395,6 +408,8 @@ def main() -> None:
     theme_manager = ThemeManager(presets_path=presets_file_path)
     if args.backdrops:
         theme_manager.current_theme.current_backdrop_path = args.backdrops[0]
+
+    render_backend = RenderingBackend(theme_manager)
 
     theme_manager.set_palette(args.theme)
     theme_manager.set_effects(args.effects)
@@ -492,6 +507,7 @@ def main() -> None:
                 slow_time_obj,
                 active_units_override=slow_analog_units,
                 theme_manager=theme_manager,
+                render_backend=render_backend,
                 as_pixel=True,
                 **analog_slow_params
             )
@@ -515,6 +531,7 @@ def main() -> None:
                 fast_time_obj, # Stopwatch time
                 active_units_override=fast_analog_units,
                 theme_manager=theme_manager,
+                render_backend=render_backend,
                 as_pixel=True,
                 **analog_fast_params
             )
@@ -545,6 +562,7 @@ def main() -> None:
                 active_units=slow_digital_units,
                 display_format_template=slow_digital_format,
                 theme_manager=theme_manager,
+                render_backend=render_backend,
                 as_pixel=True,
                 **digital_slow_params
             )
@@ -571,6 +589,7 @@ def main() -> None:
                 active_units=fast_digital_units,
                 display_format_template=fast_digital_format,
                 theme_manager=theme_manager,
+                render_backend=render_backend,
                 as_pixel=True,
                 **digital_fast_params
             )
@@ -606,8 +625,7 @@ def main() -> None:
 
         frame = compose_full_frame(system, internet, stopwatch_td, offset)
         img = Image.fromarray(frame, mode="RGB")
-        img = theme_manager.apply_effects(img)
-        img = theme_manager.apply_theme(img)
+        img = render_backend.process(img)
         return np.array(img)
 
     render_thread = threading.Thread(
