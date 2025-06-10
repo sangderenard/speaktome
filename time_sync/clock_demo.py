@@ -880,7 +880,7 @@ def main() -> None:
             framebuffer_ref.buffer_shape[0] != new_fb_rows
             or framebuffer_ref.buffer_shape[1] != new_fb_cols
         ):
-            framebuffer_ref._resize((new_fb_rows, new_fb_cols))  # Use internal resize
+            framebuffer_ref.resize((new_fb_rows, new_fb_cols))
 
         frame = compose_full_frame(system, internet, stopwatch_td, offset)
         img = Image.fromarray(frame, mode="RGB")
@@ -956,10 +956,10 @@ def main() -> None:
             # These should correspond to the pixel dimensions of a single character cell
             # as used by the rendering functions (print_analog_clock, print_digital_clock).
             # This is complex because different elements might use different effective pixel sizes per char.
-            # For simplicity, let's assume a base 1:1 mapping for now, or derive from scale.
-            # A better approach might be to have render_fn return the rendered pixel array AND the effective
-            # pixel dimensions per character cell for the main clock area.
-            # For now, let's assume 1:1 pixel to char cell mapping for the main buffer drawing.
+            # In practice ``get_char_cell_dims`` derives the pixel size of a
+            # character cell based on ``PIXEL_BUFFER_SCALE``.  Avoid assuming
+            # a hard 1:1 mapping so diff calculations continue to work on
+            # sub-character pixel regions.
             cell_h, cell_w = get_char_cell_dims()
             draw_diff(
                 changed,

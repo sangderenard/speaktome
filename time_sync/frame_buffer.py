@@ -39,13 +39,24 @@ class PixelFrameBuffer:
             f"diff_threshold={self.diff_threshold})"
         )
 
-    def _resize(self, shape: tuple[int, int]): # No change, but type hint was missing -> None
-        """Resize internal buffers to ``shape``."""
+    def _resize(self, shape: tuple[int, int]) -> None:
+        """Resize internal buffers to ``shape`` without acquiring the lock."""
         self.buffer_shape = (shape[0], shape[1], 3)
-        self.buffer_render = np.full(self.buffer_shape, self.default_pixel, dtype=np.uint8)
-        self.buffer_next = np.full(self.buffer_shape, self.default_pixel, dtype=np.uint8)
-        self.buffer_display = np.full(self.buffer_shape, self.default_pixel, dtype=np.uint8)
+        self.buffer_render = np.full(
+            self.buffer_shape, self.default_pixel, dtype=np.uint8
+        )
+        self.buffer_next = np.full(
+            self.buffer_shape, self.default_pixel, dtype=np.uint8
+        )
+        self.buffer_display = np.full(
+            self.buffer_shape, self.default_pixel, dtype=np.uint8
+        )
         self._force_full_diff_next_call = True
+
+    def resize(self, shape: tuple[int, int]) -> None:
+        """Thread-safe wrapper around :meth:`_resize`."""
+        with self.lock:
+            self._resize(shape)
 
     def update_render(self, new_data: np.ndarray) -> None:
         """Update the render buffer with ``new_data``.
@@ -54,8 +65,7 @@ class PixelFrameBuffer:
         the current configuration.
         """
         if new_data.shape != self.buffer_shape:
-            with self.lock:
-                self._resize((new_data.shape[0], new_data.shape[1])) # Pass (rows, cols)
+            self.resize((new_data.shape[0], new_data.shape[1]))
         with self.lock:
             np.copyto(self.buffer_render, new_data)
 
