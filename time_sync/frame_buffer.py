@@ -33,6 +33,12 @@ class PixelFrameBuffer:
         self.diff_threshold = max(0, diff_threshold) # Ensure threshold is not negative
         self._force_full_diff_next_call = False
 
+    def __repr__(self) -> str:
+        return (
+            f"PixelFrameBuffer(shape={self.buffer_shape[:2]}, "
+            f"diff_threshold={self.diff_threshold})"
+        )
+
     def _resize(self, shape: tuple[int, int]): # No change, but type hint was missing -> None
         """Resize internal buffers to ``shape``."""
         self.buffer_shape = (shape[0], shape[1], 3)
