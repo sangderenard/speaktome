@@ -1,18 +1,27 @@
+#!/usr/bin/env python3
 """Console utilities for screen manipulation and color initialization."""
-
 from __future__ import annotations
 
 try:
+    from AGENTS.tools.header_utils import ENV_SETUP_BOX
     from colorama import Cursor, ansi, just_fix_windows_console as _just_fix_windows_console
-except ImportError:
-    # Provide no-op fallbacks if colorama is not installed,
-    # though it's a dependency.
-    class _MockAnsi:
-        def __getattr__(self, name: str) -> str:
-            return ""
-    Cursor = _MockAnsi() # type: ignore
-    ansi = _MockAnsi() # type: ignore
-    def _just_fix_windows_console() -> None: pass # type: ignore
+except Exception:
+    import sys
+    print(ENV_SETUP_BOX)
+    sys.exit(1)
+# --- END HEADER ---
+
+# Provide no-op fallbacks if colorama is not installed. These stubs ensure the
+# module continues to function, albeit without colored output.
+class _MockAnsi:
+    def __getattr__(self, name: str) -> str:
+        return ""
+
+Cursor = Cursor if 'Cursor' in locals() else _MockAnsi()  # type: ignore
+ansi = ansi if 'ansi' in locals() else _MockAnsi()  # type: ignore
+_just_fix_windows_console = (
+    _just_fix_windows_console if '_just_fix_windows_console' in locals() else lambda: None
+)  # type: ignore
 
 def init_colorama_for_windows() -> None:
     """Initialize Colorama for proper ANSI escape code handling on Windows."""

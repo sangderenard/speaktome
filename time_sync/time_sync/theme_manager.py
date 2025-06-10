@@ -92,11 +92,19 @@ class ThemeManager:
         if effects:
             if effects.get("glow_radius", 0) > 0:
                 glow = image.filter(ImageFilter.GaussianBlur(effects["glow_radius"]))
-                image = Image.blend(image, glow, effects["glow_intensity"])
-            
+                image = Image.blend(image, glow, effects.get("glow_intensity", 0.5))
+
             if effects.get("shadow_blur", 0) > 0:
-                # Create and blend shadow...
-                pass  # (Implementation details for shadow effect)
+                if image.mode != "RGBA":
+                    image = image.convert("RGBA")
+                offset_x, offset_y = effects.get("shadow_offset", (2, 2))
+                shadow_color = tuple(self.current_theme.palette.get("shadow", (0, 0, 0, 150)))
+                shadow = Image.new("RGBA", image.size, shadow_color)
+                shadow = shadow.filter(ImageFilter.GaussianBlur(effects["shadow_blur"]))
+                base = Image.new("RGBA", image.size, (0, 0, 0, 0))
+                base.paste(shadow, (offset_x, offset_y), shadow)
+                base.paste(image, (0, 0), image)
+                image = base
 
         return image
 
