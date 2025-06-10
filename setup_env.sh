@@ -28,6 +28,50 @@ safe_run() {
   return 0
 }
 
+# Attempt to install a package quietly. If the install outputs data within
+# $TIMEOUT seconds the captured output is streamed. Otherwise the process is
+# terminated and the log is displayed with a warning.
+install_quiet() {
+  local TIMEOUT=60
+  local log
+  log="$(mktemp)"
+  ("$@" >"$log" 2>&1) &
+  local pid=$!
+  local started=0
+  local i=0
+  while kill -0 "$pid" 2>/dev/null; do
+    sleep 1
+    i=$((i + 1))
+    if [ $started -eq 0 ] && [ -s "$log" ]; then
+      started=1
+      cat "$log"
+      tail -f "$log" --pid="$pid" &
+      tail_pid=$!
+    fi
+    if [ $i -ge $TIMEOUT ] && [ $started -eq 0 ]; then
+      kill "$pid" 2>/dev/null
+      wait "$pid" 2>/dev/null
+      echo "Optional Torch download did not succeed, continuing anyway." >&2
+      cat "$log"
+      rm -f "$log"
+      return 0
+    fi
+  done
+  wait "$pid"
+  local status=$?
+  if [ $started -eq 1 ]; then
+    kill "$tail_pid" 2>/dev/null
+    wait "$tail_pid" 2>/dev/null
+  else
+    cat "$log"
+  fi
+  rm -f "$log"
+  if [ $status -ne 0 ]; then
+    echo "Optional Torch download did not succeed, continuing anyway." >&2
+  fi
+  return 0
+}
+
 if [ $USE_VENV -eq 1 ]; then
   safe_run python -m venv .venv
   source .venv/bin/activate
@@ -60,13 +104,13 @@ done
 # Always install torch first for GPU safety
 if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
     echo "Installing latest stable CPU-only torch (CI environment)"
-    safe_run $VENV_PIP install torch==2.3.1+cpu -f https://download.pytorch.org/whl/torch_stable.html
+    install_quiet "$VENV_PIP" install torch==2.3.1+cpu -f https://download.pytorch.org/whl/torch_stable.html
 elif [ $FORCE_GPU -eq 1 ]; then
     echo "Installing GPU-enabled torch"
-    safe_run $VENV_PIP install torch -f https://download.pytorch.org/whl/cu118
+    install_quiet "$VENV_PIP" install torch -f https://download.pytorch.org/whl/cu118
 else
     echo "Installing latest stable CPU-only torch (default)"
-    safe_run $VENV_PIP install torch==2.3.1+cpu -f https://download.pytorch.org/whl/torch_stable.html
+    install_quiet "$VENV_PIP" install torch==2.3.1+cpu -f https://download.pytorch.org/whl/torch_stable.html
 fi
 
 # If not called from a dev script, launch the dev menu for all codebase/group installs
