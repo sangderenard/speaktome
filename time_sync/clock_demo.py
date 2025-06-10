@@ -7,6 +7,9 @@ import argparse
 import time
 import json
 import os
+import threading
+import sys
+import numpy as np
 
 from time_sync import (
     get_offset, sync_offset,
@@ -14,6 +17,10 @@ from time_sync import (
     init_colorama_for_windows, reset_cursor_to_top, full_clear_and_reset_cursor
 )
 from time_sync.theme_manager import ThemeManager, ClockTheme # Ensure this import works
+from time_sync.frame_buffer import AsciiFrameBuffer
+from time_sync.render_thread import render_loop
+from time_sync.draw import draw_diff
+from time_sync.ascii_digits import render_ascii_to_array  # or your main render fn
 
 # Platform-specific input handling (adapted from AGENTS/tools/dev_group_menu.py)
 if os.name == 'nt':  # Windows
@@ -182,6 +189,14 @@ def interactive_configure_mode(clock_type: str, initial_config: dict, backdrop_p
     print(f"Exited {clock_type} clock configuration mode.")
 
 
+def as_ascii_array(s: str, width: int) -> np.ndarray:
+    """Convert a string (possibly multiline) to a 2D array, padded to width."""
+    lines = s.splitlines()
+    arr = np.full((len(lines), width), " ", dtype="<U1")
+    for i, line in enumerate(lines):
+        arr[i, :min(len(line), width)] = list(line[:width])
+    return arr
+
 def main() -> None:
     """Run the clock demo until interrupted."""
     parser = argparse.ArgumentParser(description="Live clock demo with various displays.")
@@ -272,6 +287,20 @@ def main() -> None:
     # For now, let's assume it's findable from the CWD or an adjusted path.
     # Path to presets, assuming clock_demo.py is in time_sync/ and presets is in time_sync/time_sync/presets
     presets_file_path = os.path.join(os.path.dirname(__file__), "time_sync", "presets", "default_themes.json")
+    
+    # Try to find presets relative to the script or common project structures
+    # This helps if the script is run from different working directories.
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    
+    # Path 1: <script_dir>/time_sync/presets/default_themes.json (if clock_demo.py is in time_sync root)
+    path1 = os.path.join(script_dir, "time_sync", "presets", "default_themes.json")
+    # Path 2: <script_dir>/../presets/default_themes.json (if clock_demo.py is in time_sync/time_sync/ and presets is in time_sync/presets)
+    path2 = os.path.join(script_dir, "..", "presets", "default_themes.json")
+    # Path 3: presets/default_themes.json (if run from project root and presets is in project_root/presets)
+    path3 = "presets/default_themes.json"
+    # Path 4: time_sync/presets/default_themes.json (if run from project root and presets is in project_root/time_sync/presets)
+    path4 = "time_sync/presets/default_themes.json"
+
     if not os.path.exists(presets_file_path) and os.path.exists("presets/default_themes.json"): # If run from repo root
         presets_file_path = "presets/default_themes.json" 
     elif not os.path.exists(presets_file_path) and os.path.exists("time_sync/presets/default_themes.json"): # If run from one level up
@@ -279,6 +308,38 @@ def main() -> None:
 
     theme_manager = ThemeManager(presets_path=presets_file_path)
     
+    # Initialize clock parameters by merging defaults with command-line args
+    analog_params = default_analog_config.copy()
+    if args.analog_clock_rect:
+        analog_params["clock_drawing_rect_on_canvas"] = args.analog_clock_rect
+    if args.analog_backdrop or args.backdrop:
+        analog_params["backdrop_image_path"] = args.analog_backdrop if args.analog_backdrop is not None else args.backdrop
+
+    digital_params = default_digital_config.copy()
+    if args.digital_backdrop or args.backdrop:
+        digital_params["backdrop_image_path"] = args.digital_backdrop if args.digital_backdrop is not None else args.backdrop
+
+    # Set up framebuffer and render thread for digital internet clock
+    fb_shape = (default_digital_config.get("target_ascii_height", 7), default_digital_config.get("target_ascii_width", 60))
+    framebuffer = AsciiFrameBuffer(fb_shape)
+    stop_event = threading.Event()
+    show_diff = False
+
+    def render_fn():
+        # Render internet time as ASCII ndarray for framebuffer
+        now_dt = _dt.datetime.utcnow().replace(tzinfo=_dt.timezone.utc) + _dt.timedelta(seconds=get_offset())
+        return render_ascii_to_array(
+            now_dt.strftime("%H:%M:%S"),
+            **default_digital_config
+        )
+
+    render_thread = threading.Thread(
+        target=render_loop,
+        args=(framebuffer, render_fn, 10, stop_event),
+        daemon=True
+    )
+    render_thread.start()
+
     try:
         while True:
             elapsed = time.perf_counter() - start
@@ -291,31 +352,9 @@ def main() -> None:
             s, ms = divmod(rem, 1000)
             stopwatch = f"{h:02}:{m:02}:{s:02}.{ms:03}"
 
-            # Move cursor to top to overwrite, reducing flicker.
-            # Note: If new content is shorter than old, remnants may remain.
             reset_cursor_to_top()
 
-            # Set current theme based on args (or allow interactive changes to override)
-            # This should ideally only be done once or when args change, but for simplicity here:
-            if not hasattr(theme_manager, "_initial_theme_set"): # Apply CLI theme args once
-                theme_manager.current_theme.palette = theme_manager.presets["color_palettes"].get(args.theme, {})
-                theme_manager.current_theme.effects = theme_manager.presets["effects_presets"].get(args.effects, {})
-                theme_manager.current_theme.ascii_style = args.ascii_style # Use the direct style name
-                theme_manager.current_theme.post_processing = theme_manager.presets["post_processing"].get(args.post_processing, {})
-                theme_manager._initial_theme_set = True
-
-
-            # Prepare analog clock config
-            analog_params = default_analog_config.copy()
-            analog_params["backdrop_image_path"] = args.analog_backdrop if args.analog_backdrop is not None else args.backdrop
-            if args.analog_clock_rect: # CLI overrides JSON
-                analog_params["clock_drawing_rect_on_canvas"] = args.analog_clock_rect
-            
-            # Prepare digital clock config
-            digital_params = default_digital_config.copy()
-            digital_params["backdrop_image_path"] = args.digital_backdrop if args.digital_backdrop is not None else args.backdrop
-            # Add CLI overrides for digital params if any were added
-
+            # Analog clock and system digital clock as before
             if args.show_analog:
                 print_analog_clock(
                     internet,
@@ -330,21 +369,25 @@ def main() -> None:
                     **digital_params
                 )
                 print()
+
+            # --- Use framebuffer for internet digital clock ---
             if args.show_digital_internet:
-                print_digital_clock(
-                    internet, 
-                    theme_manager=theme_manager,
-                    **digital_params)
-                print()
+                diff = framebuffer.get_diff_and_promote()
+                draw_diff(diff)
+
             if args.show_stopwatch:
                 print(f"Stopwatch: {stopwatch}")
             if args.show_offset:
                 print(f"Offset: {_dt.timedelta(seconds=offset)}")
-            
+
             key = getch_timeout(args.refresh_rate)
             if key:
                 if key.lower() == 'q':
+                    stop_event.set()
                     break
+                elif key.lower() == 'd':
+                    show_diff = not show_diff
+                # ...existing theme/effects/post-processing switching...
                 elif key.lower() == 'a':
                     theme_manager.cycle_ascii_style()
                 elif key.lower() == 'i':
@@ -352,31 +395,117 @@ def main() -> None:
                 elif key.lower() == 'b':
                     theme_manager.toggle_backdrop_inversion()
                 elif key.lower() == 't':
-                    # Cycle color palettes
                     palettes = list(theme_manager.presets["color_palettes"].keys())
                     idx = palettes.index(theme_manager.current_theme.palette.get("name", args.theme)) if "name" in theme_manager.current_theme.palette else palettes.index(args.theme)
                     next_palette = palettes[(idx + 1) % len(palettes)]
                     theme_manager.current_theme.palette = theme_manager.presets["color_palettes"][next_palette]
                     theme_manager.current_theme.palette["name"] = next_palette
                 elif key.lower() == 'e':
-                    # Cycle effects
                     effects = list(theme_manager.presets["effects_presets"].keys())
                     idx = effects.index(theme_manager.current_theme.effects.get("name", args.effects)) if "name" in theme_manager.current_theme.effects else effects.index(args.effects)
                     next_effect = effects[(idx + 1) % len(effects)]
                     theme_manager.current_theme.effects = theme_manager.presets["effects_presets"][next_effect]
                     theme_manager.current_theme.effects["name"] = next_effect
                 elif key.lower() == 'p':
-                    # Cycle post-processing
                     posts = list(theme_manager.presets["post_processing"].keys())
                     idx = posts.index(theme_manager.current_theme.post_processing.get("name", args.post_processing)) if "name" in theme_manager.current_theme.post_processing else posts.index(args.post_processing)
                     next_post = posts[(idx + 1) % len(posts)]
                     theme_manager.current_theme.post_processing = theme_manager.presets["post_processing"][next_post]
                     theme_manager.current_theme.post_processing["name"] = next_post
-            else: # No key pressed, just sleep for the remaining refresh cycle
+            else:
                 time.sleep(args.refresh_rate)
 
     except KeyboardInterrupt:
-        # On exit, do a full clear for a clean terminal.
+        stop_event.set()
+        full_clear_and_reset_cursor()
+        print("Demo stopped.")
+        print(f"Final system time: {system.strftime('%H:%M:%S')}")
+        print(f"Final internet time: {internet.strftime('%H:%M:%S')}")
+        print(f"Offset: {_dt.timedelta(seconds=offset)}")
+
+    # --- FRAMEBUFFER COMPOSITION ---
+    # Determine framebuffer size (big enough for all widgets)
+    fb_rows = 40
+    fb_cols = 80
+    framebuffer = AsciiFrameBuffer((fb_rows, fb_cols))
+    stop_event = threading.Event()
+
+    def compose_full_frame(system, internet, stopwatch, offset):
+        buf = np.full((fb_rows, fb_cols), " ", dtype="<U1")
+        row = 0
+
+        if args.show_analog:
+            analog_arr = print_analog_clock(
+                internet,
+                theme_manager=theme_manager,
+                as_array=True,
+                **analog_params
+            )
+            h, w = analog_arr.shape
+            buf[row:row+h, :w] = analog_arr
+            row += h + 1
+
+        if args.show_digital_system:
+            sys_arr = print_digital_clock(
+                system,
+                theme_manager=theme_manager,
+                as_array=True,
+                **digital_params
+            )
+            h, w = sys_arr.shape
+            buf[row:row+h, :w] = sys_arr
+            row += h + 1
+
+        if args.show_digital_internet:
+            net_arr = render_ascii_to_array(
+                internet.strftime("%H:%M:%S"),
+                **default_digital_config
+            )
+            h, w = net_arr.shape
+            buf[row:row+h, :w] = net_arr
+            row += h + 1
+
+        if args.show_stopwatch:
+            sw_arr = as_ascii_array(f"Stopwatch: {stopwatch}", fb_cols)
+            buf[row:row+1, :fb_cols] = sw_arr
+            row += 1
+
+        if args.show_offset:
+            off_arr = as_ascii_array(f"Offset: {_dt.timedelta(seconds=offset)}", fb_cols)
+            buf[row:row+1, :fb_cols] = off_arr
+            row += 1
+
+        return buf
+
+    try:
+        while True:
+            elapsed = time.perf_counter() - start
+            offset = get_offset()
+            system = _dt.datetime.utcnow().replace(tzinfo=_dt.timezone.utc)
+            internet = system + _dt.timedelta(seconds=offset)
+
+            h, rem = divmod(int(elapsed * 1000), 3600 * 1000)
+            m, rem = divmod(rem, 60 * 1000)
+            s, ms = divmod(rem, 1000)
+            stopwatch = f"{h:02}:{m:02}:{s:02}.{ms:03}"
+
+            # Compose the full frame as a 2D array
+            full_frame = compose_full_frame(system, internet, stopwatch, offset)
+            framebuffer.update_render(full_frame)
+            diff = framebuffer.get_diff_and_promote()
+            draw_diff(diff)
+
+            key = getch_timeout(args.refresh_rate)
+            if key:
+                if key.lower() == 'q':
+                    stop_event.set()
+                    break
+                # ...rest of your key handling...
+            else:
+                time.sleep(args.refresh_rate)
+
+    except KeyboardInterrupt:
+        stop_event.set()
         full_clear_and_reset_cursor()
         print("Demo stopped.")
         print(f"Final system time: {system.strftime('%H:%M:%S')}")

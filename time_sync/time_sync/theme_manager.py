@@ -23,7 +23,7 @@ class ThemeManager:
 
     def _load_presets(self) -> None:
         try:
-            with open(self.presets_path, 'r') as f:
+            with open(self.presets_path, 'r', encoding='utf-8') as f:
                 self.presets = json.load(f)
         except Exception as e:
             print(f"Error loading presets: {e}")
@@ -62,15 +62,34 @@ class ThemeManager:
         return image
 
     def get_current_ascii_ramp(self) -> str:
-        """Get current ASCII style ramp"""
-        return self.presets["ascii_styles"].get(
-            self.current_theme.ascii_style, 
-            self.presets["ascii_styles"]["block"]
-        )
+        """Get current ASCII style ramp.
+        Falls back to "block" style if current is not found,
+        then to a hardcoded default if "block" is also not found (e.g. due to loading error).
+        """
+        # Hardcoded default ramp, matching the "block" style in default_themes.json
+        DEFAULT_FALLBACK_RAMP = " .:░▒▓█"
+
+        ascii_styles_preset = self.presets.get("ascii_styles", {})
+
+        # 1. Try to get the ramp for the current theme's ascii_style
+        current_style_ramp = ascii_styles_preset.get(self.current_theme.ascii_style)
+        if current_style_ramp is not None: # Check for None in case a style has an empty string ramp
+            return current_style_ramp
+
+        # 2. If current theme's style not found, try to get the "block" style ramp
+        block_style_ramp = ascii_styles_preset.get("block")
+        if block_style_ramp is not None:
+            return block_style_ramp
+        
+        # 3. If "block" style is also not found, return the hardcoded default fallback ramp.
+        return DEFAULT_FALLBACK_RAMP
 
     def cycle_ascii_style(self) -> str:
         """Cycle to next ASCII style"""
-        styles = list(self.presets["ascii_styles"].keys())
+        styles = list(self.presets.get("ascii_styles", {}).keys())
+        if not styles: # Fallback if no styles are loaded
+            self.current_theme.ascii_style = "block" # Default to "block" style name
+            return self.current_theme.ascii_style
         try:
             current_idx = styles.index(self.current_theme.ascii_style)
             next_idx = (current_idx + 1) % len(styles)
