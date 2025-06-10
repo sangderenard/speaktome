@@ -20,7 +20,7 @@ from .console import (
     full_clear_and_reset_cursor,
     reset_cursor_to_top,
 )
-from ..frame_buffer import AsciiFrameBuffer
+from ..frame_buffer import PixelFrameBuffer # Changed from AsciiFrameBuffer
 from ..render_thread import render_loop
 from ..draw import draw_diff
 from . import _internet  # exported for tests
@@ -39,7 +39,7 @@ __all__ = [
     "init_colorama_for_windows",
     "full_clear_and_reset_cursor",
     "reset_cursor_to_top",
-    "AsciiFrameBuffer",
+    "PixelFrameBuffer", # Changed from AsciiFrameBuffer
     "render_loop",
     "draw_diff",
     "_internet",

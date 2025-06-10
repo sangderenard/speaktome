@@ -17,10 +17,10 @@ from time_sync import (
     init_colorama_for_windows, reset_cursor_to_top, full_clear_and_reset_cursor
 )
 from time_sync.theme_manager import ThemeManager, ClockTheme # Ensure this import works
-from time_sync.frame_buffer import AsciiFrameBuffer
+from time_sync.frame_buffer import PixelFrameBuffer
 from time_sync.render_thread import render_loop
 from time_sync.draw import draw_diff
-from time_sync.ascii_digits import render_ascii_to_array  # or your main render fn
+from time_sync.ascii_digits import compose_ascii_digits # Used for rendering text to pixel array
 
 # Platform-specific input handling (adapted from AGENTS/tools/dev_group_menu.py)
 if os.name == 'nt':  # Windows
@@ -189,14 +189,27 @@ def interactive_configure_mode(clock_type: str, initial_config: dict, backdrop_p
     print(f"Exited {clock_type} clock configuration mode.")
 
 
-def as_ascii_array(s: str, width: int) -> np.ndarray:
-    """Convert a string (possibly multiline) to a 2D array, padded to width."""
-    lines = s.splitlines()
-    arr = np.full((len(lines), width), " ", dtype="<U1")
-    for i, line in enumerate(lines):
-        arr[i, :min(len(line), width)] = list(line[:width])
-    return arr
-
+def render_simple_text_to_pixel_array(
+    text: str,
+    target_pixel_width: int,
+    target_pixel_height: int,
+    font_size: int = 12, # Smaller default for simple text lines
+    text_color: tuple[int,int,int,int] = (200,200,200,255), # Light grey
+    bg_color: tuple[int,int,int,int] = (0,0,0,0) # Transparent background for PIL image
+    ) -> np.ndarray:
+    """Renders a single line of text to a pixel array."""
+    # Use compose_ascii_digits to leverage its text-to-image capabilities
+    pixel_array = compose_ascii_digits(
+        text,
+        font_size=font_size,
+        text_color_on_image=text_color,
+        # No shadow, no outline for simple text by default
+        shadow_color_on_image=(0,0,0,0), outline_thickness=0,
+        return_pixel_array_instead=True,
+        target_pixel_width=target_pixel_width,
+        target_pixel_height=target_pixel_height
+    )
+    return pixel_array
 def main() -> None:
     """Run the clock demo until interrupted."""
     parser = argparse.ArgumentParser(description="Live clock demo with various displays.")
@@ -321,13 +334,17 @@ def main() -> None:
 
     # --- FRAMEBUFFER COMPOSITION ---
     fb_rows = 40
-    fb_cols = 80
-    framebuffer = AsciiFrameBuffer((fb_rows, fb_cols))
+    fb_cols = 120 # Pixel columns, can be wider than typical char cells
+    # For pixel buffer, fb_rows and fb_cols define the pixel resolution.
+    # Each "pixel" will be mapped to a terminal character cell by draw_diff.
+    framebuffer = PixelFrameBuffer((fb_rows, fb_cols))
     stop_event = threading.Event()
 
     def compose_full_frame(system, internet, stopwatch, offset):
-        buf = np.full((fb_rows, fb_cols), " ", dtype="<U1")
+        # Initialize buffer with black pixels
+        buf = np.full((fb_rows, fb_cols, 3), [0,0,0], dtype=np.uint8)
         row = 0
+        available_width = fb_cols
 
         if args.show_analog:
             analog_arr = print_analog_clock(
@@ -337,8 +354,11 @@ def main() -> None:
                 **analog_params
             )
             h, w = analog_arr.shape
-            buf[row:row+h, :w] = analog_arr
-            row += h + 1
+            place_w = min(w, available_width)
+            buf[row:row+h, :place_w] = analog_arr[:, :place_w]
+            row += h 
+            # Add a small black spacer row if there's space
+            if row < fb_rows: buf[row, :available_width] = [10,10,10]; row +=1 # Dark grey spacer
 
         if args.show_digital_system:
             sys_arr = print_digital_clock(
@@ -348,27 +368,48 @@ def main() -> None:
                 **digital_params
             )
             h, w = sys_arr.shape
-            buf[row:row+h, :w] = sys_arr
-            row += h + 1
+            place_w = min(w, available_width)
+            buf[row:row+h, :place_w] = sys_arr[:, :place_w]
+            row += h
+            if row < fb_rows: buf[row, :available_width] = [10,10,10]; row +=1
 
         if args.show_digital_internet:
-            net_arr = render_ascii_to_array(
+            # Use compose_ascii_digits directly for pixel array
+            # Ensure default_digital_config has appropriate target_ascii_width/height
+            # which will be used as target_pixel_width/height
+            net_params = default_digital_config.copy()
+            # Example: define pixel dimensions for this specific text element
+            target_h = net_params.get("target_ascii_height", 7) 
+            target_w = net_params.get("target_ascii_width", 60)
+
+            net_arr = compose_ascii_digits(
                 internet.strftime("%H:%M:%S"),
-                **default_digital_config
+                return_pixel_array_instead=True,
+                target_pixel_width=target_w,
+                target_pixel_height=target_h,
+                **net_params
             )
-            h, w = net_arr.shape
-            buf[row:row+h, :w] = net_arr
-            row += h + 1
+            h, w, _ = net_arr.shape
+            place_w = min(w, available_width)
+            if row + h <= fb_rows:
+                buf[row:row+h, :place_w] = net_arr[:, :place_w]
+                row += h
+                if row < fb_rows: buf[row, :available_width] = [10,10,10]; row +=1
 
         if args.show_stopwatch:
-            sw_arr = as_ascii_array(f"Stopwatch: {stopwatch}", fb_cols)
-            buf[row:row+1, :fb_cols] = sw_arr
-            row += 1
+            text_h = 3 # Small height for single line text
+            if row + text_h <= fb_rows:
+                sw_arr = render_simple_text_to_pixel_array(f"Stopwatch: {stopwatch}", available_width, text_h, font_size=10)
+                buf[row:row+text_h, :available_width] = sw_arr
+                row += text_h
+                if row < fb_rows: buf[row, :available_width] = [10,10,10]; row +=1
 
         if args.show_offset:
-            off_arr = as_ascii_array(f"Offset: {_dt.timedelta(seconds=offset)}", fb_cols)
-            buf[row:row+1, :fb_cols] = off_arr
-            row += 1
+            text_h = 3
+            if row + text_h <= fb_rows:
+                off_arr = render_simple_text_to_pixel_array(f"Offset: {_dt.timedelta(seconds=offset)}", available_width, text_h, font_size=10)
+                buf[row:row+text_h, :available_width] = off_arr
+                row += text_h
 
         return buf
 

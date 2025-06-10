@@ -8,7 +8,7 @@ try:
     import threading
     import time
     from typing import Callable
-    from .frame_buffer import AsciiFrameBuffer
+    from .frame_buffer import PixelFrameBuffer # Changed from AsciiFrameBuffer
 except Exception:
     import sys
     print(ENV_SETUP_BOX)
@@ -17,7 +17,7 @@ except Exception:
 
 
 def render_loop(
-    framebuffer: AsciiFrameBuffer,
+    framebuffer: PixelFrameBuffer, # Changed from AsciiFrameBuffer
     render_fn: Callable[[], np.ndarray],
     fps: float,
     stop_event: threading.Event,
@@ -25,6 +25,6 @@ def render_loop(
     """Continuously render frames until ``stop_event`` is set."""
     delay = 1.0 / max(fps, 0.1)
     while not stop_event.is_set():
-        ascii_frame = render_fn()
-        framebuffer.update_render(ascii_frame)
+        pixel_frame = render_fn() # render_fn now returns a (H, W, 3) pixel array
+        framebuffer.update_render(pixel_frame)
         time.sleep(delay)
