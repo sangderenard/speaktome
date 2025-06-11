@@ -28,8 +28,8 @@ except Exception:
 # KEY ASSUMPTIONS/DEPENDENCIES: Requires Python interpreter access and the
 # ``speaktome`` package importable in subprocesses.
 # TODO:
-#   - Capture stdout/stderr from tests for logging.
-#   - Surface structured results for ``format_test_digest.py``.
+#   - Capture stdout/stderr from tests for logging. [DONE]
+#   - Surface structured results for ``format_test_digest.py``. [DONE]
 # NOTES: This is a minimal scaffold and does not implement all failure modes.
 # ###########################################################################
 
@@ -41,7 +41,8 @@ def load_headers() -> dict:
     return json.loads(data)
 
 
-def run_test(mod: str, cls: str, faculty: Faculty) -> tuple[str, bool]:
+def run_test(mod: str, cls: str, faculty: Faculty) -> dict[str, object]:
+    """Return structured results for ``cls.test`` under ``faculty``."""
     env = os.environ.copy()
     env[FORCE_ENV] = faculty.name
     code = (
@@ -50,8 +51,17 @@ def run_test(mod: str, cls: str, faculty: Faculty) -> tuple[str, bool]:
         f"cls = getattr(mod, '{cls}'); "
         "getattr(cls, 'test', lambda: None)();"
     )
-    proc = subprocess.run([sys.executable, "-c", code], env=env)
-    return faculty.name, proc.returncode == 0
+    proc = subprocess.run(
+        [sys.executable, "-c", code],
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+    return {
+        "ok": proc.returncode == 0,
+        "stdout": proc.stdout,
+        "stderr": proc.stderr,
+    }
 
 
 def main() -> None:
@@ -63,8 +73,8 @@ def main() -> None:
             key = f"{mod}.{cls}"
             results[key] = {}
             for fac in Faculty:
-                name, ok = run_test(mod, cls, fac)
-                results[key][name] = ok
+                results[key][fac.name] = run_test(mod, cls, fac)
+
     print(json.dumps(results, indent=2))
 
 
