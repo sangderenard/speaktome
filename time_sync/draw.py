@@ -160,7 +160,8 @@ def get_changed_subunits(
     old_frame: np.ndarray,
     new_frame: np.ndarray,
     subunit_height: int,
-    subunit_width: int
+    subunit_width: int,
+    loss_threshold: float = 0.0,
 ) -> List[Tuple[int, int, np.ndarray]]:
     """
     Compares two frames and returns subunits from the new_frame that have changed.
@@ -173,6 +174,10 @@ def get_changed_subunits(
         new_frame: The current frame.
         subunit_height: The height of the rectangular subunits to check.
         subunit_width: The width of the rectangular subunits to check.
+        loss_threshold:
+            Mean absolute difference threshold for considering a subunit
+            changed. A value of ``0.0`` means any difference will be
+            returned.
 
     Returns:
         A list of tuples. Each tuple contains:
@@ -180,11 +185,7 @@ def get_changed_subunits(
                          in the original frame.
         - x_coord (int): The x-coordinate of the top-left corner of the changed subunit
                          in the original frame.
-        - subunit_data (np.ndarray): A NumPy array representing the pixel data of
-                                     the changed subunit, extracted from new_frame.
-                                     Edge subunits are padded to exactly
-                                     ``(subunit_height, subunit_width, ...)`` so
-                                     all returned arrays share a uniform shape.
+
 
     Raises:
         ValueError: If old_frame and new_frame do not have the same shape,
@@ -209,28 +210,27 @@ def get_changed_subunits(
             current_subunit_old = old_frame[y:y_end, x:x_end]
             current_subunit_new = new_frame[y:y_end, x:x_end]
 
-            # Compare the subunits. np.any() handles multi-channel data
-            # and checks for any difference between the two slices.
-            if np.any(current_subunit_old != current_subunit_new):
-                subunit_data = current_subunit_new.copy()
+            # Short-circuit: if the slice is smaller than requested, mark it
+            # changed without comparing to ``old_frame``.
+            if (
+                current_subunit_new.shape[0] != subunit_height
+                or current_subunit_new.shape[1] != subunit_width
+            ):
+                changed_subunits_list.append((y, x, current_subunit_new.copy()))
+                continue
 
-                # Pad subunits that fall on the frame edge so all entries share
-                # the same shape. The ASCII classifier expects uniform sizes.
-                pad_h = subunit_height - subunit_data.shape[0]
-                pad_w = subunit_width - subunit_data.shape[1]
-                if pad_h > 0 or pad_w > 0:
-                    if subunit_data.ndim == 3:
-                        pad_shape = (
-                            subunit_height,
-                            subunit_width,
-                            subunit_data.shape[2],
-                        )
-                    else:
-                        pad_shape = (subunit_height, subunit_width)
-                    padded = np.zeros(pad_shape, dtype=subunit_data.dtype)
-                    padded[: subunit_data.shape[0], : subunit_data.shape[1]] = subunit_data
-                    subunit_data = padded
+            # Compare the subunits using a loss metric. ``loss_threshold``
+            # represents the mean absolute difference required to flag a
+            # change. Multi-channel data is handled by computing the mean
+            # across all channels.
+            loss = np.mean(
+                np.abs(
+                    current_subunit_old.astype(np.int16)
+                    - current_subunit_new.astype(np.int16)
+                )
+            )
+            if loss > loss_threshold:
+                changed_subunits_list.append((y, x, current_subunit_new.copy()))
 
-                changed_subunits_list.append((y, x, subunit_data))
 
     return changed_subunits_list

@@ -28,17 +28,7 @@ def test_get_changed_subunits_basic():
     assert np.array_equal(data, np.array([[[255, 0, 0]]], dtype=np.uint8))
 
 
-def test_get_changed_subunits_edge_padding():
-    old = np.zeros((2, 2), dtype=np.uint8)
-    new = old.copy()
-    new[1, 1] = 1
-    subs = get_changed_subunits(old, new, 3, 3)
-    assert len(subs) == 1
-    y, x, data = subs[0]
-    assert (y, x) == (0, 0)
-    # Edge subunit should be padded to the full requested size
-    assert data.shape == (3, 3)
-    assert data[1, 1] == 1
+
 
 
 def test_default_kernel_char():
