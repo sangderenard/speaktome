@@ -39,7 +39,9 @@ def flexible_subunit_kernel(
     """
     if mode == "raw":
         return subunit_data
-    char = default_subunit_to_char_kernel(subunit_data, ramp)
+    char = default_subunit_batch_to_chars(
+        np.expand_dims(subunit_data, axis=0), ramp
+    )[0]
     if mode == "ascii":
         return char
     if mode == "hybrid":
@@ -92,6 +94,7 @@ def default_subunit_to_char_kernel(
     """Map a single subunit's pixel data to an ASCII character."""
     return default_subunit_batch_to_chars(np.expand_dims(subunit_data, axis=0), ramp)[0]
 
+
 def draw_text_overlay(
     row: int,
     col: int,
@@ -104,11 +107,11 @@ def draw_text_overlay(
     sys.stdout.flush()
 
 def draw_diff(
-    changed_subunits: list[tuple[int, int, np.ndarray]], # List of (y_pixel, x_pixel, subunit_pixel_data)
-    char_cell_pixel_height: int = 1, # The height of a character cell in pixels
+    changed_subunits: list[tuple[int, int, np.ndarray]],  # List of (y_pixel, x_pixel, subunit_pixel_data)
+    char_cell_pixel_height: int = 1,  # The height of a character cell in pixels
     char_cell_pixel_width: int = 1,  # The width of a character cell in pixels
-    subunit_to_char_kernel: callable[[np.ndarray], str] = default_subunit_to_char_kernel,
-    active_ascii_ramp: str = DEFAULT_DRAW_ASCII_RAMP, # The ASCII ramp to use for character conversion
+    subunit_to_char_kernel: callable[[np.ndarray, str], list[str]] = default_subunit_batch_to_chars,
+    active_ascii_ramp: str = DEFAULT_DRAW_ASCII_RAMP,  # The ASCII ramp to use for character conversion
     base_row: int = 1, 
     base_col: int = 1
 ) -> None:
@@ -118,19 +121,15 @@ def draw_diff(
     `char_cell_pixel_height` and `char_cell_pixel_width` define the dimensions of a single
     character cell in terms of pixels. The `subunit_data` for each entry in `changed_subunits`
     is expected to match these dimensions (or be a part of a larger image from which these
-    coordinates are derived). The `subunit_to_char_kernel` converts this `subunit_data`
-    (representing one character cell's worth of pixels) into a single display character.
+    coordinates are derived). The `subunit_to_char_kernel` is expected to accept the entire
+    batch of subunits and return a list of ASCII characters for display.
     `base_row`, `base_col` are 1-indexed for ANSI terminal compatibility.
     """
     if char_cell_pixel_height <= 0: char_cell_pixel_height = 1
     if char_cell_pixel_width <= 0: char_cell_pixel_width = 1
 
-    # Batch convert all subunits to characters when using the default kernel
-    if subunit_to_char_kernel is default_subunit_to_char_kernel:
-        subunit_batch = np.stack([data for _, _, data in changed_subunits], axis=0)
-        chars = default_subunit_batch_to_chars(subunit_batch, active_ascii_ramp)
-    else:
-        chars = [subunit_to_char_kernel(data, active_ascii_ramp) for _, _, data in changed_subunits]
+    subunit_batch = np.stack([data for _, _, data in changed_subunits], axis=0)
+    chars = subunit_to_char_kernel(subunit_batch, active_ascii_ramp)
 
     for (y_pixel, x_pixel, subunit_data), char_to_draw in zip(changed_subunits, chars):
         char_y = y_pixel // char_cell_pixel_height

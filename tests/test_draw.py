@@ -1,18 +1,20 @@
+#!/usr/bin/env python3
+"""Tests for ASCII drawing utilities."""
 from __future__ import annotations
 
 try:
     from AGENTS.tools.header_utils import ENV_SETUP_BOX
     import numpy as np
     from time_sync.draw import (
+        get_changed_subunits,
+        default_subunit_batch_to_chars,
+        flexible_subunit_kernel,
+    )
 except Exception:
     import sys
     print(ENV_SETUP_BOX)
     sys.exit(1)
 # --- END HEADER ---
-    get_changed_subunits,
-    default_subunit_to_char_kernel,
-    flexible_subunit_kernel,
-)
 
 
 def test_get_changed_subunits_basic():
@@ -27,9 +29,9 @@ def test_get_changed_subunits_basic():
 
 
 def test_default_kernel_char():
-    arr = np.array([[[255, 255, 255]]], dtype=np.uint8)
-    char = default_subunit_to_char_kernel(arr)
-    assert isinstance(char, str) and len(char) == 1
+    arr = np.array([[[[255, 255, 255]]]], dtype=np.uint8)
+    chars = default_subunit_batch_to_chars(arr)
+    assert isinstance(chars[0], str) and len(chars[0]) == 1
 
 
 def test_flexible_kernel_modes():
