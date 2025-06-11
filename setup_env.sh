@@ -15,10 +15,12 @@ export SPEAKTOME_ACTIVE_FILE="$ACTIVE_FILE"
 
 USE_VENV=1
 HEADLESS=0
+NOTORCH=0
 for arg in "$@"; do
   case $arg in
-    --no-venv) USE_VENV=0 ;;
-    --headless) HEADLESS=1 ;;
+    -no-venv) USE_VENV=0 ;;
+    -headless) HEADLESS=1 ;;
+    -notorch|-no-torch) NOTORCH=1 ;;
   esac
 done
 
@@ -32,9 +34,9 @@ PY
 )"
 fi
 
-[ -n "$CODEBASES" ] && MENU_ARGS+=("--codebases" "$CODEBASES")
+[ -n "$CODEBASES" ] && MENU_ARGS+=("-codebases" "$CODEBASES")
 for g in "${GROUPS[@]}"; do
-  MENU_ARGS+=("--groups" "$g")
+  MENU_ARGS+=("-groups" "$g")
 done
 echo "[DEBUG] Codebases: ${CODEBASES:-}" >&2
 echo "[DEBUG] Groups: ${GROUPS[*]:-}" >&2
@@ -106,10 +108,6 @@ fi
 safe_run $VENV_PYTHON -m pip install --upgrade pip
 safe_run $VENV_PYTHON -m pip install wheel
 
-NOEXTRAS=0
-ML=0        # flag for full ML extras (transformers, torch_geometric)
-FORCE_GPU=0
-PREFETCH=0
 MAP_FILE="$SCRIPT_ROOT/AGENTS/codebase_map.json"
 CODEBASES=""
 GROUPS=()
@@ -117,27 +115,22 @@ MENU_ARGS=()
 
 for arg in "$@"; do
   case $arg in
-    --noextras|--minimal) NOEXTRAS=1 ;;
-    --extras|--full)      NOEXTRAS=0 ;;
-    --ml)                 ML=1      ;;
-    --gpu)                FORCE_GPU=1 ;;
-    --prefetch)           PREFETCH=1 ;;
-    --codebases=*|--cb=*) CODEBASES="${arg#*=}" ;;
-    --groups=*|--grp=*)   GROUPS+=("${arg#*=}") ;;
+    -codebases=*|-cb=*) CODEBASES="${arg#*=}" ;;
+    -groups=*|-grp=*)   GROUPS+=("${arg#*=}") ;;
   esac
 done
 
-
-# Always install torch first for GPU safety
-if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
-    echo "Installing latest stable CPU-only torch (CI environment)"
-    install_quiet "$VENV_PIP" install torch==2.3.1+cpu -f https://download.pytorch.org/whl/torch_stable.html
-elif [ $FORCE_GPU -eq 1 ]; then
-    echo "Installing GPU-enabled torch"
-    install_quiet "$VENV_PIP" install torch -f https://download.pytorch.org/whl/cu118
+if [ $NOTORCH -eq 1 ]; then
+  echo "[INFO] -notorch: Skipping torch installation and torch-dependent codebases/groups."
 else
-    echo "Installing latest stable CPU-only torch (default)"
-    install_quiet "$VENV_PIP" install torch==2.3.1+cpu -f https://download.pytorch.org/whl/torch_stable.html
+  # Always install torch first for CPU safety
+  if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
+      echo "Installing latest stable CPU-only torch (CI environment)"
+      install_quiet "$VENV_PIP" install torch==2.3.1+cpu -f https://download.pytorch.org/whl/torch_stable.html
+  else
+      echo "Installing latest stable CPU-only torch (default)"
+      install_quiet "$VENV_PIP" install torch==2.3.1+cpu -f https://download.pytorch.org/whl/torch_stable.html
+  fi
 fi
 
 # If not called from a dev script, launch the dev menu for all codebase/group installs

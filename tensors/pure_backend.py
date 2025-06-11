@@ -539,6 +539,14 @@ class PurePythonTensorOperations(AbstractTensor):
         result.data = data
         return result
 
+    def get_shape(self, tensor=None):
+        t = self._AbstractTensor__unwrap(tensor) if tensor is not None else self.data
+        return _get_shape(t)
+
+    def get_ndims(self, tensor=None):
+        t = self._AbstractTensor__unwrap(tensor) if tensor is not None else self.data
+        return len(_get_shape(t))
+
     def to_dtype_(self, tensor, dtype: str = "float"):
         # For pure Python, just convert all elements recursively
         def convert(val):

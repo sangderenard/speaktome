@@ -3,9 +3,6 @@
 $ErrorActionPreference = 'Stop'
 
 function Safe-Run([ScriptBlock]$cmd) {
-    Write-Host "[DEBUG] Safe-Run function entered."
-    Write-Host "[DEBUG]   cmd Type: $($cmd.GetType().FullName)"
-    Write-Host "[DEBUG]   cmd Value: '$cmd'"
     try { & $cmd }
     catch {
         Write-Host "Warning: $($_.Exception.Message)"
@@ -19,26 +16,31 @@ if (-not $activeFile) { $activeFile = Join-Path ([System.IO.Path]::GetTempPath()
 $env:SPEAKTOME_ACTIVE_FILE = $activeFile
 $menuArgs = @()
 $useVenv = $true
+$useTorch = $true
 foreach ($arg in $args) {
-    if ($arg -eq '--no-venv' -or $arg -eq '-no-venv') {
+    if ($arg -eq '-no-venv') {
         $useVenv = $false
     }
-    elseif ($arg -like '--codebases=*' -or $arg -like '--cb=*') {
+    elseif ($arg -eq '-notorch' -or $arg -eq '-no-torch') {
+        $useTorch = $false
+    }
+    elseif ($arg -like '-codebases=*' -or $arg -like '-cb=*') {
         $cbVal = $arg.Split('=')[1]
         if ($cbVal -and $cbVal.Trim().Length -gt 0) {
-            $menuArgs += '--codebases'
+            $menuArgs += '-codebases'
             $menuArgs += $cbVal
         }
     }
-    elseif ($arg -like '--groups=*' -or $arg -like '--grp=*') {
+    elseif ($arg -like '-groups=*' -or $arg -like '-grp=*') {
         $grpVal = $arg.Split('=')[1]
         if ($grpVal -and $grpVal.Trim().Length -gt 0) {
-            $menuArgs += '--groups'
+            $menuArgs += '-groups'
             $menuArgs += $grpVal
         }
     }
 }
-Safe-Run { & "$scriptRoot\setup_env.ps1" @args -from-dev }
+if (-not $useTorch) { $menuArgs += '-notorch' }
+Safe-Run { & "$scriptRoot\setup_env.ps1" @args -from-dev $(if (-not $useTorch) { '-NoTorch' }) }
 
 # Update the venv path handling section:
 if ($useVenv) {
@@ -153,3 +155,7 @@ if (Test-Path $activeFile) {
     Remove-Item $marker -ErrorAction SilentlyContinue
     Write-Warning "Active selection file not found; pytest will remain disabled."
 }
+
+# All options for this script should be used with single-dash PowerShell-style flags, e.g.:
+#   -NoTorch -NoVenv -Codebases projectA,projectB -Groups groupX
+# Do not use double-dash flags (e.g., --notorch) with this script.

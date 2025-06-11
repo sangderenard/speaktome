@@ -23,14 +23,24 @@ safe_run() {
 
 # Run the regular setup script (this creates the venv)
 USE_VENV=1
+NOTORCH=0
 for arg in "$@"; do
   case $arg in
-    --no-venv) USE_VENV=0 ;;
-    --codebases=*|--cb=*) MENU_ARGS+=("--codebases" "${arg#*=}") ;;
-    --groups=*|--grp=*)   MENU_ARGS+=("--groups" "${arg#*=}") ;;
+    -no-venv) USE_VENV=0 ;;
+    -notorch|-no-torch) NOTORCH=1 ;;
+    -codebases=*|-cb=*) MENU_ARGS+=("-codebases" "${arg#*=}") ;;
+    -groups=*|-grp=*)   MENU_ARGS+=("-groups" "${arg#*=}") ;;
   esac
 done
 
+if [ $NOTORCH -eq 1 ]; then
+  echo "[INFO] --notorch: Skipping torch installation and torch-dependent codebases/groups."
+fi
+
+# When running setup_env.sh, pass --notorch if set
+if [ $NOTORCH -eq 1 ]; then
+  set -- "$@" --notorch
+fi
 safe_run bash "$SCRIPT_ROOT/setup_env.sh" "$@" --from-dev
 
 # Define the venv Python path (assumes setup_env.sh created it at .venv)
@@ -135,3 +145,7 @@ else
   rm -f "$PYTEST_MARKER"
   echo "Warning: Active selection file not found; pytest will remain disabled." >&2
 fi
+
+# All options for this script should be used with double-dash GNU-style flags, e.g.:
+#   --notorch --no-venv --codebases=projectA,projectB --groups=groupX
+# Do not use single-dash flags (e.g., -NoTorch) with this script.

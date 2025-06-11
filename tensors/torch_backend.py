@@ -52,9 +52,9 @@ class PyTorchTensorOperations(AbstractTensor):
         self.default_device = torch.device(default_device)
 
     def _AbstractTensor__apply_operator_(self, op: str, left: Any, right: Any):
-        """Delegate arithmetic ops to PyTorch tensors."""
-        a = left
-        b = right
+        """Delegate arithmetic ops to PyTorch tensors. Always unwrap to raw tensors."""
+        a = self._AbstractTensor__unwrap(left)
+        b = self._AbstractTensor__unwrap(right)
         if op in ("add", "iadd"):
             return a + b
         if op == "radd":
@@ -200,10 +200,19 @@ class PyTorchTensorOperations(AbstractTensor):
         t = self._AbstractTensor__unwrap(tensor)
         return torch.argmin(t) if dim is None else torch.argmin(t, dim=dim)
 
+    def get_shape(self, tensor=None):
+        t = self._AbstractTensor__unwrap(tensor) if tensor is not None else self.data
+        return tuple(t.shape)
+
+    def get_ndims(self, tensor=None):
+        t = self._AbstractTensor__unwrap(tensor) if tensor is not None else self.data
+        return t.dim()
+
     def interpolate_(self, tensor, size):
+        t = self._AbstractTensor__unwrap(tensor)
         if isinstance(size, int):
             size = (size,)
-        if len(size) != tensor.dim():
+        if len(size) != self.get_ndims(t):
             raise ValueError("size must match tensor dimensions")
         def interp_dim(t, new_len, axis):
             old_len = t.shape[axis]
@@ -212,12 +221,12 @@ class PyTorchTensorOperations(AbstractTensor):
             pos = torch.linspace(0, old_len - 1, steps=new_len, device=t.device, dtype=torch.float32)
             left = pos.floor().long()
             right = torch.clamp(left + 1, max=old_len - 1)
-            weight = (pos - left.float()).view([-1 if i == axis else 1 for i in range(t.dim())])
-            left_vals = torch.gather(t, axis, left.view([-1 if i == axis else 1 for i in range(t.dim())]).expand([new_len if i == axis else s for i, s in enumerate(t.shape)]))
-            right_vals = torch.gather(t, axis, right.view([-1 if i == axis else 1 for i in range(t.dim())]).expand([new_len if i == axis else s for i, s in enumerate(t.shape)]))
+            weight = (pos - left.float()).view([-1 if i == axis else 1 for i in range(self.get_ndims(t))])
+            left_vals = torch.gather(t, axis, left.view([-1 if i == axis else 1 for i in range(self.get_ndims(t))]).expand([new_len if i == axis else s for i, s in enumerate(t.shape)]))
+            right_vals = torch.gather(t, axis, right.view([-1 if i == axis else 1 for i in range(self.get_ndims(t))]).expand([new_len if i == axis else s for i, s in enumerate(t.shape)]))
             return left_vals * (1 - weight) + right_vals * weight
-        result = tensor
-        for d in range(tensor.dim()):
+        result = t
+        for d in range(self.get_ndims(t)):
             result = interp_dim(result, size[d], d)
         return result
 

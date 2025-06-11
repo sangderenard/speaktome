@@ -361,3 +361,11 @@ class NumPyTensorOperations(AbstractTensor):
         result = type(target_ops)(track_time=target_ops.track_time)
         result.data = np.array(data)
         return result
+
+    def get_shape(self, tensor=None):
+        t = self._AbstractTensor__unwrap(tensor) if tensor is not None else self.data
+        return tuple(t.shape)
+
+    def get_ndims(self, tensor=None):
+        t = self._AbstractTensor__unwrap(tensor) if tensor is not None else self.data
+        return t.ndim

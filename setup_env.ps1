@@ -2,17 +2,17 @@
 # No Unicode. All pip/python commands run inside venv unless -NoVenv is used.
 
 param(
-    [switch]$Extras,
-    [switch]$NoExtras,
-    [switch]$ml,
-    [switch]$gpu,
-    [switch]$prefetch,
     [switch]$NoVenv,
+    [switch]$NoTorch,
     [switch]$headless,
     [switch]$FromDev,
     [string[]]$Codebases,
     [string[]]$Groups
 )
+
+# All options for this script should be used with single-dash PowerShell-style flags, e.g.:
+#   -NoTorch -NoVenv -Codebases projectA,projectB -Groups groupX
+# Do not use double-dash flags (e.g., --notorch) with this script.
 
 $activeFile = $env:SPEAKTOME_ACTIVE_FILE
 if (-not $activeFile) {
@@ -40,17 +40,17 @@ if (-not $Codebases) {
         # Let dev_group_menu handle interactive selection
     }
 }
-if ($Extras) { $NoExtras = $false }
 $menuArgs = @()
-if ($Codebases) { $menuArgs += '--codebases'; $menuArgs += ($Codebases -join ',') }
+if ($Codebases) { $menuArgs += '-Codebases'; $menuArgs += ($Codebases -join ',') }
 if ($Groups) {
     foreach ($g in $Groups) {
         if ($g -and $g.Trim().Length -gt 0) {
-            $menuArgs += '--groups'
+            $menuArgs += '-Groups'
             $menuArgs += $g
         }
     }
 }
+if ($NoTorch) { $menuArgs += '-NoTorch' }
 Write-Host "[DEBUG] Codebases: $($Codebases -join ';')"
 Write-Host "[DEBUG] Groups: $($Groups -join ';')"
 
@@ -146,16 +146,17 @@ if (-not $NoVenv) {
 Safe-Run { & $venvPython -m pip install --upgrade pip }
 Safe-Run { & $venvPython -m pip install wheel }  # <-- Add this line
 
-# Always install torch first
-if ($env:GITHUB_ACTIONS -eq 'true') {
-    Write-Host 'Installing CPU-only torch (CI environment)'
-    Install-Quiet $venvPip "install torch==2.3.1+cpu -f https://download.pytorch.org/whl/torch_stable.html"
-} elseif ($gpu) {
-    Write-Host 'Installing GPU-enabled torch'
-    Install-Quiet $venvPip "install torch -f https://download.pytorch.org/whl/cu118"
+# Torch install logic
+if ($NoTorch) {
+    Write-Host '[INFO] -NoTorch: Skipping torch installation and torch-dependent codebases/groups.'
 } else {
-    Write-Host 'Installing CPU-only torch (default)'
-    Install-Quiet $venvPip "install torch==2.3.1+cpu -f https://download.pytorch.org/whl/torch_stable.html"
+    if ($env:GITHUB_ACTIONS -eq 'true') {
+        Write-Host 'Installing CPU-only torch (CI environment)'
+        Install-Quiet $venvPip "install torch==2.3.1+cpu -f https://download.pytorch.org/whl/torch_stable.html"
+    } else {
+        Write-Host 'Installing CPU-only torch (default)'
+        Install-Quiet $venvPip "install torch==2.3.1+cpu -f https://download.pytorch.org/whl/torch_stable.html"
+    }
 }
 
 # If not called from a dev script, launch the dev menu for all codebase/group installs

@@ -378,3 +378,11 @@ class JAXTensorOperations(AbstractTensor):
         else:
             # Default to float32
             return jnp.asarray(tensor, dtype=jnp.float32)
+
+    def get_shape(self, tensor=None):
+        t = self._AbstractTensor__unwrap(tensor) if tensor is not None else self.data
+        return tuple(t.shape)
+
+    def get_ndims(self, tensor=None):
+        t = self._AbstractTensor__unwrap(tensor) if tensor is not None else self.data
+        return t.ndim

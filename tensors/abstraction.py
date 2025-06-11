@@ -69,6 +69,16 @@ class AbstractTensor(ABC):
         self.track_time = track_time
         self.last_op_time: float | None = None
         self.data = None  # Holds the tensor's data
+        self.shape = None  # Shape metadata, set by __wrap
+        self.ndims = None  # Number of dimensions, set by __wrap
+
+    def _AbstractTensor__wrap(self, tensor):
+        """Default wrap: should be overridden by backend. Wraps a backend-native tensor and sets shape/ndims."""
+        obj = type(self)()
+        obj.data = tensor
+        obj.shape = obj.get_shape(tensor)
+        obj.ndims = obj.get_ndims(tensor)
+        return obj
 
     # --------------------------------------------------------------
     # Internal helpers
@@ -310,6 +320,38 @@ class AbstractTensor(ABC):
     def tensor_type(self) -> type:
         return self.tensor_type_
 
+    # --- Shape and dimension accessors (overloads) ---
+    @property
+    def shape(self):
+        """Return the shape of the tensor as a tuple (property)."""
+        return self.get_shape(self.data)
+
+    def shape_(self, tensor=None):
+        """Return the shape of the tensor as a tuple (method, for backend compatibility)."""
+        return self.get_shape(self.data_or(tensor))
+
+    def shape(self, tensor=None):
+        """Return the shape of the tensor as a tuple (method, for legacy compatibility)."""
+        return self.get_shape(self.data_or(tensor))
+
+    @property
+    def ndim(self):
+        """Return the number of dimensions (property, numpy style)."""
+        return self.get_ndims(self.data)
+
+    @property
+    def ndims(self):
+        """Return the number of dimensions (property, project style)."""
+        return self.get_ndims(self.data)
+
+    def dim(self, tensor=None):
+        """Return the number of dimensions (method, torch style)."""
+        return self.get_ndims(self.data_or(tensor))
+
+    def ndims(self, tensor=None):
+        """Return the number of dimensions (method, project style)."""
+        return self.get_ndims(self.data_or(tensor))
+
     # Lightweight helper to coerce arbitrary input to this backend's tensor type
     def to_backend(
         self,
@@ -323,6 +365,8 @@ class AbstractTensor(ABC):
         if type(self) is type(target_ops):
             result = type(target_ops)(track_time=self.track_time)
             result.data = self.clone_(self)
+            result.shape = result.get_shape(result.data)
+            result.ndims = result.get_ndims(result.data)
             return result
 
         conv_func = CONVERSION_REGISTRY.get((type(self), type(target_ops)))
@@ -332,10 +376,16 @@ class AbstractTensor(ABC):
             converted = conv_func(self, self, target_ops)
 
         if isinstance(converted, AbstractTensor):
+            # Ensure shape/ndims are set after conversion
+            if getattr(converted, 'data', None) is not None:
+                converted.shape = converted.get_shape(converted.data)
+                converted.ndims = converted.get_ndims(converted.data)
             return converted.to_backend(target_ops)
 
         new_tensor = type(target_ops)(track_time=self.track_time)
         new_tensor.data = converted
+        new_tensor.shape = new_tensor.get_shape(converted)
+        new_tensor.ndims = new_tensor.get_ndims(converted)
         return new_tensor
 
     def ensure_tensor(self, tensor: Any) -> "AbstractTensor":
@@ -464,6 +514,16 @@ class AbstractTensor(ABC):
         if obj is None:
             return self.data
         return obj
+
+    @abstractmethod
+    def get_shape(self, tensor=None):
+        """Return the shape of the tensor as a tuple."""
+        pass
+
+    @abstractmethod
+    def get_ndims(self, tensor=None):
+        """Return the number of dimensions of the tensor."""
+        pass
 
 # Remove stray demo/test code (stacked = ..., values, idxs = ...)
 
