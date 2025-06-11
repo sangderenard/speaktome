@@ -8,7 +8,7 @@ try:
     import numpy as np
     from PIL import Image, ImageDraw, ImageFont
     from tensors import (
-        AbstractTensorOperations,
+        AbstractTensor,
         get_tensor_operations,
         PyTorchTensorOperations,
         NumPyTensorOperations,
@@ -29,12 +29,12 @@ except ImportError:
 from fontmapper.FM16.modules.charset_ops import obtain_charset
 
 
-def _backend_numpy(ops: AbstractTensorOperations) -> bool:
+def _backend_numpy(ops: AbstractTensor) -> bool:
     """Return True if ``ops`` uses a NumPy-based backend."""
     return isinstance(ops, NumPyTensorOperations)
 
 
-def _backend_torch(ops: AbstractTensorOperations) -> bool:
+def _backend_torch(ops: AbstractTensor) -> bool:
     """Return True if ``ops`` uses a PyTorch backend."""
     return isinstance(ops, PyTorchTensorOperations)
 
@@ -46,7 +46,7 @@ class AsciiKernelClassifier:
         font_size: int = 16,
         char_size: tuple[int, int] = (16, 16),
         loss_mode: str = "sad",
-        tensor_ops: AbstractTensorOperations | None = None,
+        tensor_ops: AbstractTensor | None = None,
     ) -> None:
         self.ramp = ramp
         self.vocab_size = len(ramp)

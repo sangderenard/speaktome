@@ -7,7 +7,7 @@ try:
     import torch
 
     from tensors import (
-        AbstractTensorOperations,
+        AbstractTensor,
         get_tensor_operations,
     )
 
@@ -82,7 +82,7 @@ class BeamGraphOperator:
     def __init__(
         self,
         tree: 'CompressedBeamTree',
-        tensor_ops: AbstractTensorOperations | None = None,
+        tensor_ops: AbstractTensor | None = None,
     ) -> None:
         """
         :param tree: The CompressedBeamTree instance to operate on.

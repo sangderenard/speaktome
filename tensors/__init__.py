@@ -5,7 +5,7 @@ from __future__ import annotations
 try:
     from AGENTS.tools.header_utils import ENV_SETUP_BOX
     from .abstraction import (
-        AbstractTensorOperations,
+        AbstractTensor,
         get_tensor_operations,
     )
     from .faculty import Faculty, DEFAULT_FACULTY, FORCE_ENV, detect_faculty
@@ -41,7 +41,7 @@ except Exception:  # pragma: no cover - c backend missing
     CTensorOperations = None  # type: ignore
 
 __all__ = [
-    "AbstractTensorOperations",
+    "AbstractTensor",
     "get_tensor_operations",
     "PyTorchTensorOperations",
     "NumPyTensorOperations",

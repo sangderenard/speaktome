@@ -7,7 +7,7 @@ try:
 
     if TYPE_CHECKING:  # pragma: no cover - type hints only
         from .beam_search_instruction import BeamSearchInstruction
-    from tensors import AbstractTensorOperations
+    from tensors import AbstractTensor
     from .model_abstraction import AbstractModelWrapper
 except Exception:
     import sys
@@ -47,7 +47,7 @@ class LookaheadController:
         device: Any, # Generic device type
         tokenizer: Any, # Tokenizer should have pad_token_id
         config: LookaheadConfig,
-        tensor_ops: AbstractTensorOperations | None,
+        tensor_ops: AbstractTensor | None,
         model_wrapper: AbstractModelWrapper,
     ):
         self.lookahead_steps = lookahead_steps

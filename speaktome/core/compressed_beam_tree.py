@@ -15,7 +15,7 @@ try:
     # Local application/library specific imports
     from .beam_tree_node import BeamTreeNode  # Assuming BeamTreeNode is in beam_tree_node.py
     from tensors import (
-        AbstractTensorOperations,
+        AbstractTensor,
         get_tensor_operations,
     )
 except Exception:
@@ -30,7 +30,7 @@ class CompressedBeamTree:
         device: str = "cuda",
         tokenizer: Optional['PreTrainedTokenizer'] = None,
         operator=None,
-        tensor_ops: AbstractTensorOperations | None = None,
+        tensor_ops: AbstractTensor | None = None,
     ) -> None:
         self.device = torch.device(device)
         self.operator = operator

@@ -1,4 +1,4 @@
-"""Pure Python implementation of :class:`AbstractTensorOperations`."""
+"""Pure Python implementation of :class:`AbstractTensor`."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ from __future__ import annotations
 # ----------------------------------------
 # 1. OPERATOR IMPLEMENTATION:
 #    - DO NOT implement magic methods (__add__, __mul__, etc.)
-#    - These are handled by AbstractTensorOperations
+#    - These are handled by AbstractTensor
 #    - Only implement the single designated operator method from the abstract class
 #
 # 2. TEST COMPLIANCE:
@@ -16,7 +16,7 @@ from __future__ import annotations
 #    - Failed tests are preferable to false implementations
 #
 # 3. BACKEND RESPONSIBILITIES:
-#    - Implement only the core tensor operations defined in AbstractTensorOperations
+#    - Implement only the core tensor operations defined in AbstractTensor
 #    - All operator routing happens through the abstract class
 #    - Let test failures expose missing functionality naturally
 #
@@ -26,19 +26,19 @@ from __future__ import annotations
 #    - Do not add dummy fallbacks for missing dependencies
 #
 # Remember: Magic methods and operator overloading are EXCLUSIVELY handled by
-# AbstractTensorOperations. Backend implementations provide only the raw
+# AbstractTensor. Backend implementations provide only the raw
 # tensor operations.
 
 from typing import Any, Tuple, Optional, List
 import math
 import json
 
-from .abstraction import AbstractTensorOperations, _get_shape, _flatten
+from .abstraction import AbstractTensor, _get_shape, _flatten
 
 # --- END HEADER ---
 
 
-class PurePythonTensorOperations(AbstractTensorOperations):
+class PurePythonTensorOperations(AbstractTensor):
     """Educational tensor ops using nested Python lists."""
 
     def __init__(self, track_time: bool = False):
@@ -59,7 +59,7 @@ class PurePythonTensorOperations(AbstractTensorOperations):
         # ###############################################################
         pass
 
-    def _AbstractTensorOperations__apply_operator(self, op: str, left: Any, right: Any):
+    def _AbstractTensor__apply_operator(self, op: str, left: Any, right: Any):
         """Dispatch basic arithmetic for nested lists."""
         if op in {"matmul", "rmatmul", "imatmul"}:
             a, b = (left, right) if op != "rmatmul" else (right, left)

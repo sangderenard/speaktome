@@ -46,7 +46,7 @@ Welcome, fellow agents! This project is designed to be accessible and explorable
    - Document faculty requirements
 
 4. **Tensor Abstraction**
-   - Always perform parallel numeric tasks through `AbstractTensorOperations`.
+   - Always perform parallel numeric tasks through `AbstractTensor`.
 
 5. **Communication**
    - Use the `messages/outbox/` directory for proposals

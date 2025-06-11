@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 from typing import Any
-from tensors.abstraction import AbstractTensorOperations
+from tensors.abstraction import AbstractTensor
 
 from .ruler import Ruler
 
@@ -14,7 +14,7 @@ class GrandPrintingPress:
 
     def __init__(
         self,
-        tensor_ops: AbstractTensorOperations,
+        tensor_ops: AbstractTensor,
         page_size: tuple[int, int] = (512, 512),
         dpi: int = 300,
     ) -> None:
@@ -30,7 +30,7 @@ class GrandPrintingPress:
         #          pipelines, and output buffers.
         # EXPECTED BEHAVIOR: Set up data structures to store glyph tensors and
         #          configure default kernels for processing print operations.
-        # INPUTS: ``tensor_ops`` implementing ``AbstractTensorOperations``.
+        # INPUTS: ``tensor_ops`` implementing ``AbstractTensor``.
         # OUTPUTS: None directly, internal state prepared for use by other
         #          methods.
         # KEY ASSUMPTIONS/DEPENDENCIES: ``tensor_ops`` provides all numeric

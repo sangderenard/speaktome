@@ -16,8 +16,8 @@ if REPO_ROOT not in sys.path:
 import tensors as ta
 
 
-def available_backends() -> list[tuple[str, type[ta.AbstractTensorOperations]]]:
-    backends: list[tuple[str, type[ta.AbstractTensorOperations]]] = [
+def available_backends() -> list[tuple[str, type[ta.AbstractTensor]]]:
+    backends: list[tuple[str, type[ta.AbstractTensor]]] = [
         ("PurePython", ta.PurePythonTensorOperations)
     ]
     if importlib.util.find_spec("numpy") is not None:
@@ -56,7 +56,7 @@ def to_plain(value: Any) -> Any:
     return value
 
 
-def run_test(name: str, ops: ta.AbstractTensorOperations, ref_ops: ta.AbstractTensorOperations) -> Tuple[bool, str]:
+def run_test(name: str, ops: ta.AbstractTensor, ref_ops: ta.AbstractTensor) -> Tuple[bool, str]:
     if name not in _SAMPLE_INPUT:
         return False, "no sample defined"
     func = _SAMPLE_INPUT[name]
@@ -75,7 +75,7 @@ def list_tests() -> list[str]:
     return list(_SAMPLE_INPUT.keys())
 
 
-def choose_backend(backends: list[tuple[str, type[ta.AbstractTensorOperations]]]):
+def choose_backend(backends: list[tuple[str, type[ta.AbstractTensor]]]):
     print("Available backends:")
     for idx, (name, _) in enumerate(backends, start=1):
         print(f" {idx}. {name}")

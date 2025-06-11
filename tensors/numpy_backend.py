@@ -1,10 +1,10 @@
-"""NumPy implementation of :class:`AbstractTensorOperations`."""
+"""NumPy implementation of :class:`AbstractTensor`."""
 
 # TENSOR BACKEND IMPLEMENTATION GUIDELINES:
 # ----------------------------------------
 # 1. OPERATOR IMPLEMENTATION:
 #    - DO NOT implement magic methods (__add__, __mul__, etc.)
-#    - These are handled by AbstractTensorOperations
+#    - These are handled by AbstractTensor
 #    - Only implement the single designated operator method from the abstract class
 #
 # 2. TEST COMPLIANCE:
@@ -14,7 +14,7 @@
 #    - Failed tests are preferable to false implementations
 #
 # 3. BACKEND RESPONSIBILITIES:
-#    - Implement only the core tensor operations defined in AbstractTensorOperations
+#    - Implement only the core tensor operations defined in AbstractTensor
 #    - All operator routing happens through the abstract class
 #    - Let test failures expose missing functionality naturally
 #
@@ -24,12 +24,12 @@
 #    - Do not add dummy fallbacks for missing dependencies
 #
 # Remember: Magic methods and operator overloading are EXCLUSIVELY handled by
-# AbstractTensorOperations. Backend implementations provide only the raw
+# AbstractTensor. Backend implementations provide only the raw
 # tensor operations.
 
 from typing import Any, Tuple, List, Optional
 
-from .abstraction import AbstractTensorOperations
+from .abstraction import AbstractTensor
 
 try:
     from AGENTS.tools.header_utils import ENV_SETUP_BOX
@@ -47,11 +47,11 @@ except Exception:
     sys.exit(1)
 # --- END HEADER ---
 
-class NumPyTensorOperations(AbstractTensorOperations):
+class NumPyTensorOperations(AbstractTensor):
     def __init__(self, track_time: bool = False):
         super().__init__(track_time=track_time)
 
-    def _AbstractTensorOperations__apply_operator_(self, op: str, left: Any, right: Any):
+    def _AbstractTensor__apply_operator_(self, op: str, left: Any, right: Any):
         """Apply arithmetic operators on NumPy arrays."""
         a = np.array(left) if not isinstance(left, np.ndarray) else left
         b = np.array(right) if not isinstance(right, np.ndarray) else right

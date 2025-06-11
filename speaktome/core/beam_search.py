@@ -23,7 +23,7 @@ try:
     from .beam_retirement_manager import BeamRetirementManager
     from .compressed_beam_tree import CompressedBeamTree
     from tensors import (
-        AbstractTensorOperations,
+        AbstractTensor,
     )
     from .model_abstraction import (
         AbstractModelWrapper,
@@ -47,7 +47,7 @@ class BeamSearch:
                  max_candidates_per_lookahead_step: Optional[int] = None # This is lookahead_top_k
     ):
         self.scorer = scorer
-        self.tensor_ops: AbstractTensorOperations = scorer.tensor_ops
+        self.tensor_ops: AbstractTensor = scorer.tensor_ops
         self.max_len = max_len
         self.beam_width = beam_width
         self.gpu_limit = gpu_limit
@@ -348,7 +348,7 @@ class BeamSearch:
         # Use current_lookahead_aggregate_fn or a default (e.g., RMS, handled by LookaheadController if None)
         # For LookaheadConfig, aggregate_fn is mandatory. Let's define a default RMS here if not provided.
         agg_fn_for_config = self.current_lookahead_aggregate_fn
-        tensor_ops_instance: AbstractTensorOperations = self.tensor_ops
+        tensor_ops_instance: AbstractTensor = self.tensor_ops
         model_wrapper_instance = PyTorchModelWrapper(model)
         if agg_fn_for_config is None:
             def default_rms_aggregate_fn(score_matrix: Any) -> Any:
