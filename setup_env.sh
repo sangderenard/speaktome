@@ -153,3 +153,6 @@ PY
 )
 echo "   * Torch = ${TORCH_INFO:-missing}"
 echo "Selections recorded to $SPEAKTOME_ACTIVE_FILE"
+
+# Always drop to the dev_group_menu for optional installs
+"$VENV_PYTHON" "$SCRIPT_ROOT/AGENTS/tools/dev_group_menu.py"
