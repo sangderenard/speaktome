@@ -9,23 +9,36 @@ try:
         get_tensor_operations,
     )
     from .faculty import Faculty, DEFAULT_FACULTY, FORCE_ENV, detect_faculty
-    from .torch_backend import PyTorchTensorOperations
-    from .numpy_backend import NumPyTensorOperations
     from .pure_backend import PurePythonTensorOperations
-
-    try:
-        from .jax_backend import JAXTensorOperations
-    except Exception:  # pragma: no cover - optional backend
-        JAXTensorOperations = None  # type: ignore
-    try:
-        from .c_backend import CTensorOperations
-    except Exception:  # pragma: no cover - optional backend
-        CTensorOperations = None  # type: ignore
 except Exception:
     import sys
     print(ENV_SETUP_BOX)
     sys.exit(1)
 # --- END HEADER ---
+
+PyTorchTensorOperations = None
+try:  # optional torch backend
+    from .torch_backend import PyTorchTensorOperations  # type: ignore
+except Exception:  # pragma: no cover - torch missing
+    PyTorchTensorOperations = None  # type: ignore
+
+NumPyTensorOperations = None
+try:  # optional numpy backend
+    from .numpy_backend import NumPyTensorOperations  # type: ignore
+except Exception:  # pragma: no cover - numpy missing
+    NumPyTensorOperations = None  # type: ignore
+
+JAXTensorOperations = None
+try:  # optional jax backend
+    from .jax_backend import JAXTensorOperations  # type: ignore
+except Exception:  # pragma: no cover - jax missing
+    JAXTensorOperations = None  # type: ignore
+
+CTensorOperations = None
+try:  # optional C backend
+    from .c_backend import CTensorOperations  # type: ignore
+except Exception:  # pragma: no cover - c backend missing
+    CTensorOperations = None  # type: ignore
 
 
 __all__ = [
