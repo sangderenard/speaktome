@@ -118,7 +118,7 @@ Write-Host "For advanced codebase/group selection, run: python AGENTS/tools/dev_
 Write-Host "Selections recorded to $activeFile"
 
 # Mark the environment so pytest knows setup completed with at least one codebase
-$marker = Join-Path $scriptDir '.venv\pytest_enabled'
+$marker = Join-Path $scriptRoot '.venv\pytest_enabled'
 if (Test-Path $activeFile) {
     try {
         $data = Get-Content $activeFile | ConvertFrom-Json
