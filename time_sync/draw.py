@@ -185,12 +185,7 @@ def get_changed_subunits(
                          in the original frame.
         - x_coord (int): The x-coordinate of the top-left corner of the changed subunit
                          in the original frame.
-        - subunit_data (np.ndarray): Pixel data from ``new_frame`` for the
-                                     changed subunit. If the slice is smaller
-                                     than ``subunit_height`` or ``subunit_width``
-                                     (i.e., it hits the frame edge) the region is
-                                     automatically marked as changed without
-                                     comparing it against ``old_frame``.
+
 
     Raises:
         ValueError: If old_frame and new_frame do not have the same shape,
@@ -236,5 +231,6 @@ def get_changed_subunits(
             )
             if loss > loss_threshold:
                 changed_subunits_list.append((y, x, current_subunit_new.copy()))
+
 
     return changed_subunits_list
