@@ -131,18 +131,20 @@ class ThemeManager:
         # 3. If "block" style is also not found, return the hardcoded default fallback ramp.
         return DEFAULT_FALLBACK_RAMP
 
-    def cycle_ascii_style(self) -> str:
-        """Cycle to next ASCII style"""
+    def cycle_ascii_style(self, step: int = 1) -> str:
+        """Cycle the active ASCII style forward or backward by ``step``."""
         styles = list(self.presets.get("ascii_styles", {}).keys())
-        if not styles: # Fallback if no styles are loaded
-            self.current_theme.ascii_style = "block" # Default to "block" style name
+        if not styles:  # Fallback if no styles are loaded
+            self.current_theme.ascii_style = "block"  # Default to "block" style name
             return self.current_theme.ascii_style
+
         try:
-            current_idx = styles.index(self.current_theme.ascii_style)
-            next_idx = (current_idx + 1) % len(styles)
-            self.current_theme.ascii_style = styles[next_idx]
+            idx = styles.index(self.current_theme.ascii_style)
         except ValueError:
-            self.current_theme.ascii_style = styles[0]
+            idx = 0
+
+        new_idx = (idx + step) % len(styles)
+        self.current_theme.ascii_style = styles[new_idx]
         return self.current_theme.ascii_style
 
     def toggle_clock_inversion(self) -> bool:
