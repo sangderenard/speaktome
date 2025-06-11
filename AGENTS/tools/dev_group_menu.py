@@ -52,6 +52,7 @@ if os.name == 'nt':  # Windows
 
 ROOT = Path(__file__).resolve().parents[2]
 REGISTRY = ROOT / "AGENTS" / "CODEBASE_REGISTRY.md"
+MAP_FILE = ROOT / "AGENTS" / "codebase_map.json"
 ACTIVE_ENV = "SPEAKTOME_ACTIVE_FILE"
 
 
@@ -95,7 +96,20 @@ def build_codebase_groups() -> tuple[dict[str, dict[str, list[str]]], dict[str, 
     return mapping, paths
 
 
-CODEBASES, CODEBASE_PATHS = build_codebase_groups()
+def load_codebase_map(map_path: Path) -> tuple[dict[str, dict[str, list[str]]], dict[str, Path]]:
+    """Load codebase mapping from ``map_path`` or fall back to discovery."""
+    if map_path.exists():
+        try:
+            data = json.loads(map_path.read_text())
+            mapping = {k: v.get("groups", {}) for k, v in data.items()}
+            paths = {k: ROOT / v.get("path", k) for k, v in data.items()}
+            return mapping, paths
+        except Exception:
+            pass
+    return build_codebase_groups()
+
+
+CODEBASES, CODEBASE_PATHS = load_codebase_map(MAP_FILE)
 
 
 def interactive_selection() -> tuple[list[str], dict[str, dict[str, list[str]]]]:

@@ -41,18 +41,16 @@ def _venv_marker_ok() -> bool:
     except Exception:
         return False
 
-def _discover_codebases(registry: Path) -> list[str]:
-    pattern = re.compile(r"- \*\*(.+?)\*\*")
-    if not registry.exists():
+def _discover_codebases(map_file: Path) -> list[str]:
+    if not map_file.exists():
         return []
-    cbs = []
-    for line in registry.read_text().splitlines():
-        m = pattern.match(line.strip())
-        if m:
-            cbs.append(m.group(1))
-    return cbs
+    try:
+        data = json.loads(map_file.read_text())
+        return list(data.keys())
+    except Exception:
+        return []
 
-CODEBASES = _discover_codebases(ROOT / "AGENTS" / "CODEBASE_REGISTRY.md")
+CODEBASES = _discover_codebases(ROOT / "AGENTS" / "codebase_map.json")
 
 def _guess_codebase(path: Path) -> str:
     text = path.read_text(errors="ignore")
