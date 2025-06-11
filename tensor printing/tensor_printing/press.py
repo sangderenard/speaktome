@@ -1,6 +1,3 @@
-"""Grand Printing Press core machinery."""
-# --- END HEADER ---
-
 from __future__ import annotations
 
 from typing import Any
@@ -25,24 +22,14 @@ class GrandPrintingPress:
         self.canvas = tensor_ops.zeros(
             (height, width), dtype=tensor_ops.float_dtype, device=None
         )
+        # Glyph libraries keyed by (font_path, font_size)
         self.glyph_libraries: dict[tuple[str | None, int], dict[str, Any]] = {}
-        self.kernel_registry: dict[str, Any] = {}
-        # ########## STUB: GrandPrintingPress.__init__ ##########
-        # PURPOSE: Initialize resources for managing glyph libraries, kernel
-        #          pipelines, and output buffers.
-        # EXPECTED BEHAVIOR: Set up data structures to store glyph tensors and
-        #          configure default kernels for processing print operations.
-        # INPUTS: ``tensor_ops`` implementing ``AbstractTensor``.
-        # OUTPUTS: None directly, internal state prepared for use by other
-        #          methods.
-        # KEY ASSUMPTIONS/DEPENDENCIES: ``tensor_ops`` provides all numeric
-        #          tensor operations required by the algorithms.
-        # TODO:
-        #   - Load or generate default glyph libraries.
-        #   - Establish kernel registry and composition interface.
-        # NOTES: This starter implementation merely stores ``tensor_ops`` for
-        #        future use and allocates a blank canvas.
-        # ###################################################################
+        # Post-processing kernels
+        self.kernels: list[callable] = []
+
+    def add_kernel(self, func: callable) -> None:
+        """Register a post-processing kernel."""
+        self.kernels.append(func)
 
     def print_glyph(
         self,
@@ -51,18 +38,6 @@ class GrandPrintingPress:
         unit: str = "mm",
     ) -> Any:
         """Apply a glyph tensor at the given position."""
-        # ########## STUB: GrandPrintingPress.print_glyph ##########
-        # PURPOSE: Render ``glyph`` onto an internal canvas at ``position``.
-        # EXPECTED BEHAVIOR: The glyph is composited with existing canvas data
-        #          using defined kernels for blending and post-processing.
-        # INPUTS: ``glyph`` tensor compatible with ``tensor_ops`` and a 2D
-        #          ``position``.
-        # OUTPUTS: Updated canvas tensor or handle.
-        # KEY ASSUMPTIONS/DEPENDENCIES: Canvas initialized elsewhere.
-        # TODO:
-        #   - Implement placement and blending logic.
-        #   - Expose kernel hooks for custom effects.
-        # ###################################################################
         y_idx, x_idx = self.ruler.coordinates_to_tensor(position[0], position[1], unit)
         g_height, g_width = self.tensor_ops.shape(glyph)
         c_height, c_width = self.tensor_ops.shape(self.canvas)
@@ -80,22 +55,17 @@ class GrandPrintingPress:
             self.tensor_ops.assign_at_indices(
                 self.canvas, indices_dim0, indices_dim1, values
             )
+
+        for kernel in self.kernels:
+            self.canvas = kernel(self.canvas)
         return self.canvas
 
     def finalize_page(self) -> Any:
         """Return the completed tensor page."""
-        # ########## STUB: GrandPrintingPress.finalize_page ##########
-        # PURPOSE: Produce the final composed tensor after all operations.
-        # EXPECTED BEHAVIOR: Apply post-processing kernels (e.g., noise,
-        #          blurring) and return the result.
-        # INPUTS: None.
-        # OUTPUTS: Tensor representing the finished printed page.
-        # KEY ASSUMPTIONS/DEPENDENCIES: Uses kernels configured in ``__init__``.
-        # TODO:
-        #   - Implement post-processing pipeline.
-        #   - Define format of the returned tensor.
-        # ###################################################################
-        return self.tensor_ops.clamp(self.canvas, 0.0, 1.0)
+        output = self.canvas
+        for kernel in self.kernels:
+            output = kernel(output)
+        return self.tensor_ops.clamp(output, 0.0, 1.0)
 
     def load_font(
         self,
@@ -152,6 +122,7 @@ class GrandPrintingPress:
             if ch == "\n":
                 sample = next(iter(library.values()))
                 g_height = self.tensor_ops.shape(sample)[0]
+                # move down by glyph height in tensor units
                 y -= self.ruler.tensor_to_coordinates(0, g_height, unit)[1]
                 x = position[0]
                 continue
@@ -162,3 +133,4 @@ class GrandPrintingPress:
             g_width = self.tensor_ops.shape(glyph)[1]
             x += self.ruler.tensor_to_coordinates(g_width, 0, unit)[0]
         return self.canvas
+

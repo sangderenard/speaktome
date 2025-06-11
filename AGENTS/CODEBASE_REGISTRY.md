@@ -8,6 +8,7 @@ This document lists the independent project directories maintained in this repos
 - **time_sync** — system clock offset helpers.
 - **AGENTS/tools** — shared helper scripts for repository management.
 - **fontmapper** — ASCII rendering and font mapping experiments.
+- **fontmapper2** — next-generation ASCII rendering utilities.
 - **tensors** — tensor backends and abstraction layer.
 
 Additional codebases can be added here as the repository grows.
