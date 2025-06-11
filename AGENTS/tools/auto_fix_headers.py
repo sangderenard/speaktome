@@ -6,10 +6,16 @@ try:
     import os
     import re
     from pathlib import Path
-    from .header_utils import ENV_SETUP_BOX
+    from .header_utils import (
+        ENV_SETUP_BOX,
+        HEADER_START,
+        HEADER_END,
+        IMPORT_FAILURE_PREFIX,
+    )
 except Exception:
     import sys
 
+    print(f"{IMPORT_FAILURE_PREFIX} {__file__}")
     print(ENV_SETUP_BOX)
     sys.exit(1)
 # --- END HEADER ---
@@ -30,7 +36,8 @@ def in_tensor_printing_inspiration(path: Path) -> bool:
     return "tensor printing" in parts and "inspiration" in parts
 
 
-HEADER_SENTINEL = "# --- END HEADER ---"
+HEADER_START_SENTINEL = HEADER_START
+HEADER_END_SENTINEL = HEADER_END
 
 IMPORT_RE = re.compile(r"^(from\s+\S+\s+import|import\s+\S+)")
 
@@ -59,7 +66,7 @@ def iter_py_files(root: Path):
 
 def fix_file(path: Path) -> None:
     text = path.read_text(encoding="utf-8")
-    if HEADER_SENTINEL in text:
+    if HEADER_END_SENTINEL in text:
         if all(
             token in text
             for token in (
@@ -67,12 +74,14 @@ def fix_file(path: Path) -> None:
                 "print(ENV_SETUP_BOX)",
                 "sys.exit(1)",
                 "from AGENTS.tools.header_utils import ENV_SETUP_BOX",
+                IMPORT_FAILURE_PREFIX,
+                HEADER_START_SENTINEL,
             )
         ):
             return
         lines = text.splitlines()
         sentinel_idx = next(
-            (i for i, ln in enumerate(lines) if ln.strip() == HEADER_SENTINEL),
+            (i for i, ln in enumerate(lines) if ln.strip() == HEADER_END_SENTINEL),
             None,
         )
         if sentinel_idx is None:
@@ -95,6 +104,7 @@ def fix_file(path: Path) -> None:
         modified = False
         header_lines = [
             f"{indent}import sys",
+            f"{indent}print(f'{IMPORT_FAILURE_PREFIX} {{__file__}}')",
             f"{indent}print(ENV_SETUP_BOX)",
             f"{indent}sys.exit(1)",
         ]
@@ -115,6 +125,10 @@ def fix_file(path: Path) -> None:
                     f"{indent_try}from AGENTS.tools.header_utils import ENV_SETUP_BOX",
                 )
                 modified = True
+        if HEADER_START_SENTINEL not in lines[:3]:
+            insert_idx = 1 if lines and lines[0].startswith("#!") else 0
+            lines.insert(insert_idx, HEADER_START_SENTINEL)
+            modified = True
         if modified:
             Path(path).write_text("\n".join(lines) + "\n", encoding="utf-8")
         return
@@ -128,6 +142,7 @@ def fix_file(path: Path) -> None:
     if lines and lines[0].startswith("#!"):
         out_lines.append(lines[0])
         idx = 1
+    out_lines.append(HEADER_START_SENTINEL)
 
     # Capture leading comments or encoding declarations
     while (
@@ -155,7 +170,9 @@ def fix_file(path: Path) -> None:
     out_lines.append("from __future__ import annotations")
     out_lines.append("")
     out_lines.append("try:")
-    out_lines.append("    from AGENTS.tools.header_utils import ENV_SETUP_BOX")
+    out_lines.append(
+        "    from AGENTS.tools.header_utils import ENV_SETUP_BOX, IMPORT_FAILURE_PREFIX"
+    )
 
     # Move imports into try block
     while idx < len(lines):
@@ -172,9 +189,10 @@ def fix_file(path: Path) -> None:
 
     out_lines.append("except Exception:")
     out_lines.append("    import sys")
+    out_lines.append(f"    print(f'{IMPORT_FAILURE_PREFIX} {{__file__}}')")
     out_lines.append("    print(ENV_SETUP_BOX)")
     out_lines.append("    sys.exit(1)")
-    out_lines.append(HEADER_SENTINEL)
+    out_lines.append(HEADER_END_SENTINEL)
 
     out_lines.extend(lines[idx:])
     Path(path).write_text("\n".join(out_lines) + "\n", encoding="utf-8")

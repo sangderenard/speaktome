@@ -1,9 +1,16 @@
+#!/usr/bin/env python3
+# --- BEGIN HEADER ---
 """Pre-commit hook enforcing HEADER, tests, and the end sentinel."""
 
 from __future__ import annotations
 
 try:
-    from AGENTS.tools.header_utils import ENV_SETUP_BOX
+    from AGENTS.tools.header_utils import (
+        ENV_SETUP_BOX,
+        IMPORT_FAILURE_PREFIX,
+        HEADER_START,
+        HEADER_END,
+    )
     from .header_utils import ENV_SETUP_BOX
     import subprocess
     import ast
@@ -11,6 +18,7 @@ try:
     from pathlib import Path
 except Exception:
     import sys
+    print(f"{IMPORT_FAILURE_PREFIX} {__file__}")
     print(ENV_SETUP_BOX)
     sys.exit(1)
 # --- END HEADER ---
@@ -25,14 +33,16 @@ If the pre-commit hook caught your changes, here's a friendly checklist:
 1. Every Python file needs:
    - A `HEADER` (as docstring or constant)
    - A `@staticmethod test()` method in each class
-   - `from __future__ import annotations` before the `try` block
-   - Imports wrapped in a `try` block
-   - An `except` block that imports `sys`, prints guidance about running `setup_env_dev`, then calls `sys.exit(1)`
-   - A `# --- END HEADER ---` sentinel after the `except` block
+    - `from __future__ import annotations` before the `try` block
+    - Imports wrapped in a `try` block
+    - An `except` block that imports `sys`, prints guidance about running `setup_env_dev`, then calls `sys.exit(1)`
+    - A `# --- END HEADER ---` sentinel after the `except` block
+    - The `# --- BEGIN HEADER ---` sentinel after the shebang
 
 2. Example structure:
    ```python
    #!/usr/bin/env python3
+   # --- BEGIN HEADER ---
    \"\"\"Optional module docstring.\"\"\"
    from __future__ import annotations
 
@@ -40,6 +50,7 @@ If the pre-commit hook caught your changes, here's a friendly checklist:
        import your_modules
    except Exception:
        import sys
+       print(f"{IMPORT_FAILURE_PREFIX} {__file__}")
        print(ENV_SETUP_BOX)
        sys.exit(1)
    # --- END HEADER ---
@@ -108,7 +119,7 @@ def check_class_header_and_test(filepath):
 
 def check_end_header(filepath: Path) -> list[str]:
     """Ensure ``# --- END HEADER ---`` appears after the final global import."""
-    sentinel = "# --- END HEADER ---"
+    sentinel = HEADER_END
     with open(filepath, encoding="utf-8") as f:
         lines = f.readlines()
 
@@ -136,7 +147,7 @@ def check_end_header(filepath: Path) -> list[str]:
 
 def check_try_header(filepath: Path) -> list[str]:
     """Verify header elements such as shebang, docstring, and ``try`` block."""
-    sentinel = "# --- END HEADER ---"
+    sentinel = HEADER_END
     with open(filepath, encoding="utf-8") as f:
         lines = f.readlines()
 
@@ -171,6 +182,8 @@ def check_try_header(filepath: Path) -> list[str]:
         sys_exit = any("sys.exit(" in ln for ln in region)
 
     errors = []
+    if HEADER_START not in lines[:3]:
+        errors.append("Missing '# --- BEGIN HEADER ---'")
     if not lines or not lines[0].startswith("#!"):
         errors.append("Missing shebang")
     try:
