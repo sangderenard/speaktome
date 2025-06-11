@@ -30,9 +30,8 @@ Welcome, fellow agents! This project is designed to be accessible and explorable
    - Ensure all new Python files include a `HEADER`
    - Include `@staticmethod test()` methods
   - Place `from __future__ import annotations` before the header
-  - Wrap imports in a `try`/`except` block that prints
-    guidance about running `setup_env_dev` and activating the virtual
-    environment, then immediately exits with `sys.exit(1)`
+  - Wrap imports in a `try`/`except` block that prints guidance about running
+    `setup_env_dev`
    - Follow the `# --- END HEADER ---` convention
 
 2. **Identity and Attribution**

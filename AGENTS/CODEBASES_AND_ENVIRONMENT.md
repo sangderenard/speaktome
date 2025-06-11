@@ -8,25 +8,5 @@ Conflicts should be rare when tasks remain isolated. When two pull requests impl
 
 ## Virtual Environment Expectations
 
-All repository scripts must run from the Python interpreter in `.venv`. The
-developer setup (`setup_env_dev.sh` or `setup_env_dev.ps1`) installs every
-required dependency. If you encounter an `ImportError`, check the following:
-
-1. Ensure the `.venv` environment is active. Running outside of the virtual
-   environment is the most common cause of missing packages.
-2. Confirm `setup_env_dev` finished successfully. A partial run can leave the
-   environment incomplete.
-
-It should not be possible to correctly use the provided virtual environment and
-lack a required library. When a package truly seems absent, verify that
-`setup_env.sh` does not already install it, then add the dependency to
-`pyproject.toml` so future setups fetch it automatically. (For example, `torch`
-is installed by default and should never be missing.) **Do not attempt a manual
-`pip install`; rerun the setup script with the necessary groups instead.**
-
-### Automated Setup
-
-Run `setup_env_dev.sh` with no extras or prefetch flags when preparing a
-headless environment. Prior versions of this guide instructed agents to call
-`AGENTS/tools/dev_group_menu.py` directly, but that process is deprecated and
-causes inconsistent installs. See `AGENTS/OBSOLETE_SETUP_GUIDE.md` for background.
+All repository scripts run from the `.venv` interpreter created by the setup
+scripts. For detailed instructions see `AGENTS/HEADLESS_SETUP_GUIDE.md`.

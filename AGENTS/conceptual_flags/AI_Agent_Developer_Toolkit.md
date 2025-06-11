@@ -20,8 +20,7 @@ Creation of a portable, static binary toolkit specifically tailored for AI agent
 
 1. Download appropriate static binaries.
 2. Place binaries within `AGENTS/tools/bin/`.
-3. Use provided shell scripts (`setup_env.sh`) to dynamically configure environment paths.
-4. Use `check_toolkit.sh` to validate availability and functionality.
+3. Use `check_toolkit.sh` to validate availability and functionality.
 
 ## Historical Context
 

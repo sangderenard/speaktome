@@ -2,7 +2,7 @@
 
 ## Quick Setup
 
-Run `setup_env_dev.sh` to install this codebase.
+Refer to `AGENTS/HEADLESS_SETUP_GUIDE.md` for installation details.
 
 This folder houses work toward a "Grand Printing Press" built on the abstract tensor operations shared by the rest of the repository.
 
