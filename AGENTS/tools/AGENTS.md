@@ -1,5 +1,11 @@
 # Agent Tools
 
+## Quick Setup
+
+```bash
+python AGENTS/tools/dev_group_menu.py --install --codebases AGENTS/tools
+```
+
 This codebase provides helper scripts for managing the repository and coordinating agent work.
 
 ## Optional Dependency Groups

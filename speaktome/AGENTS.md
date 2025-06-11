@@ -1,5 +1,12 @@
 # SpeakToMe Source
 
+## Quick Setup
+
+```bash
+python AGENTS/tools/dev_group_menu.py --install --codebases speaktome
+python AGENTS/tools/dev_group_menu.py --install --codebases speaktome --groups speaktome:plot,ml,jax,ctensor,numpy,dev
+```
+
 This directory contains the primary beam search controllers and utilities for generating text. When adding new modules or functions, accompany them with tests in `../tests` and keep all code compliant with `AGENTS/CODING_STANDARDS.md`.
 
 ## Optional Dependency Groups
