@@ -7,7 +7,7 @@ try:
     # Third-party imports
     import torch
 
-    from ...tensors.faculty import Faculty
+    from tensors.faculty import Faculty
 
     FACULTY_REQUIREMENT = Faculty.PYGEO
 

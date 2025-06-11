@@ -9,7 +9,7 @@ try:
     if TYPE_CHECKING:  # pragma: no cover - type hints only
         import torch
 
-    from ..tensors.faculty import Faculty
+    from tensors.faculty import Faculty
 
     FACULTY_REQUIREMENT = Faculty.TORCH
 
@@ -22,7 +22,7 @@ try:
     from .scorer import Scorer
     from .beam_retirement_manager import BeamRetirementManager
     from .compressed_beam_tree import CompressedBeamTree
-    from ..tensors import (
+    from tensors import (
         AbstractTensorOperations,
     )
     from .model_abstraction import (

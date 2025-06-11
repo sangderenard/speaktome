@@ -17,7 +17,8 @@ authors = [{ name = "SpeakToMe Authors" }]
 
 # Core (always needed)
 dependencies = [
-  "numpy>=1.26"
+  "numpy>=1.26",
+  "tensors>=0.1.0"
 ]
 
 # Named feature groups—install only what you need:
@@ -34,17 +35,6 @@ ml = [
   "transformers>=4.30",           # model interfaces
   "sentence-transformers>=2.2"    # high-level embeddings
   # torch & torch_geometric handled by setup_env.sh for CPU vs GPU installs
-]
-jax = [
-  "jax[cpu]>=0.4"       # experimental JAX backend
-]
-ctensor = [
-  "cffi>=1.15",         # C backend helpers
-  "setuptools>=61",     # required for CFFI builds
-  "ziglang>=0.14"       # optional Zig compiler for prebuilt binaries
-]
-numpy = [
-  "numpy>=1.26"        # standard NumPy backend
 ]
 dev = [
   "pytest>=8.0"

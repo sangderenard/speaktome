@@ -1,6 +1,6 @@
 import pytest
 
-from speaktome.tensors import get_tensor_operations
+from tensors import get_tensor_operations
 from speaktome.core.abstract_linear_net import AbstractLinearLayer, SequentialLinearModel
 
 # --- END HEADER ---

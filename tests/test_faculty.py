@@ -1,4 +1,4 @@
-"""Tests for the :mod:`speaktome.tensors.faculty` module.
+"""Tests for the :mod:`tensors.faculty` module.
 
 These exercises confirm that the faculty-detection logic honours installed
 libraries and environment overrides.  The language used here aims for clarity
@@ -10,7 +10,7 @@ import pytest
 import sys
 from unittest import mock
 
-from speaktome.tensors.faculty import detect_faculty, Faculty, FORCE_ENV, DEFAULT_FACULTY
+from tensors.faculty import detect_faculty, Faculty, FORCE_ENV, DEFAULT_FACULTY
 # --- END HEADER ---
 
 

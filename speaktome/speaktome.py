@@ -3,7 +3,7 @@ from typing import List, Tuple, Dict, Optional, Any, Callable, TYPE_CHECKING
 import argparse
 
 # Third-party imports
-from .tensors.faculty import Faculty, DEFAULT_FACULTY
+from tensors.faculty import Faculty, DEFAULT_FACULTY
 try:
     from AGENTS.tools.header_utils import ENV_SETUP_BOX
     import torch

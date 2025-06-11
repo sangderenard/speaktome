@@ -14,7 +14,7 @@ pytest.importorskip('torch', reason='speaktome class tests require torch')
 
 from speaktome.util.cli_permutations import CLIArgumentMatrix
 from speaktome.util.token_vocab import TokenVocabulary
-from speaktome.tensors.faculty import DEFAULT_FACULTY, Faculty
+from tensors.faculty import DEFAULT_FACULTY, Faculty
 # --- END HEADER ---
 
 logger = logging.getLogger(__name__)
@@ -56,8 +56,8 @@ STUB_MODULES = [
     ("speaktome.domains.geo.pyg_graph_controller", "PyGGraphController"),
     ("speaktome.domains.geo.pygeo_mind", "PyGeoMind"),
     ("speaktome.core.scorer", "Scorer"),
-    ("speaktome.tensors.torch_backend", "PyTorchTensorOperations"),
-    ("speaktome.tensors.pure_backend", "PurePythonTensorOperations"),
+    ("tensors.torch_backend", "PyTorchTensorOperations"),
+    ("tensors.pure_backend", "PurePythonTensorOperations"),
 ]
 
 

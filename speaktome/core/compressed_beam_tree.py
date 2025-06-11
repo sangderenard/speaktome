@@ -14,7 +14,7 @@ try:
 
     # Local application/library specific imports
     from .beam_tree_node import BeamTreeNode  # Assuming BeamTreeNode is in beam_tree_node.py
-    from ..tensors import (
+    from tensors import (
         AbstractTensorOperations,
         get_tensor_operations,
     )

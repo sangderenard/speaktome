@@ -8,7 +8,7 @@ try:
     import pytest
 
     from AGENTS.tools.header_utils import ENV_SETUP_BOX
-    from speaktome.tensors.c_backend import CTensorOperations
+    from tensors.c_backend import CTensorOperations
 except Exception:
     import sys
     print(ENV_SETUP_BOX)

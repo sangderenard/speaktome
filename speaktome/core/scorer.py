@@ -18,7 +18,7 @@ try:
     import torch.nn.functional as F
     import queue
 
-    from ..tensors import (
+    from tensors import (
         AbstractTensorOperations,
         get_tensor_operations,
     )

@@ -11,7 +11,7 @@ try:
     import sys
     from pathlib import Path
 
-    from speaktome.tensors.faculty import Faculty, FORCE_ENV
+    from tensors.faculty import Faculty, FORCE_ENV
 except Exception:
     import sys
     print(ENV_SETUP_BOX)

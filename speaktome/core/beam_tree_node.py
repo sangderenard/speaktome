@@ -5,7 +5,7 @@ try:
 
     import torch
 
-    from ..tensors import (
+    from tensors import (
         AbstractTensorOperations,
         get_tensor_operations,
     )
