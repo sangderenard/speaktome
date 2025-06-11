@@ -14,9 +14,12 @@ $scriptRoot = $PSScriptRoot
 $activeFile = $env:SPEAKTOME_ACTIVE_FILE
 if (-not $activeFile) { $activeFile = Join-Path ([System.IO.Path]::GetTempPath()) 'speaktome_active.json' }
 $env:SPEAKTOME_ACTIVE_FILE = $activeFile
+$menuArgs = @()
 $useVenv = $true
 foreach ($arg in $args) {
     if ($arg -eq '--no-venv' -or $arg -eq '-no-venv') { $useVenv = $false }
+    elseif ($arg -like '--codebases=*' -or $arg -like '--cb=*') { $menuArgs += '--codebases'; $menuArgs += $arg.Split('=')[1] }
+    elseif ($arg -like '--groups=*' -or $arg -like '--grp=*') { $menuArgs += '--groups'; $menuArgs += $arg.Split('=')[1] }
 }
 Safe-Run { & "$scriptRoot\setup_env.ps1" @args --from-dev }
 
@@ -102,7 +105,7 @@ function Show-Menu {
             '6' { Write-Host "Preview CODING_STANDARDS.md"; Safe-Run { & $venvPython AGENTS/tools/preview_doc.py AGENTS/CODING_STANDARDS.md }; $Timeout = 10 }
             '7' { Write-Host "Preview CONTRIBUTING.md"; Safe-Run { & $venvPython AGENTS/tools/preview_doc.py AGENTS/CONTRIBUTING.md }; $Timeout = 10 }
             '8' { Write-Host "Preview PROJECT_OVERVIEW.md"; Safe-Run { & $venvPython AGENTS/tools/preview_doc.py AGENTS/PROJECT_OVERVIEW.md }; $Timeout = 10 }
-            '9' { Write-Host "Launching dev group menu"; Safe-Run { & $venvPython AGENTS/tools/dev_group_menu.py --record $activeFile }; $Timeout = 10 }
+            '9' { Write-Host "Launching dev group menu"; Safe-Run { & $venvPython AGENTS/tools/dev_group_menu.py --record $activeFile @menuArgs }; $Timeout = 10 }
             'q' { Write-Host "Exiting."; break }
             default { Write-Host "Unknown choice: $choice" }
         }

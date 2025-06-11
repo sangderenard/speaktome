@@ -1,0 +1,81 @@
+{
+  "tensor printing": {
+    "path": "tensor printing",
+    "groups": {}
+  },
+  "speaktome": {
+    "path": "speaktome",
+    "groups": {
+      "plot": [
+        "matplotlib>=3.7",
+        "networkx>=3.1",
+        "scikit-learn>=1.2"
+      ],
+      "ml": [
+        "transformers>=4.30",
+        "sentence-transformers>=2.2"
+      ],
+      "dev": [
+        "pytest>=8.0"
+      ]
+    }
+  },
+  "time_sync": {
+    "path": "time_sync",
+    "groups": {
+      "gui": [
+        "pygame>=2"
+      ]
+    }
+  },
+  "laplace": {
+    "path": "laplace",
+    "groups": {}
+  },
+  "fontmapper": {
+    "path": "fontmapper",
+    "groups": {
+      "ml": [
+        "torch",
+        "torchvision",
+        "pynvml"
+      ],
+      "ssim": [
+        "scikit-image"
+      ],
+      "amqp": [
+        "pika"
+      ],
+      "server": [
+        "flask",
+        "flask-cors",
+        "waitress; sys_platform == 'win32'"
+      ],
+      "gui": [
+        "PyQt5"
+      ]
+    }
+  },
+  "tensors": {
+    "path": "tensors",
+    "groups": {
+      "jax": [
+        "jax[cpu]>=0.4"
+      ],
+      "ctensor": [
+        "cffi>=1.15",
+        "setuptools>=61",
+        "ziglang>=0.14"
+      ],
+      "torch": [
+        "torch"
+      ],
+      "numpy": [
+        "numpy>=1.26"
+      ],
+      "dev": [
+        "pytest>=8.0"
+      ]
+    }
+  }
+}

@@ -88,15 +88,28 @@ NOEXTRAS=0
 ML=0        # flag for full ML extras (transformers, torch_geometric)
 FORCE_GPU=0
 PREFETCH=0
-CODEBASES="speaktome,AGENTS/tools,time_sync"
+MAP_FILE="$SCRIPT_ROOT/AGENTS/codebase_map.json"
+if [ -f "$MAP_FILE" ]; then
+  CODEBASES="$(python - "$MAP_FILE" <<'PY'
+import json,sys
+d=json.load(open(sys.argv[1]))
+print(",".join(d.keys()))
+PY
+)"
+else
+  CODEBASES="speaktome,AGENTS/tools,time_sync"
+fi
+MENU_ARGS=()
 
 for arg in "$@"; do
   case $arg in
-    --noextras)       NOEXTRAS=1 ;;
-    --ml)             ML=1      ;;  # install ML extras too
-    --gpu)            FORCE_GPU=1 ;;
-    --prefetch)       PREFETCH=1 ;;
-    --codebases=*)    CODEBASES="${arg#*=}" ;;
+    --noextras|--minimal) NOEXTRAS=1 ;;
+    --extras|--full)      NOEXTRAS=0 ;;
+    --ml)                 ML=1      ;;
+    --gpu)                FORCE_GPU=1 ;;
+    --prefetch)           PREFETCH=1 ;;
+    --codebases=*|--cb=*) CODEBASES="${arg#*=}"; MENU_ARGS+=("--codebases" "$CODEBASES") ;;
+    --groups=*|--grp=*)   MENU_ARGS+=("--groups" "${arg#*=}") ;;
   esac
 done
 
@@ -123,7 +136,7 @@ done
 
 if [ $CALLED_BY_DEV -eq 0 ]; then
   echo "Launching codebase/group selection tool for editable installs..."
-  PIP_CMD="$VENV_PIP" "$VENV_PYTHON" "$SCRIPT_ROOT/AGENTS/tools/dev_group_menu.py" --install --record "$SPEAKTOME_ACTIVE_FILE"
+  PIP_CMD="$VENV_PIP" "$VENV_PYTHON" "$SCRIPT_ROOT/AGENTS/tools/dev_group_menu.py" --install --record "$SPEAKTOME_ACTIVE_FILE" "${MENU_ARGS[@]}"
 fi
 
 echo "Environment setup complete."

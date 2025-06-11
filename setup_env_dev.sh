@@ -10,6 +10,7 @@ set -uo pipefail
 SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ACTIVE_FILE=${SPEAKTOME_ACTIVE_FILE:-/tmp/speaktome_active.json}
 export SPEAKTOME_ACTIVE_FILE="$ACTIVE_FILE"
+MENU_ARGS=()
 
 safe_run() {
   "$@"
@@ -25,6 +26,8 @@ USE_VENV=1
 for arg in "$@"; do
   case $arg in
     --no-venv) USE_VENV=0 ;;
+    --codebases=*|--cb=*) MENU_ARGS+=("--codebases" "${arg#*=}") ;;
+    --groups=*|--grp=*)   MENU_ARGS+=("--groups" "${arg#*=}") ;;
   esac
 done
 
@@ -70,17 +73,17 @@ if [ $USE_VENV -eq 1 ]; then
   fi
 fi
 
-install_speaktome_extras() {
-  local SPEAKTOME_DIR="$SCRIPT_ROOT/speaktome"
-  if [ ! -d "$SPEAKTOME_DIR" ]; then
-    echo "Warning: SpeakToMe directory not found at $SPEAKTOME_DIR. Skipping extras installation." >&2
+launch_codebase_menu() {
+  local REPO_DIR="$SCRIPT_ROOT"
+  if [ ! -d "$REPO_DIR" ]; then
+    echo "Warning: Repository root not found at $REPO_DIR. Skipping menu launch." >&2
     return 0
   fi
 
-  # Save current directory and cd into speaktome
+  # Save current directory and cd into the repo root
   local OLD_DIR
   OLD_DIR="$(pwd)"
-  cd "$SPEAKTOME_DIR"
+  cd "$REPO_DIR"
 
   echo "Attempting to upgrade pip..."
   if ! "$VENV_PYTHON" -m pip install --upgrade pip; then
@@ -91,9 +94,9 @@ install_speaktome_extras() {
   cd "$OLD_DIR"
 
   echo "Launching codebase/group selection tool..."
-  PIP_CMD="$VENV_PIP" "$VENV_PYTHON" "$SCRIPT_ROOT/AGENTS/tools/dev_group_menu.py" --install --record "$SPEAKTOME_ACTIVE_FILE"
+  PIP_CMD="$VENV_PIP" "$VENV_PYTHON" "$SCRIPT_ROOT/AGENTS/tools/dev_group_menu.py" --install --record "$SPEAKTOME_ACTIVE_FILE" "${MENU_ARGS[@]}"
 }
-install_speaktome_extras
+launch_codebase_menu
 
 # Interactive document menu with inactivity timeout
 dev_menu() {
