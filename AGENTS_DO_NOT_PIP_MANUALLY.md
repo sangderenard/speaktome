@@ -7,13 +7,16 @@ Running `setup_env.sh` creates a virtual environment, installs CPU Torch by defa
 To run either script non-interactively, invoke the menu tool yourself with explicit selections:
 
 ```bash
-# create the environment without prompts
-bash setup_env.sh --from-dev --extras --prefetch
+# create the environment without prompts using the developer script
+bash setup_env_dev.sh --prefetch
 # choose codebases and groups headlessly
 python AGENTS/tools/dev_group_menu.py --install \
     --codebases speaktome \
     --groups speaktome:dev
 ```
+
+Refer to `AGENTS/CODEBASE_REGISTRY.md` for a complete list of available codebase
+s.
 
 `--codebases` specifies which project folders to install and `--groups` lists the optional dependency groups. Passing these arguments bypasses every menu prompt so the environment can be prepared automatically.
 
