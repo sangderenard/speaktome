@@ -137,104 +137,87 @@ class PurePythonTensorOperations(AbstractTensorOperations):
         raise NotImplementedError("Unsupported types for matmul")
 
     # Creation ops
-    def full(self, size: Tuple[int, ...], fill_value: Any, dtype: Any, device: Any):
+    def full_(self, size: Tuple[int, ...], fill_value: Any, dtype: Any, device: Any):
         if not size:
             return fill_value
-        return [self.full(size[1:], fill_value, dtype, device) for _ in range(size[0])]
+        return [self.full_(size[1:], fill_value, dtype, device) for _ in range(size[0])]
 
-    def zeros(self, size: Tuple[int, ...], dtype: Any, device: Any):
-        return self.full(size, 0, dtype, device)
+    def zeros_(self, size: Tuple[int, ...], dtype: Any, device: Any):
+        return self.full_(size, 0, dtype, device)
 
-    def clone(self, tensor: Any) -> Any:
+    def clone_(self, tensor: Any) -> Any:
         if not isinstance(tensor, list):
             return tensor
-        return [self.clone(item) for item in tensor]
+        return [self.clone_(item) for item in tensor]
 
-    def to_device(self, tensor: Any, device: Any) -> Any:
+    def to_device_(self, tensor: Any, device: Any) -> Any:
         return tensor
 
-    def stack(self, tensors: List[Any], dim: int = 0) -> Any:
+    def stack_(self, tensors: List[Any], dim: int = 0) -> Any:
         if not tensors:
             return []
         tensors = [self.ensure_tensor(t) for t in tensors]
         if dim == 0:
-            return [self.clone(t) for t in tensors]
+            return [self.clone_(t) for t in tensors]
         ref_shape = _get_shape(tensors[0])
         for t in tensors:
             if _get_shape(t) != ref_shape:
                 raise ValueError("All tensors must have the same shape")
         return [
-            self.stack([t[i] for t in tensors], dim=dim - 1)
+            self.stack_([t[i] for t in tensors], dim=dim - 1)
             for i in range(len(tensors[0]))
         ]
 
-    def get_device(self, tensor: Any) -> Any:
+    def get_device_(self, tensor: Any) -> Any:
         return "cpu_pure_python"
 
-    def get_dtype(self, tensor: Any) -> Any:
+    def get_dtype_(self, tensor: Any) -> Any:
         if isinstance(tensor, list):
             if not tensor:
                 return None
-            return self.get_dtype(tensor[0])
+            return self.get_dtype_(tensor[0])
         return type(tensor)
 
-    def item(self, tensor: Any) -> Any:
+    def item_(self, tensor: Any) -> Any:
         if isinstance(tensor, list) and len(tensor) == 1:
             return tensor[0]
         return tensor
 
-    def max(self, tensor: Any) -> Any:
+    def max_(self, tensor: Any) -> Any:
         flat = _flatten(tensor)
         return max(flat) if flat else None
 
-    def long_cast(self, tensor: Any) -> Any:
+    def long_cast_(self, tensor: Any) -> Any:
         if isinstance(tensor, list):
-            return [self.long_cast(item) for item in tensor]
+            return [self.long_cast_(item) for item in tensor]
         return int(tensor)
 
-    def not_equal(self, tensor1: Any, tensor2: Any) -> Any:
+    def not_equal_(self, tensor1: Any, tensor2: Any) -> Any:
         if isinstance(tensor1, list) and isinstance(tensor2, list):
-            return [self.not_equal(t1, t2) for t1, t2 in zip(tensor1, tensor2)]
+            return [self.not_equal_(t1, t2) for t1, t2 in zip(tensor1, tensor2)]
         return tensor1 != tensor2
 
-    def arange(
-        self,
-        start: int,
-        end: Optional[int] = None,
-        step: int = 1,
-        device: Any = None,
-        dtype: Any = None,
-    ) -> Any:
+    def arange_(self, start: int, end: Optional[int] = None, step: int = 1, device: Any = None, dtype: Any = None) -> Any:
         if end is None:
             return list(range(start))
         return list(range(start, end, step))
 
-    def select_by_indices(
-        self, tensor: Any, indices_dim0: Any, indices_dim1: Any
-    ) -> Any:
+    def select_by_indices_(self, tensor: Any, indices_dim0: Any, indices_dim1: Any) -> Any:
         if not isinstance(tensor, list) or not isinstance(tensor[0], list):
-            raise NotImplementedError(
-                "select_by_indices only supports 2D lists for now"
-            )
-
+            raise NotImplementedError("select_by_indices only supports 2D lists for now")
         selected_rows = [tensor[i] for i in indices_dim0]
         if isinstance(indices_dim1, list):
             if len(indices_dim0) != len(indices_dim1):
-                raise ValueError(
-                    "Index lists must have same length for element-wise selection"
-                )
-            return [
-                selected_rows[i][indices_dim1[i]] for i in range(len(selected_rows))
-            ]
+                raise ValueError("Index lists must have same length for element-wise selection")
+            return [selected_rows[i][indices_dim1[i]] for i in range(len(selected_rows))]
         elif isinstance(indices_dim1, slice):
             return [row[indices_dim1] for row in selected_rows]
         else:
             return [row[indices_dim1] for row in selected_rows]
 
-    def log_softmax(self, tensor: Any, dim: int) -> Any:
+    def log_softmax_(self, tensor: Any, dim: int) -> Any:
         if dim != -1 and dim != len(_get_shape(tensor)) - 1:
             raise NotImplementedError("log_softmax only implemented for last dimension")
-
         if not isinstance(tensor, list):
             return math.log(1.0)
         if not isinstance(tensor[0], list):
@@ -242,46 +225,41 @@ class PurePythonTensorOperations(AbstractTensorOperations):
             exp_tensor = [math.exp(x - max_val) for x in tensor]
             sum_exp = sum(exp_tensor)
             return [math.log(x / sum_exp) for x in exp_tensor]
-        return [self.log_softmax(sublist, dim=-1) for sublist in tensor]
+        return [self.log_softmax_(sublist, dim=-1) for sublist in tensor]
 
-    def topk(self, tensor: Any, k: int, dim: int) -> Tuple[Any, Any]:
-        """Return the top ``k`` values and indices along ``dim`` using pure Python."""
+    def topk_(self, tensor: Any, k: int, dim: int) -> Tuple[Any, Any]:
         shape = _get_shape(tensor)
         if not shape:
             return [tensor], [0]
-
         if dim < 0:
             dim += len(shape)
         if dim < 0 or dim >= len(shape):
             raise ValueError("dim out of range")
-
         if len(shape) == 1:
             indexed = sorted(((v, i) for i, v in enumerate(tensor)), reverse=True)[:k]
             values = [v for v, _ in indexed]
             indices = [i for _, i in indexed]
             return values, indices
-
         if dim == 0:
             transposed = list(zip(*tensor))
             col_vals: List[List[Any]] = []
             col_idxs: List[List[Any]] = []
             for col in transposed:
-                vals, idxs = self.topk(list(col), k, dim=0)
+                vals, idxs = self.topk_(list(col), k, dim=0)
                 col_vals.append(vals)
                 col_idxs.append(idxs)
             values = [list(v) for v in zip(*col_vals)] if col_vals else []
             indices = [list(i) for i in zip(*col_idxs)] if col_idxs else []
             return values, indices
-
         values = []
         indices = []
         for sub in tensor:
-            vals, idxs = self.topk(sub, k, dim - 1)
+            vals, idxs = self.topk_(sub, k, dim - 1)
             values.append(vals)
             indices.append(idxs)
         return values, indices
 
-    def pad(self, tensor: Any, pad: Tuple[int, ...], value: float = 0) -> Any:
+    def pad_(self, tensor: Any, pad: Tuple[int, ...], value: float = 0) -> Any:
         if len(pad) != 4:
             raise NotImplementedError("pad only implemented for 2D tensors")
         pad_left, pad_right, pad_top, pad_bottom = pad
@@ -298,7 +276,7 @@ class PurePythonTensorOperations(AbstractTensorOperations):
             padded_rows.append([value] * (cols + pad_left + pad_right))
         return padded_rows
 
-    def cat(self, tensors: List[Any], dim: int = 0) -> Any:
+    def cat_(self, tensors: List[Any], dim: int = 0) -> Any:
         if not tensors:
             return []
         tensors = [self.ensure_tensor(t) for t in tensors]
@@ -309,9 +287,7 @@ class PurePythonTensorOperations(AbstractTensorOperations):
             return result
         if dim == 1:
             if not all(len(t) == len(tensors[0]) for t in tensors):
-                raise ValueError(
-                    "Tensors must have same number of rows for dim 1 concatenation"
-                )
+                raise ValueError("Tensors must have same number of rows for dim 1 concatenation")
             result = []
             for i in range(len(tensors[0])):
                 combined = []
@@ -321,9 +297,7 @@ class PurePythonTensorOperations(AbstractTensorOperations):
             return result
         raise NotImplementedError("cat only implemented for dim 0 and 1")
 
-    def repeat_interleave(
-        self, tensor: Any, repeats: int, dim: Optional[int] = None
-    ) -> Any:
+    def repeat_interleave_(self, tensor: Any, repeats: int, dim: Optional[int] = None) -> Any:
         if dim is None or dim == 0:
             if not isinstance(tensor, list):
                 return [tensor] * repeats
@@ -331,59 +305,40 @@ class PurePythonTensorOperations(AbstractTensorOperations):
             for item in tensor:
                 result.extend([item] * repeats)
             return result
-        raise NotImplementedError(
-            "repeat_interleave only implemented for dim 0 or None"
-        )
+        raise NotImplementedError("repeat_interleave only implemented for dim 0 or None")
 
-    def view_flat(self, tensor: Any) -> Any:
+    def view_flat_(self, tensor: Any) -> Any:
         return _flatten(tensor)
 
-    def assign_at_indices(
-        self,
-        tensor_to_modify: Any,
-        indices_dim0: Any,
-        indices_dim1: Any,
-        values_to_assign: Any,
-    ):
-        if not isinstance(tensor_to_modify, list) or not isinstance(
-            tensor_to_modify[0], list
-        ):
-            raise NotImplementedError(
-                "assign_at_indices only supports 2D lists for now"
-            )
+    def assign_at_indices_(self, tensor_to_modify: Any, indices_dim0: Any, indices_dim1: Any, values_to_assign: Any):
+        if not isinstance(tensor_to_modify, list) or not isinstance(tensor_to_modify[0], list):
+            raise NotImplementedError("assign_at_indices only supports 2D lists for now")
         if not isinstance(indices_dim0, list) or not isinstance(indices_dim1, list):
             raise ValueError("indices_dim0 and indices_dim1 must be lists")
-        if len(indices_dim0) != len(indices_dim1) or len(indices_dim0) != len(
-            values_to_assign
-        ):
+        if len(indices_dim0) != len(indices_dim1) or len(indices_dim0) != len(values_to_assign):
             raise ValueError("Index lists and values list must have same length")
         for i in range(len(indices_dim0)):
             row_idx = indices_dim0[i]
             col_idx = indices_dim1[i]
             value = values_to_assign[i]
             tensor_to_modify[row_idx][col_idx] = value
+        return tensor_to_modify
 
-    def increment_at_indices(self, tensor_to_modify: Any, mask: Any):
+    def increment_at_indices_(self, tensor_to_modify: Any, mask: Any):
         if (
             not isinstance(tensor_to_modify, list)
             or not isinstance(mask, list)
             or len(tensor_to_modify) != len(mask)
         ):
-            raise NotImplementedError(
-                "increment_at_indices only supports flat lists with boolean mask"
-            )
+            raise NotImplementedError("increment_at_indices only supports flat lists with boolean mask")
         for i in range(len(tensor_to_modify)):
             if mask[i]:
                 tensor_to_modify[i] += 1
+        return tensor_to_modify
 
-    def clamp(
-        self,
-        tensor: Any,
-        min_val: Optional[float] = None,
-        max_val: Optional[float] = None,
-    ) -> Any:
+    def clamp_(self, tensor: Any, min_val: Optional[float] = None, max_val: Optional[float] = None) -> Any:
         if isinstance(tensor, list):
-            return [self.clamp(item, min_val, max_val) for item in tensor]
+            return [self.clamp_(item, min_val, max_val) for item in tensor]
         value = tensor
         if min_val is not None:
             value = max(value, min_val)
@@ -391,13 +346,13 @@ class PurePythonTensorOperations(AbstractTensorOperations):
             value = min(value, max_val)
         return value
 
-    def shape(self, tensor: Any) -> Tuple[int, ...]:
+    def shape_(self, tensor: Any) -> Tuple[int, ...]:
         return _get_shape(tensor)
 
-    def numel(self, tensor: Any) -> int:
+    def numel_(self, tensor: Any) -> int:
         return len(_flatten(tensor))
 
-    def mean(self, tensor: Any, dim: Optional[int] = None) -> Any:
+    def mean_(self, tensor: Any, dim: Optional[int] = None) -> Any:
         if not isinstance(tensor, list):
             return tensor
         if dim is None or dim == 0:
@@ -409,46 +364,44 @@ class PurePythonTensorOperations(AbstractTensorOperations):
             return [sum(row) / len(row) if row else 0.0 for row in tensor]
         raise NotImplementedError("mean only implemented for dim 0, 1, or None")
 
-    def pow(self, tensor: Any, exponent: float) -> Any:
+    def pow_(self, tensor: Any, exponent: float) -> Any:
         if isinstance(tensor, list):
-            return [self.pow(item, exponent) for item in tensor]
+            return [self.pow_(item, exponent) for item in tensor]
         return tensor**exponent
 
-    def sqrt(self, tensor: Any) -> Any:
+    def sqrt_(self, tensor: Any) -> Any:
         if isinstance(tensor, list):
-            return [self.sqrt(item) for item in tensor]
+            return [self.sqrt_(item) for item in tensor]
         return math.sqrt(tensor)
 
-    def tensor_from_list(self, data: List[Any], dtype: Any, device: Any) -> Any:
+    def tensor_from_list_(self, data: List[Any], dtype: Any, device: Any) -> Any:
         return data
 
-    def boolean_mask_select(self, tensor: Any, mask: Any) -> Any:
+    def boolean_mask_select_(self, tensor: Any, mask: Any) -> Any:
         if (
             not isinstance(tensor, list)
             or not isinstance(mask, list)
             or len(tensor) != len(mask)
         ):
-            raise NotImplementedError(
-                "boolean_mask_select only supports flat lists with boolean mask"
-            )
+            raise NotImplementedError("boolean_mask_select only supports flat lists with boolean mask")
         return [tensor[i] for i in range(len(tensor)) if mask[i]]
 
-    def tolist(self, tensor: Any) -> List[Any]:
-        return self.clone(tensor)
+    def tolist_(self, tensor: Any) -> List[Any]:
+        return self.clone_(tensor)
 
-    def less(self, tensor: Any, value: Any) -> Any:
+    def less_(self, tensor: Any, value: Any) -> Any:
         if isinstance(tensor, list):
-            return [self.less(item, value) for item in tensor]
+            return [self.less_(item, value) for item in tensor]
         return tensor < value
 
-    def index_select(self, tensor: Any, dim: int, indices: Any) -> Any:
+    def index_select_(self, tensor: Any, dim: int, indices: Any) -> Any:
         if dim == 0:
             return [tensor[i] for i in indices]
         if dim == 1:
             return [[row[i] for i in indices] for row in tensor]
         raise NotImplementedError("index_select only implemented for dim 0 or 1")
 
-    def argmin(self, tensor: Any, dim: Optional[int] = None) -> Any:
+    def argmin_(self, tensor: Any, dim: Optional[int] = None) -> Any:
         shape = _get_shape(tensor)
         if dim is None:
             flat = _flatten(tensor)
@@ -458,26 +411,24 @@ class PurePythonTensorOperations(AbstractTensorOperations):
         if len(shape) == 1:
             return tensor.index(min(tensor))
         if dim == 0:
-            return [self.argmin([row[i] for row in tensor]) for i in range(shape[1])]
-        return [self.argmin(sub, dim - 1) for sub in tensor]
+            return [self.argmin_([row[i] for row in tensor]) for i in range(shape[1])]
+        return [self.argmin_(sub, dim - 1) for sub in tensor]
 
-    def interpolate(self, tensor: Any, size: Tuple[int, ...]) -> Any:
+    def interpolate_(self, tensor: Any, size: Tuple[int, ...]) -> Any:
         shape = _get_shape(tensor)
         if len(shape) != len(size):
             raise ValueError("size must match tensor dimensions")
-
         def blend(a, b, frac):
             if not isinstance(a, list):
                 return a * (1 - frac) + b * frac
             return [blend(ai, bi, frac) for ai, bi in zip(a, b)]
-
         def interp_along_dim(data, dim, new_len):
             if dim == 0:
                 if not isinstance(data, list):
                     return data
                 old_len = len(data)
                 if old_len == 1:
-                    return [self.clone(data[0]) for _ in range(new_len)]
+                    return [self.clone_(data[0]) for _ in range(new_len)]
                 result = []
                 for i in range(new_len):
                     pos = (i * (old_len - 1)) / (new_len - 1) if new_len > 1 else 0
@@ -485,40 +436,38 @@ class PurePythonTensorOperations(AbstractTensorOperations):
                     right = min(left + 1, old_len - 1)
                     frac = pos - left
                     if frac == 0:
-                        result.append(self.clone(data[left]))
+                        result.append(self.clone_(data[left]))
                     else:
                         result.append(blend(data[left], data[right], frac))
                 return result
             return [interp_along_dim(sub, dim - 1, new_len) for sub in data]
-
         result = tensor
         for dim_idx in reversed(range(len(size))):
             result = interp_along_dim(result, dim_idx, size[dim_idx])
         return result
 
-    def save(self, tensor: Any, filepath: str) -> None:
+    def save_(self, tensor: Any, filepath: str) -> None:
         with open(filepath, "w") as f:
             json.dump(tensor, f)
 
-    def load(self, filepath: str, dtype: Any, device: Any) -> Any:
+    def load_(self, filepath: str, dtype: Any, device: Any) -> Any:
         with open(filepath, "r") as f:
             return json.load(f)
 
-    # Dtype helpers
     @property
-    def long_dtype(self) -> Any:
+    def long_dtype_(self) -> Any:
         return int
 
     @property
-    def bool_dtype(self) -> Any:
+    def bool_dtype_(self) -> Any:
         return bool
 
     @property
-    def float_dtype(self) -> Any:
+    def float_dtype_(self) -> Any:
         return float
 
     @property
-    def tensor_type(self) -> type:
+    def tensor_type_(self) -> type:
         return list
 
     @staticmethod
@@ -529,3 +478,43 @@ class PurePythonTensorOperations(AbstractTensorOperations):
         assert stacked == [[[1, 2], [3, 4]], [[1, 2], [3, 4]]]
         values, idxs = ops.topk([1, 3, 2, 4], k=2, dim=-1)
         assert values == [4, 3] and idxs == [3, 1]
+
+    @staticmethod
+    def from_numpy(source_ops, tensor, target_ops):
+        # If already pure python, just return the data
+        if isinstance(source_ops, PurePythonTensorOperations):
+            return source_ops.data
+        # Otherwise, convert numpy array to list
+        return tensor.data.tolist() if hasattr(tensor.data, 'tolist') else list(tensor.data)
+
+    @staticmethod
+    def from_torch(source_ops, tensor, target_ops):
+        if isinstance(source_ops, PurePythonTensorOperations):
+            return source_ops.data
+        return tensor.data.detach().cpu().tolist()
+
+    @staticmethod
+    def from_pure(source_ops, tensor, target_ops):
+        # Already a pure python list
+        return tensor.data
+
+    @staticmethod
+    def from_jax(source_ops, tensor, target_ops):
+        if isinstance(source_ops, PurePythonTensorOperations):
+            return source_ops.data
+        return tensor.data.tolist() if hasattr(tensor.data, 'tolist') else list(tensor.data)
+
+    def to_dtype_(self, tensor, dtype: str = "float"):
+        # For pure Python, just convert all elements recursively
+        def convert(val):
+            if dtype in ("float", "float32", "f32"):
+                return float(val)
+            elif dtype in ("int", "int32", "i32"):
+                return int(val)
+            elif dtype in ("bool",):
+                return bool(val)
+            else:
+                return float(val)
+        if isinstance(tensor, list):
+            return [self.to_dtype_(t, dtype) for t in tensor]
+        return convert(tensor)

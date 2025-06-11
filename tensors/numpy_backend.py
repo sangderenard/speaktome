@@ -51,7 +51,7 @@ class NumPyTensorOperations(AbstractTensorOperations):
     def __init__(self, track_time: bool = False):
         super().__init__(track_time=track_time)
 
-    def _AbstractTensorOperations__apply_operator(self, op: str, left: Any, right: Any):
+    def _AbstractTensorOperations__apply_operator_(self, op: str, left: Any, right: Any):
         """Apply arithmetic operators on NumPy arrays."""
         a = np.array(left) if not isinstance(left, np.ndarray) else left
         b = np.array(right) if not isinstance(right, np.ndarray) else right
@@ -119,53 +119,53 @@ class NumPyTensorOperations(AbstractTensorOperations):
             return torch.bool
         return None
 
-    def full(self, size, fill_value, dtype, device):
+    def full_(self, size, fill_value, dtype, device):
         return np.full(size, fill_value, dtype=self._torch_dtype_to_numpy(dtype))
 
-    def zeros(self, size, dtype, device):
+    def zeros_(self, size, dtype, device):
         return np.zeros(size, dtype=self._torch_dtype_to_numpy(dtype))
 
-    def clone(self, tensor):
+    def clone_(self, tensor):
         return np.array(tensor, copy=True)
 
-    def to_device(self, tensor, device):
+    def to_device_(self, tensor, device):
         return tensor
 
-    def get_device(self, tensor):
+    def get_device_(self, tensor):
         return 'cpu'
 
-    def get_dtype(self, tensor):
+    def get_dtype_(self, tensor):
         if isinstance(tensor, np.ndarray):
             return self._numpy_dtype_to_torch(tensor.dtype)
         return tensor.dtype
 
-    def item(self, tensor):
+    def item_(self, tensor):
         return tensor.item()
 
-    def max(self, tensor):
+    def max_(self, tensor):
         return np.max(tensor)
 
-    def long_cast(self, tensor):
+    def long_cast_(self, tensor):
         return tensor.astype(np.int64)
 
-    def not_equal(self, tensor1, tensor2):
+    def not_equal_(self, tensor1, tensor2):
         return tensor1 != tensor2
 
-    def arange(self, start, end=None, step=1, device=None, dtype=None):
+    def arange_(self, start, end=None, step=1, device=None, dtype=None):
         np_dtype = self._torch_dtype_to_numpy(dtype) if dtype is not None else None
         if end is None:
             return np.arange(start, dtype=np_dtype)
         return np.arange(start, end, step, dtype=np_dtype)
 
-    def select_by_indices(self, tensor, indices_dim0, indices_dim1):
+    def select_by_indices_(self, tensor, indices_dim0, indices_dim1):
         return tensor[indices_dim0, indices_dim1]
 
-    def log_softmax(self, tensor, dim):
+    def log_softmax_(self, tensor, dim):
         e_x = np.exp(tensor - np.max(tensor, axis=dim, keepdims=True))
         softmax = e_x / np.sum(e_x, axis=dim, keepdims=True)
         return np.log(softmax)
 
-    def topk(self, tensor, k, dim):
+    def topk_(self, tensor, k, dim):
         if dim < 0:
             dim = tensor.ndim + dim
         sorted_indices = np.argsort(tensor, axis=dim)
@@ -176,11 +176,11 @@ class NumPyTensorOperations(AbstractTensorOperations):
         values = np.take_along_axis(tensor, top_k_indices, axis=dim)
         return values, top_k_indices
 
-    def stack(self, tensors, dim=0):
+    def stack_(self, tensors, dim=0):
         tensors = [self.ensure_tensor(t) for t in tensors]
         return np.stack(tensors, axis=dim)
 
-    def pad(self, tensor, pad, value=0.0):
+    def pad_(self, tensor, pad, value=0.0):
         if len(pad) % 2 != 0:
             raise ValueError("Padding length must be even.")
         num_dims_to_pad = len(pad) // 2
@@ -195,63 +195,64 @@ class NumPyTensorOperations(AbstractTensorOperations):
             np_pad_width.append((left, right))
         return np.pad(tensor, pad_width=np_pad_width, constant_values=value)
 
-    def cat(self, tensors, dim=0):
+    def cat_(self, tensors, dim=0):
         tensors = [self.ensure_tensor(t) for t in tensors]
         return np.concatenate(tensors, axis=dim)
 
-    def repeat_interleave(self, tensor, repeats, dim=None):
+    def repeat_interleave_(self, tensor, repeats, dim=None):
         return np.repeat(tensor, repeats, axis=dim)
 
-    def view_flat(self, tensor):
+    def view_flat_(self, tensor):
         return tensor.reshape(-1)
 
-    def assign_at_indices(self, tensor_to_modify, indices_dim0, indices_dim1, values_to_assign):
+    def assign_at_indices_(self, tensor_to_modify, indices_dim0, indices_dim1, values_to_assign):
         tensor_to_modify[indices_dim0, indices_dim1] = values_to_assign
+        return tensor_to_modify
 
-    def increment_at_indices(self, tensor_to_modify, mask):
+    def increment_at_indices_(self, tensor_to_modify, mask):
         tensor_to_modify[mask] += 1
+        return tensor_to_modify
 
-    def clamp(self, tensor, min_val=None, max_val=None):
+    def clamp_(self, tensor, min_val=None, max_val=None):
         return np.clip(tensor, a_min=min_val, a_max=max_val)
 
-    def shape(self, tensor):
+    def shape_(self, tensor):
         return tuple(tensor.shape)
 
-    def numel(self, tensor):
+    def numel_(self, tensor):
         return tensor.size
 
-    def mean(self, tensor, dim=None):
+    def mean_(self, tensor, dim=None):
         return np.mean(tensor, axis=dim)
 
-    def pow(self, tensor, exponent: float):
+    def pow_(self, tensor, exponent: float):
         return np.power(tensor, exponent)
 
-    def sqrt(self, tensor):
+    def sqrt_(self, tensor):
         return np.sqrt(tensor)
 
-    def tensor_from_list(self, data, dtype, device):
+    def tensor_from_list_(self, data, dtype, device):
         return np.array(data, dtype=self._torch_dtype_to_numpy(dtype))
 
-    def boolean_mask_select(self, tensor, mask):
+    def boolean_mask_select_(self, tensor, mask):
         return tensor[mask]
 
-    def tolist(self, tensor):
+    def tolist_(self, tensor):
         return tensor.tolist()
 
-    def less(self, tensor, value):
+    def less_(self, tensor, value):
         return tensor < value
 
-    def index_select(self, tensor, dim, indices):
+    def index_select_(self, tensor, dim, indices):
         return np.take(tensor, indices, axis=dim)
 
-    def argmin(self, tensor, dim=None):
+    def argmin_(self, tensor, dim=None):
         return np.argmin(tensor, axis=dim)
 
-    def interpolate(self, tensor, size):
+    def interpolate_(self, tensor, size):
         arr = np.array(tensor)
         if len(size) != arr.ndim:
             raise ValueError("size must match tensor dimensions")
-
         def interp_axis(a, new_len, axis):
             old_len = a.shape[axis]
             if old_len == new_len:
@@ -264,34 +265,72 @@ class NumPyTensorOperations(AbstractTensorOperations):
             for idx in np.ndindex(a.shape[1:]):
                 out[(slice(None),) + idx] = np.interp(new_idx, old_idx, a[(slice(None),) + idx])
             return np.swapaxes(out, 0, axis)
-
         result = arr
         for d in range(arr.ndim):
             result = interp_axis(result, size[d], d)
         return result
 
-
-    def save(self, tensor, filepath: str) -> None:
+    def save_(self, tensor, filepath: str) -> None:
         np.save(filepath, tensor)
 
-    def load(self, filepath: str, dtype, device):
+    def load_(self, filepath: str, dtype, device):
         arr = np.load(f"{filepath}.npy") if not filepath.endswith('.npy') else np.load(filepath)
         if dtype is not None:
             arr = arr.astype(self._torch_dtype_to_numpy(dtype))
         return arr
 
+    def to_dtype_(self, tensor, dtype: str = "float"):
+        import numpy as np
+        if dtype in ("float", "float32", "f32"):
+            return tensor.astype(np.float32)
+        elif dtype in ("float64", "double", "f64"):
+            return tensor.astype(np.float64)
+        elif dtype in ("int", "int32", "i32"):
+            return tensor.astype(np.int32)
+        elif dtype in ("int64", "long", "i64"):
+            return tensor.astype(np.int64)
+        elif dtype in ("uint8", "byte"):
+            return tensor.astype(np.uint8)
+        elif dtype in ("bool",):
+            return tensor.astype(np.bool_)
+        else:
+            # Default to float32
+            return tensor.astype(np.float32)
+
     @property
-    def long_dtype(self):
+    def long_dtype_(self):
         return np.int64
 
     @property
-    def bool_dtype(self):
+    def bool_dtype_(self):
         return np.bool_
 
     @property
-    def float_dtype(self):
+    def float_dtype_(self):
         return np.float32
 
     @property
-    def tensor_type(self) -> type:
+    def tensor_type_(self) -> type:
         return np.ndarray
+
+    @staticmethod
+    def from_numpy(source_ops, tensor, target_ops):
+        # If already numpy, just return the data (clone if needed)
+        if isinstance(source_ops, NumPyTensorOperations):
+            return source_ops.data
+        import numpy as np
+        return np.array(tensor.data, copy=False)
+
+    @staticmethod
+    def from_torch(source_ops, tensor, target_ops):
+        return tensor.data.detach().cpu().numpy()
+
+    @staticmethod
+    def from_pure(source_ops, tensor, target_ops):
+        import numpy as np
+        return np.array(tensor.data)
+
+    @staticmethod
+    def from_jax(source_ops, tensor, target_ops):
+        import numpy as np
+        return np.array(tensor.data)
