@@ -31,7 +31,7 @@ package selection. Provide `--codebases` and `--groups` to that helper to skip
 all prompts when scripting installs:
 
 ```bash
-bash setup_env_dev.sh --extras --prefetch --from-dev
+bash setup_env_dev.sh --prefetch
 python AGENTS/tools/dev_group_menu.py --install \
     --codebases speaktome \
     --groups speaktome:dev
