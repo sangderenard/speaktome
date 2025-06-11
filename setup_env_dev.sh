@@ -73,57 +73,35 @@ if [ $USE_VENV -eq 1 ]; then
   fi
 fi
 
-launch_codebase_menu() {
-  local REPO_DIR="$SCRIPT_ROOT"
-  if [ ! -d "$REPO_DIR" ]; then
-    echo "Warning: Repository root not found at $REPO_DIR. Skipping menu launch." >&2
-    return 0
-  fi
-
-  # Save current directory and cd into the repo root
-  local OLD_DIR
-  OLD_DIR="$(pwd)"
-  cd "$REPO_DIR"
-
-  echo "Attempting to upgrade pip..."
-  if ! "$VENV_PYTHON" -m pip install --upgrade pip; then
-    echo "Warning: Failed to upgrade pip." >&2
-  fi
-
-  # Restore previous directory
-  cd "$OLD_DIR"
-
-  echo "Launching codebase/group selection tool..."
-  PIP_CMD="$VENV_PIP" "$VENV_PYTHON" "$SCRIPT_ROOT/AGENTS/tools/dev_group_menu.py" --install --record "$SPEAKTOME_ACTIVE_FILE" "${MENU_ARGS[@]}"
-}
-launch_codebase_menu
 
 # Interactive document menu with inactivity timeout
 dev_menu() {
   local TIMEOUT=5 choice
   while true; do
     echo "\nDeveloper info menu (timeout ${TIMEOUT}s):"
-    echo " 1) Dump headers"
-    echo " 2) Stub finder"
-    echo " 3) List contributors"
-    echo " 4) Preview AGENT_CONSTITUTION.md"
-    echo " 5) Preview AGENTS.md"
-    echo " 6) Preview LICENSE"
-    echo " 7) Preview CODING_STANDARDS.md"
-    echo " 8) Preview CONTRIBUTING.md"
-    echo " 9) Preview PROJECT_OVERVIEW.md"
+    echo " 0) Dump headers"
+    echo " 1) Stub finder"
+    echo " 2) List contributors"
+    echo " 3) Preview AGENT_CONSTITUTION.md"
+    echo " 4) Preview AGENTS.md"
+    echo " 5) Preview LICENSE"
+    echo " 6) Preview CODING_STANDARDS.md"
+    echo " 7) Preview CONTRIBUTING.md"
+    echo " 8) Preview PROJECT_OVERVIEW.md"
+    echo " 9) Launch dev group menu"
     echo " q) Quit"
     read -r -t "$TIMEOUT" -p "Select option: " choice || { echo "No input in ${TIMEOUT}s. Exiting."; break; }
     case $choice in
-      1) echo "Running dump_headers"; safe_run "$VENV_PYTHON" AGENTS/tools/dump_headers.py speaktome --markdown; TIMEOUT=60 ;;
-      2) echo "Running stubfinder"; safe_run "$VENV_PYTHON" AGENTS/tools/stubfinder.py speaktome; TIMEOUT=60 ;;
-      3) echo "Running list_contributors"; safe_run "$VENV_PYTHON" AGENTS/tools/list_contributors.py; TIMEOUT=60 ;;
-      4) echo "Preview AGENT_CONSTITUTION.md"; safe_run "$VENV_PYTHON" AGENTS/tools/preview_doc.py AGENTS/AGENT_CONSTITUTION.md; TIMEOUT=60 ;;
-      5) echo "Preview AGENTS.md"; safe_run "$VENV_PYTHON" AGENTS/tools/preview_doc.py AGENTS.md; TIMEOUT=60 ;;
-      6) echo "Preview LICENSE"; safe_run "$VENV_PYTHON" AGENTS/tools/preview_doc.py LICENSE; TIMEOUT=60 ;;
-      7) echo "Preview CODING_STANDARDS.md"; safe_run "$VENV_PYTHON" AGENTS/tools/preview_doc.py AGENTS/CODING_STANDARDS.md; TIMEOUT=60 ;;
-      8) echo "Preview CONTRIBUTING.md"; safe_run "$VENV_PYTHON" AGENTS/tools/preview_doc.py AGENTS/CONTRIBUTING.md; TIMEOUT=60 ;;
-      9) echo "Preview PROJECT_OVERVIEW.md"; safe_run "$VENV_PYTHON" AGENTS/tools/preview_doc.py AGENTS/PROJECT_OVERVIEW.md; TIMEOUT=60 ;;
+      0) echo "Running dump_headers"; safe_run "$VENV_PYTHON" AGENTS/tools/dump_headers.py speaktome --markdown; TIMEOUT=10 ;;
+      1) echo "Running stubfinder"; safe_run "$VENV_PYTHON" AGENTS/tools/stubfinder.py speaktome; TIMEOUT=10 ;;
+      2) echo "Running list_contributors"; safe_run "$VENV_PYTHON" AGENTS/tools/list_contributors.py; TIMEOUT=10 ;;
+      3) echo "Preview AGENT_CONSTITUTION.md"; safe_run "$VENV_PYTHON" AGENTS/tools/preview_doc.py AGENTS/AGENT_CONSTITUTION.md; TIMEOUT=10 ;;
+      4) echo "Preview AGENTS.md"; safe_run "$VENV_PYTHON" AGENTS/tools/preview_doc.py AGENTS.md; TIMEOUT=10 ;;
+      5) echo "Preview LICENSE"; safe_run "$VENV_PYTHON" AGENTS/tools/preview_doc.py LICENSE; TIMEOUT=10 ;;
+      6) echo "Preview CODING_STANDARDS.md"; safe_run "$VENV_PYTHON" AGENTS/tools/preview_doc.py AGENTS/CODING_STANDARDS.md; TIMEOUT=10 ;;
+      7) echo "Preview CONTRIBUTING.md"; safe_run "$VENV_PYTHON" AGENTS/tools/preview_doc.py AGENTS/CONTRIBUTING.md; TIMEOUT=10 ;;
+      8) echo "Preview PROJECT_OVERVIEW.md"; safe_run "$VENV_PYTHON" AGENTS/tools/preview_doc.py AGENTS/PROJECT_OVERVIEW.md; TIMEOUT=10 ;;
+      9) echo "Launching dev group menu"; safe_run "$VENV_PYTHON" AGENTS/tools/dev_group_menu.py --record "$SPEAKTOME_ACTIVE_FILE" "${MENU_ARGS[@]}"; TIMEOUT=10 ;;
       q|Q) echo "Exiting."; break ;;
       *) echo "Unknown choice: $choice" ;;
     esac
