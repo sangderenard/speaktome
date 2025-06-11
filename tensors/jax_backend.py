@@ -179,7 +179,7 @@ class JAXTensorOperations(AbstractTensorOperations):
         return jnp.pad(tensor, pad_width=tuple(pad_width), constant_values=value).tolist()
 
     def cat(self, tensors: List[Any], dim: int = 0) -> Any:
-        tensors = [self._to_jnp(t) for t in tensors]
+        tensors = [self._to_jnp(self.ensure_tensor(t)) for t in tensors]
         return jnp.concatenate(tensors, axis=dim).tolist()
 
     def topk(self, tensor: Any, k: int, dim: int) -> Tuple[Any, Any]:
@@ -200,7 +200,7 @@ class JAXTensorOperations(AbstractTensorOperations):
         return values.tolist(), idxs.tolist()
 
     def stack(self, tensors: List[Any], dim: int = 0) -> Any:
-        tensors = [self._to_jnp(t) for t in tensors]
+        tensors = [self._to_jnp(self.ensure_tensor(t)) for t in tensors]
         return jnp.stack(tensors, axis=dim).tolist()
 
     def repeat_interleave(self, tensor: Any, repeats: int, dim: Optional[int] = None) -> Any:
@@ -305,6 +305,10 @@ class JAXTensorOperations(AbstractTensorOperations):
     @property
     def float_dtype(self) -> Any:
         return float
+
+    @property
+    def tensor_type(self) -> type:
+        return jnp.ndarray
 
     @staticmethod
     def test() -> None:

@@ -134,12 +134,14 @@ class PyTorchTensorOperations(AbstractTensorOperations):
         return torch.topk(tensor, k=k, dim=dim)
 
     def stack(self, tensors, dim=0):
+        tensors = [self.ensure_tensor(t) for t in tensors]
         return torch.stack(tensors, dim=dim)
 
     def pad(self, tensor, pad, value=0.0):
         return F.pad(tensor, pad, value=value)
 
     def cat(self, tensors, dim=0):
+        tensors = [self.ensure_tensor(t) for t in tensors]
         return torch.cat(tensors, dim=dim)
 
     def repeat_interleave(self, tensor, repeats, dim=None):
@@ -234,3 +236,7 @@ class PyTorchTensorOperations(AbstractTensorOperations):
     @property
     def float_dtype(self):
         return torch.float32
+
+    @property
+    def tensor_type(self) -> type:
+        return torch.Tensor

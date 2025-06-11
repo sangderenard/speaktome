@@ -269,6 +269,27 @@ class AbstractTensorOperations(ABC):
         """Return the default floating point dtype."""
         pass
 
+    @property
+    @abstractmethod
+    def tensor_type(self) -> type:
+        """Return the preferred underlying tensor type for this backend."""
+        pass
+
+    # Lightweight helper to coerce arbitrary input to this backend's tensor type
+    def ensure_tensor(self, tensor: Any) -> Any:
+        """Return ``tensor`` converted to this backend if needed."""
+        if isinstance(tensor, self.tensor_type):
+            return tensor
+        if torch is not None and isinstance(tensor, torch.Tensor):
+            return get_tensor_operations(Faculty.TORCH).to_backend(tensor, self)
+        if np is not None and isinstance(tensor, np.ndarray):
+            return get_tensor_operations(Faculty.NUMPY).to_backend(tensor, self)
+        if isinstance(tensor, list):
+            return self.tensor_from_list(tensor, dtype=None, device=None)
+        if hasattr(tensor, "tolist"):
+            return self.tensor_from_list(tensor.tolist(), dtype=None, device=None)
+        return self.tensor_from_list([tensor], dtype=None, device=None)
+
     # --- Operator routing ---
     @abstractmethod
     def __apply_operator(self, op: str, left: Any, right: Any):

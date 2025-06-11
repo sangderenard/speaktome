@@ -219,3 +219,16 @@ def test_pure_python_matmul():
     b = [[5, 6], [7, 8]]
     result = ops._AbstractTensorOperations__apply_operator("matmul", a, b)
     assert result == [[19, 22], [43, 50]]
+
+
+def test_stack_mixed_inputs():
+    """Ensure ``stack`` converts mismatched input types transparently."""
+    np_spec = importlib.util.find_spec("numpy")
+    if np_spec is None:
+        pytest.skip("NumPy not available")
+    import numpy as np
+    ops = NumPyTensorOperations()
+    arr = np.array([1, 2])
+    lst = [1, 2]
+    stacked = ops.stack([arr, lst], dim=0)
+    assert ops.tolist(stacked) == [[1, 2], [1, 2]]
