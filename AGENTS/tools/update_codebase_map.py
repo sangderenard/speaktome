@@ -21,7 +21,12 @@ ROOT = Path(__file__).resolve().parents[2]
 
 def discover_codebases(root: Path) -> list[Path]:
     """Return directories containing a top-level `pyproject.toml`."""
-    return [p.parent for p in root.glob('*/pyproject.toml')]
+    returnvals = [p.parent for p in root.glob('*/pyproject.toml')]
+    # Always include AGENTS/tools as a path:
+    special_path = root / 'AGENTS' / 'tools'
+    if special_path.is_dir():
+        returnvals.append(special_path)
+    return returnvals
 
 
 def extract_groups(toml_path: Path) -> dict[str, list[str]]:

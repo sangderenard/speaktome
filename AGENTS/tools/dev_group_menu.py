@@ -37,17 +37,40 @@ except Exception:
 if os.name == 'nt':  # Windows
     import msvcrt
 
-    def getch_timeout(timeout):
+    def getch_timeout(timeout: float) -> str | None:
         """Get a single character with timeout on Windows."""
         result = []
+        # Event to signal thread completion or error
+        finished_event = threading.Event()
 
-        def input_thread():
+        def _input_thread_target():
             try:
-                result.append(msvcrt.getch().decode())
+                # msvcrt.getch() blocks until a key is pressed and returns bytes.
+                char_bytes = msvcrt.getch()
+                # For simple y/n prompts, we expect single ASCII/UTF-8 chars.
+                # Special keys (arrows, F-keys) might return multiple bytes
+                # or non-decodable sequences, which errors='ignore' handles.
+                if char_bytes:
+                    decoded_char = char_bytes.decode('utf-8', errors='ignore')
+                    if decoded_char: # Ensure decoding was successful and non-empty
+                        result.append(decoded_char)
             except Exception:
-                import sys
-                print(ENV_SETUP_BOX)
-                sys.exit(1)
+                # Optionally log the exception here, e.g.:
+                # import logging
+                # logging.exception("Error reading character in getch_timeout")
+                pass # Let the main thread handle timeout or empty result
+            finally:
+                finished_event.set() # Signal that the thread is done
+
+        thread = threading.Thread(target=_input_thread_target)
+        thread.daemon = True  # Allow main program to exit even if thread is running
+        thread.start()
+
+        finished_event.wait(timeout=timeout)  # Wait for the event or timeout
+
+        if result:
+            return result[0]
+        return None # Timeout occurred or thread failed to get a character
 # --- END HEADER ---
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -196,6 +219,95 @@ def install_selections(
                 subprocess.run([pip_cmd, "install", pkg], check=False, env=env)
 
 
+def interactive_menu_selection() -> tuple[list[str], dict[str, dict[str, list[str]]]]:
+    """
+    Show a console menu letting the user toggle each codebase and its groups.
+    Pressing the assigned letter toggles a selection. Pressing 'c' continues.
+    The final result is returned as (list_of_codebases, {cb: {grp: [pkgs]}}).
+    """
+    selected_codebases = set()
+    selected_groups: dict[str, dict[str, list[str]]] = {}
+
+    codebases = sorted(CODEBASES.keys())
+    idx_map = {}  # letter -> (type, name)  type='cb' or 'grp'
+
+    # Assign letters to codebases and groups
+    letters = "abcdefghijklmnopqrstuvwxyz"
+    letter_idx = 0
+    for cb in codebases:
+        idx_map[letters[letter_idx]] = ("cb", cb)
+        letter_idx += 1
+        for grp in sorted(CODEBASES[cb]):
+            idx_map[letters[letter_idx]] = ("grp", f"{cb}:{grp}")
+            letter_idx += 1
+            if letter_idx >= len(letters):
+                break
+        if letter_idx >= len(letters):
+            break
+
+    timeout = 5.0  # Start with 5 seconds
+
+    while True:
+        print("\nSelect codebases and optional groups (press letter to toggle, 'c' to continue, or 'q' to quit):")
+        for letter, (typ, name) in idx_map.items():
+            if typ == "cb":
+                cb = name
+                mark = "[X]" if cb in selected_codebases else "[ ]"
+                print(f"  ({letter}) {mark} Codebase: {cb}")
+                # Indent next lines for groups
+                for k, (grpTyp, grpName) in idx_map.items():
+                    if grpTyp == "grp" and grpName.startswith(f"{cb}:"):
+                        groupOnly = grpName.split(":", maxsplit=1)[1]
+                        isSelected = (cb in selected_groups and groupOnly in selected_groups[cb])
+                        grpMark = "[X]" if isSelected else "[ ]"
+                        print(f"       ({k}) {grpMark} Group: {groupOnly}")
+
+        choice = getch_timeout(timeout)
+        if not choice:
+            print("No input, continuing...")
+            break
+        
+        # Any key pressed increases timeout to 10 seconds for subsequent iterations
+        timeout = 10.0
+        
+        choice = choice.lower()
+        if ord(choice) == 27:
+            print("No selections made. Exiting.")
+            sys.exit(0)
+        if ord(choice) == 13:
+            print("Continuing with current selections.")
+            break
+        if choice in idx_map:
+            (typ, name) = idx_map[choice]
+            if typ == "cb":
+                if name in selected_codebases:
+                    selected_codebases.remove(name)
+                    selected_groups.pop(name, None)
+                else:
+                    selected_codebases.add(name)
+                    selected_groups.setdefault(name, {})
+            else:  # group
+                cb, grp = name.split(":", 1)
+                if cb not in selected_codebases:
+                    print(f"Select codebase '{cb}' first.")
+                else:
+                    if grp in selected_groups[cb]:
+                        selected_groups[cb].pop(grp)
+                    else:
+                        selected_groups[cb][grp] = CODEBASES[cb][grp]
+        else:
+            print(f"Unknown command: {choice}")
+
+    final_codebases = sorted(selected_codebases)
+    final_groups: dict[str, dict[str, list[str]]] = {}
+    for cb in final_codebases:
+        gSel = selected_groups.get(cb, {})
+        final_groups[cb] = {}
+        for grp, pkgs in gSel.items():
+            final_groups[cb][grp] = pkgs
+    return final_codebases, final_groups
+
+
 def main(argv: list[str] | None = None) -> None:  # pragma: no cover - CLI
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -249,10 +361,11 @@ def main(argv: list[str] | None = None) -> None:  # pragma: no cover - CLI
         print(args.record or os.environ.get(ACTIVE_ENV, str(Path(tempfile.gettempdir()) / "speaktome_active.json")))
         return
 
+    # If user passed --codebases/--groups on CLI, skip menu. Otherwise, show it.
     if args.codebases or args.groups:
         cbs, selections = noninteractive_selection(args.codebases, args.groups)
     else:
-        cbs, selections = interactive_selection()
+        cbs, selections = interactive_menu_selection()
 
     if args.install:
         pip_cmd = os.environ.get("PIP_CMD", "pip")

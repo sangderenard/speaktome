@@ -5,6 +5,8 @@
 
 set -uo pipefail
 
+
+
 # Resolve repository root so this script works from any directory
 SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
@@ -134,7 +136,15 @@ for arg in "$@"; do
   esac
 done
 
-if [ $CALLED_BY_DEV -eq 0 ]; then
+# Always run dev_group_menu.py at the end
+if [ $CALLED_BY_DEV -eq 1 ]; then
+  # Headless install of AGENTS/tools
+  echo "Installing AGENTS/tools in headless mode..."
+  PIP_CMD="$VENV_PIP" "$VENV_PYTHON" "$SCRIPT_ROOT/AGENTS/tools/dev_group_menu.py" --install --codebases AGENTS/tools --groups AGENTS/tools: --record "$SPEAKTOME_ACTIVE_FILE"
+  # Then run again with any arguments passed
+  echo "Launching codebase/group selection tool for editable installs (from-dev)..."
+  PIP_CMD="$VENV_PIP" "$VENV_PYTHON" "$SCRIPT_ROOT/AGENTS/tools/dev_group_menu.py" --install --record "$SPEAKTOME_ACTIVE_FILE" "${MENU_ARGS[@]}"
+else
   echo "Launching codebase/group selection tool for editable installs..."
   PIP_CMD="$VENV_PIP" "$VENV_PYTHON" "$SCRIPT_ROOT/AGENTS/tools/dev_group_menu.py" --install --record "$SPEAKTOME_ACTIVE_FILE" "${MENU_ARGS[@]}"
 fi
@@ -153,6 +163,3 @@ PY
 )
 echo "   * Torch = ${TORCH_INFO:-missing}"
 echo "Selections recorded to $SPEAKTOME_ACTIVE_FILE"
-
-# Always drop to the dev_group_menu for optional installs
-"$VENV_PYTHON" "$SCRIPT_ROOT/AGENTS/tools/dev_group_menu.py"
