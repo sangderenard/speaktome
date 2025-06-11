@@ -4,7 +4,7 @@ pub fn build(b: *std.build.Builder) void {
     const target = b.standardTargetOptions(.{});
     const mode = b.standardReleaseOptions();
 
-    const cgpt_path = "speaktome/tensors/models/c_gpt";
+    const cgpt_path = "tensors/tensors/models/c_gpt";
     const cgpt = b.addSharedLibrary("cgpt", .{ .root_source_file = .{ .path = cgpt_path ++ "/cgpt.c" } });
     cgpt.setTarget(target);
     cgpt.setBuildMode(mode);

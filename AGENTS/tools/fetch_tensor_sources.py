@@ -1,7 +1,7 @@
 """Download third-party sources for tensor models.
 
 This script ensures required third-party libraries exist for
-`speaktome/tensors/models`. If a dependency directory contains only
+`tensors/models`. If a dependency directory contains only
  the placeholder README shipped with the repository, the script clones
 its source from GitHub using ``git``.
 """

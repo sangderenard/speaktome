@@ -4,7 +4,7 @@ from __future__ import annotations
 
 try:
     from AGENTS.tools.header_utils import ENV_SETUP_BOX
-    from .tensors.faculty import Faculty, DEFAULT_FACULTY, FORCE_ENV
+    from tensors.faculty import Faculty, DEFAULT_FACULTY, FORCE_ENV
 except Exception:
     import sys
     print(ENV_SETUP_BOX)

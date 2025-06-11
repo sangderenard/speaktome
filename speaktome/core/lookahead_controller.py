@@ -7,7 +7,7 @@ try:
 
     if TYPE_CHECKING:  # pragma: no cover - type hints only
         from .beam_search_instruction import BeamSearchInstruction
-    from ..tensors import AbstractTensorOperations
+    from tensors import AbstractTensorOperations
     from .model_abstraction import AbstractModelWrapper
 except Exception:
     import sys
@@ -55,7 +55,7 @@ class LookaheadController:
         self.device = device
         self.tokenizer = tokenizer
         if tensor_ops is None:
-            from ..tensors import get_tensor_operations
+            from tensors import get_tensor_operations
             tensor_ops = get_tensor_operations()
         self.tensor_ops = tensor_ops
         self.model_wrapper = model_wrapper

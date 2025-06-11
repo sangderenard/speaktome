@@ -10,8 +10,8 @@ quick sanity check when experimenting with alternate implementations.
 # --- END HEADER ---
 
 import time
-from speaktome.tensors.faculty import Faculty
-from speaktome.tensors import get_tensor_operations
+from tensors.faculty import Faculty
+from tensors import get_tensor_operations
 
 
 def benchmark_sqrt(faculty: Faculty, reps: int = 1000) -> float:

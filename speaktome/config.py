@@ -1,7 +1,7 @@
 # Third-party imports
 import os
 
-from .tensors.faculty import Faculty, DEFAULT_FACULTY
+from tensors.faculty import Faculty, DEFAULT_FACULTY
 # --- END HEADER ---
 
 try:

@@ -11,15 +11,15 @@ try:
     import itertools
 
 
-    from speaktome.tensors import (
+    from tensors import (
         PurePythonTensorOperations,
         NumPyTensorOperations,
         PyTorchTensorOperations,
         JAXTensorOperations,
     )
-    from speaktome.tensors.faculty import detect_faculty
+    from tensors.faculty import detect_faculty
 
-    from speaktome.tensors.pure_backend import PurePythonTensorOperations  # For isinstance check
+    from tensors.pure_backend import PurePythonTensorOperations  # For isinstance check
 
 except Exception:
     import sys

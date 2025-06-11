@@ -1,7 +1,7 @@
 """PyTest configuration with faculty-aware logging.
 
 This configuration file establishes a consistent logging setup for all tests
-and announces the active :class:`~speaktome.tensors.faculty.Faculty` tier.  The output
+and announces the active :class:`~tensors.faculty.Faculty` tier.  The output
 is written to ``testing/logs`` so future agents may trace prior sessions.
 """
 
@@ -17,7 +17,7 @@ from io import StringIO
 import json
 
 # Import faculty components for logging
-from speaktome.tensors.faculty import DEFAULT_FACULTY, FORCE_ENV, Faculty
+from tensors.faculty import DEFAULT_FACULTY, FORCE_ENV, Faculty
 
 ROOT = Path(__file__).resolve().parents[1]
 ACTIVE_FILE = Path(os.environ.get("SPEAKTOME_ACTIVE_FILE", "/tmp/speaktome_active.json"))

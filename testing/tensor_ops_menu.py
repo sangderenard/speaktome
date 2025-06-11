@@ -13,7 +13,7 @@ REPO_ROOT = os.path.dirname(os.path.dirname(__file__))
 if REPO_ROOT not in sys.path:
     sys.path.insert(0, REPO_ROOT)
 
-from speaktome import tensors as ta
+import tensors as ta
 
 
 def available_backends() -> list[tuple[str, type[ta.AbstractTensorOperations]]]:
@@ -25,7 +25,7 @@ def available_backends() -> list[tuple[str, type[ta.AbstractTensorOperations]]]:
     if importlib.util.find_spec("torch") is not None:
         backends.append(("PyTorch", ta.PyTorchTensorOperations))
     try:
-        from speaktome.tensors.c_backend import CTensorOperations
+        from tensors.c_backend import CTensorOperations
         backends.append(("CTensor", CTensorOperations))
     except Exception:
         pass

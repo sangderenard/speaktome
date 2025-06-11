@@ -7,7 +7,7 @@ try:
     from typing import Any, Iterable, Dict
 
     from .model_abstraction import AbstractModelWrapper
-    from ..tensors.abstraction import AbstractTensorOperations
+    from tensors.abstraction import AbstractTensorOperations
 except Exception:
     import sys
     print(ENV_SETUP_BOX)

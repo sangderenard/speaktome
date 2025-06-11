@@ -6,7 +6,7 @@ try:
     from AGENTS.tools.header_utils import ENV_SETUP_BOX
     import importlib
 
-    from speaktome.tensors.models.c_gpt import cgpt
+    from tensors.models.c_gpt import cgpt
 except Exception:
     import sys
     print(ENV_SETUP_BOX)

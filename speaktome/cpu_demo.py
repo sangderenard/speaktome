@@ -13,7 +13,7 @@ try:
     import argparse
     from typing import Any, Dict
 
-    from .tensors.faculty import Faculty
+    from tensors.faculty import Faculty
 
     FACULTY_REQUIREMENT = Faculty.PURE_PYTHON
     try:
@@ -24,7 +24,7 @@ try:
         np = None  # type: ignore
 
     from .util.token_vocab import TokenVocabulary
-    from .tensors import get_tensor_operations
+    from tensors import get_tensor_operations
     from .core.model_abstraction import AbstractModelWrapper
     from .core.abstract_linear_net import (
         AbstractLinearLayer,
