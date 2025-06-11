@@ -664,5 +664,25 @@ class CompressedBeamTree:
             if l > 0: # only copy if length > 0
                 final_beams[i, :l] = batch_tokens_tensors[i][:l] # Ensure slicing matches length
                 final_scores[i, :l] = batch_scores_tensors[i][:l]
-        
+
         return final_beams, final_scores, final_lengths_tensor
+
+    @staticmethod
+    def test() -> None:
+        """Verify batch extension of leaves maintains full paths."""
+        import torch
+
+        tree = CompressedBeamTree(device="cpu")
+        idx = tree.add_root_beam([1, 2], [0.1, 0.2])
+
+        parent = torch.tensor([idx], dtype=torch.long)
+        tokens = torch.tensor([[1, 2, 3]], dtype=torch.long)
+        scores = torch.tensor([[0.1, 0.2, 0.3]], dtype=torch.float)
+        lengths = torch.tensor([3], dtype=torch.long)
+
+        new_ids = tree.extend_leaves_batch(parent, tokens, scores, lengths)
+        new_idx = int(new_ids[0])
+
+        tokens_tensor, _, length = tree.get_beam_tensors_by_beam_idx(new_idx, 3)
+        assert length == 3
+        assert tokens_tensor.tolist() == [1, 2, 3]
