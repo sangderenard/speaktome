@@ -25,7 +25,8 @@ safe_run() {
 USE_VENV=1
 NOTORCH=0
 for arg in "$@"; do
-  case $arg in
+  arg_lc="${arg,,}"
+  case $arg_lc in
     -no-venv) USE_VENV=0 ;;
     -notorch|-no-torch) NOTORCH=1 ;;
     -codebases=*|-cb=*) MENU_ARGS+=("-codebases" "${arg#*=}") ;;

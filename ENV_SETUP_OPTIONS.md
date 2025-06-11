@@ -38,22 +38,16 @@ The environment setup scripts automate the creation of a Python virtual environm
 
 ## All Options and Flags
 
-| Option/Flag         | PowerShell Param         | Bash Flag           | Description                                                                                 |
-|--------------------|-------------------------|---------------------|---------------------------------------------------------------------------------------------|
-| `-NoVenv`          | `-NoVenv`               | `--no-venv`         | Do not create or use a Python virtual environment.                                           |
-| `-NoTorch`         | `-NoTorch`              | `--notorch`         | Skip installing PyTorch and any codebase/group that requires it.                             |
-| `-Codebases VAL`   | `-Codebases VAL`        | `--codebases=VAL`   | Specify codebases to install/select (comma-separated or repeated).                           |
-| `-Groups VAL`      | `-Groups VAL`           | `--groups=VAL`      | Specify groups to install/select (comma-separated or repeated).                              |
-| `-headless`        | `-headless`             | `--headless`        | Run in non-interactive mode (auto-select codebases/groups if possible).                      |
-| `-FromDev`         | `-FromDev`              | `--from-dev`        | Internal: Indicates script was called from a dev setup script.                               |
-| `-ml`              | `-ml`                   | `--ml`              | Install full ML extras (transformers, torch_geometric, etc).                                 |
-| `-gpu`             | `-gpu`                  | `--gpu`             | Force GPU-enabled torch install (if not using -NoTorch).                                     |
-| `-prefetch`        | `-prefetch`             | `--prefetch`        | Prefetch models or data (if supported by codebases/groups).                                  |
-| `-NoExtras`        | `-NoExtras`             | `--noextras`        | Minimal install, skip optional extras.                                                       |
-| `-Extras`          | `-Extras`               | `--extras`          | Install all extras.                                                                         |
+| Option/Flag         | Both PowerShell & Bash | Description                                                                                 |
+|--------------------|-------------------------|-----------------------------------------------------------------------------------------|
+| `-NoVenv`          | `-NoVenv`               | Do not create or use a Python virtual environment.                                      |
+| `-notorch`         | `-notorch`              | Skip installing PyTorch and any codebase/group that requires it.                        |
+| `-Codebases VAL`   | `-Codebases VAL`        | Specify codebases to install/select (comma-separated).                                  |
+| `-Groups VAL`      | `-Groups VAL`           | Specify groups to install/select (comma-separated).                                     |
+| `-headless`        | `-headless`             | Run in non-interactive mode.                                                            |
+| `-FromDev`         | `-FromDev`              | Internal: Indicates script was called from a dev setup script.                          |
 
-> **PowerShell scripts only support single-dash flags (e.g., `-NoTorch`, `-NoVenv`, `-Codebases`). Do not use double-dash flags with PowerShell scripts.**
-> **Bash scripts only support double-dash GNU-style flags (e.g., `--notorch`, `--no-venv`, `--codebases`). Do not use single-dash flags with Bash scripts.**
+> **Both PowerShell and Bash scripts use identical single-dash flags for consistency across operating systems.**
 
 ---
 
@@ -63,18 +57,19 @@ The environment setup scripts automate the creation of a Python virtual environm
 
 **Windows (PowerShell):**
 ```powershell
-# In repo root
+# In repo root - Interactive mode (no defaults selected)
 ./setup_env.ps1
 ```
 
 **Linux/macOS (Bash):**
 ```bash
-# In repo root
+# In repo root - Interactive mode (no defaults selected)
 bash setup_env.sh
 ```
 
-- Prompts for codebase/group selection unless run with `-headless`/`--headless` or explicit `-Codebases`/`--codebases`/`-Groups`/`--groups`.
-- Installs torch by default unless `-NoTorch`/`--notorch` is specified.
+- Runs in interactive mode with NO codebases/groups pre-selected.
+- User must choose from available options defined in `AGENTS/codebase_map.json`.
+- Installs torch by default unless `-notorch` is specified.
 
 ### Developer Setup
 
@@ -95,84 +90,87 @@ bash setup_env_dev.sh
 
 **Windows (PowerShell):**
 ```powershell
-./setup_env.ps1 -headless -Codebases projectA,projectB
+./setup_env.ps1 -headless -codebases projecta,projectb -groups groupx
 ```
 
 **Linux/macOS (Bash):**
 ```bash
-bash setup_env.sh --headless --codebases=projectA,projectB
+bash setup_env.sh -headless -codebases=projecta,projectb -groups=groupx
 ```
 
-- No interactive prompts. Codebases/groups are auto-selected or provided via flags.
+- No interactive prompts. Must specify codebases and/or groups explicitly.
+- Available codebases and groups are defined in `AGENTS/codebase_map.json`.
 
 ### Headless Setup Without Torch
 
 **Windows (PowerShell):**
 ```powershell
-./setup_env.ps1 -headless -NoTorch
+./setup_env.ps1 -headless -notorch -codebases projectc,projectd -groups groupy
 ```
 
 **Linux/macOS (Bash):**
 ```bash
-bash setup_env.sh --headless --notorch
+bash setup_env.sh -headless -notorch -codebases=projectc,projectd -groups=groupy
 ```
 
 - Skips torch installation and any codebase/group that requires torch.
-- Use with `-Codebases`/`--codebases`/`-Groups`/`--groups` to further restrict selection.
+- Use with `-codebases` or `-groups` to specify what to install instead.
 
 ---
 
 ## Avoiding Torch and Torch-Dependent Codebases/Groups
 
-- Use the `-NoTorch` (PowerShell) or `--notorch` (Bash) flag to skip torch installation.
+- Use the `-notorch` flag to skip torch installation.
 - The setup scripts will also skip any codebase or group that requires torch, either directly or as a dependency.
-- In headless mode, auto-selection will avoid torch-dependent codebases/groups if `-NoTorch`/`--notorch` is set.
+- In headless mode, auto-selection will avoid torch-dependent codebases/groups if `-notorch` is set.
 - In interactive mode, torch-dependent options will be hidden or disabled if possible.
 
 ---
 
 ## Examples
 
-**Minimal install, no venv, no torch:**
+**Interactive setup (no defaults, user selects from menu):**
 ```powershell
-./setup_env.ps1 -NoVenv -NoTorch -NoExtras
+./setup_env.ps1
 ```
 ```bash
-bash setup_env.sh --no-venv --notorch --noextras
+bash setup_env.sh
 ```
 
-**Developer setup, only for groupX, with torch:**
+**Headless setup with specific codebases and groups:**
 ```powershell
-./setup_env_dev.ps1 -Groups groupX
+./setup_env.ps1 -headless -codebases projecta,projectb -groups groupx
 ```
 ```bash
-bash setup_env_dev.sh --groups=groupX
+bash setup_env.sh -headless -codebases=projecta,projectb -groups=groupx
 ```
 
-**Headless, all extras, skip torch:**
+**No venv, no torch, specific codebases and groups:**
 ```powershell
-./setup_env.ps1 -headless -Extras -NoTorch
+./setup_env.ps1 -novenv -notorch -codebases projectc,projectd -groups groupy
 ```
 ```bash
-bash setup_env.sh --headless --extras --notorch
+bash setup_env.sh -novenv -notorch -codebases=projectc,projectd -groups=groupy
 ```
 
-**Interactive, GPU torch, specific codebases:**
+**Developer setup with specific group:**
 ```powershell
-./setup_env.ps1 -gpu -Codebases projectA,projectB
+./setup_env_dev.ps1 -groups groupx
 ```
 ```bash
-bash setup_env.sh --gpu --codebases=projectA,projectB
+bash setup_env_dev.sh -groups=groupx
 ```
 
 ---
 
 ## Notes
 
-- All options are case-insensitive in PowerShell, case-sensitive in Bash.
-- The `-NoTorch`/`--notorch` flag is the authoritative way to avoid torch and torch-dependent codebases/groups.
-- For advanced codebase/group selection, use the developer menu or pass explicit flags.
-- The scripts will create a `.venv` directory by default unless `-NoVenv`/`--no-venv` is used.
+- All flags use single-dash format for consistency across both PowerShell and Bash.
+- The `-notorch` flag is the authoritative way to avoid torch and torch-dependent codebases/groups.
+- For interactive setup, no codebases/groups are pre-selected - user must choose from the menu.
+- For headless setup, codebases and/or groups must be specified explicitly.
+- Available codebases and groups are defined in `AGENTS/codebase_map.json`.
+- The scripts will create a `.venv` directory by default unless `-NoVenv` is used.
 - Selections are recorded to the file specified by the `SPEAKTOME_ACTIVE_FILE` environment variable (or a default path).
 
 ---

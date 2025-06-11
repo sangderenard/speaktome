@@ -2,13 +2,36 @@
 # No Unicode. All pip/python commands run inside venv unless -NoVenv is used.
 
 param(
-    [switch]$NoVenv,
-    [switch]$NoTorch,
-    [switch]$headless,
-    [switch]$FromDev,
-    [string[]]$Codebases,
-    [string[]]$Groups
+    [Parameter(ValueFromRemainingArguments=$true)]
+    [string[]]$args
 )
+
+# Manual flag parsing for all arguments (case-insensitive, -flag=value style)
+$NoVenv = $false
+$NoTorch = $false
+$headless = $false
+$FromDev = $false
+$Codebases = @()
+$Groups = @()
+foreach ($arg in $args) {
+    $arg_lc = $arg.ToLower()
+    if ($arg_lc -eq '-novenv') { $NoVenv = $true }
+    elseif ($arg_lc -eq '-notorch') { $NoTorch = $true }
+    elseif ($arg_lc -eq '-headless') { $headless = $true }
+    elseif ($arg_lc -eq '-fromdev') { $FromDev = $true }
+    elseif ($arg_lc -like '-codebases=*') {
+        $cbVal = $arg.Substring($arg.IndexOf('=')+1)
+        if ($cbVal -and $cbVal.Trim().Length -gt 0) {
+            $Codebases = $cbVal -split ','
+        }
+    }
+    elseif ($arg_lc -like '-groups=*') {
+        $grpVal = $arg.Substring($arg.IndexOf('=')+1)
+        if ($grpVal -and $grpVal.Trim().Length -gt 0) {
+            $Groups = $grpVal -split ','
+        }
+    }
+}
 
 # All options for this script should be used with single-dash PowerShell-style flags, e.g.:
 #   -NoTorch -NoVenv -Codebases projectA,projectB -Groups groupX

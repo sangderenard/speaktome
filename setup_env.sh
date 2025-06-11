@@ -17,7 +17,8 @@ USE_VENV=1
 HEADLESS=0
 NOTORCH=0
 for arg in "$@"; do
-  case $arg in
+  arg_lc="${arg,,}"
+  case $arg_lc in
     -no-venv) USE_VENV=0 ;;
     -headless) HEADLESS=1 ;;
     -notorch|-no-torch) NOTORCH=1 ;;
@@ -114,7 +115,8 @@ GROUPS=()
 MENU_ARGS=()
 
 for arg in "$@"; do
-  case $arg in
+  arg_lc="${arg,,}"
+  case $arg_lc in
     -codebases=*|-cb=*) CODEBASES="${arg#*=}" ;;
     -groups=*|-grp=*)   GROUPS+=("${arg#*=}") ;;
   esac

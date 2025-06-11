@@ -18,20 +18,21 @@ $menuArgs = @()
 $useVenv = $true
 $useTorch = $true
 foreach ($arg in $args) {
-    if ($arg -eq '-no-venv') {
+    $arg_lc = $arg.ToLower()
+    if ($arg_lc -eq '-no-venv') {
         $useVenv = $false
     }
-    elseif ($arg -eq '-notorch' -or $arg -eq '-no-torch') {
+    elseif ($arg_lc -eq '-notorch' -or $arg_lc -eq '-no-torch') {
         $useTorch = $false
     }
-    elseif ($arg -like '-codebases=*' -or $arg -like '-cb=*') {
+    elseif ($arg_lc -like '-codebases=*' -or $arg_lc -like '-cb=*') {
         $cbVal = $arg.Split('=')[1]
         if ($cbVal -and $cbVal.Trim().Length -gt 0) {
             $menuArgs += '-codebases'
             $menuArgs += $cbVal
         }
     }
-    elseif ($arg -like '-groups=*' -or $arg -like '-grp=*') {
+    elseif ($arg_lc -like '-groups=*' -or $arg_lc -like '-grp=*') {
         $grpVal = $arg.Split('=')[1]
         if ($grpVal -and $grpVal.Trim().Length -gt 0) {
             $menuArgs += '-groups'
