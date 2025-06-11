@@ -541,6 +541,33 @@ class AbstractTensor(ABC):
     def __imatmul__(self, other):
         return self.__apply_operator('imatmul', self, other)
 
+    # --- Indexing helpers ---
+    def __getitem__(self, idx):
+        """Return an indexed view wrapped as an AbstractTensor when possible."""
+        data = self.data
+        if data is None:
+            raise ValueError("__getitem__ called on empty tensor")
+        # c_backend tensors lack Python slicing support
+        if data.__class__.__name__ == "CTensor":
+            raise NotImplementedError("__getitem__ not implemented for CTensor backend")
+        result = data[idx]
+        if isinstance(result, self.tensor_type):
+            wrapped = type(self)(track_time=self.track_time)
+            wrapped.data = result
+            return wrapped
+        return result
+
+    def __setitem__(self, idx, value):
+        """Assign to the underlying tensor using Python indexing."""
+        data = self.data
+        if data is None:
+            raise ValueError("__setitem__ called on empty tensor")
+        if data.__class__.__name__ == "CTensor":
+            raise NotImplementedError("__setitem__ not implemented for CTensor backend")
+        if isinstance(value, AbstractTensor):
+            value = value.data
+        data[idx] = value
+
     def data_or(self, obj: Any = None) -> Any:
         """Return self.data if no argument is passed, otherwise return the argument unchanged."""
         if obj is None:
