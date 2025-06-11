@@ -7,12 +7,18 @@ try:
     from fontTools.ttLib import TTFont
     from PIL import Image, ImageDraw, ImageFont
     import numpy as np
-    import torch
 except Exception:
     import sys
     print(ENV_SETUP_BOX)
     sys.exit(1)
 # --- END HEADER ---
+
+# --- Optional: Torch (soft fail) ---
+try:
+    import torch
+    TORCH_AVAILABLE = True
+except ImportError:
+    TORCH_AVAILABLE = False
 
 from typing import Iterable, Tuple, List
 
@@ -114,7 +120,7 @@ def generate_variants(
 
 
 def bytemaps_as_ascii(
-    char_bitmasks: Iterable[np.ndarray | torch.Tensor],
+    char_bitmasks: Iterable[np.ndarray | "torch.Tensor"],
     width: int,
     height: int,
     console_width: int = 240,
@@ -129,7 +135,7 @@ def bytemaps_as_ascii(
         row = bitmasks[i:i + per_line]
         for line_no in range(lines_per_bm):
             for bitmask in row:
-                if isinstance(bitmask, torch.Tensor):
+                if TORCH_AVAILABLE and "torch" in str(type(bitmask)):
                     bitmask = bitmask.squeeze().cpu().numpy()
                 if bitmask.max() > 1:
                     bitmask = bitmask / 255.0

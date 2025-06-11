@@ -7,7 +7,7 @@ try:
 except ImportError:
     SSIM_AVAILABLE = False
 
-from fontmapper.FM16.FMS6 import obtain_charset, generate_variants  # Adjust import as needed
+from fontmapper.FM16.modules.charset_ops import obtain_charset
 
 class AsciiKernelClassifier:
     def __init__(self, ramp: str, font_path="DejaVuSansMono.ttf", font_size=16, char_size=(16, 16), loss_mode="sad"):
@@ -22,14 +22,14 @@ class AsciiKernelClassifier:
         self._prepare_reference_bitmasks()
 
     def _prepare_reference_bitmasks(self):
-        # Use obtain_charset to get charset and bitmasks
+        # Use obtain_charset from charset_ops to get charset and bitmasks
         fonts, charset, charBitmasks, max_width, max_height = obtain_charset(
             font_files=[self.font_path], font_size=self.font_size, complexity_level=0
         )
         # Only keep chars in our ramp
         self.charset = [c for c in charset if c in self.ramp]
         # Map ramp to indices in charset
-        self.ramp_indices = [self.charset.index(c) for c in self.ramp if c in self.charset]
+        self.ramp_indices = [charset.index(c) for c in self.ramp if c in charset]
         # Only keep bitmasks for ramp chars
         self.charBitmasks = [charBitmasks[i] for i in self.ramp_indices]
         self.charBitmasks = [self._resize_to_char_size(bm) for bm in self.charBitmasks]
