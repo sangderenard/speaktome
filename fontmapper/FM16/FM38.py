@@ -573,39 +573,6 @@ class MetaModel(nn.Module):
                 category_learning_rate.item(), gradient_learning_rate.item(),
                 image_learning_rate.item(), demo_learning_rate.item(), human_learning_rate.item())
 
-class CharSorter(nn.Module):
-    def __init__(self, config):
-        super(CharSorter, self).__init__()
-        self.config = config
-        num_classes = len(config.charset)
-        self.conv1 = nn.Conv2d(1, config.conv1_out, kernel_size=5, stride=1, padding=2)
-        self.pool = nn.MaxPool2d(kernel_size=2, stride=2, padding=0)
-        self.conv2 = nn.Conv2d(config.conv1_out, config.conv2_out, kernel_size=5, stride=1, padding=2)
-
-        # Dummy forward pass to determine size automatically
-        dummy_input = torch.autograd.Variable(torch.ones(1, 1, config.height, config.width))
-        output = self.conv2(self.pool(self.conv1(dummy_input)))
-        output = self.pool(output)
-        n_size = output.numel() // output.shape[0]
-
-        self.fc1 = nn.Linear(n_size, config.linear_out)
-        self.fc2 = nn.Linear(config.linear_out, num_classes)
-        self.relu = nn.ReLU()
-        self.dropout = nn.Dropout(p=config.dropout)
-        self.charset = config.charset
-        self.charBitmasks = config.charBitmasks
-        self.demo_width = config.width
-        self.demo_height = config.height
-
-    def forward(self, x):
-        x = x.view(-1, 1, self.config.height, self.config.width)
-        x = self.pool(self.relu(self.conv1(x)))
-        x = self.pool(self.relu(self.conv2(x)))
-        x = x.view(-1, self.fc1.in_features)
-        x = self.relu(self.fc1(x))
-        x = self.dropout(x)
-        x = self.fc2(x)
-        return x
     
 def weighted_average(loss_dataloaders_list):
     if not loss_dataloaders_list:
@@ -1627,55 +1594,6 @@ def create_config(base_config, font_files=None, font_size=None, complexity_level
 
 
           
-class AddRandomNoise(object):
-    def __call__(self, img):
-        noise = torch.randn_like(img, device=device) * 0.1
-        return torch.clamp(img + noise, 0, 1)
-
-class DistortionChain(object):
-    def __init__(self, noise_chance=0.5, blur_chance=0.5):
-        self.noise_chance = noise_chance
-        self.blur_chance = blur_chance
-        self.noise_transform = AddRandomNoise()
-        self.blur_transform = RandomGaussianBlur()
-
-    def __call__(self, img):
-        if random.random() < self.noise_chance:
-            img = self.noise_transform(img)
-        if random.random() < self.blur_chance:
-            img = self.blur_transform(img)
-        return img
-class RandomGaussianBlur(object):
-    def __call__(self, img):
-        sigma = random.uniform(0.5, 1.5)
-        max_kernel_size = min(img.shape[-2], img.shape[-1]) // 10  # Limit kernel size to 10% of image size
-        kernel_size = 1 + 2 * random.randint(0, max_kernel_size+1)  # Randomly select kernel size within the limit
-        img = TF.gaussian_blur(img, kernel_size=(kernel_size, kernel_size), sigma=sigma)
-        return img
-class ToTensorAndToDevice:
-    def __init__(self, device):
-        self.device = device
-
-    def __call__(self, pic):
-        tensor = transforms.ToTensor()(pic)
-        tensor = tensor.to(self.device)
-        return tensor
-    
-class CustomDataset(Dataset):
-    def __init__(self, char_bitmasks, labels, transform=None):
-        self.char_bitmasks = [Image.fromarray(obj).convert('L') for obj in char_bitmasks]
-        self.labels = labels.clone()
-        self.transform = transform
-
-    def __getitem__(self, idx):
-        image = self.char_bitmasks[idx]
-        label = self.labels[idx]
-        if self.transform:
-            image = self.transform(image)
-        return image, label.clone()
-
-    def __len__(self):
-        return len(self.char_bitmasks)
     
 
 
