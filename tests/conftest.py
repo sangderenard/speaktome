@@ -16,6 +16,9 @@ import importlib.util
 from io import StringIO
 import json
 
+# Pretty logging helper
+from AGENTS.tools.pretty_logger import PrettyLogger
+
 # Import faculty components for logging
 from tensors.faculty import DEFAULT_FACULTY, FORCE_ENV, Faculty
 
