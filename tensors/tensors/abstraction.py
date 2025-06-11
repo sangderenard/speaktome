@@ -11,13 +11,14 @@ try:
     from collections import deque
 
     from .faculty import Faculty, DEFAULT_FACULTY
-    from .. import config
+    import speaktome.config as config
     import torch
     import numpy as np
 except ModuleNotFoundError:
     torch = None  # type: ignore
     np = None  # type: ignore
 except Exception:
+    print("Failed to import required modules for tensor operations.")
     import sys
     print(ENV_SETUP_BOX)
     sys.exit(1)

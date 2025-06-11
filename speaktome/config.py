@@ -1,6 +1,6 @@
 # Third-party imports
 import os
-
+print("Importing speaktome.config...")
 from tensors.faculty import Faculty, DEFAULT_FACULTY
 # --- END HEADER ---
 

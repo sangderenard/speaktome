@@ -8,6 +8,7 @@ try:
     from enum import IntEnum
 except Exception:
     import sys
+    print("faculty.py: Failed to import required modules.")
     print(ENV_SETUP_BOX)
     sys.exit(1)
 # --- END HEADER ---
