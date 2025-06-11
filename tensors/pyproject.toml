@@ -20,6 +20,9 @@ ctensor = [
   "setuptools>=61",
   "ziglang>=0.14"
 ]
+torch = [
+  "torch",
+]
 numpy = [
   "numpy>=1.26"
 ]
