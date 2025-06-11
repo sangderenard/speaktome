@@ -205,9 +205,9 @@ def test_to_backend_roundtrip(src_cls, tgt_cls):
     tgt_ops = tgt_cls()
     data = [[1, 2], [3, 4]]
     tensor = src_ops.tensor_from_list(data, dtype=src_ops.float_dtype, device=None)
-    converted = src_ops.to_backend(tensor, tgt_ops)
+    converted = tensor.to_backend(tgt_ops)
     assert tgt_ops.tolist(converted) == data
-    roundtrip = tgt_ops.to_backend(converted, src_ops)
+    roundtrip = converted.to_backend(src_ops)
     assert src_ops.tolist(roundtrip) == data
         
 

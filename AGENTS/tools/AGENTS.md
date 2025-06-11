@@ -2,9 +2,7 @@
 
 ## Quick Setup
 
-```bash
-python AGENTS/tools/dev_group_menu.py --install --codebases AGENTS/tools
-```
+Run `setup_env_dev.sh` from the repository root to install this codebase.
 
 This codebase provides helper scripts for managing the repository and coordinating agent work.
 
@@ -12,8 +10,6 @@ This codebase provides helper scripts for managing the repository and coordinati
 
 No optional dependency groups are defined in `pyproject.toml`.
 
-## Non-Interactive Setup Example
+## Non-Interactive Setup
 
-```bash
-python AGENTS/tools/dev_group_menu.py --install --codebases AGENTS/tools
-```
+No additional steps are required beyond running the main setup script.

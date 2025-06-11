@@ -2,10 +2,7 @@
 
 ## Quick Setup
 
-```bash
-python AGENTS/tools/dev_group_menu.py --install --codebases tensors
-python AGENTS/tools/dev_group_menu.py --install --codebases tensors --groups tensors:jax,ctensor,torch,numpy,dev
-```
+Run `setup_env_dev.sh` to install this codebase. Extras for specific backends can be added via pip, e.g. `pip install -e .[jax]`.
 
 This directory hosts the implementations of tensor operations for different numerical libraries (NumPy, PyTorch, JAX, etc.).
 

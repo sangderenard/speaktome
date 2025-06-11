@@ -28,18 +28,18 @@ jobs:
       - name: Upgrade pip (better resolver)
         run: python -m pip install --upgrade pip
 
-      - name: Install core + dev + plot extras
+      - name: Install environment
         run: |
-          bash setup_env.sh --extras   # installs core + dev + plot + CPU torch by default
+          bash setup_env.sh
 
       - name: Run tests
         run: |
           source .venv/bin/activate
           .venv/bin/pytest -v
 
-      # ─── Optional: add coverage, lint, or ml extras ─────────
-      # - name: Install ML extras (only if you’re ready for GPU or CPU ML)
-      #   run: bash setup_env.sh --extras --ml
+      # ─── Optional: install ML extras if needed ─────────
+      # - name: Install ML extras
+      #   run: bash setup_env.sh --ml
       #
       # - name: Run ML demos
       #   run: |

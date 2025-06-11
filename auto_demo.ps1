@@ -5,8 +5,8 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-# Reinstall environment with extras and prefetch models
-powershell -ExecutionPolicy Bypass -File reinstall_env.ps1 -Yes --extras --prefetch
+# Reinstall environment
+powershell -ExecutionPolicy Bypass -File reinstall_env.ps1 -Yes
 
 # First demo run (non-interactive)
 & ./run.ps1 -s "Automation demo" -m 5 -auto_expand 2 -safe_mode

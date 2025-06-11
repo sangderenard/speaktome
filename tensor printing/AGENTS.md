@@ -2,9 +2,7 @@
 
 ## Quick Setup
 
-```bash
-python AGENTS/tools/dev_group_menu.py --install --codebases tensor_printing
-```
+Run `setup_env_dev.sh` to install this codebase.
 
 This folder houses work toward a "Grand Printing Press" built on the abstract tensor operations shared by the rest of the repository.
 
@@ -14,8 +12,6 @@ This folder houses work toward a "Grand Printing Press" built on the abstract te
 
 This codebase defines no optional dependency groups in its `pyproject.toml`.
 
-## Non-Interactive Setup Example
+## Non-Interactive Setup
 
-```bash
-python AGENTS/tools/dev_group_menu.py --install --codebases tensor_printing
-```
+No further steps are required.

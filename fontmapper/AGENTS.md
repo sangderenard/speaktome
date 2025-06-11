@@ -2,14 +2,11 @@
 
 ## Quick Setup
 
-```bash
-python AGENTS/tools/dev_group_menu.py --install --codebases fontmapper
-python AGENTS/tools/dev_group_menu.py --install --codebases fontmapper --groups fontmapper:ml,ssim,amqp,server,gui
-```
+Run `setup_env_dev.sh` to install this codebase. Optional groups can be added using pip extras, for example `pip install -e .[ml]`.
 
 This directory contains experimental scripts for converting images to ASCII art and training related models. The subfolder `FM16` holds the current iteration including configuration files and pretrained weights.
 
-These tools rely on packages such as Torch, PIL, and Flask. Prepare the environment with the standard menu helper.
+These tools rely on packages such as Torch, PIL, and Flask. Prepare the environment with the standard setup scripts.
 
 `FMS6.py` and `FM38.py` expose command line options for text-only output or a small Flask server defined by `server.yaml`. Models are experimental and may evolve quickly. Keep additions documented and follow `AGENTS/CODING_STANDARDS.md`.
 

@@ -82,14 +82,11 @@ class AsciiKernelClassifier:
     def _resize_to_char_size(self, arr: np.ndarray):
         """Resize ``arr`` to ``self.char_size`` using the tensor abstraction."""
         np_ops = get_tensor_operations(Faculty.NUMPY)
-        tensor_np = np_ops.__class__()
-        tensor_np.data = np_ops.tensor_from_list(arr.tolist(), dtype=np_ops.float_dtype, device=None)
+        tensor_np = np_ops.tensor_from_list(arr.tolist(), dtype=np_ops.float_dtype, device=None)
         tensor_ops = tensor_np.to_backend(self.tensor_ops)
-        tensor_ops_data = tensor_ops.data / 255.0
-        resized = self.tensor_ops.interpolate(tensor_ops_data, self.char_size)
-        out_np = self.tensor_ops.__class__()
-        out_np.data = resized
-        out_np_converted = out_np.to_backend(np_ops)
+        normalized = tensor_ops / 255.0
+        resized = self.tensor_ops.interpolate(normalized, self.char_size)
+        out_np_converted = resized.to_backend(np_ops)
         if out_np_converted.shape() != self.char_size:
             raise ValueError(f"Resized shape {out_np_converted.shape()} does not match char_size {self.char_size}")
         if getattr(out_np_converted, "data", None) is None:
@@ -112,9 +109,15 @@ class AsciiKernelClassifier:
         if not SSIM_AVAILABLE:
             raise RuntimeError("SSIM loss requires scikit-image")
         np_ops = get_tensor_operations(Faculty.NUMPY)
-        arr1 = self.tensor_ops.to_backend(np_ops)
-        arr2 = self.tensor_ops.to_backend(np_ops)
-        return 1.0 - ssim(arr1.data.astype(np.float32), arr2.data.astype(np.float32), data_range=1.0)
+        cand_tensor = self.tensor_ops.ensure_tensor(candidate)
+        ref_tensor = self.tensor_ops.ensure_tensor(reference)
+        arr1 = cand_tensor.to_backend(np_ops)
+        arr2 = ref_tensor.to_backend(np_ops)
+        return 1.0 - ssim(
+            arr1.data.astype(np.float32),
+            arr2.data.astype(np.float32),
+            data_range=1.0,
+        )
 
     def classify_batch(self, subunit_batch: np.ndarray) -> dict:
         """Classify a batch of subunit images in parallel using tensor ops."""
@@ -123,28 +126,23 @@ class AsciiKernelClassifier:
 
         # Wrap the numpy array in a NumPyTensorOperations instance and convert to the target backend
         np_ops = get_tensor_operations(Faculty.NUMPY)
-        batch_tensor = np_ops.__class__()
-        luminance_tensor = self.tensor_ops.__class__()
-        batch_tensor.data = subunit_batch
-        batch = batch_tensor.to_backend(self.tensor_ops)
-        batch.to_dtype("float")
+        batch = self.tensor_ops.ensure_tensor(subunit_batch).to_dtype("float")
         batch_shape = batch.shape()
         N = batch_shape[0]
 
         # Compute luminance using the tensor's own methods
         if len(batch_shape) == 4 and batch_shape[3] == 3:
-            luminance_tensor.from_numpy(batch.mean(dim=3) / 255.0)
+            luminance_tensor = batch.mean(dim=3) / 255.0
         elif len(batch_shape) == 3:
-            luminance_tensor.from_numpy(batch / 255.0)
+            luminance_tensor = batch / 255.0
         else:
-            luminance_tensor.zeros((N, *self.char_size), dtype=dtype, device=device)
+            luminance_tensor = self.tensor_ops.zeros((N, *self.char_size), dtype=dtype, device=device)
 
         if luminance_tensor.shape()[1:] != tuple(self.char_size):
-            resized = [self._resize_tensor_to_char(luminance[i]) for i in range(N)]
-            luminance_tensor.stack(resized, dim=0)
+            resized = [self._resize_tensor_to_char(luminance_tensor[i]) for i in range(N)]
+            luminance_tensor = self.tensor_ops.stack(resized, dim=0)
 
-        refs_data = [bm.data for bm in self.charBitmasks]
-        refs = self.tensor_ops.stack(refs_data, dim=0)
+        refs = self.tensor_ops.stack(self.charBitmasks, dim=0)
         diff = luminance_tensor[:, None, :, :] - refs[None, :, :, :]
         abs_diff = self.tensor_ops.sqrt(self.tensor_ops.pow(diff, 2))
 
