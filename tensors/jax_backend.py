@@ -151,6 +151,21 @@ class JAXTensorOperations(AbstractTensor):
     def long_cast_(self, tensor: Any) -> Any:
         return self._to_jnp(tensor).astype(jnp.int64)
 
+    def float_(self, tensor: Any) -> Any:
+        return self.to_dtype_(tensor, "float")
+
+    def double_(self, tensor: Any) -> Any:
+        return self.to_dtype_(tensor, "double")
+
+    def int_(self, tensor: Any) -> Any:
+        return self.to_dtype_(tensor, "int")
+
+    def long_(self, tensor: Any) -> Any:
+        return self.to_dtype_(tensor, "long")
+
+    def bool_(self, tensor: Any) -> Any:
+        return self.to_dtype_(tensor, "bool")
+
     def not_equal_(self, tensor1: Any, tensor2: Any) -> Any:
         return jnp.not_equal(self._to_jnp(tensor1), self._to_jnp(tensor2))
 

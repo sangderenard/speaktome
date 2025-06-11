@@ -150,6 +150,21 @@ class NumPyTensorOperations(AbstractTensor):
     def long_cast_(self, tensor):
         return self._AbstractTensor__unwrap(tensor).astype(np.int64)
 
+    def float_(self, tensor):
+        return self.to_dtype_(tensor, "float")
+
+    def double_(self, tensor):
+        return self.to_dtype_(tensor, "double")
+
+    def int_(self, tensor):
+        return self.to_dtype_(tensor, "int")
+
+    def long_(self, tensor):
+        return self.to_dtype_(tensor, "long")
+
+    def bool_(self, tensor):
+        return self.to_dtype_(tensor, "bool")
+
     def not_equal_(self, tensor1, tensor2):
         return self._AbstractTensor__unwrap(tensor1) != self._AbstractTensor__unwrap(tensor2)
 
