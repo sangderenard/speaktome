@@ -143,7 +143,13 @@ class AsciiKernelClassifier:
             luminance_tensor = self.tensor_ops.stack(resized, dim=0)
 
         refs = self.tensor_ops.stack(self.charBitmasks, dim=0)
-        diff = luminance_tensor[:, None, :, :] - refs[None, :, :, :]
+        expanded_inputs = self.tensor_ops.repeat_interleave(
+            luminance_tensor[:, None, :, :], self.vocab_size, dim=1
+        )
+        expanded_refs = self.tensor_ops.repeat_interleave(
+            refs[None, :, :, :], N, dim=0
+        )
+        diff = expanded_inputs - expanded_refs
         abs_diff = self.tensor_ops.sqrt(self.tensor_ops.pow(diff, 2))
 
         losses = self.tensor_ops.mean(abs_diff, dim=(2, 3))
