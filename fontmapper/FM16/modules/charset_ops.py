@@ -61,7 +61,8 @@ def list_printable_characters(font_path: str, font_size: int = 12, epsilon: int 
         if tup not in seen:
             seen.add(tup)
             unique_chars.append(char)
-            w, _ = font_pil.font.getsize(char)
+            (w, _), _ = font_pil.font.getsize(char)
+            
             unique_widths.append(w)
     mode_width = max(set(unique_widths), key=unique_widths.count)
     filtered_chars = [c for c, w in zip(unique_chars, unique_widths) if abs(w - mode_width) <= epsilon]

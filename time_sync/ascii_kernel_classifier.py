@@ -10,7 +10,7 @@ except ImportError:
 from fontmapper.FM16.modules.charset_ops import obtain_charset
 
 class AsciiKernelClassifier:
-    def __init__(self, ramp: str, font_path="DejaVuSansMono.ttf", font_size=16, char_size=(16, 16), loss_mode="sad"):
+    def __init__(self, ramp: str, font_path="fontmapper/FM16/consola.ttf", font_size=16, char_size=(16, 16), loss_mode="sad"):
         self.ramp = ramp
         self.vocab_size = len(ramp)
         self.font_path = font_path
@@ -21,18 +21,25 @@ class AsciiKernelClassifier:
         self.charBitmasks = None
         self._prepare_reference_bitmasks()
 
+    def set_font(self, font_path=None, font_size=None, char_size=None):
+        """Set font parameters and regenerate reference bitmasks."""
+        if font_path is not None:
+            self.font_path = font_path
+        if font_size is not None:
+            self.font_size = font_size
+        if char_size is not None:
+            self.char_size = char_size
+        self._prepare_reference_bitmasks()
+
     def _prepare_reference_bitmasks(self):
         # Use obtain_charset from charset_ops to get charset and bitmasks
         fonts, charset, charBitmasks, max_width, max_height = obtain_charset(
             font_files=[self.font_path], font_size=self.font_size, complexity_level=0
         )
-        # Only keep chars in our ramp
-        self.charset = [c for c in charset if c in self.ramp]
-        # Map ramp to indices in charset
-        self.ramp_indices = [charset.index(c) for c in self.ramp if c in charset]
-        # Only keep bitmasks for ramp chars
-        self.charBitmasks = [charBitmasks[i] for i in self.ramp_indices]
-        self.charBitmasks = [self._resize_to_char_size(bm) for bm in self.charBitmasks]
+        # Only keep chars in our ramp, preserving charset order
+        filtered = [(c, bm) for c, bm in zip(charset, charBitmasks) if c in self.ramp]
+        self.charset = [c for c, _ in filtered]
+        self.charBitmasks = [self._resize_to_char_size(bm) for _, bm in filtered]
 
     def _resize_to_char_size(self, arr):
         img = Image.fromarray(arr)
@@ -77,7 +84,7 @@ class AsciiKernelClassifier:
                 losses_all = [self.sad_loss(luminance_map, ref) for ref in self.charBitmasks]
             idx = int(np.argmin(losses_all))
             indices[i] = idx
-            chars.append(self.ramp[idx])
+            chars.append(self.charset[idx])
             losses[i] = losses_all[idx]
         return {
             "indices": indices,

@@ -16,6 +16,54 @@ try:
     import sys
     import numpy as np
     from colorama import Style, Fore, Back  # For colored terminal output
+    from time_sync import (
+        get_offset,
+        sync_offset,
+        print_analog_clock,
+        print_digital_clock,
+        init_colorama_for_windows,
+        reset_cursor_to_top,
+        full_clear_and_reset_cursor,
+    )
+    from time_sync.time_sync.theme_manager import (
+        ThemeManager,
+        ClockTheme,
+    )
+    from time_sync.time_sync.render_backend import RenderingBackend
+    from time_sync.frame_buffer import PixelFrameBuffer
+    from time_sync.render_thread import render_loop
+    from time_sync.draw import draw_diff
+    from time_sync.time_sync.ascii_digits import (
+        compose_ascii_digits,
+        ASCII_RAMP_BLOCK,
+    )
+    from time_sync.draw import draw_text_overlay  # Import the new text drawing function
+    from PIL import Image
+    import queue
+    from time_sync.menu_resolver import MenuResolver
+
+    # Platform-specific input handling (adapted from AGENTS/tools/dev_group_menu.py)
+    if os.name == "nt":  # Windows
+        pass  # Windows specific input will be handled directly in input_thread_fn
+    else:  # Unix-like
+        import select
+        import sys
+        import termios
+        import tty
+
+        def getch_timeout(timeout_seconds: float) -> str | None:
+            """Get a single character with timeout on Unix-like systems."""
+            fd = sys.stdin.fileno()
+            old_settings = termios.tcgetattr(fd)
+            try:
+                tty.setraw(sys.stdin.fileno())
+                ready_to_read, _, _ = select.select([sys.stdin], [], [], timeout_seconds)
+                if ready_to_read:
+                    return sys.stdin.read(1)
+                return None
+            finally:
+                termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+
 except Exception:
     import sys
 
@@ -23,55 +71,8 @@ except Exception:
     sys.exit(1)
 # --- END HEADER ---
 
-from time_sync import (
-    get_offset,
-    sync_offset,
-    print_analog_clock,
-    print_digital_clock,
-    init_colorama_for_windows,
-    reset_cursor_to_top,
-    full_clear_and_reset_cursor,
-)
-from time_sync.time_sync.theme_manager import (
-    ThemeManager,
-    ClockTheme,
-)
-from time_sync.time_sync.render_backend import RenderingBackend
-from time_sync.frame_buffer import PixelFrameBuffer
-from time_sync.render_thread import render_loop
-from time_sync.draw import draw_diff
-from time_sync.time_sync.ascii_digits import (
-    compose_ascii_digits,
-    ASCII_RAMP_BLOCK,
-)
-from time_sync.draw import draw_text_overlay  # Import the new text drawing function
-from PIL import Image
-import queue
-
-# Platform-specific input handling (adapted from AGENTS/tools/dev_group_menu.py)
-if os.name == "nt":  # Windows
-    pass  # Windows specific input will be handled directly in input_thread_fn
-else:  # Unix-like
-    import select
-    import sys
-    import termios
-    import tty
-
-    def getch_timeout(timeout_seconds: float) -> str | None:
-        """Get a single character with timeout on Unix-like systems."""
-        fd = sys.stdin.fileno()
-        old_settings = termios.tcgetattr(fd)
-        try:
-            tty.setraw(sys.stdin.fileno())
-            ready_to_read, _, _ = select.select([sys.stdin], [], [], timeout_seconds)
-            if ready_to_read:
-                return sys.stdin.read(1)
-            return None
-        finally:
-            termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
-
-
-# --- END HEADER ---
+CHAR_ROWS = 35   # Set your desired ASCII grid height
+CHAR_COLS = 120  # Set your desired ASCII grid width
 
 
 def parse_rect(rect_str: str) -> tuple[int, int, int, int] | None:
@@ -358,32 +359,26 @@ def load_key_mappings(path: str = KEY_MAPPINGS_PATH) -> dict:
 
 class InputDispatcher:
     """
-    Dispatches input events to action handlers.
-    Ready for future parallelization.
+    Dispatches input events to action handlers using MenuResolver.
     """
 
-    def __init__(self, action_handlers, key_mappings):
-        self.action_handlers = action_handlers
-        self.key_mappings = key_mappings
+    def __init__(self, menu_resolver):
+        self.menu_resolver = menu_resolver
 
     def dispatch(self, input_buffer):
-        change_occured = False  # Track if any change occurred
-        # Split input_buffer into chars and dispatch each
+        change_occured = False
         for char_key_raw in input_buffer:
-            change_occured = change_occured or self.handle_key(char_key_raw)
-
-        return change_occured  # Return True if any key was handled
-
-    def handle_key(self, char_key_raw):
-        # Only normal mode for now; extend for config as needed
-        for action, mapping in self.key_mappings.get("normal", {}).items():
-            if char_key_raw in mapping["keys"]:
-                handler = self.action_handlers["normal"].get(action)
-                if handler:
-                    handler()
-                    return True  # Indicate a change occurred
-                break
-
+            action = self.menu_resolver.handle_key(char_key_raw)
+            if action:
+                # Handle mode transitions for config
+                if action == "enter_config_mode":
+                    self.menu_resolver.push_mode("config")
+                    self.menu_resolver.set_focused_clock_type("analog")  # or "digital"
+                elif action == "config_quit":
+                    self.menu_resolver.pop_mode()
+                    self.menu_resolver.set_focused_clock_type(None)
+                change_occured = True
+        return change_occured
 
 def main() -> None:
     """Run the clock demo until interrupted."""
@@ -684,15 +679,19 @@ def main() -> None:
             BASE_FB_COLS * PIXEL_BUFFER_SCALE
         )
 
-    def get_char_cell_dims() -> tuple[int, int]:
-        """Return pixel dimensions for one terminal character cell."""
-        # Heuristic: a single ASCII character roughly corresponds to four
-        # framebuffer pixels when ``PIXEL_BUFFER_SCALE`` is ``1.0``.  This
-        # keeps the overall text field size stable as resolution changes.
-        dim = max(1, int(round(PIXEL_BUFFER_SCALE * 4)))
-        return dim, dim
+    def get_char_cell_dims(char_rows = CHAR_ROWS, char_cols = CHAR_COLS) -> tuple[int, int]:
+        """
+        Dynamically compute the pixel size of each character cell so that the framebuffer
+        is divided evenly into a fixed number of character rows and columns.
+        """
+        fb_rows, fb_cols = get_scaled_fb_dims()
+        cell_h = max(1, fb_rows // char_rows)
+        cell_w = max(1, fb_cols // char_cols)
+        return cell_h, cell_w
 
     fb_rows, fb_cols = get_scaled_fb_dims()
+    cell_h, cell_w = get_char_cell_dims(CHAR_ROWS, CHAR_COLS)
+
     framebuffer = PixelFrameBuffer(
         (fb_rows, fb_cols), diff_threshold=20
     )  # Initialized with scaled dims
@@ -1180,7 +1179,8 @@ def main() -> None:
     # or for config:
     # action_handlers["config"]["analog"]["new_config_action"] = missing_handler_stub
 
-    input_dispatcher = InputDispatcher(action_handlers, key_mappings)
+    menu_resolver = MenuResolver(key_mappings, action_handlers)
+    input_dispatcher = InputDispatcher(menu_resolver)
 
     try:
         while True:
@@ -1290,10 +1290,29 @@ def main() -> None:
                 legend_start_col = 1
                 legend_col_width = available_cols // 2  # Split legend into two columns
 
-                legend_parts = []
-                for action, mapping in key_mappings.items():
-                    keys_str = "/".join(mapping["keys"])
-                    legend_parts.append(f"{keys_str}: {mapping['description']}")
+                def collect_legend_parts(mapping):
+                    legend = []
+                    if isinstance(mapping, dict):
+                        for v in mapping.values():
+                            if isinstance(v, dict) and "keys" in v:
+                                keys_str = "/".join(v["keys"])
+                                desc = v.get("description", "")
+                                legend.append(f"{keys_str}: {desc}")
+                            elif isinstance(v, dict):
+                                legend.extend(collect_legend_parts(v))
+                    return legend
+
+                mode = menu_resolver.mode_stack[-1] if menu_resolver.mode_stack else "normal"
+                focused_clock_type = getattr(menu_resolver, "focused_clock_type", None)
+
+                if mode == "normal":
+                    legend_mapping = key_mappings.get("normal", {})
+                elif mode == "config" and focused_clock_type:
+                    legend_mapping = key_mappings.get("config", {}).get(focused_clock_type, {})
+                else:
+                    legend_mapping = {}
+
+                legend_parts = collect_legend_parts(legend_mapping)
 
                 num_legend_items = len(legend_parts)
                 col1_items = legend_parts[: (num_legend_items + 1) // 2]
@@ -1306,7 +1325,6 @@ def main() -> None:
                     ):  # Prevent drawing outside cleared area
                         break
                     line_text_parts = []
-                    # Use fixed ljust for text overlays, not scaled
                     ljust_val = 30
                     if i < len(col1_items):
                         line_text_parts.append(col1_items[i].ljust(ljust_val))
@@ -1318,15 +1336,15 @@ def main() -> None:
                         legend_start_col,
                         legend_line_text,
                         Style.RESET_ALL,
-                    )  # Default color
-                    current_text_overlay_row += 1  # Move to next line
+                    )
+                    current_text_overlay_row += 1
 
             # Drain the input queue
             while not input_queue.empty():
                 key = input_queue.get()
                 input_buffer += key
 
-            input_dispatcher.dispatch(input_buffer)
+            action_processed_this_loop = input_dispatcher.dispatch(input_buffer)
             input_buffer = ""  # Clear after dispatch
 
             # Trigger keyframe if an action was processed

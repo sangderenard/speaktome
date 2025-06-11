@@ -79,7 +79,7 @@ def default_subunit_to_char_kernel(
     # If ramp changed, regenerate classifier and reference images
     if _classifier_cache["ramp"] != ramp or _classifier_cache["classifier"] is None:
         classifier = AsciiKernelClassifier(ramp)
-        classifier.set_font("DejaVuSansMono.ttf", 16, (16, 16))
+        classifier.set_font("fontmapper/FM16/consola.ttf", 16, (16, 16))
         _classifier_cache["ramp"] = ramp
         _classifier_cache["classifier"] = classifier
     else:
