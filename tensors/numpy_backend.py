@@ -29,6 +29,8 @@
 
 from typing import Any, Tuple, List, Optional
 
+from .abstraction import AbstractTensorOperations
+
 try:
     from AGENTS.tools.header_utils import ENV_SETUP_BOX
     import numpy as np

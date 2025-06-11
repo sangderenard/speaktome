@@ -31,6 +31,8 @@ from __future__ import annotations
 
 from typing import Any, Tuple, List, Optional
 
+from .abstraction import AbstractTensorOperations
+
 try:
     from AGENTS.tools.header_utils import ENV_SETUP_BOX
     import jax
