@@ -14,5 +14,5 @@ See `AGENTS/CODEBASE_REGISTRY.md` for the canonical list.
 
 ## Environment Setup
 
-All environment configuration is handled by the headless workflow described in
-`AGENTS/HEADLESS_SETUP_GUIDE.md`.
+All environment configuration is handled by the workflow described in
+`ENV_SETUP_OPTIONS.md`.

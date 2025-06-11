@@ -2,7 +2,7 @@
 
 ## Quick Setup
 
-Refer to `AGENTS/HEADLESS_SETUP_GUIDE.md` for installation details.
+Refer to `../ENV_SETUP_OPTIONS.md` for installation details.
 
 This folder houses work toward a "Grand Printing Press" built on the abstract tensor operations shared by the rest of the repository.
 
