@@ -37,6 +37,10 @@ try:
     import jax.numpy as jnp
     from jax import lax
 except ModuleNotFoundError:  # pragma: no cover - optional dependency
+    jax = None  # type: ignore
+    jnp = None  # type: ignore
+    lax = None  # type: ignore
+except Exception:
     import sys
     print(ENV_SETUP_BOX)
     sys.exit(1)

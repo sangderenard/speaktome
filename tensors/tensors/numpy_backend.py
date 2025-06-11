@@ -38,6 +38,8 @@ except ModuleNotFoundError:  # pragma: no cover - optional dependency
 try:
     import torch
 except ModuleNotFoundError:  # pragma: no cover - optional dependency
+    torch = None  # type: ignore
+except Exception:
     import sys
     print(ENV_SETUP_BOX)
     sys.exit(1)
