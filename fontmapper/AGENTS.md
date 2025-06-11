@@ -2,7 +2,7 @@
 
 ## Quick Setup
 
-Consult `AGENTS/HEADLESS_SETUP_GUIDE.md` for environment setup.
+Consult `../ENV_SETUP_OPTIONS.md` for environment setup.
 
 This directory contains experimental scripts for converting images to ASCII art and training related models. The subfolder `FM16` holds the current iteration including configuration files and pretrained weights.
 

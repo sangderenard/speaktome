@@ -10,4 +10,4 @@ If something is missing, re-run `setup_env_dev.sh` and select all relevant group
 
 ### Headless Testing
 
-For automated environments see `AGENTS/HEADLESS_SETUP_GUIDE.md`.
+For automated environments see `ENV_SETUP_OPTIONS.md`.

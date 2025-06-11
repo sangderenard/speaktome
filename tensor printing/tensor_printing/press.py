@@ -1,6 +1,3 @@
-"""Grand Printing Press core machinery."""
-# --- END HEADER ---
-
 from __future__ import annotations
 
 from typing import Any
@@ -25,8 +22,9 @@ class GrandPrintingPress:
         self.canvas = tensor_ops.zeros(
             (height, width), dtype=tensor_ops.float_dtype, device=None
         )
-        # Initialize glyph library and kernel pipeline
-        self.glyph_library: dict[str, Any] = {}
+        # Glyph libraries keyed by (font_path, font_size)
+        self.glyph_libraries: dict[tuple[str | None, int], dict[str, Any]] = {}
+        # Post-processing kernels
         self.kernels: list[callable] = []
 
     def add_kernel(self, func: callable) -> None:
@@ -40,7 +38,6 @@ class GrandPrintingPress:
         unit: str = "mm",
     ) -> Any:
         """Apply a glyph tensor at the given position."""
-        # Basic placement logic with optional kernel hooks
         y_idx, x_idx = self.ruler.coordinates_to_tensor(position[0], position[1], unit)
         g_height, g_width = self.tensor_ops.shape(glyph)
         c_height, c_width = self.tensor_ops.shape(self.canvas)
@@ -69,3 +66,71 @@ class GrandPrintingPress:
         for kernel in self.kernels:
             output = kernel(output)
         return self.tensor_ops.clamp(output, 0.0, 1.0)
+
+    def load_font(
+        self,
+        font_path: str | None,
+        font_size: int,
+        characters: str = "".join(chr(i) for i in range(32, 127)),
+    ) -> None:
+        """Load a font into a glyph library using Pillow if available."""
+        try:
+            from PIL import Image, ImageDraw, ImageFont
+        except Exception as exc:  # pragma: no cover - optional dependency
+            raise RuntimeError("Pillow is required to load fonts") from exc
+
+        if font_path is None:
+            font = ImageFont.load_default()
+        else:
+            font = ImageFont.truetype(font_path, font_size)
+
+        library: dict[str, Any] = {}
+        for ch in characters:
+            bbox = font.getbbox(ch)
+            width = bbox[2] - bbox[0]
+            height = bbox[3] - bbox[1]
+            img = Image.new("L", (width, height), color=0)
+            draw = ImageDraw.Draw(img)
+            draw.text((0, 0), ch, fill=255, font=font)
+            arr = [
+                list(img.getdata()[i * width : (i + 1) * width])
+                for i in range(height)
+            ]
+            glyph = self.tensor_ops.tensor_from_list(
+                arr, dtype=self.tensor_ops.float_dtype, device=None
+            )
+            library[ch] = glyph
+
+        self.glyph_libraries[(font_path, font_size)] = library
+
+    def print_text(
+        self,
+        text: str,
+        position: tuple[float, float],
+        font_path: str | None,
+        font_size: int,
+        unit: str = "mm",
+    ) -> Any:
+        """Render text using a previously loaded font."""
+        key = (font_path, font_size)
+        if key not in self.glyph_libraries:
+            self.load_font(font_path, font_size)
+
+        x, y = position
+        library = self.glyph_libraries[key]
+        for ch in text:
+            if ch == "\n":
+                sample = next(iter(library.values()))
+                g_height = self.tensor_ops.shape(sample)[0]
+                # move down by glyph height in tensor units
+                y -= self.ruler.tensor_to_coordinates(0, g_height, unit)[1]
+                x = position[0]
+                continue
+            glyph = library.get(ch)
+            if glyph is None:
+                continue
+            self.print_glyph(glyph, (x, y), unit=unit)
+            g_width = self.tensor_ops.shape(glyph)[1]
+            x += self.ruler.tensor_to_coordinates(g_width, 0, unit)[0]
+        return self.canvas
+
