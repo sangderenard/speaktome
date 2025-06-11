@@ -2,7 +2,7 @@
 
 ## Quick Setup
 
-Run `setup_env_dev.sh` to install this codebase. Optional groups can be added using pip extras, for example `pip install -e .[ml]`.
+Consult `AGENTS/HEADLESS_SETUP_GUIDE.md` for environment setup.
 
 This directory contains experimental scripts for converting images to ASCII art and training related models. The subfolder `FM16` holds the current iteration including configuration files and pretrained weights.
 

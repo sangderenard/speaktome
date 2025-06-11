@@ -8,11 +8,9 @@ This directory holds open work items and prototypes.
 each one here as an individual `.stub.md` file. The filename is based on the
 source path and starting line number.
 
-Running the tool (for example via `setup_env_dev.sh`) first deletes existing
-`.stub.md` files, ensuring results stay current rather than piling up.
-
-`setup_env_dev.sh` invokes this script automatically after environment
-installation, so stubs are captured at startup.
+Running the tool first deletes existing `.stub.md` files, ensuring results stay
+current rather than piling up. The developer setup scripts invoke this utility
+automatically so stubs are captured at startup.
 
 Agents may implement a stub by creating a new file with the same basename but a
 different extension (e.g., `.py`, `.txt`). Please call out any tasks that need

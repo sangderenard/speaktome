@@ -2,7 +2,7 @@
 
 ## Quick Setup
 
-Run `setup_env_dev.sh` from the repository root to install this codebase.
+See `AGENTS/HEADLESS_SETUP_GUIDE.md` for all environment setup instructions.
 
 This codebase provides helper scripts for managing the repository and coordinating agent work.
 

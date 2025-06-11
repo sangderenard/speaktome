@@ -27,109 +27,14 @@ before attempting any network download.
 
 ## Environment Setup
 
-Use the included script to create a virtual environment and install only the
-core dependencies (`numpy` and other light utilities). Heavy libraries such as
-PyTorch and Transformers are *optional* and live in
-`optional_requirements.txt`. Run the script without any flags for the minimal
-setup:
+All environment setup is documented in `AGENTS/HEADLESS_SETUP_GUIDE.md`.
 
-```bash
-bash setup_env.sh                      # minimal install
-# optional packages may be installed later using pip extras
-```
-
-The script installs the repository in editable mode and then runs a
-verification step that ensures all optional groups defined in
-``pyproject.toml`` are present. Missing packages are installed on demand,
-with any failures reported but not fatal.
-
-On Windows use the PowerShell script:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File setup_env.ps1                      # minimal
-# install optional packages later if desired
-```
-
-Like the Bash version, this script installs the package in editable mode and
-checks for missing optional dependencies.
-
-Activate the environment with:
-
-```bash
-source .venv/bin/activate
-```
-
-On Windows activate with:
-
-```powershell
-.venv\Scripts\Activate.ps1
-```
-
-### Offline Setup
-
-After creating the virtual environment, run the following script to download the
-required models **only if you installed the optional dependencies**
-(PyTorch and Transformers):
-
-```bash
-bash fetch_models.sh
-```
-
-On Windows run:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File fetch_models.ps1
-```
-
-The script stores GPT-2 and the SentenceTransformer model under the `models/`
-directory. The program automatically checks this location, but you can also set
-the following environment variables to specify custom paths:
-
-```bash
-export GPT2_MODEL_PATH=models/gpt2
-export SENTENCE_TRANSFORMER_MODEL_PATH=models/paraphrase-MiniLM-L6-v2
-```
-
-Once the models are downloaded you can run the program without further network
-access. If you skip this step, the application falls back to the lightweight
-CPU demo mode.
-
-### Developer Setup
-Run `bash setup_env_dev.sh` for a complete environment with development tools.
-
-On Windows use the PowerShell script:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File setup_env_dev.ps1
-```
-
-### Non-Interactive Setup
-For headless automation or CI environments simply run `bash setup_env_dev.sh --from-dev`.
 
 ### Running Python Modules
 
-Always run Python scripts from the repository root so editable imports resolve
-correctly. Activate the virtual environment created by the setup scripts before
-invoking any module:
-
-```bash
-# one-time setup
-bash setup_env.sh
-source .venv/bin/activate
-
-# execute any module
-python -m speaktome.speaktome -s "Hello"
-python -m testing.lookahead_demo
-```
-
-`setup_env.sh` installs core dependencies and an editable copy of the package.
-`setup_env_dev.sh` extends this with development tools and automatically scans
-for stubs. These scripts also offer a menu for selecting optional dependency
-groups so your environment matches other collaborators. Skipping them or
-installing packages by hand often leads to `ModuleNotFoundError` or version
-conflicts because the editable install was never completed. In short: **run a
-setup script first, activate the environment, then use `python -m` from the repo
-root**.
+Always run modules from the repository root so editable imports resolve
+correctly. Ensure the virtual environment described in
+`AGENTS/HEADLESS_SETUP_GUIDE.md` is active before invoking any module.
 
 
 ## Running SpeakToMe
@@ -221,53 +126,11 @@ PyTorch Geometric. The `torch_geometric` package is installed automatically the
 first time you enable the GNN with `--with_gnn`. You may also install the
 `ml` extras group manually if desired.
 
+
 ### Resetting the Environment
 
-If you ever need to recreate the virtual environment from scratch, run
-`reinstall_env.sh`. This script removes the existing `.venv` directory and then
-invokes `setup_env.sh` with any arguments you pass. It prompts for confirmation
-by default, but you can supply `-y` (or `--yes`) to skip the prompt for fully
-automated workflows.
 
-```bash
-bash reinstall_env.sh -y               # minimal reinstall
-# optional packages may be reinstalled later with pip extras
-```
 
-On Windows use the accompanying PowerShell script:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File reinstall_env.ps1 -Yes                      # minimal
-# optional packages may be installed later
-```
-
-### Windows Without PowerShell
-If you prefer to avoid PowerShell, create the environment and run the program from `cmd.exe`:
-
-1. `py -3 -m venv .venv`
-2. `.venv\Scripts\activate.bat`
-3. `pip install --upgrade pip`
-4. `pip install -r requirements.txt`  # installs only NumPy
-   Add `optional_requirements.txt` to get PyTorch and Transformers
-5. Run the program with `run.cmd`:
-   `run.cmd -s "Hello" -m 10 -c -a 5 --final_viz`
-
-   Or manually invoke:
-   `.venv\Scripts\python.exe -m speaktome.speaktome [args]`
-
-To download models without PowerShell, open Python from the virtual environment and execute the commands shown in `fetch_models.sh`.
-
-### Automated Demo
-
-Use the helper scripts `auto_demo.sh` (Bash) and `auto_demo.ps1` (PowerShell) to reinstall the environment non-interactively and run a few example searches. Pass `--interactive` (or `-interactive` on Windows) to end with a manual test run.
-
-```bash
-bash auto_demo.sh --interactive
-```
-
-```powershell
-./auto_demo.ps1 -interactive
-```
 
 ## Testing
 
