@@ -681,6 +681,10 @@ class CTensorOperations(AbstractTensorOperations):
     def float_dtype(self) -> Any:
         return float
 
+    @property
+    def tensor_type(self) -> type:
+        return CTensor
+
     @staticmethod
     def test() -> None:
         """Simple self-check calling ``sqrt`` from ``libm``."""

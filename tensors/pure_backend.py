@@ -156,6 +156,7 @@ class PurePythonTensorOperations(AbstractTensorOperations):
     def stack(self, tensors: List[Any], dim: int = 0) -> Any:
         if not tensors:
             return []
+        tensors = [self.ensure_tensor(t) for t in tensors]
         if dim == 0:
             return [self.clone(t) for t in tensors]
         ref_shape = _get_shape(tensors[0])
@@ -300,6 +301,7 @@ class PurePythonTensorOperations(AbstractTensorOperations):
     def cat(self, tensors: List[Any], dim: int = 0) -> Any:
         if not tensors:
             return []
+        tensors = [self.ensure_tensor(t) for t in tensors]
         if dim == 0:
             result = []
             for t in tensors:
@@ -514,6 +516,10 @@ class PurePythonTensorOperations(AbstractTensorOperations):
     @property
     def float_dtype(self) -> Any:
         return float
+
+    @property
+    def tensor_type(self) -> type:
+        return list
 
     @staticmethod
     def test() -> None:

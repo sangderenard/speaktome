@@ -177,6 +177,7 @@ class NumPyTensorOperations(AbstractTensorOperations):
         return values, top_k_indices
 
     def stack(self, tensors, dim=0):
+        tensors = [self.ensure_tensor(t) for t in tensors]
         return np.stack(tensors, axis=dim)
 
     def pad(self, tensor, pad, value=0.0):
@@ -195,6 +196,7 @@ class NumPyTensorOperations(AbstractTensorOperations):
         return np.pad(tensor, pad_width=np_pad_width, constant_values=value)
 
     def cat(self, tensors, dim=0):
+        tensors = [self.ensure_tensor(t) for t in tensors]
         return np.concatenate(tensors, axis=dim)
 
     def repeat_interleave(self, tensor, repeats, dim=None):
@@ -289,3 +291,7 @@ class NumPyTensorOperations(AbstractTensorOperations):
     @property
     def float_dtype(self):
         return np.float32
+
+    @property
+    def tensor_type(self) -> type:
+        return np.ndarray
