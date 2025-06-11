@@ -1,4 +1,14 @@
+#!/usr/bin/env python3
+"""FontMapper FM38 utility functions."""
 from __future__ import annotations
+
+try:
+    from AGENTS.tools.header_utils import ENV_SETUP_BOX
+except Exception:
+    import sys
+    print(ENV_SETUP_BOX)
+    sys.exit(1)
+# --- END HEADER ---
 
 # --- Core Imports (always required) ---
 try:
@@ -49,6 +59,18 @@ from .optional_dependencies import (
 channel = None
 
 # --- END IMPORT WALL ---
+
+from .modules import (
+    ModelCompatConfig,
+    ModelConfig,
+    CharSorter,
+    AddRandomNoise,
+    DistortionChain,
+    RandomGaussianBlur,
+    ToTensorAndToDevice,
+    CustomDataset,
+    CustomInputDataset,
+)
 
 device_id = 0
 # This function gets the free memory for a specific GPU
