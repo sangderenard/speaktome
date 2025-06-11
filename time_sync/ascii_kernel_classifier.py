@@ -77,26 +77,20 @@ class AsciiKernelClassifier:
         filtered = [(c, bm) for c, bm in zip(charset, charBitmasks) if c in self.ramp]
         self.charset = [c for c, _ in filtered]
         processed = [self._resize_to_char_size(bm) for _, bm in filtered]
-        dtype = self.tensor_ops.float_dtype
-        self.charBitmasks = [
-            self.tensor_ops.tensor_from_list(bm.tolist(), dtype=dtype, device=None)
-            for bm in processed
-        ]
+        self.charBitmasks = processed
 
-    def _resize_to_char_size(self, arr):
-        img = Image.fromarray(arr)
-        img = img.resize(self.char_size, Image.BILINEAR)
-        return np.array(img, dtype=np.float32) / 255.0
+    def _resize_to_char_size(self, arr: np.ndarray):
+        """Resize ``arr`` to ``self.char_size`` using the tensor abstraction."""
+        np_ops = get_tensor_operations(Faculty.NUMPY)
+        tensor_np = np_ops.tensor_from_list(arr.tolist(), dtype=np_ops.float_dtype, device=None)
+        tensor_ops = np_ops.to_backend(tensor_np, self.tensor_ops) / 255.0
+        resized = self.tensor_ops.interpolate(tensor_ops, self.char_size)
+        out_np = self.tensor_ops.to_backend(resized, np_ops)
+        return np.array(out_np, dtype=np.float32)
 
     def _resize_tensor_to_char(self, tensor: Any) -> Any:
-        """Resize ``tensor`` to ``self.char_size`` using NumPy/PIL."""
-        np_ops = get_tensor_operations(Faculty.NUMPY)
-        arr = self.tensor_ops.to_backend(tensor, np_ops)
-        img = Image.fromarray((arr * 255).astype(np.uint8))
-        img = img.resize(self.char_size, Image.BILINEAR)
-        out_np = np.array(img, dtype=np.float32) / 255.0
-        tensor_np = np_ops.tensor_from_list(out_np.tolist(), dtype=np_ops.float_dtype, device=None)
-        return np_ops.to_backend(tensor_np, self.tensor_ops)
+        """Resize ``tensor`` to ``self.char_size`` using the tensor abstraction."""
+        return self.tensor_ops.interpolate(tensor, self.char_size)
 
     def sad_loss(self, candidate: Any, reference: Any) -> float:
         """Sum of absolute differences between ``candidate`` and ``reference``."""
