@@ -12,8 +12,21 @@ except Exception:
 
 from .model_configs import ModelCompatConfig, ModelConfig
 from .char_sorter import CharSorter
-from .transforms import AddRandomNoise, DistortionChain, RandomGaussianBlur, ToTensorAndToDevice
+from .transforms import (
+    AddRandomNoise,
+    DistortionChain,
+    RandomGaussianBlur,
+    ToTensorAndToDevice,
+)
 from .datasets import CustomDataset, CustomInputDataset
+from .charset_ops import (
+    list_printable_characters,
+    generate_checkerboard_pattern,
+    generate_variants,
+    bytemaps_as_ascii,
+    obtain_charset,
+)
+from .model_ops import load_char_sorter, evaluate_batch
 
 __all__ = [
     "ModelCompatConfig",
@@ -25,4 +38,11 @@ __all__ = [
     "ToTensorAndToDevice",
     "CustomDataset",
     "CustomInputDataset",
+    "list_printable_characters",
+    "generate_checkerboard_pattern",
+    "generate_variants",
+    "bytemaps_as_ascii",
+    "obtain_charset",
+    "load_char_sorter",
+    "evaluate_batch",
 ]

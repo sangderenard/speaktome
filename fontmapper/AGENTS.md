@@ -11,3 +11,10 @@ python AGENTS/tools/dev_group_menu.py --install \
 ```
 
 `FMS6.py` and `FM38.py` expose command line options for text-only output or a small Flask server defined by `server.yaml`. Models are experimental and may evolve quickly. Keep additions documented and follow `AGENTS/CODING_STANDARDS.md`.
+
+### Modular Utilities
+
+Character set generation functions and model evaluation helpers now live in
+`FM16/modules/charset_ops.py` and `FM16/modules/model_ops.py`. Import these
+utilities instead of relying on the large scripts when integrating with other
+projects.
