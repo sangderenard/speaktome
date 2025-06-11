@@ -39,7 +39,9 @@ def flexible_subunit_kernel(
     """
     if mode == "raw":
         return subunit_data
-    char = default_subunit_to_char_kernel(subunit_data, ramp)
+    char = default_subunit_batch_to_chars(
+        np.expand_dims(subunit_data, axis=0), ramp
+    )[0]
     if mode == "ascii":
         return char
     if mode == "hybrid":
@@ -68,15 +70,11 @@ _classifier_cache = {
     "classifier": None,
 }
 
-def default_subunit_to_char_kernel(
-    subunit_data: np.ndarray,
+def default_subunit_batch_to_chars(
+    subunit_batch: np.ndarray,
     ramp: str = DEFAULT_DRAW_ASCII_RAMP,
-) -> str:
-    """
-    Kernel function to map a subunit of pixel data to a single character.
-    Uses AsciiKernelClassifier to select the best character by sum of absolute differences.
-    """
-    # If ramp changed, regenerate classifier and reference images
+) -> list[str]:
+    """Return characters for ``subunit_batch`` using a cached classifier."""
     if _classifier_cache["ramp"] != ramp or _classifier_cache["classifier"] is None:
         classifier = AsciiKernelClassifier(ramp)
         classifier.set_font("fontmapper/FM16/consola.ttf", 16, (16, 16))
@@ -85,10 +83,10 @@ def default_subunit_to_char_kernel(
     else:
         classifier = _classifier_cache["classifier"]
 
-    # Prepare batch of one for compatibility
-    subunit_batch = np.expand_dims(subunit_data, axis=0)
     result = classifier.classify_batch(subunit_batch)
-    return result["chars"][0]
+    return result["chars"]
+
+
 
 def draw_text_overlay(
     row: int,
@@ -102,11 +100,11 @@ def draw_text_overlay(
     sys.stdout.flush()
 
 def draw_diff(
-    changed_subunits: list[tuple[int, int, np.ndarray]], # List of (y_pixel, x_pixel, subunit_pixel_data)
-    char_cell_pixel_height: int = 1, # The height of a character cell in pixels
+    changed_subunits: list[tuple[int, int, np.ndarray]],  # List of (y_pixel, x_pixel, subunit_pixel_data)
+    char_cell_pixel_height: int = 1,  # The height of a character cell in pixels
     char_cell_pixel_width: int = 1,  # The width of a character cell in pixels
-    subunit_to_char_kernel: callable[[np.ndarray], str] = default_subunit_to_char_kernel,
-    active_ascii_ramp: str = DEFAULT_DRAW_ASCII_RAMP, # The ASCII ramp to use for character conversion
+    subunit_to_char_kernel: callable[[np.ndarray, str], list[str]] = default_subunit_batch_to_chars,
+    active_ascii_ramp: str = DEFAULT_DRAW_ASCII_RAMP,  # The ASCII ramp to use for character conversion
     base_row: int = 1, 
     base_col: int = 1
 ) -> None:
@@ -116,38 +114,36 @@ def draw_diff(
     `char_cell_pixel_height` and `char_cell_pixel_width` define the dimensions of a single
     character cell in terms of pixels. The `subunit_data` for each entry in `changed_subunits`
     is expected to match these dimensions (or be a part of a larger image from which these
-    coordinates are derived). The `subunit_to_char_kernel` converts this `subunit_data`
-    (representing one character cell's worth of pixels) into a single display character.
+    coordinates are derived). The `subunit_to_char_kernel` is expected to accept the entire
+    batch of subunits and return a list of ASCII characters for display.
     `base_row`, `base_col` are 1-indexed for ANSI terminal compatibility.
     """
     if char_cell_pixel_height <= 0: char_cell_pixel_height = 1
     if char_cell_pixel_width <= 0: char_cell_pixel_width = 1
 
-    for y_pixel, x_pixel, subunit_data in changed_subunits:
-        # y_pixel, x_pixel are the top-left pixel coordinates of the subunit.
-        # This subunit (subunit_data) is converted to a single character by the kernel.
-        # Divide by character cell dimensions (in pixels) to get character cell coordinates.
+    subunit_batch = np.stack([data for _, _, data in changed_subunits], axis=0)
+    chars = subunit_to_char_kernel(subunit_batch, active_ascii_ramp)
+
+    for (y_pixel, x_pixel, subunit_data), char_to_draw in zip(changed_subunits, chars):
         char_y = y_pixel // char_cell_pixel_height
         char_x = x_pixel // char_cell_pixel_width
-        
-        char_to_draw = subunit_to_char_kernel(subunit_data, active_ascii_ramp)
-        
+
         # Determine average color of the subunit for foreground/background
-        if subunit_data.ndim == 3 and subunit_data.shape[2] == 3: # RGB
+        if subunit_data.ndim == 3 and subunit_data.shape[2] == 3:  # RGB
             avg_color = np.mean(subunit_data, axis=(0, 1)).astype(int)
             r, g, b = avg_color[0], avg_color[1], avg_color[2]
-            # Use average color as background, fixed white foreground.
-            # A more advanced kernel could return (char, fg_color_tuple, bg_color_tuple).
             ansi_color_bg = f"\x1b[48;2;{r};{g};{b}m"
-            ansi_color_fg = "\x1b[38;2;255;255;255m" # White foreground
-        else: # Grayscale or other
-            ansi_color_bg = "" # No specific background color
-            ansi_color_fg = "" # No specific foreground color
+            ansi_color_fg = "\x1b[38;2;255;255;255m"
+        else:
+            ansi_color_bg = ""
+            ansi_color_fg = ""
 
         terminal_row = base_row + char_y
         terminal_col = base_col + char_x
 
-        sys.stdout.write(f"\x1b[{terminal_row};{terminal_col}H{ansi_color_bg}{ansi_color_fg}{char_to_draw}\x1b[0m")
+        sys.stdout.write(
+            f"\x1b[{terminal_row};{terminal_col}H{ansi_color_bg}{ansi_color_fg}{char_to_draw}\x1b[0m"
+        )
     sys.stdout.flush()
 
 
