@@ -68,15 +68,11 @@ _classifier_cache = {
     "classifier": None,
 }
 
-def default_subunit_to_char_kernel(
-    subunit_data: np.ndarray,
+def default_subunit_batch_to_chars(
+    subunit_batch: np.ndarray,
     ramp: str = DEFAULT_DRAW_ASCII_RAMP,
-) -> str:
-    """
-    Kernel function to map a subunit of pixel data to a single character.
-    Uses AsciiKernelClassifier to select the best character by sum of absolute differences.
-    """
-    # If ramp changed, regenerate classifier and reference images
+) -> list[str]:
+    """Return characters for ``subunit_batch`` using a cached classifier."""
     if _classifier_cache["ramp"] != ramp or _classifier_cache["classifier"] is None:
         classifier = AsciiKernelClassifier(ramp)
         classifier.set_font("fontmapper/FM16/consola.ttf", 16, (16, 16))
@@ -85,10 +81,16 @@ def default_subunit_to_char_kernel(
     else:
         classifier = _classifier_cache["classifier"]
 
-    # Prepare batch of one for compatibility
-    subunit_batch = np.expand_dims(subunit_data, axis=0)
     result = classifier.classify_batch(subunit_batch)
-    return result["chars"][0]
+    return result["chars"]
+
+
+def default_subunit_to_char_kernel(
+    subunit_data: np.ndarray,
+    ramp: str = DEFAULT_DRAW_ASCII_RAMP,
+) -> str:
+    """Map a single subunit's pixel data to an ASCII character."""
+    return default_subunit_batch_to_chars(np.expand_dims(subunit_data, axis=0), ramp)[0]
 
 def draw_text_overlay(
     row: int,
@@ -123,31 +125,33 @@ def draw_diff(
     if char_cell_pixel_height <= 0: char_cell_pixel_height = 1
     if char_cell_pixel_width <= 0: char_cell_pixel_width = 1
 
-    for y_pixel, x_pixel, subunit_data in changed_subunits:
-        # y_pixel, x_pixel are the top-left pixel coordinates of the subunit.
-        # This subunit (subunit_data) is converted to a single character by the kernel.
-        # Divide by character cell dimensions (in pixels) to get character cell coordinates.
+    # Batch convert all subunits to characters when using the default kernel
+    if subunit_to_char_kernel is default_subunit_to_char_kernel:
+        subunit_batch = np.stack([data for _, _, data in changed_subunits], axis=0)
+        chars = default_subunit_batch_to_chars(subunit_batch, active_ascii_ramp)
+    else:
+        chars = [subunit_to_char_kernel(data, active_ascii_ramp) for _, _, data in changed_subunits]
+
+    for (y_pixel, x_pixel, subunit_data), char_to_draw in zip(changed_subunits, chars):
         char_y = y_pixel // char_cell_pixel_height
         char_x = x_pixel // char_cell_pixel_width
-        
-        char_to_draw = subunit_to_char_kernel(subunit_data, active_ascii_ramp)
-        
+
         # Determine average color of the subunit for foreground/background
-        if subunit_data.ndim == 3 and subunit_data.shape[2] == 3: # RGB
+        if subunit_data.ndim == 3 and subunit_data.shape[2] == 3:  # RGB
             avg_color = np.mean(subunit_data, axis=(0, 1)).astype(int)
             r, g, b = avg_color[0], avg_color[1], avg_color[2]
-            # Use average color as background, fixed white foreground.
-            # A more advanced kernel could return (char, fg_color_tuple, bg_color_tuple).
             ansi_color_bg = f"\x1b[48;2;{r};{g};{b}m"
-            ansi_color_fg = "\x1b[38;2;255;255;255m" # White foreground
-        else: # Grayscale or other
-            ansi_color_bg = "" # No specific background color
-            ansi_color_fg = "" # No specific foreground color
+            ansi_color_fg = "\x1b[38;2;255;255;255m"
+        else:
+            ansi_color_bg = ""
+            ansi_color_fg = ""
 
         terminal_row = base_row + char_y
         terminal_col = base_col + char_x
 
-        sys.stdout.write(f"\x1b[{terminal_row};{terminal_col}H{ansi_color_bg}{ansi_color_fg}{char_to_draw}\x1b[0m")
+        sys.stdout.write(
+            f"\x1b[{terminal_row};{terminal_col}H{ansi_color_bg}{ansi_color_fg}{char_to_draw}\x1b[0m"
+        )
     sys.stdout.flush()
 
 
