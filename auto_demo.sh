@@ -3,8 +3,8 @@
 # This script performs a non-interactive reinstall and runs a few example commands.
 set -euo pipefail
 
-# Reinstall environment with extras and prefetch models
-bash reinstall_env.sh -y --extras --prefetch
+# Reinstall environment
+bash reinstall_env.sh -y
 
 # First demo run (non-interactive)
 bash run.sh -s "Automation demo" -m 5 --auto_expand 2 -x

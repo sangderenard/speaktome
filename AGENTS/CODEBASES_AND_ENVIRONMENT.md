@@ -26,17 +26,7 @@ is installed by default and should never be missing.) **Do not attempt a manual
 
 ### Automated Setup
 
-Both setup scripts rely on `AGENTS/tools/dev_group_menu.py` for optional
-package selection. Provide `--codebases` and `--groups` to that helper to skip
-all prompts when scripting installs:
-
-```bash
-bash setup_env_dev.sh --prefetch
-python AGENTS/tools/dev_group_menu.py --install \
-    --codebases speaktome \
-    --groups speaktome:dev
-```
-
-This approach allows CI pipelines to create a fully configured virtual
-environment without human input. Use the same invocation when running
-`python testing/test_hub.py` in headless or automated contexts.
+Run `setup_env_dev.sh` with no extras or prefetch flags when preparing a
+headless environment. Prior versions of this guide instructed agents to call
+`AGENTS/tools/dev_group_menu.py` directly, but that process is deprecated and
+causes inconsistent installs. See `AGENTS/OBSOLETE_SETUP_GUIDE.md` for background.

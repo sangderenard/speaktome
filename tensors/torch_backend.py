@@ -96,28 +96,28 @@ class PyTorchTensorOperations(AbstractTensor):
         return torch.zeros(size, dtype=dtype, device=device or self.default_device)
 
     def clone_(self, tensor):
-        return tensor.clone()
+        return self._AbstractTensor__unwrap(tensor).clone()
 
     def to_device_(self, tensor, device):
-        return tensor.to(device or self.default_device)
+        return self._AbstractTensor__unwrap(tensor).to(device or self.default_device)
 
     def get_device_(self, tensor):
-        return tensor.device
+        return self._AbstractTensor__unwrap(tensor).device
 
     def get_dtype_(self, tensor):
-        return tensor.dtype
+        return self._AbstractTensor__unwrap(tensor).dtype
 
     def item_(self, tensor):
-        return tensor.item()
+        return self._AbstractTensor__unwrap(tensor).item()
 
     def max_(self, tensor):
-        return torch.max(tensor)
+        return torch.max(self._AbstractTensor__unwrap(tensor))
 
     def long_cast_(self, tensor):
-        return tensor.long()
+        return self._AbstractTensor__unwrap(tensor).long()
 
     def not_equal_(self, tensor1, tensor2):
-        return tensor1 != tensor2
+        return self._AbstractTensor__unwrap(tensor1) != self._AbstractTensor__unwrap(tensor2)
 
     def arange_(self, start, end=None, step=1, device=None, dtype=None):
         if end is None:
@@ -125,74 +125,80 @@ class PyTorchTensorOperations(AbstractTensor):
         return torch.arange(start, end, step, device=device or self.default_device, dtype=dtype)
 
     def select_by_indices_(self, tensor, indices_dim0, indices_dim1):
-        return tensor[indices_dim0, indices_dim1]
+        t = self._AbstractTensor__unwrap(tensor)
+        return t[indices_dim0, indices_dim1]
 
     def log_softmax_(self, tensor, dim):
-        return F.log_softmax(tensor, dim=dim)
+        return F.log_softmax(self._AbstractTensor__unwrap(tensor), dim=dim)
 
     def topk_(self, tensor, k, dim):
-        return torch.topk(tensor, k=k, dim=dim)
+        return torch.topk(self._AbstractTensor__unwrap(tensor), k=k, dim=dim)
 
     def stack_(self, tensors, dim=0):
-        tensors = [self.ensure_tensor(t) for t in tensors]
+        tensors = [self._AbstractTensor__unwrap(t) for t in tensors]
         return torch.stack(tensors, dim=dim)
 
     def pad_(self, tensor, pad, value=0.0):
         return F.pad(tensor, pad, value=value)
 
     def cat_(self, tensors, dim=0):
-        tensors = [self.ensure_tensor(t) for t in tensors]
+        tensors = [self._AbstractTensor__unwrap(t) for t in tensors]
         return torch.cat(tensors, dim=dim)
 
     def repeat_interleave_(self, tensor, repeats, dim=None):
-        return tensor.repeat_interleave(repeats, dim=dim)
+        return self._AbstractTensor__unwrap(tensor).repeat_interleave(repeats, dim=dim)
 
     def view_flat_(self, tensor):
-        return tensor.view(-1)
+        return self._AbstractTensor__unwrap(tensor).view(-1)
 
     def assign_at_indices_(self, tensor_to_modify, indices_dim0, indices_dim1, values_to_assign):
-        tensor_to_modify[indices_dim0, indices_dim1] = values_to_assign
-        return tensor_to_modify
+        t = self._AbstractTensor__unwrap(tensor_to_modify)
+        v = self._AbstractTensor__unwrap(values_to_assign)
+        t[indices_dim0, indices_dim1] = v
+        return t
 
     def increment_at_indices_(self, tensor_to_modify, mask):
-        tensor_to_modify[mask] += 1
-        return tensor_to_modify
+        t = self._AbstractTensor__unwrap(tensor_to_modify)
+        m = self._AbstractTensor__unwrap(mask)
+        t[m] += 1
+        return t
 
     def clamp_(self, tensor, min_val=None, max_val=None):
-        return torch.clamp(tensor, min=min_val, max=max_val)
+        return torch.clamp(self._AbstractTensor__unwrap(tensor), min=min_val, max=max_val)
 
     def shape_(self, tensor):
-        return tuple(tensor.shape)
+        return tuple(self._AbstractTensor__unwrap(tensor).shape)
 
     def numel_(self, tensor):
-        return tensor.numel()
+        return self._AbstractTensor__unwrap(tensor).numel()
 
     def mean_(self, tensor, dim=None):
-        return torch.mean(tensor, dim=dim)
+        return torch.mean(self._AbstractTensor__unwrap(tensor), dim=dim)
 
     def pow_(self, tensor, exponent: float):
-        return torch.pow(tensor, exponent)
+        return torch.pow(self._AbstractTensor__unwrap(tensor), exponent)
 
     def sqrt_(self, tensor):
-        return torch.sqrt(tensor)
+        return torch.sqrt(self._AbstractTensor__unwrap(tensor))
 
     def tensor_from_list_(self, data, dtype, device):
         return torch.tensor(data, dtype=dtype, device=device or self.default_device)
 
     def boolean_mask_select_(self, tensor, mask):
-        return tensor[mask]
+        return self._AbstractTensor__unwrap(tensor)[mask]
 
     def tolist_(self, tensor):
-        return tensor.tolist()
+        return self._AbstractTensor__unwrap(tensor).tolist()
 
     def less_(self, tensor, value):
-        return tensor < value
+        return self._AbstractTensor__unwrap(tensor) < value
 
     def index_select_(self, tensor, dim, indices):
-        return torch.index_select(tensor, dim, indices)
+        return torch.index_select(self._AbstractTensor__unwrap(tensor), dim, indices)
 
     def argmin_(self, tensor, dim=None):
-        return torch.argmin(tensor) if dim is None else torch.argmin(tensor, dim=dim)
+        t = self._AbstractTensor__unwrap(tensor)
+        return torch.argmin(t) if dim is None else torch.argmin(t, dim=dim)
 
     def interpolate_(self, tensor, size):
         if isinstance(size, int):
@@ -245,27 +251,38 @@ class PyTorchTensorOperations(AbstractTensor):
         if tensor is None:
             raise ValueError("from_numpy called with tensor=None")
         import torch
-
-        return torch.from_numpy(tensor).to(target_ops.default_device)
+        arr = tensor.data if hasattr(tensor, "data") else tensor
+        result = type(target_ops)(default_device=target_ops.default_device)
+        result.data = torch.from_numpy(arr).to(target_ops.default_device)
+        return result
 
     @staticmethod
     def from_torch(source_ops, tensor, target_ops):
         # Already a torch tensor, just move to correct device if needed
+        t = tensor.data if hasattr(tensor, "data") else tensor
         if isinstance(source_ops, PyTorchTensorOperations):
-            return source_ops.data.to(target_ops.default_device)
-        return tensor.data.to(target_ops.default_device)
+            t = source_ops.data
+        result = type(target_ops)(default_device=target_ops.default_device)
+        result.data = t.to(target_ops.default_device)
+        return result
 
     @staticmethod
     def from_pure(source_ops, tensor, target_ops):
         import torch
-        return torch.tensor(tensor.data, device=target_ops.default_device)
+        data = tensor.data if hasattr(tensor, "data") else tensor
+        result = type(target_ops)(default_device=target_ops.default_device)
+        result.data = torch.tensor(data, device=target_ops.default_device)
+        return result
 
     @staticmethod
     def from_jax(source_ops, tensor, target_ops):
         import torch
         import numpy as np
-        np_array = np.array(tensor.data)
-        return torch.from_numpy(np_array).to(target_ops.default_device)
+        arr = tensor.data if hasattr(tensor, "data") else tensor
+        np_array = np.array(arr)
+        result = type(target_ops)(default_device=target_ops.default_device)
+        result.data = torch.from_numpy(np_array).to(target_ops.default_device)
+        return result
 
     def to_dtype_(self, tensor, dtype: str = "float"):
         import torch

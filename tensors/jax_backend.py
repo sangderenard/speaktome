@@ -68,6 +68,7 @@ class JAXTensorOperations(AbstractTensor):
 
     def _to_jnp(self, tensor: Any) -> jnp.ndarray:
         """Safely convert input to JAX array."""
+        tensor = self._AbstractTensor__unwrap(tensor)
         if isinstance(tensor, jnp.ndarray):
             return tensor
         return jnp.array(tensor)
@@ -131,27 +132,27 @@ class JAXTensorOperations(AbstractTensor):
         return jax.device_put(jnp.zeros(size, dtype=dtype), device or self.default_device)
 
     def clone_(self, tensor: Any) -> Any:
-        return jnp.array(tensor, copy=True)
+        return jnp.array(self._AbstractTensor__unwrap(tensor), copy=True)
 
     # ------------------------------------------------------------------
     # Basic info
     def get_device_(self, tensor: Any) -> Any:
-        return tensor.device
+        return self._AbstractTensor__unwrap(tensor).device
 
     def get_dtype_(self, tensor: Any) -> Any:
-        return tensor.dtype
+        return self._AbstractTensor__unwrap(tensor).dtype
 
     def item_(self, tensor: Any) -> Any:
-        return tensor.item()
+        return self._AbstractTensor__unwrap(tensor).item()
 
     def max_(self, tensor: Any) -> Any:
-        return jnp.max(tensor)
+        return jnp.max(self._to_jnp(tensor))
 
     def long_cast_(self, tensor: Any) -> Any:
-        return tensor.astype(jnp.int64)
+        return self._to_jnp(tensor).astype(jnp.int64)
 
     def not_equal_(self, tensor1: Any, tensor2: Any) -> Any:
-        return jnp.not_equal(tensor1, tensor2)
+        return jnp.not_equal(self._to_jnp(tensor1), self._to_jnp(tensor2))
 
     def arange_(self, start: int, end: Optional[int] = None, step: int = 1, device: Any = None, dtype: Any = None) -> Any:
         arr = jnp.arange(start, end, step, dtype=dtype) if end is not None else jnp.arange(start, dtype=dtype)
@@ -179,7 +180,7 @@ class JAXTensorOperations(AbstractTensor):
         return jnp.pad(tensor, pad_width=tuple(pad_width), constant_values=value).tolist()
 
     def cat_(self, tensors: List[Any], dim: int = 0) -> Any:
-        tensors = [self._to_jnp(self.ensure_tensor(t)) for t in tensors]
+        tensors = [self._to_jnp(t) for t in tensors]
         return jnp.concatenate(tensors, axis=dim).tolist()
 
     def topk_(self, tensor: Any, k: int, dim: int) -> Tuple[Any, Any]:
@@ -200,7 +201,7 @@ class JAXTensorOperations(AbstractTensor):
         return values.tolist(), idxs.tolist()
 
     def stack_(self, tensors: List[Any], dim: int = 0) -> Any:
-        tensors = [self._to_jnp(self.ensure_tensor(t)) for t in tensors]
+        tensors = [self._to_jnp(t) for t in tensors]
         return jnp.stack(tensors, axis=dim).tolist()
 
     def repeat_interleave_(self, tensor: Any, repeats: int, dim: Optional[int] = None) -> Any:
@@ -325,27 +326,40 @@ class JAXTensorOperations(AbstractTensor):
     @staticmethod
     def from_numpy(source_ops, tensor, target_ops):
         import jax.numpy as jnp
-        return jnp.array(tensor.data)
+        arr = tensor.data if hasattr(tensor, "data") else tensor
+        result = type(target_ops)(track_time=target_ops.track_time)
+        result.data = jnp.array(arr)
+        return result
 
     @staticmethod
     def from_torch(source_ops, tensor, target_ops):
         import jax.numpy as jnp
         import numpy as np
-        np_array = tensor.data.detach().cpu().numpy()
-        return jnp.array(np_array)
+        t = tensor.data if hasattr(tensor, "data") else tensor
+        np_array = t.detach().cpu().numpy()
+        result = type(target_ops)(track_time=target_ops.track_time)
+        result.data = jnp.array(np_array)
+        return result
 
     @staticmethod
     def from_pure(source_ops, tensor, target_ops):
         import jax.numpy as jnp
-        return jnp.array(tensor.data)
+        data = tensor.data if hasattr(tensor, "data") else tensor
+        result = type(target_ops)(track_time=target_ops.track_time)
+        result.data = jnp.array(data)
+        return result
 
     @staticmethod
     def from_jax(source_ops, tensor, target_ops):
         # Already a jax array, just return the data
         if isinstance(source_ops, JAXTensorOperations):
-            return source_ops.data
+            data = source_ops.data
+        else:
+            data = tensor.data if hasattr(tensor, "data") else tensor
         import jax.numpy as jnp
-        return jnp.array(tensor.data)
+        result = type(target_ops)(track_time=target_ops.track_time)
+        result.data = jnp.array(data)
+        return result
 
     def to_dtype_(self, tensor, dtype: str = "float"):
         import jax.numpy as jnp

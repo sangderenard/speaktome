@@ -31,12 +31,11 @@ Use the included script to create a virtual environment and install only the
 core dependencies (`numpy` and other light utilities). Heavy libraries such as
 PyTorch and Transformers are *optional* and live in
 `optional_requirements.txt`. Run the script without any flags for the minimal
-setup. Add `--extras` to install the optional packages, and `--prefetch` if you
-want to download models during setup (requires the extras):
+setup:
 
 ```bash
 bash setup_env.sh                      # minimal install
-bash setup_env.sh --extras --prefetch  # install optional packages too
+# optional packages may be installed later using pip extras
 ```
 
 The script installs the repository in editable mode and then runs a
@@ -48,7 +47,7 @@ On Windows use the PowerShell script:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File setup_env.ps1                      # minimal
-powershell -ExecutionPolicy Bypass -File setup_env.ps1 --extras --prefetch  # optional
+# install optional packages later if desired
 ```
 
 Like the Bash version, this script installs the package in editable mode and
@@ -96,30 +95,16 @@ access. If you skip this step, the application falls back to the lightweight
 CPU demo mode.
 
 ### Developer Setup
-Use the developer script to run the standard installation. It then launches an interactive menu for viewing key documentation:
+Run `bash setup_env_dev.sh` for a complete environment with development tools.
 
-```bash
-bash setup_env_dev.sh --extras --prefetch
-```
-
-On Windows run:
+On Windows use the PowerShell script:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File setup_env_dev.ps1 -extras -prefetch
+powershell -ExecutionPolicy Bypass -File setup_env_dev.ps1
 ```
 
 ### Non-Interactive Setup
-For headless automation or CI environments, bypass the menus by invoking the
-group selection tool directly:
-
-```bash
-# create the environment
-bash setup_env_dev.sh --extras --prefetch --from-dev
-# install selected codebases and groups without prompts
-python AGENTS/tools/dev_group_menu.py --install \
-    --codebases speaktome \
-    --groups speaktome:dev
-```
+For headless automation or CI environments simply run `bash setup_env_dev.sh --from-dev`.
 
 ### Running Python Modules
 
@@ -129,7 +114,7 @@ invoking any module:
 
 ```bash
 # one-time setup
-bash setup_env.sh --extras --prefetch  # or: bash setup_env_dev.sh --extras --prefetch
+bash setup_env.sh
 source .venv/bin/activate
 
 # execute any module
@@ -232,9 +217,9 @@ Use `--preload_models` if you prefer to load all models up front rather than on-
 ### Optional GNN Features
 
 The project includes an experimental controller called **PyGeoMind** built on top of
-PyTorch Geometric. The `torch_geometric` package will be installed automatically
-the first time you enable the GNN with `--with_gnn`. Use `--extras` during setup
-if you prefer installing it ahead of time.
+PyTorch Geometric. The `torch_geometric` package is installed automatically the
+first time you enable the GNN with `--with_gnn`. You may also install the
+`ml` extras group manually if desired.
 
 ### Resetting the Environment
 
@@ -246,14 +231,14 @@ automated workflows.
 
 ```bash
 bash reinstall_env.sh -y               # minimal reinstall
-bash reinstall_env.sh -y --extras --prefetch    # reinstall with optional packages
+# optional packages may be reinstalled later with pip extras
 ```
 
 On Windows use the accompanying PowerShell script:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File reinstall_env.ps1 -Yes                      # minimal
-powershell -ExecutionPolicy Bypass -File reinstall_env.ps1 -Yes --extras --prefetch  # optional
+# optional packages may be installed later
 ```
 
 ### Windows Without PowerShell

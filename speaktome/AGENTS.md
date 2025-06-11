@@ -2,10 +2,7 @@
 
 ## Quick Setup
 
-```bash
-python AGENTS/tools/dev_group_menu.py --install --codebases speaktome
-python AGENTS/tools/dev_group_menu.py --install --codebases speaktome --groups speaktome:plot,ml,jax,ctensor,numpy,dev
-```
+Run `setup_env_dev.sh` to install this codebase. Optional groups are defined in `pyproject.toml` if additional features are desired.
 
 This directory contains the primary beam search controllers and utilities for generating text. When adding new modules or functions, accompany them with tests in `../tests` and keep all code compliant with `AGENTS/CODING_STANDARDS.md`.
 
@@ -20,22 +17,11 @@ The `pyproject.toml` defines these groups:
 - `numpy`
 - `dev`
 
-Use the group menu tool to install them non-interactively:
+Use standard `pip` extras syntax when needed, e.g. `pip install -e .[plot]` inside the virtual environment.
 
-```bash
-python AGENTS/tools/dev_group_menu.py --install \
-    --codebases speaktome \
-    --groups speaktome:plot,ml,jax,ctensor,numpy,dev
-```
+## Non-Interactive Setup
 
-## Non-Interactive Setup Example
-
-```bash
-bash setup_env_dev.sh --extras --prefetch --from-dev
-python AGENTS/tools/dev_group_menu.py --install \
-    --codebases speaktome \
-    --groups speaktome:dev
-```
+Simply run `setup_env_dev.sh` with no additional flags.
 
 # Agents Documentation
 

@@ -126,30 +126,32 @@ class NumPyTensorOperations(AbstractTensor):
         return np.zeros(size, dtype=self._torch_dtype_to_numpy(dtype))
 
     def clone_(self, tensor):
+        tensor = self._AbstractTensor__unwrap(tensor)
         return np.array(tensor, copy=True)
 
     def to_device_(self, tensor, device):
-        return tensor
+        return self._AbstractTensor__unwrap(tensor)
 
     def get_device_(self, tensor):
         return 'cpu'
 
     def get_dtype_(self, tensor):
+        tensor = self._AbstractTensor__unwrap(tensor)
         if isinstance(tensor, np.ndarray):
             return self._numpy_dtype_to_torch(tensor.dtype)
         return tensor.dtype
 
     def item_(self, tensor):
-        return tensor.item()
+        return self._AbstractTensor__unwrap(tensor).item()
 
     def max_(self, tensor):
-        return np.max(tensor)
+        return np.max(self._AbstractTensor__unwrap(tensor))
 
     def long_cast_(self, tensor):
-        return tensor.astype(np.int64)
+        return self._AbstractTensor__unwrap(tensor).astype(np.int64)
 
     def not_equal_(self, tensor1, tensor2):
-        return tensor1 != tensor2
+        return self._AbstractTensor__unwrap(tensor1) != self._AbstractTensor__unwrap(tensor2)
 
     def arange_(self, start, end=None, step=1, device=None, dtype=None):
         np_dtype = self._torch_dtype_to_numpy(dtype) if dtype is not None else None
@@ -158,14 +160,17 @@ class NumPyTensorOperations(AbstractTensor):
         return np.arange(start, end, step, dtype=np_dtype)
 
     def select_by_indices_(self, tensor, indices_dim0, indices_dim1):
+        tensor = self._AbstractTensor__unwrap(tensor)
         return tensor[indices_dim0, indices_dim1]
 
     def log_softmax_(self, tensor, dim):
+        tensor = self._AbstractTensor__unwrap(tensor)
         e_x = np.exp(tensor - np.max(tensor, axis=dim, keepdims=True))
         softmax = e_x / np.sum(e_x, axis=dim, keepdims=True)
         return np.log(softmax)
 
     def topk_(self, tensor, k, dim):
+        tensor = self._AbstractTensor__unwrap(tensor)
         if dim < 0:
             dim = tensor.ndim + dim
         sorted_indices = np.argsort(tensor, axis=dim)
@@ -177,13 +182,14 @@ class NumPyTensorOperations(AbstractTensor):
         return values, top_k_indices
 
     def stack_(self, tensors, dim=0):
-        tensors = [self.ensure_tensor(t) for t in tensors]
+        tensors = [self._AbstractTensor__unwrap(t) for t in tensors]
         return np.stack(tensors, axis=dim)
 
     def pad_(self, tensor, pad, value=0.0):
         if len(pad) % 2 != 0:
             raise ValueError("Padding length must be even.")
         num_dims_to_pad = len(pad) // 2
+        tensor = self._AbstractTensor__unwrap(tensor)
         if num_dims_to_pad > tensor.ndim:
             raise ValueError("Padding tuple length implies padding more dimensions than tensor has.")
         np_pad_width = []
@@ -196,61 +202,67 @@ class NumPyTensorOperations(AbstractTensor):
         return np.pad(tensor, pad_width=np_pad_width, constant_values=value)
 
     def cat_(self, tensors, dim=0):
-        tensors = [self.ensure_tensor(t) for t in tensors]
+        tensors = [self._AbstractTensor__unwrap(t) for t in tensors]
         return np.concatenate(tensors, axis=dim)
 
     def repeat_interleave_(self, tensor, repeats, dim=None):
+        tensor = self._AbstractTensor__unwrap(tensor)
         return np.repeat(tensor, repeats, axis=dim)
 
     def view_flat_(self, tensor):
-        return tensor.reshape(-1)
+        return self._AbstractTensor__unwrap(tensor).reshape(-1)
 
     def assign_at_indices_(self, tensor_to_modify, indices_dim0, indices_dim1, values_to_assign):
-        tensor_to_modify[indices_dim0, indices_dim1] = values_to_assign
-        return tensor_to_modify
+        t = self._AbstractTensor__unwrap(tensor_to_modify)
+        v = self._AbstractTensor__unwrap(values_to_assign)
+        t[indices_dim0, indices_dim1] = v
+        return t
 
     def increment_at_indices_(self, tensor_to_modify, mask):
-        tensor_to_modify[mask] += 1
-        return tensor_to_modify
+        t = self._AbstractTensor__unwrap(tensor_to_modify)
+        t[mask] += 1
+        return t
 
     def clamp_(self, tensor, min_val=None, max_val=None):
-        return np.clip(tensor, a_min=min_val, a_max=max_val)
+        return np.clip(self._AbstractTensor__unwrap(tensor), a_min=min_val, a_max=max_val)
 
     def shape_(self, tensor):
-        return tuple(tensor.shape)
+        return tuple(self._AbstractTensor__unwrap(tensor).shape)
 
     def numel_(self, tensor):
-        return tensor.size
+        return self._AbstractTensor__unwrap(tensor).size
 
     def mean_(self, tensor, dim=None):
-        return np.mean(tensor, axis=dim)
+        return np.mean(self._AbstractTensor__unwrap(tensor), axis=dim)
 
     def pow_(self, tensor, exponent: float):
-        return np.power(tensor, exponent)
+        return np.power(self._AbstractTensor__unwrap(tensor), exponent)
 
     def sqrt_(self, tensor):
-        return np.sqrt(tensor)
+        return np.sqrt(self._AbstractTensor__unwrap(tensor))
 
     def tensor_from_list_(self, data, dtype, device):
         return np.array(data, dtype=self._torch_dtype_to_numpy(dtype))
 
     def boolean_mask_select_(self, tensor, mask):
+        tensor = self._AbstractTensor__unwrap(tensor)
         return tensor[mask]
 
     def tolist_(self, tensor):
-        return tensor.tolist()
+        return self._AbstractTensor__unwrap(tensor).tolist()
 
     def less_(self, tensor, value):
-        return tensor < value
+        return self._AbstractTensor__unwrap(tensor) < value
 
     def index_select_(self, tensor, dim, indices):
+        tensor = self._AbstractTensor__unwrap(tensor)
         return np.take(tensor, indices, axis=dim)
 
     def argmin_(self, tensor, dim=None):
-        return np.argmin(tensor, axis=dim)
+        return np.argmin(self._AbstractTensor__unwrap(tensor), axis=dim)
 
     def interpolate_(self, tensor, size):
-        arr = np.array(tensor)
+        arr = np.array(self._AbstractTensor__unwrap(tensor))
         if len(size) != arr.ndim:
             raise ValueError("size must match tensor dimensions")
         def interp_axis(a, new_len, axis):
@@ -317,20 +329,35 @@ class NumPyTensorOperations(AbstractTensor):
     def from_numpy(source_ops, tensor, target_ops):
         # If already numpy, just return the data (clone if needed)
         if isinstance(source_ops, NumPyTensorOperations):
-            return source_ops.data
-        import numpy as np
-        return np.array(tensor.data, copy=False)
+            arr = source_ops.data
+        else:
+            import numpy as np
+            arr = np.array(tensor.data, copy=False)
+        result = type(target_ops)(track_time=target_ops.track_time)
+        result.data = arr
+        return result
 
     @staticmethod
     def from_torch(source_ops, tensor, target_ops):
-        return tensor.data.detach().cpu().numpy()
+        import numpy as np
+        t = tensor.data if hasattr(tensor, "data") else tensor
+        arr = t.detach().cpu().numpy()
+        result = type(target_ops)(track_time=target_ops.track_time)
+        result.data = arr
+        return result
 
     @staticmethod
     def from_pure(source_ops, tensor, target_ops):
         import numpy as np
-        return np.array(tensor.data)
+        data = tensor.data if hasattr(tensor, "data") else tensor
+        result = type(target_ops)(track_time=target_ops.track_time)
+        result.data = np.array(data)
+        return result
 
     @staticmethod
     def from_jax(source_ops, tensor, target_ops):
         import numpy as np
-        return np.array(tensor.data)
+        data = tensor.data if hasattr(tensor, "data") else tensor
+        result = type(target_ops)(track_time=target_ops.track_time)
+        result.data = np.array(data)
+        return result

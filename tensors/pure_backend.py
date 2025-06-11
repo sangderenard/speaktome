@@ -61,6 +61,8 @@ class PurePythonTensorOperations(AbstractTensor):
 
     def _AbstractTensor__apply_operator(self, op: str, left: Any, right: Any):
         """Dispatch basic arithmetic for nested lists."""
+        left = self._AbstractTensor__unwrap(left)
+        right = self._AbstractTensor__unwrap(right)
         if op in {"matmul", "rmatmul", "imatmul"}:
             a, b = (left, right) if op != "rmatmul" else (right, left)
             return self._matmul(a, b)
@@ -146,17 +148,18 @@ class PurePythonTensorOperations(AbstractTensor):
         return self.full_(size, 0, dtype, device)
 
     def clone_(self, tensor: Any) -> Any:
+        tensor = self._AbstractTensor__unwrap(tensor)
         if not isinstance(tensor, list):
             return tensor
         return [self.clone_(item) for item in tensor]
 
     def to_device_(self, tensor: Any, device: Any) -> Any:
-        return tensor
+        return self._AbstractTensor__unwrap(tensor)
 
     def stack_(self, tensors: List[Any], dim: int = 0) -> Any:
         if not tensors:
             return []
-        tensors = [self.ensure_tensor(t) for t in tensors]
+        tensors = [self._AbstractTensor__unwrap(t) for t in tensors]
         if dim == 0:
             return [self.clone_(t) for t in tensors]
         ref_shape = _get_shape(tensors[0])
@@ -279,7 +282,7 @@ class PurePythonTensorOperations(AbstractTensor):
     def cat_(self, tensors: List[Any], dim: int = 0) -> Any:
         if not tensors:
             return []
-        tensors = [self.ensure_tensor(t) for t in tensors]
+        tensors = [self._AbstractTensor__unwrap(t) for t in tensors]
         if dim == 0:
             result = []
             for t in tensors:
@@ -311,6 +314,8 @@ class PurePythonTensorOperations(AbstractTensor):
         return _flatten(tensor)
 
     def assign_at_indices_(self, tensor_to_modify: Any, indices_dim0: Any, indices_dim1: Any, values_to_assign: Any):
+        tensor_to_modify = self._AbstractTensor__unwrap(tensor_to_modify)
+        values_to_assign = self._AbstractTensor__unwrap(values_to_assign)
         if not isinstance(tensor_to_modify, list) or not isinstance(tensor_to_modify[0], list):
             raise NotImplementedError("assign_at_indices only supports 2D lists for now")
         if not isinstance(indices_dim0, list) or not isinstance(indices_dim1, list):
@@ -325,6 +330,8 @@ class PurePythonTensorOperations(AbstractTensor):
         return tensor_to_modify
 
     def increment_at_indices_(self, tensor_to_modify: Any, mask: Any):
+        tensor_to_modify = self._AbstractTensor__unwrap(tensor_to_modify)
+        mask = self._AbstractTensor__unwrap(mask)
         if (
             not isinstance(tensor_to_modify, list)
             or not isinstance(mask, list)
@@ -337,6 +344,7 @@ class PurePythonTensorOperations(AbstractTensor):
         return tensor_to_modify
 
     def clamp_(self, tensor: Any, min_val: Optional[float] = None, max_val: Optional[float] = None) -> Any:
+        tensor = self._AbstractTensor__unwrap(tensor)
         if isinstance(tensor, list):
             return [self.clamp_(item, min_val, max_val) for item in tensor]
         value = tensor
@@ -347,12 +355,13 @@ class PurePythonTensorOperations(AbstractTensor):
         return value
 
     def shape_(self, tensor: Any) -> Tuple[int, ...]:
-        return _get_shape(tensor)
+        return _get_shape(self._AbstractTensor__unwrap(tensor))
 
     def numel_(self, tensor: Any) -> int:
-        return len(_flatten(tensor))
+        return len(_flatten(self._AbstractTensor__unwrap(tensor)))
 
     def mean_(self, tensor: Any, dim: Optional[int] = None) -> Any:
+        tensor = self._AbstractTensor__unwrap(tensor)
         if not isinstance(tensor, list):
             return tensor
         if dim is None or dim == 0:
@@ -365,11 +374,13 @@ class PurePythonTensorOperations(AbstractTensor):
         raise NotImplementedError("mean only implemented for dim 0, 1, or None")
 
     def pow_(self, tensor: Any, exponent: float) -> Any:
+        tensor = self._AbstractTensor__unwrap(tensor)
         if isinstance(tensor, list):
             return [self.pow_(item, exponent) for item in tensor]
         return tensor**exponent
 
     def sqrt_(self, tensor: Any) -> Any:
+        tensor = self._AbstractTensor__unwrap(tensor)
         if isinstance(tensor, list):
             return [self.sqrt_(item) for item in tensor]
         return math.sqrt(tensor)
@@ -378,6 +389,8 @@ class PurePythonTensorOperations(AbstractTensor):
         return data
 
     def boolean_mask_select_(self, tensor: Any, mask: Any) -> Any:
+        tensor = self._AbstractTensor__unwrap(tensor)
+        mask = self._AbstractTensor__unwrap(mask)
         if (
             not isinstance(tensor, list)
             or not isinstance(mask, list)
@@ -387,14 +400,17 @@ class PurePythonTensorOperations(AbstractTensor):
         return [tensor[i] for i in range(len(tensor)) if mask[i]]
 
     def tolist_(self, tensor: Any) -> List[Any]:
+        tensor = self._AbstractTensor__unwrap(tensor)
         return self.clone_(tensor)
 
     def less_(self, tensor: Any, value: Any) -> Any:
+        tensor = self._AbstractTensor__unwrap(tensor)
         if isinstance(tensor, list):
             return [self.less_(item, value) for item in tensor]
         return tensor < value
 
     def index_select_(self, tensor: Any, dim: int, indices: Any) -> Any:
+        tensor = self._AbstractTensor__unwrap(tensor)
         if dim == 0:
             return [tensor[i] for i in indices]
         if dim == 1:
@@ -402,6 +418,7 @@ class PurePythonTensorOperations(AbstractTensor):
         raise NotImplementedError("index_select only implemented for dim 0 or 1")
 
     def argmin_(self, tensor: Any, dim: Optional[int] = None) -> Any:
+        tensor = self._AbstractTensor__unwrap(tensor)
         shape = _get_shape(tensor)
         if dim is None:
             flat = _flatten(tensor)
@@ -415,6 +432,7 @@ class PurePythonTensorOperations(AbstractTensor):
         return [self.argmin_(sub, dim - 1) for sub in tensor]
 
     def interpolate_(self, tensor: Any, size: Tuple[int, ...]) -> Any:
+        tensor = self._AbstractTensor__unwrap(tensor)
         shape = _get_shape(tensor)
         if len(shape) != len(size):
             raise ValueError("size must match tensor dimensions")
@@ -447,6 +465,7 @@ class PurePythonTensorOperations(AbstractTensor):
         return result
 
     def save_(self, tensor: Any, filepath: str) -> None:
+        tensor = self._AbstractTensor__unwrap(tensor)
         with open(filepath, "w") as f:
             json.dump(tensor, f)
 
@@ -483,26 +502,42 @@ class PurePythonTensorOperations(AbstractTensor):
     def from_numpy(source_ops, tensor, target_ops):
         # If already pure python, just return the data
         if isinstance(source_ops, PurePythonTensorOperations):
-            return source_ops.data
-        # Otherwise, convert numpy array to list
-        return tensor.data.tolist() if hasattr(tensor.data, 'tolist') else list(tensor.data)
+            data = source_ops.data
+        else:
+            arr = tensor.data if hasattr(tensor, 'data') else tensor
+            data = arr.tolist() if hasattr(arr, 'tolist') else list(arr)
+        result = type(target_ops)(track_time=target_ops.track_time)
+        result.data = data
+        return result
 
     @staticmethod
     def from_torch(source_ops, tensor, target_ops):
         if isinstance(source_ops, PurePythonTensorOperations):
-            return source_ops.data
-        return tensor.data.detach().cpu().tolist()
+            data = source_ops.data
+        else:
+            t = tensor.data if hasattr(tensor, 'data') else tensor
+            data = t.detach().cpu().tolist()
+        result = type(target_ops)(track_time=target_ops.track_time)
+        result.data = data
+        return result
 
     @staticmethod
     def from_pure(source_ops, tensor, target_ops):
-        # Already a pure python list
-        return tensor.data
+        data = tensor.data if hasattr(tensor, 'data') else tensor
+        result = type(target_ops)(track_time=target_ops.track_time)
+        result.data = data
+        return result
 
     @staticmethod
     def from_jax(source_ops, tensor, target_ops):
         if isinstance(source_ops, PurePythonTensorOperations):
-            return source_ops.data
-        return tensor.data.tolist() if hasattr(tensor.data, 'tolist') else list(tensor.data)
+            data = source_ops.data
+        else:
+            d = tensor.data if hasattr(tensor, 'data') else tensor
+            data = d.tolist() if hasattr(d, 'tolist') else list(d)
+        result = type(target_ops)(track_time=target_ops.track_time)
+        result.data = data
+        return result
 
     def to_dtype_(self, tensor, dtype: str = "float"):
         # For pure Python, just convert all elements recursively

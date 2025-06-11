@@ -70,6 +70,14 @@ class AbstractTensor(ABC):
         self.last_op_time: float | None = None
         self.data = None  # Holds the tensor's data
 
+    # --------------------------------------------------------------
+    # Internal helpers
+    def __unwrap(self, obj: Any) -> Any:
+        """Internal helper to access the raw tensor value."""
+        if isinstance(obj, AbstractTensor):
+            return obj.data
+        return obj
+
     def benchmark(self, call: "Callable[[], Any]") -> Any:
         """Run ``call`` and store elapsed time if benchmarking is enabled."""
         if self.track_time:
@@ -282,7 +290,7 @@ class AbstractTensor(ABC):
     def to_dtype(self, dtype: str = "float") -> "AbstractTensor":
         """Convert self.data to the specified dtype using the backend's to_dtype_ method."""
         result = type(self)(track_time=self.track_time)
-        result.data = self.to_dtype_(self.data, dtype)
+        result.data = self.to_dtype_(self, dtype)
         return result
 
     # --- Dtype helpers ---
@@ -303,46 +311,66 @@ class AbstractTensor(ABC):
         return self.tensor_type_
 
     # Lightweight helper to coerce arbitrary input to this backend's tensor type
-    def to_backend(self, target_ops: "AbstractTensor") -> "AbstractTensor":
-        """Convert this tensor to the target backend, returning a new AbstractTensor instance with .data set."""
-        if type(self) is type(target_ops):
-            # Same backend: clone or return self
-            new_tensor = type(self)()
-            new_tensor.data = self.clone(self.data)
-            return new_tensor
-        # Find conversion function
-        conv_func = CONVERSION_REGISTRY.get((type(self), type(target_ops)), None)
-        if conv_func is None:
+    def to_backend(
+        self,
+        target_ops: "AbstractTensor",
+    ) -> "AbstractTensor":
+        """Return ``self`` converted to ``target_ops`` backend."""
 
-            # Fallback to default conversion
-            converted_data = default_to_backend(self, self.data, target_ops)
+        if not isinstance(target_ops, AbstractTensor):
+            raise TypeError("target_ops must be an AbstractTensor instance")
+
+        if type(self) is type(target_ops):
+            result = type(target_ops)(track_time=self.track_time)
+            result.data = self.clone_(self)
+            return result
+
+        conv_func = CONVERSION_REGISTRY.get((type(self), type(target_ops)))
+        if conv_func is None:
+            converted = default_to_backend(self, self, target_ops)
         else:
-            converted_data = conv_func(self, self.data, target_ops)
-        new_tensor = type(target_ops)()
-        new_tensor.data = converted_data
+            converted = conv_func(self, self, target_ops)
+
+        if isinstance(converted, AbstractTensor):
+            return converted.to_backend(target_ops)
+
+        new_tensor = type(target_ops)(track_time=self.track_time)
+        new_tensor.data = converted
         return new_tensor
 
-    def ensure_tensor(self, tensor: Any) -> Any:
+    def ensure_tensor(self, tensor: Any) -> "AbstractTensor":
+        """Return ``tensor`` wrapped as an ``AbstractTensor`` instance."""
+
         if tensor is None:
             raise ValueError("ensure_tensor called with tensor=None")
-        if isinstance(tensor, self.tensor_type):
-            return tensor
-        # If tensor is an AbstractTensor instance, convert using to_backend
+
         if isinstance(tensor, AbstractTensor):
-            return tensor.to_backend(self).data
+            return tensor.to_backend(self)
+
+        if isinstance(tensor, self.tensor_type):
+            result = type(self)(track_time=self.track_time)
+            result.data = tensor
+            return result
+
         if torch is not None and isinstance(tensor, torch.Tensor):
             torch_ops = get_tensor_operations(Faculty.TORCH)
-            return torch_ops.__class__().to_backend(self.__class__()).data if not isinstance(self, torch_ops.__class__) else tensor
+            tmp = torch_ops.__class__()
+            tmp.data = tensor
+            return tmp.to_backend(self)
+
         if np is not None and isinstance(tensor, np.ndarray):
             numpy_ops = get_tensor_operations(Faculty.NUMPY)
-            numpy_tensor = numpy_ops.__class__()  # create a new NumPyTensorOperations instance
+            numpy_tensor = numpy_ops.__class__()
             numpy_tensor.data = tensor
-            return numpy_tensor.to_backend(self).data
+            return numpy_tensor.to_backend(self)
+
         if isinstance(tensor, list):
-            return self.tensor_from_list(tensor, dtype=None, device=None).data
+            return self.tensor_from_list(tensor, dtype=None, device=None)
+
         if hasattr(tensor, "tolist"):
-            return self.tensor_from_list(tensor.tolist(), dtype=None, device=None).data
-        return self.tensor_from_list([tensor], dtype=None, device=None).data
+            return self.tensor_from_list(tensor.tolist(), dtype=None, device=None)
+
+        return self.tensor_from_list([tensor], dtype=None, device=None)
 
     # --- Operator routing ---
     def __apply_operator(self, op: str, left: Any, right: Any):
