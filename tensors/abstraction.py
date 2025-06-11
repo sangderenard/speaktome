@@ -28,6 +28,28 @@ CONVERSION_REGISTRY: Dict[Tuple[type, type], Callable[["AbstractTensor", Any, "A
 
 OPS_CACHE: Dict[type, "AbstractTensor"] = {}
 
+
+class ShapeAccessor:
+    """Proxy object allowing both ``tensor.shape`` and ``tensor.shape()``."""
+
+    def __init__(self, owner: "AbstractTensor") -> None:
+        self.owner = owner
+
+    def __call__(self, tensor: Any | None = None) -> Tuple[int, ...]:
+        return self.owner.shape_(self.owner.data_or(tensor))
+
+    def __iter__(self):  # type: ignore[override]
+        return iter(self())
+
+    def __len__(self) -> int:  # type: ignore[override]
+        return len(self())
+
+    def __getitem__(self, idx: int) -> int:  # type: ignore[override]
+        return self()[idx]
+
+    def __repr__(self) -> str:  # type: ignore[override]
+        return repr(self())
+
 def register_conversion(src_cls: type, tgt_cls: type, func: Callable[["AbstractTensor", Any, "AbstractTensor"], Any]) -> None:
     """Register a direct tensor conversion function."""
     CONVERSION_REGISTRY[(src_cls, tgt_cls)] = func
@@ -69,15 +91,11 @@ class AbstractTensor(ABC):
         self.track_time = track_time
         self.last_op_time: float | None = None
         self.data = None  # Holds the tensor's data
-        self.shape = None  # Shape metadata, set by __wrap
-        self.ndims = None  # Number of dimensions, set by __wrap
 
     def _AbstractTensor__wrap(self, tensor):
-        """Default wrap: should be overridden by backend. Wraps a backend-native tensor and sets shape/ndims."""
+        """Default wrap: should be overridden by backend. Wraps a backend-native tensor."""
         obj = type(self)()
         obj.data = tensor
-        obj.shape = obj.get_shape(tensor)
-        obj.ndims = obj.get_ndims(tensor)
         return obj
 
     # --------------------------------------------------------------
@@ -223,10 +241,6 @@ class AbstractTensor(ABC):
         result.data = self.clamp_(tensor, min_val, max_val)
         return result
 
-    def shape(self, tensor: Any = None) -> Tuple[int, ...]:
-        tensor = self.data_or(tensor)
-        return self.shape_(tensor)
-
     def numel(self, tensor: Any = None) -> int:
         tensor = self.data_or(tensor)
         return self.numel_(tensor)
@@ -322,16 +336,12 @@ class AbstractTensor(ABC):
 
     # --- Shape and dimension accessors (overloads) ---
     @property
-    def shape(self):
-        """Return the shape of the tensor as a tuple (property)."""
-        return self.get_shape(self.data)
+    def shape(self) -> ShapeAccessor:
+        """Return a callable/iterable shape accessor."""
+        return ShapeAccessor(self)
 
-    def shape_(self, tensor=None):
-        """Return the shape of the tensor as a tuple (method, for backend compatibility)."""
-        return self.get_shape(self.data_or(tensor))
-
-    def shape(self, tensor=None):
-        """Return the shape of the tensor as a tuple (method, for legacy compatibility)."""
+    def shape_(self, tensor: Any = None) -> Tuple[int, ...]:
+        """Return the shape of the tensor as a tuple (backend hook)."""
         return self.get_shape(self.data_or(tensor))
 
     @property
@@ -365,8 +375,6 @@ class AbstractTensor(ABC):
         if type(self) is type(target_ops):
             result = type(target_ops)(track_time=self.track_time)
             result.data = self.clone_(self)
-            result.shape = result.get_shape(result.data)
-            result.ndims = result.get_ndims(result.data)
             return result
 
         conv_func = CONVERSION_REGISTRY.get((type(self), type(target_ops)))
@@ -376,16 +384,10 @@ class AbstractTensor(ABC):
             converted = conv_func(self, self, target_ops)
 
         if isinstance(converted, AbstractTensor):
-            # Ensure shape/ndims are set after conversion
-            if getattr(converted, 'data', None) is not None:
-                converted.shape = converted.get_shape(converted.data)
-                converted.ndims = converted.get_ndims(converted.data)
             return converted.to_backend(target_ops)
 
         new_tensor = type(target_ops)(track_time=self.track_time)
         new_tensor.data = converted
-        new_tensor.shape = new_tensor.get_shape(converted)
-        new_tensor.ndims = new_tensor.get_ndims(converted)
         return new_tensor
 
     def ensure_tensor(self, tensor: Any) -> "AbstractTensor":
