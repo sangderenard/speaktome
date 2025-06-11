@@ -206,7 +206,7 @@ class CTensor:
 class CTensorOperations(AbstractTensor):
     """C backend using cffi for all arithmetic ops."""
 
-    def _AbstractTensor__apply_operator(self, op: str, left: CTensor, right: Any):
+    def _AbstractTensor__apply_operator_(self, op: str, left: CTensor, right: Any):
         """Operate on ``CTensor`` objects or scalars."""
         if isinstance(right, CTensor) and isinstance(left, CTensor):
             if left.shape != right.shape:
@@ -269,24 +269,24 @@ class CTensorOperations(AbstractTensor):
             raise TypeError("CTensorOperations only supports CTensor or scalar operands.")
 
     # Creation ops
-    def full(self, size: Tuple[int, ...], fill_value: Any, dtype: Any, device: Any):
+    def full_(self, size: Tuple[int, ...], fill_value: Any, dtype: Any, device: Any):
         t = CTensor(size)
         for i in range(t.size):
             t.buffer[i] = float(fill_value)
         return t
 
-    def zeros(self, size: Tuple[int, ...], dtype: Any, device: Any):
+    def zeros_(self, size: Tuple[int, ...], dtype: Any, device: Any):
         return self.full(size, 0.0, dtype, device)
 
-    def clone(self, tensor: CTensor) -> CTensor:
+    def clone_(self, tensor: CTensor) -> CTensor:
         t = CTensor(tensor.shape)
         ffi.memmove(t.buffer, tensor.buffer, tensor.size * ffi.sizeof("double"))
         return t
 
-    def to_device(self, tensor: CTensor, device: Any) -> CTensor:
+    def to_device_(self, tensor: CTensor, device: Any) -> CTensor:
         return tensor  # No-op for now
 
-    def arange(
+    def arange_(
         self,
         start: int,
         end: Optional[int] = None,
@@ -306,31 +306,31 @@ class CTensorOperations(AbstractTensor):
         C.create_arange(start_val, step_val, n, out.as_c_ptr())
         return out
 
-    def pow(self, tensor: Any, exponent: float) -> CTensor:
+    def pow_(self, tensor: Any, exponent: float) -> CTensor:
         if not isinstance(tensor, CTensor):
             tensor = CTensor.from_list(tensor, _get_shape(tensor))
         out = CTensor(tensor.shape)
         C.pow_scalar(tensor.as_c_ptr(), float(exponent), out.as_c_ptr(), tensor.size)
         return out
 
-    def sqrt(self, tensor: Any) -> CTensor:
+    def sqrt_(self, tensor: Any) -> CTensor:
         if not isinstance(tensor, CTensor):
             tensor = CTensor.from_list(tensor, _get_shape(tensor))
         out = CTensor(tensor.shape)
         C.sqrt_double(tensor.as_c_ptr(), out.as_c_ptr(), tensor.size)
         return out
 
-    def tensor_from_list(self, data: List[Any], dtype: Any, device: Any) -> CTensor:
+    def tensor_from_list_(self, data: List[Any], dtype: Any, device: Any) -> CTensor:
         shape = _get_shape(data)
         return CTensor.from_list(data, shape)
 
-    def shape(self, tensor: CTensor) -> Tuple[int, ...]:
+    def shape_(self, tensor: CTensor) -> Tuple[int, ...]:
         return tensor.shape
 
-    def numel(self, tensor: CTensor) -> int:
+    def numel_(self, tensor: CTensor) -> int:
         return tensor.size
 
-    def mean(self, tensor: Any, dim: Optional[int] = None) -> Any:
+    def mean_(self, tensor: Any, dim: Optional[int] = None) -> Any:
         if not isinstance(tensor, CTensor):
             tensor = CTensor.from_list(tensor, _get_shape(tensor))
         values = _flatten(tensor.tolist())
@@ -351,22 +351,22 @@ class CTensorOperations(AbstractTensor):
             return out.buffer[0]
         return out
 
-    def less(self, tensor: Any, value: Any) -> list:
+    def less_(self, tensor: Any, value: Any) -> list:
         if not isinstance(tensor, CTensor):
             tensor = CTensor.from_list(tensor, _get_shape(tensor))
         return [tensor.buffer[i] < value for i in range(tensor.size)]
 
-    def view_flat(self, tensor: Any) -> list:
+    def view_flat_(self, tensor: Any) -> list:
         if not isinstance(tensor, CTensor):
             tensor = CTensor.from_list(tensor, _get_shape(tensor))
         return _flatten(tensor.tolist())
 
-    def tolist(self, tensor: Any) -> list:
+    def tolist_(self, tensor: Any) -> list:
         if not isinstance(tensor, CTensor):
             tensor = CTensor.from_list(tensor, _get_shape(tensor))
         return tensor.tolist()
 
-    def clamp(
+    def clamp_(
         self,
         tensor: Any,
         min_val: Optional[float] = None,
@@ -384,7 +384,7 @@ class CTensorOperations(AbstractTensor):
             out.buffer[i] = val
         return out
 
-    def select_by_indices(self, tensor: CTensor, indices_dim0: Any, indices_dim1: Any) -> Any:
+    def select_by_indices_(self, tensor: CTensor, indices_dim0: Any, indices_dim1: Any) -> Any:
         # ########## STUB: CTensorOperations.select_by_indices ##########
         # PURPOSE: Gather elements from ``tensor`` using two index arrays.
         # EXPECTED BEHAVIOR: Return a 1D CTensor of selected values.
@@ -422,7 +422,7 @@ class CTensorOperations(AbstractTensor):
 
         return CTensor(out_shape, out_buf)
 
-    def log_softmax(self, tensor: CTensor, dim: int) -> Any:
+    def log_softmax_(self, tensor: CTensor, dim: int) -> Any:
         """Compute log softmax along ``dim`` using C routines."""
         if not isinstance(tensor, CTensor):
             tensor = CTensor.from_list(tensor, _get_shape(tensor))
@@ -439,7 +439,7 @@ class CTensorOperations(AbstractTensor):
             C.log_softmax_dim(tensor.as_c_ptr(), c_shape, ndim, dim, out.as_c_ptr())
         return out
 
-    def pad(self, tensor: CTensor, pad: Tuple[int, ...], value: float = 0) -> Any:
+    def pad_(self, tensor: CTensor, pad: Tuple[int, ...], value: float = 0) -> Any:
         """Pad ``tensor`` with ``value`` according to ``pad`` specification."""
         if not isinstance(tensor, CTensor):
             tensor = CTensor.from_list(tensor, _get_shape(tensor))
@@ -479,7 +479,7 @@ class CTensorOperations(AbstractTensor):
         )
         return out
 
-    def topk(self, tensor: CTensor, k: int, dim: int) -> Tuple[Any, Any]:
+    def topk_(self, tensor: CTensor, k: int, dim: int) -> Tuple[Any, Any]:
         shape = tensor.shape
         ndim = len(shape)
         if dim < 0:
@@ -506,7 +506,7 @@ class CTensorOperations(AbstractTensor):
         )
         return values, indices
 
-    def repeat_interleave(self, tensor: CTensor, repeats: int, dim: Optional[int] = None) -> Any:
+    def repeat_interleave_(self, tensor: CTensor, repeats: int, dim: Optional[int] = None) -> Any:
         # ########## STUB: CTensorOperations.repeat_interleave ##########
         # PURPOSE: Repeat each element in ``tensor`` ``repeats`` times along ``dim``.
         # EXPECTED BEHAVIOR: New CTensor with expanded dimension.
@@ -519,7 +519,7 @@ class CTensorOperations(AbstractTensor):
         # ############################################################
         raise NotImplementedError("repeat_interleave not implemented for C backend")
 
-    def assign_at_indices(
+    def assign_at_indices_(
         self,
         tensor_to_modify: CTensor,
         indices_dim0: Any,
@@ -538,7 +538,7 @@ class CTensorOperations(AbstractTensor):
         # ############################################################
         raise NotImplementedError("assign_at_indices not implemented for C backend")
 
-    def increment_at_indices(self, tensor_to_modify: CTensor, mask: Any) -> None:
+    def increment_at_indices_(self, tensor_to_modify: CTensor, mask: Any) -> None:
         # ########## STUB: CTensorOperations.increment_at_indices ##########
         # PURPOSE: Increment elements of ``tensor_to_modify`` where ``mask`` is True.
         # EXPECTED BEHAVIOR: Element-wise increment using a boolean mask.
@@ -551,7 +551,7 @@ class CTensorOperations(AbstractTensor):
         # ############################################################
         raise NotImplementedError("increment_at_indices not implemented for C backend")
 
-    def boolean_mask_select(self, tensor: CTensor, mask: Any) -> Any:
+    def boolean_mask_select_(self, tensor: CTensor, mask: Any) -> Any:
         # ########## STUB: CTensorOperations.boolean_mask_select ##########
         # PURPOSE: Select values from ``tensor`` where ``mask`` is True.
         # EXPECTED BEHAVIOR: Return CTensor or list of filtered values.
@@ -564,7 +564,7 @@ class CTensorOperations(AbstractTensor):
         # ############################################################
         raise NotImplementedError("boolean_mask_select not implemented for C backend")
 
-    def index_select(self, tensor: CTensor, dim: int, indices: Any) -> Any:
+    def index_select_(self, tensor: CTensor, dim: int, indices: Any) -> Any:
         # ########## STUB: CTensorOperations.index_select ##########
         # PURPOSE: Select entries along ``dim`` using ``indices``.
         # EXPECTED BEHAVIOR: Mirror numpy.take along the specified dimension.
@@ -577,7 +577,7 @@ class CTensorOperations(AbstractTensor):
         # ############################################################
         raise NotImplementedError("index_select not implemented for C backend")
 
-    def argmin(self, tensor: CTensor, dim: Optional[int] = None) -> Any:
+    def argmin_(self, tensor: CTensor, dim: Optional[int] = None) -> Any:
         # ########## STUB: CTensorOperations.argmin ##########
         # PURPOSE: Placeholder for argmin across dimensions in the C backend.
         # EXPECTED BEHAVIOR: Should mirror numpy.argmin with optional axis.
@@ -590,7 +590,7 @@ class CTensorOperations(AbstractTensor):
         # ############################################################
         raise NotImplementedError("argmin not implemented for C backend")
 
-    def interpolate(self, tensor: CTensor, size: Tuple[int, ...]) -> Any:
+    def interpolate_(self, tensor: CTensor, size: Tuple[int, ...]) -> Any:
         # ########## STUB: CTensorOperations.interpolate ##########
         # PURPOSE: Resize ``tensor`` to ``size`` using linear interpolation.
         # EXPECTED BEHAVIOR: Perform dimension-wise interpolation similar to
@@ -605,7 +605,7 @@ class CTensorOperations(AbstractTensor):
         # ############################################################
         raise NotImplementedError("interpolate not implemented for C backend")
 
-    def stack(self, tensors: list, dim: int = 0) -> Any:
+    def stack_(self, tensors: list, dim: int = 0) -> Any:
         # ########## STUB: CTensorOperations.stack ##########
         # PURPOSE: Concatenate a sequence of CTensors along a new dimension.
         # EXPECTED BEHAVIOR: Should return a CTensor representing ``tensors``
@@ -619,7 +619,7 @@ class CTensorOperations(AbstractTensor):
         # ############################################################
         raise NotImplementedError("stack not implemented for C backend")
 
-    def cat(self, tensors: list, dim: int = 0) -> Any:
+    def cat_(self, tensors: list, dim: int = 0) -> Any:
         # ########## STUB: CTensorOperations.cat ##########
         # PURPOSE: Concatenate CTensors along an existing dimension.
         # EXPECTED BEHAVIOR: Should join ``tensors`` on ``dim`` similar to
@@ -633,34 +633,34 @@ class CTensorOperations(AbstractTensor):
         # ############################################################
         raise NotImplementedError("cat not implemented for C backend")
 
-    def get_device(self, tensor: CTensor) -> str:
+    def get_device_(self, tensor: CTensor) -> str:
         return "cpu_cffi"
 
-    def get_dtype(self, tensor: CTensor) -> Any:
+    def get_dtype_(self, tensor: CTensor) -> Any:
         return float
 
-    def item(self, tensor: CTensor) -> Any:
+    def item_(self, tensor: CTensor) -> Any:
         if tensor.size == 1:
             return tensor.buffer[0]
         raise ValueError("Tensor has more than one element")
 
-    def max(self, tensor: CTensor) -> float:
+    def max_(self, tensor: CTensor) -> float:
         return max(tensor.tolist())
 
-    def long_cast(self, tensor: CTensor) -> CTensor:
+    def long_cast_(self, tensor: CTensor) -> CTensor:
         t = CTensor(tensor.shape)
         for i in range(t.size):
             t.buffer[i] = int(tensor.buffer[i])
         return t
 
-    def not_equal(self, tensor1: CTensor, tensor2: CTensor) -> list:
+    def not_equal_(self, tensor1: CTensor, tensor2: CTensor) -> list:
         return [tensor1.buffer[i] != tensor2.buffer[i] for i in range(tensor1.size)]
 
-    def save(self, tensor: CTensor, filepath: str) -> None:
+    def save_(self, tensor: CTensor, filepath: str) -> None:
         with open(filepath, "wb") as f:
             f.write(ffi.buffer(tensor.buffer, tensor.size * 8))
 
-    def load(self, filepath: str, dtype: Any, device: Any) -> CTensor:
+    def load_(self, filepath: str, dtype: Any, device: Any) -> CTensor:
         with open(filepath, "rb") as f:
             data = f.read()
         n = len(data) // 8
@@ -670,20 +670,44 @@ class CTensorOperations(AbstractTensor):
         return CTensor((n,), buf)
 
     @property
-    def long_dtype(self) -> Any:
+    def long_dtype_(self) -> Any:
         return int
 
     @property
-    def bool_dtype(self) -> Any:
+    def bool_dtype_(self) -> Any:
         return bool
 
     @property
-    def float_dtype(self) -> Any:
+    def float_dtype_(self) -> Any:
         return float
 
     @property
-    def tensor_type(self) -> type:
+    def tensor_type_(self) -> type:
         return CTensor
+
+    # Implementation hooks required by AbstractTensor
+    def get_shape(self, tensor=None):
+        t = tensor if tensor is not None else self.data
+        if not isinstance(t, CTensor):
+            t = CTensor.from_list(t, _get_shape(t))
+        return t.shape
+
+    def get_ndims(self, tensor=None):
+        return len(self.get_shape(tensor))
+
+    def to_dtype_(self, tensor, dtype: str = "float"):
+        """Simple dtype conversion placeholder."""
+        # ########## STUB: CTensorOperations.to_dtype_ ##########
+        # PURPOSE: Convert CTensor data to specified dtype.
+        # EXPECTED BEHAVIOR: Return new CTensor with values cast to dtype.
+        # INPUTS: CTensor instance and dtype string.
+        # OUTPUTS: CTensor with cast data.
+        # KEY ASSUMPTIONS/DEPENDENCIES: Only primitive Python dtypes supported.
+        # TODO:
+        #   - Integrate with compiled routines for different types.
+        # NOTES: Current implementation simply returns the original tensor.
+        # ############################################################
+        return tensor
 
     @staticmethod
     def test() -> None:
