@@ -162,6 +162,36 @@ class AbstractTensor(ABC):
         result.data = self.long_cast_(tensor)
         return result
 
+    def float(self, tensor: Any = None) -> "AbstractTensor":
+        tensor = self.ensure_tensor(self.data_or(tensor))
+        result = type(self)(track_time=self.track_time)
+        result.data = self.float_(tensor)
+        return result
+
+    def double(self, tensor: Any = None) -> "AbstractTensor":
+        tensor = self.ensure_tensor(self.data_or(tensor))
+        result = type(self)(track_time=self.track_time)
+        result.data = self.double_(tensor)
+        return result
+
+    def int(self, tensor: Any = None) -> "AbstractTensor":
+        tensor = self.ensure_tensor(self.data_or(tensor))
+        result = type(self)(track_time=self.track_time)
+        result.data = self.int_(tensor)
+        return result
+
+    def long(self, tensor: Any = None) -> "AbstractTensor":
+        tensor = self.ensure_tensor(self.data_or(tensor))
+        result = type(self)(track_time=self.track_time)
+        result.data = self.long_(tensor)
+        return result
+
+    def bool(self, tensor: Any = None) -> "AbstractTensor":
+        tensor = self.ensure_tensor(self.data_or(tensor))
+        result = type(self)(track_time=self.track_time)
+        result.data = self.bool_(tensor)
+        return result
+
     def not_equal(self, tensor1: Any = None, tensor2: Any = None) -> "AbstractTensor":
         t1 = self.ensure_tensor(self.data_or(tensor1))
         t2 = self.ensure_tensor(self.data_or(tensor2))

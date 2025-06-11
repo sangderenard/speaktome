@@ -116,6 +116,21 @@ class PyTorchTensorOperations(AbstractTensor):
     def long_cast_(self, tensor):
         return self._AbstractTensor__unwrap(tensor).long()
 
+    def float_(self, tensor):
+        return self._AbstractTensor__unwrap(tensor).float()
+
+    def double_(self, tensor):
+        return self._AbstractTensor__unwrap(tensor).double()
+
+    def int_(self, tensor):
+        return self._AbstractTensor__unwrap(tensor).int()
+
+    def long_(self, tensor):
+        return self._AbstractTensor__unwrap(tensor).long()
+
+    def bool_(self, tensor):
+        return self._AbstractTensor__unwrap(tensor).bool()
+
     def not_equal_(self, tensor1, tensor2):
         return self._AbstractTensor__unwrap(tensor1) != self._AbstractTensor__unwrap(tensor2)
 
