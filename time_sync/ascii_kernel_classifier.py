@@ -14,7 +14,7 @@ try:
         NumPyTensorOperations,
         Faculty,
     )
-except Exception:
+except Exception as e:
     import sys
     print(ENV_SETUP_BOX)
     sys.exit(1)

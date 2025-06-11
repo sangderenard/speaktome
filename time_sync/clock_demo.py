@@ -5,18 +5,18 @@ The demo runs until ``q`` or ``quit`` is received on standard input.
 """
 from __future__ import annotations
 
-try:
-    from AGENTS.tools.header_utils import ENV_SETUP_BOX
-    import datetime as _dt
-    import argparse
-    import time
-    import json
-    import os
-    import threading
-    import sys
-    import numpy as np
-    from colorama import Style, Fore, Back  # For colored terminal output
-    from time_sync import (
+
+#from AGENTS.tools.header_utils import ENV_SETUP_BOX
+import datetime as _dt
+import argparse
+import time
+import json
+import os
+import threading
+import sys
+import numpy as np
+from colorama import Style, Fore, Back  # For colored terminal output
+from time_sync import (
         get_offset,
         sync_offset,
         print_analog_clock,
@@ -25,50 +25,45 @@ try:
         reset_cursor_to_top,
         full_clear_and_reset_cursor,
     )
-    from time_sync.time_sync.theme_manager import (
+from time_sync.time_sync.theme_manager import (
         ThemeManager,
         ClockTheme,
     )
-    from time_sync.time_sync.render_backend import RenderingBackend
-    from time_sync.frame_buffer import PixelFrameBuffer
-    from time_sync.render_thread import render_loop
-    from time_sync.draw import draw_diff
-    from time_sync.time_sync.ascii_digits import (
+from time_sync.time_sync.render_backend import RenderingBackend
+from time_sync.frame_buffer import PixelFrameBuffer
+from time_sync.render_thread import render_loop
+from time_sync.draw import draw_diff
+from time_sync.time_sync.ascii_digits import (
         compose_ascii_digits,
         ASCII_RAMP_BLOCK,
     )
-    from time_sync.draw import draw_text_overlay  # Import the new text drawing function
-    from PIL import Image
-    import queue
-    from time_sync.menu_resolver import MenuResolver
+from time_sync.draw import draw_text_overlay  # Import the new text drawing function
+from PIL import Image
+import queue
+from time_sync.menu_resolver import MenuResolver
 
     # Platform-specific input handling (adapted from AGENTS/tools/dev_group_menu.py)
-    if os.name == "nt":  # Windows
-        pass  # Windows specific input will be handled directly in input_thread_fn
-    else:  # Unix-like
-        import select
-        import sys
-        import termios
-        import tty
-
-        def getch_timeout(timeout_seconds: float) -> str | None:
-            """Get a single character with timeout on Unix-like systems."""
-            fd = sys.stdin.fileno()
-            old_settings = termios.tcgetattr(fd)
-            try:
-                tty.setraw(sys.stdin.fileno())
-                ready_to_read, _, _ = select.select([sys.stdin], [], [], timeout_seconds)
-                if ready_to_read:
-                    return sys.stdin.read(1)
-                return None
-            finally:
-                termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
-
-except Exception:
+if os.name == "nt":  # Windows
+    pass  # Windows specific input will be handled directly in input_thread_fn
+else:  # Unix-like
+    import select
     import sys
+    import termios
+    import tty
 
-    print(ENV_SETUP_BOX)
-    sys.exit(1)
+    def getch_timeout(timeout_seconds: float) -> str | None:
+        """Get a single character with timeout on Unix-like systems."""
+        fd = sys.stdin.fileno()
+        old_settings = termios.tcgetattr(fd)
+        try:
+            tty.setraw(sys.stdin.fileno())
+            ready_to_read, _, _ = select.select([sys.stdin], [], [], timeout_seconds)
+            if ready_to_read:
+                return sys.stdin.read(1)
+            return None
+        finally:
+            termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+
 # --- END HEADER ---
 
 CHAR_ROWS = 35   # Set your desired ASCII grid height
