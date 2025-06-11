@@ -238,6 +238,32 @@ class NumPyTensorOperations(AbstractTensorOperations):
     def index_select(self, tensor, dim, indices):
         return np.take(tensor, indices, axis=dim)
 
+    def argmin(self, tensor, dim=None):
+        return np.argmin(tensor, axis=dim)
+
+    def interpolate(self, tensor, size):
+        arr = np.array(tensor)
+        if len(size) != arr.ndim:
+            raise ValueError("size must match tensor dimensions")
+
+        def interp_axis(a, new_len, axis):
+            old_len = a.shape[axis]
+            if old_len == new_len:
+                return a
+            old_idx = np.arange(old_len)
+            new_idx = np.linspace(0, old_len - 1, new_len)
+            a = np.swapaxes(a, 0, axis)
+            out_shape = (new_len,) + a.shape[1:]
+            out = np.empty(out_shape, dtype=a.dtype)
+            for idx in np.ndindex(a.shape[1:]):
+                out[(slice(None),) + idx] = np.interp(new_idx, old_idx, a[(slice(None),) + idx])
+            return np.swapaxes(out, 0, axis)
+
+        result = arr
+        for d in range(arr.ndim):
+            result = interp_axis(result, size[d], d)
+        return result
+
 
     def save(self, tensor, filepath: str) -> None:
         np.save(filepath, tensor)

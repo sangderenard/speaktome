@@ -207,6 +207,16 @@ class AbstractTensorOperations(ABC):
     def index_select(self, tensor: Any, dim: int, indices: Any) -> Any:
         pass
 
+    @abstractmethod
+    def argmin(self, tensor: Any, dim: Optional[int] = None) -> Any:
+        """Return indices of the minimum values along ``dim``."""
+        pass
+
+    @abstractmethod
+    def interpolate(self, tensor: Any, size: Tuple[int, ...]) -> Any:
+        """Resize ``tensor`` to ``size`` using linear interpolation."""
+        pass
+
     def to_backend(self, tensor: Any, other: "AbstractTensorOperations") -> Any:
         """Convert ``tensor`` to ``other`` backend using registered paths."""
         if type(self) is type(other):

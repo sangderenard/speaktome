@@ -141,9 +141,11 @@ class AsciiKernelClassifier:
 
         np_ops = get_tensor_operations(Faculty.NUMPY)
         diff_np = ops.to_backend(abs_diff, np_ops)
-        losses_all = diff_np.reshape(diff_np.shape[0], diff_np.shape[1], -1).sum(axis=2)
-        idxs = losses_all.argmin(axis=1)
-        losses = losses_all[np.arange(N), idxs]
+        losses_np = diff_np.reshape(diff_np.shape[0], diff_np.shape[1], -1).sum(axis=2)
+        losses_all = np_ops.to_backend(losses_np, ops)
+        idxs = ops.argmin(losses_all, dim=1)
+        row_indices = ops.arange(N, device=getattr(ops, "default_device", None), dtype=ops.long_dtype)
+        losses = ops.select_by_indices(losses_all, row_indices, idxs)
 
         chars = [self.charset[int(i)] for i in idxs.tolist()]
         return {

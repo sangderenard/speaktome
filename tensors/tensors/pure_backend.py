@@ -446,6 +446,54 @@ class PurePythonTensorOperations(AbstractTensorOperations):
             return [[row[i] for i in indices] for row in tensor]
         raise NotImplementedError("index_select only implemented for dim 0 or 1")
 
+    def argmin(self, tensor: Any, dim: Optional[int] = None) -> Any:
+        shape = _get_shape(tensor)
+        if dim is None:
+            flat = _flatten(tensor)
+            return flat.index(min(flat)) if flat else 0
+        if dim < 0:
+            dim += len(shape)
+        if len(shape) == 1:
+            return tensor.index(min(tensor))
+        if dim == 0:
+            return [self.argmin([row[i] for row in tensor]) for i in range(shape[1])]
+        return [self.argmin(sub, dim - 1) for sub in tensor]
+
+    def interpolate(self, tensor: Any, size: Tuple[int, ...]) -> Any:
+        shape = _get_shape(tensor)
+        if len(shape) != len(size):
+            raise ValueError("size must match tensor dimensions")
+
+        def blend(a, b, frac):
+            if not isinstance(a, list):
+                return a * (1 - frac) + b * frac
+            return [blend(ai, bi, frac) for ai, bi in zip(a, b)]
+
+        def interp_along_dim(data, dim, new_len):
+            if dim == 0:
+                if not isinstance(data, list):
+                    return data
+                old_len = len(data)
+                if old_len == 1:
+                    return [self.clone(data[0]) for _ in range(new_len)]
+                result = []
+                for i in range(new_len):
+                    pos = (i * (old_len - 1)) / (new_len - 1) if new_len > 1 else 0
+                    left = int(math.floor(pos))
+                    right = min(left + 1, old_len - 1)
+                    frac = pos - left
+                    if frac == 0:
+                        result.append(self.clone(data[left]))
+                    else:
+                        result.append(blend(data[left], data[right], frac))
+                return result
+            return [interp_along_dim(sub, dim - 1, new_len) for sub in data]
+
+        result = tensor
+        for dim_idx in reversed(range(len(size))):
+            result = interp_along_dim(result, dim_idx, size[dim_idx])
+        return result
+
     def save(self, tensor: Any, filepath: str) -> None:
         with open(filepath, "w") as f:
             json.dump(tensor, f)
