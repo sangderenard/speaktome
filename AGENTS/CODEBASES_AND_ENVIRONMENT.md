@@ -9,4 +9,4 @@ Conflicts should be rare when tasks remain isolated. When two pull requests impl
 ## Virtual Environment Expectations
 
 All repository scripts run from the `.venv` interpreter created by the setup
-scripts. For detailed instructions see `AGENTS/HEADLESS_SETUP_GUIDE.md`.
+scripts. For detailed instructions see `ENV_SETUP_OPTIONS.md`.

@@ -27,14 +27,14 @@ before attempting any network download.
 
 ## Environment Setup
 
-All environment setup is documented in `AGENTS/HEADLESS_SETUP_GUIDE.md`.
+All environment setup is documented in `../ENV_SETUP_OPTIONS.md`.
 
 
 ### Running Python Modules
 
 Always run modules from the repository root so editable imports resolve
 correctly. Ensure the virtual environment described in
-`AGENTS/HEADLESS_SETUP_GUIDE.md` is active before invoking any module.
+`../ENV_SETUP_OPTIONS.md` is active before invoking any module.
 
 
 ## Running SpeakToMe

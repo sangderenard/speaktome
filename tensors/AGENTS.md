@@ -2,7 +2,7 @@
 
 ## Quick Setup
 
-Refer to `AGENTS/HEADLESS_SETUP_GUIDE.md` for setup instructions.
+Refer to `../ENV_SETUP_OPTIONS.md` for setup instructions.
 
 This directory hosts the implementations of tensor operations for different numerical libraries (NumPy, PyTorch, JAX, etc.).
 

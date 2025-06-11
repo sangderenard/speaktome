@@ -87,6 +87,13 @@ def default_subunit_batch_to_chars(
     return result["chars"]
 
 
+def default_subunit_to_char_kernel(
+    subunit_data: np.ndarray,
+    ramp: str = DEFAULT_DRAW_ASCII_RAMP,
+) -> str:
+    """Map a single subunit's pixel data to an ASCII character."""
+    return default_subunit_batch_to_chars(np.expand_dims(subunit_data, axis=0), ramp)[0]
+
 
 def draw_text_overlay(
     row: int,
