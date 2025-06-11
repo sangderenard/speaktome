@@ -133,3 +133,6 @@ try {
     $torchInfo = 'missing'
 }
 Write-Host "Torch = $torchInfo"
+
+# Launch dev_group_menu for optional installs
+& $venvPython (Join-Path $PSScriptRoot "AGENTS\tools\dev_group_menu.py")
