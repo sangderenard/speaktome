@@ -247,6 +247,34 @@ class JAXTensorOperations(AbstractTensorOperations):
     def index_select(self, tensor: Any, dim: int, indices: Any) -> Any:
         return jnp.take(self._to_jnp(tensor), indices, axis=dim)
 
+    def argmin(self, tensor: Any, dim: Optional[int] = None) -> Any:
+        return jnp.argmin(self._to_jnp(tensor)) if dim is None else jnp.argmin(self._to_jnp(tensor), axis=dim)
+
+    def interpolate(self, tensor: Any, size: Tuple[int, ...]) -> Any:
+        arr = self._to_jnp(tensor)
+        if len(size) != arr.ndim:
+            raise ValueError("size must match tensor dimensions")
+
+        def interp_axis(a, new_len, axis):
+            old_len = a.shape[axis]
+            if old_len == new_len:
+                return a
+            pos = jnp.linspace(0, old_len - 1, new_len)
+            left = jnp.floor(pos).astype(jnp.int32)
+            right = jnp.clip(left + 1, 0, old_len - 1)
+            weight = pos - left
+            left_vals = jnp.take(a, left, axis=axis)
+            right_vals = jnp.take(a, right, axis=axis)
+            shape = [1] * a.ndim
+            shape[axis] = new_len
+            weight = weight.reshape(shape)
+            return left_vals * (1 - weight) + right_vals * weight
+
+        result = arr
+        for d in range(arr.ndim):
+            result = interp_axis(result, size[d], d)
+        return result
+
 
     # --- Persistence helpers ---
     def save(self, tensor: Any, filepath: str) -> None:

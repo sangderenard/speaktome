@@ -185,6 +185,32 @@ class PyTorchTensorOperations(AbstractTensorOperations):
     def index_select(self, tensor, dim, indices):
         return torch.index_select(tensor, dim, indices)
 
+    def argmin(self, tensor, dim=None):
+        return torch.argmin(tensor) if dim is None else torch.argmin(tensor, dim=dim)
+
+    def interpolate(self, tensor, size):
+        if isinstance(size, int):
+            size = (size,)
+        if len(size) != tensor.dim():
+            raise ValueError("size must match tensor dimensions")
+
+        def interp_dim(t, new_len, axis):
+            old_len = t.shape[axis]
+            if old_len == new_len:
+                return t
+            pos = torch.linspace(0, old_len - 1, steps=new_len, device=t.device, dtype=torch.float32)
+            left = pos.floor().long()
+            right = torch.clamp(left + 1, max=old_len - 1)
+            weight = (pos - left.float()).view([-1 if i == axis else 1 for i in range(t.dim())])
+            left_vals = torch.gather(t, axis, left.view([-1 if i == axis else 1 for i in range(t.dim())]).expand([new_len if i == axis else s for i, s in enumerate(t.shape)]))
+            right_vals = torch.gather(t, axis, right.view([-1 if i == axis else 1 for i in range(t.dim())]).expand([new_len if i == axis else s for i, s in enumerate(t.shape)]))
+            return left_vals * (1 - weight) + right_vals * weight
+
+        result = tensor
+        for d in range(tensor.dim()):
+            result = interp_dim(result, size[d], d)
+        return result
+
 
     def save(self, tensor, filepath: str) -> None:
         torch.save(tensor, filepath)

@@ -577,6 +577,34 @@ class CTensorOperations(AbstractTensorOperations):
         # ############################################################
         raise NotImplementedError("index_select not implemented for C backend")
 
+    def argmin(self, tensor: CTensor, dim: Optional[int] = None) -> Any:
+        # ########## STUB: CTensorOperations.argmin ##########
+        # PURPOSE: Placeholder for argmin across dimensions in the C backend.
+        # EXPECTED BEHAVIOR: Should mirror numpy.argmin with optional axis.
+        # INPUTS: CTensor to examine and optional dimension ``dim``.
+        # OUTPUTS: Integer index or CTensor of indices.
+        # KEY ASSUMPTIONS/DEPENDENCIES: Requires C helpers for reduction.
+        # TODO:
+        #   - Implement dimension-aware minimum search.
+        # NOTES: Current backend lacks the functionality to compute argmin.
+        # ############################################################
+        raise NotImplementedError("argmin not implemented for C backend")
+
+    def interpolate(self, tensor: CTensor, size: Tuple[int, ...]) -> Any:
+        # ########## STUB: CTensorOperations.interpolate ##########
+        # PURPOSE: Resize ``tensor`` to ``size`` using linear interpolation.
+        # EXPECTED BEHAVIOR: Perform dimension-wise interpolation similar to
+        #     other backends.
+        # INPUTS: CTensor and target ``size`` tuple.
+        # OUTPUTS: CTensor resized to ``size``.
+        # KEY ASSUMPTIONS/DEPENDENCIES: Would require new C routines for
+        #     interpolation and memory allocation.
+        # TODO:
+        #   - Add C functions to compute interpolated values.
+        # NOTES: Not yet implemented.
+        # ############################################################
+        raise NotImplementedError("interpolate not implemented for C backend")
+
     def stack(self, tensors: list, dim: int = 0) -> Any:
         # ########## STUB: CTensorOperations.stack ##########
         # PURPOSE: Concatenate a sequence of CTensors along a new dimension.

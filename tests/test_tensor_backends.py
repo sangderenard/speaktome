@@ -96,6 +96,20 @@ def run_checks(ops):
     assert ops.tolist(tvals) == [[5, 3], [6, 4]]
     assert ops.tolist(tidxs) == [[1, 2], [2, 0]]
 
+    # Argmin tests
+    amin_idx = ops.argmin(seq)
+    assert _norm(amin_idx) == seq_list.index(min(seq_list))
+    amin_rows = ops.argmin(matrix, dim=1)
+    assert ops.tolist(amin_rows) == [0, 1]
+
+    # Interpolation tests
+    base_1d = ops.tensor_from_list([0.0, 10.0], dtype=ops.float_dtype, device=None)
+    interp = ops.interpolate(base_1d, (5,))
+    assert pytest.approx(ops.tolist(interp)) == [0.0, 2.5, 5.0, 7.5, 10.0]
+    base_2d = ops.tensor_from_list([[0.0, 10.0], [10.0, 20.0]], dtype=ops.float_dtype, device=None)
+    interp2d = ops.interpolate(base_2d, (3, 4))
+    assert ops.shape(interp2d) == (3, 4)
+
     # Test operators on tensors created by the backend
     try:
         # Use float_dtype for these operations
