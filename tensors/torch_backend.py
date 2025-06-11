@@ -31,6 +31,8 @@ try:
     from AGENTS.tools.header_utils import ENV_SETUP_BOX
     from typing import Any, Tuple, List, Optional, Union
 
+    from .abstraction import AbstractTensorOperations
+
     import torch
     import torch.nn.functional as F
 except ModuleNotFoundError:
