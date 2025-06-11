@@ -2,7 +2,7 @@
 
 ## Quick Setup
 
-See `AGENTS/HEADLESS_SETUP_GUIDE.md` for all environment setup instructions.
+See `ENV_SETUP_OPTIONS.md` for all environment setup instructions.
 
 This codebase provides helper scripts for managing the repository and coordinating agent work.
 
