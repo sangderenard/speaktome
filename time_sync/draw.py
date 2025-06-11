@@ -182,10 +182,9 @@ def get_changed_subunits(
                          in the original frame.
         - subunit_data (np.ndarray): A NumPy array representing the pixel data of
                                      the changed subunit, extracted from new_frame.
-                                     The shape of subunit_data will be
-                                     (actual_subunit_height, actual_subunit_width, ...)
-                                     where actual dimensions might be smaller than
-                                     subunit_height/subunit_width if at the frame edge.
+                                     Edge subunits are padded to exactly
+                                     ``(subunit_height, subunit_width, ...)`` so
+                                     all returned arrays share a uniform shape.
 
     Raises:
         ValueError: If old_frame and new_frame do not have the same shape,
@@ -210,12 +209,28 @@ def get_changed_subunits(
             current_subunit_old = old_frame[y:y_end, x:x_end]
             current_subunit_new = new_frame[y:y_end, x:x_end]
 
-            # Compare the subunits.
-            # np.any() checks if any element is True after element-wise comparison.
-            # This handles multi-channel (e.g., RGB) data correctly.
+            # Compare the subunits. np.any() handles multi-channel data
+            # and checks for any difference between the two slices.
             if np.any(current_subunit_old != current_subunit_new):
-                # If a change is detected, append the coordinate and a copy of
-                # the subunit from the new_frame to the list.
-                changed_subunits_list.append((y, x, current_subunit_new.copy()))
+                subunit_data = current_subunit_new.copy()
+
+                # Pad subunits that fall on the frame edge so all entries share
+                # the same shape. The ASCII classifier expects uniform sizes.
+                pad_h = subunit_height - subunit_data.shape[0]
+                pad_w = subunit_width - subunit_data.shape[1]
+                if pad_h > 0 or pad_w > 0:
+                    if subunit_data.ndim == 3:
+                        pad_shape = (
+                            subunit_height,
+                            subunit_width,
+                            subunit_data.shape[2],
+                        )
+                    else:
+                        pad_shape = (subunit_height, subunit_width)
+                    padded = np.zeros(pad_shape, dtype=subunit_data.dtype)
+                    padded[: subunit_data.shape[0], : subunit_data.shape[1]] = subunit_data
+                    subunit_data = padded
+
+                changed_subunits_list.append((y, x, subunit_data))
 
     return changed_subunits_list
