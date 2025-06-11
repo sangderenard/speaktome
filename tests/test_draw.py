@@ -41,6 +41,17 @@ def test_get_changed_subunits_edge_padding():
     assert data[1, 1] == 1
 
 
+def test_get_changed_subunits_edge_short_circuit():
+    old = np.zeros((2, 2), dtype=np.uint8)
+    new = old.copy()
+    subs = get_changed_subunits(old, new, 3, 3)
+    assert len(subs) == 1
+    y, x, data = subs[0]
+    assert (y, x) == (0, 0)
+    # Even without differences, partial subunit should be marked changed
+    assert data.shape == (3, 3)
+
+
 def test_default_kernel_char():
     arr = np.array([[[[255, 255, 255]]]], dtype=np.uint8)
     chars = default_subunit_batch_to_chars(arr)

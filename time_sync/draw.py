@@ -180,11 +180,13 @@ def get_changed_subunits(
                          in the original frame.
         - x_coord (int): The x-coordinate of the top-left corner of the changed subunit
                          in the original frame.
-        - subunit_data (np.ndarray): A NumPy array representing the pixel data of
-                                     the changed subunit, extracted from new_frame.
-                                     Edge subunits are padded to exactly
-                                     ``(subunit_height, subunit_width, ...)`` so
-                                     all returned arrays share a uniform shape.
+        - subunit_data (np.ndarray): Pixel data from ``new_frame`` for the
+                                     changed subunit. If the slice is smaller
+                                     than ``subunit_height`` or ``subunit_width``
+                                     (i.e., it hits the frame edge) the region is
+                                     automatically marked as changed and padded
+                                     so every entry has a uniform shape of
+                                     ``(subunit_height, subunit_width, ...)``.
 
     Raises:
         ValueError: If old_frame and new_frame do not have the same shape,
@@ -208,6 +210,30 @@ def get_changed_subunits(
             # Extract the current subunit from both old and new frames.
             current_subunit_old = old_frame[y:y_end, x:x_end]
             current_subunit_new = new_frame[y:y_end, x:x_end]
+
+            # Short-circuit: if the extracted slice does not match the requested
+            # subunit size we consider it changed regardless of pixel equality.
+            if (
+                current_subunit_new.shape[0] != subunit_height
+                or current_subunit_new.shape[1] != subunit_width
+            ):
+                subunit_data = current_subunit_new.copy()
+                pad_h = subunit_height - subunit_data.shape[0]
+                pad_w = subunit_width - subunit_data.shape[1]
+                if pad_h > 0 or pad_w > 0:
+                    if subunit_data.ndim == 3:
+                        pad_shape = (
+                            subunit_height,
+                            subunit_width,
+                            subunit_data.shape[2],
+                        )
+                    else:
+                        pad_shape = (subunit_height, subunit_width)
+                    padded = np.zeros(pad_shape, dtype=subunit_data.dtype)
+                    padded[: subunit_data.shape[0], : subunit_data.shape[1]] = subunit_data
+                    subunit_data = padded
+                changed_subunits_list.append((y, x, subunit_data))
+                continue
 
             # Compare the subunits. np.any() handles multi-channel data
             # and checks for any difference between the two slices.
