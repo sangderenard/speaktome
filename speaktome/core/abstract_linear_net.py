@@ -7,7 +7,7 @@ try:
     from typing import Any, Iterable, Dict
 
     from .model_abstraction import AbstractModelWrapper
-    from tensors.abstraction import AbstractTensorOperations
+    from tensors.abstraction import AbstractTensor
 except Exception:
     import sys
     print(ENV_SETUP_BOX)
@@ -22,7 +22,7 @@ class AbstractLinearLayer:
         self,
         weight: Any,
         bias: Any,
-        tensor_ops: AbstractTensorOperations,
+        tensor_ops: AbstractTensor,
         activation: str | None = None,
     ) -> None:
         self.weight = weight
@@ -40,10 +40,10 @@ class AbstractLinearLayer:
 
     def forward(self, inputs: Any) -> Any:
         # matrix multiply then add bias using backend operators
-        out = self.ops._AbstractTensorOperations__apply_operator(
+        out = self.ops._AbstractTensor__apply_operator(
             "matmul", inputs, self.weight
         )
-        out = self.ops._AbstractTensorOperations__apply_operator(
+        out = self.ops._AbstractTensor__apply_operator(
             "add", out, self.bias
         )
         return self._apply_activation(out)
@@ -55,7 +55,7 @@ class SequentialLinearModel(AbstractModelWrapper):
     def __init__(
         self,
         layers: Iterable[AbstractLinearLayer],
-        tensor_ops: AbstractTensorOperations,
+        tensor_ops: AbstractTensor,
     ) -> None:
         self.layers = list(layers)
         self.ops = tensor_ops
@@ -64,7 +64,7 @@ class SequentialLinearModel(AbstractModelWrapper):
     def from_weights(
         cls,
         weights: Iterable[tuple[Any, Any]],
-        tensor_ops: AbstractTensorOperations,
+        tensor_ops: AbstractTensor,
         activation: str | None = None,
     ) -> "SequentialLinearModel":
         """Construct layers from ``(weight, bias)`` pairs."""

@@ -3,7 +3,7 @@ TENSOR BACKEND IMPLEMENTATION GUIDELINES:
 ----------------------------------------
 1. OPERATOR IMPLEMENTATION:
    - DO NOT implement magic methods (__add__, __mul__, etc.)
-   - These are handled by AbstractTensorOperations
+   - These are handled by AbstractTensor
    - Only implement the single designated operator method from the abstract class
    
 2. TEST COMPLIANCE:
@@ -13,7 +13,7 @@ TENSOR BACKEND IMPLEMENTATION GUIDELINES:
    - Failed tests are preferable to false implementations
 
 3. BACKEND RESPONSIBILITIES:
-   - Implement only the core tensor operations defined in AbstractTensorOperations
+   - Implement only the core tensor operations defined in AbstractTensor
    - All operator routing happens through the abstract class
    - Let test failures expose missing functionality naturally
 
@@ -23,7 +23,7 @@ TENSOR BACKEND IMPLEMENTATION GUIDELINES:
    - Do not add dummy fallbacks for missing dependencies
 
 Remember: Magic methods and operator overloading are EXCLUSIVELY handled by
-AbstractTensorOperations. Backend implementations provide only the raw
+AbstractTensor. Backend implementations provide only the raw
 tensor operations.
 """
 ```
@@ -36,7 +36,7 @@ This comment should be added to:
 - `speaktome/tensors/pure_backend.py`
 
 The comment emphasizes:
-1. No magic method implementations (these belong in AbstractTensorOperations)
+1. No magic method implementations (these belong in AbstractTensor)
 2. No dummy/mock implementations to pass tests
 3. Clear delineation of responsibilities
 4. Proper dependency handling

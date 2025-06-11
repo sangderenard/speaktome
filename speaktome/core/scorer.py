@@ -19,7 +19,7 @@ try:
     import queue
 
     from tensors import (
-        AbstractTensorOperations,
+        AbstractTensor,
         get_tensor_operations,
     )
 
@@ -34,7 +34,7 @@ except Exception:
 class Scorer:
     """Lazy GPT-2 scorer with pluggable vectorised heuristics and bin management."""
 
-    def __init__(self, tensor_ops: AbstractTensorOperations | None = None) -> None:
+    def __init__(self, tensor_ops: AbstractTensor | None = None) -> None:
         """Initialise defaults, tensor operations and resolve the GPT-2 model path."""
 
         self._model = None

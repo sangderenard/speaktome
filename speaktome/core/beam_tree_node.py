@@ -6,7 +6,7 @@ try:
     import torch
 
     from tensors import (
-        AbstractTensorOperations,
+        AbstractTensor,
         get_tensor_operations,
     )
 except Exception:
@@ -24,7 +24,7 @@ class BeamTreeNode:
         depth: int,
         device="cuda",
         pyg_node_id: Optional[int] = None,
-        tensor_ops: AbstractTensorOperations | None = None,
+        tensor_ops: AbstractTensor | None = None,
     ) -> None:
         tensor_ops = tensor_ops or get_tensor_operations()
         float_dtype = torch.float32 if torch is not None else None

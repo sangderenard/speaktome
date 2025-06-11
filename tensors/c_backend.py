@@ -4,7 +4,7 @@
 # ----------------------------------------
 # 1. OPERATOR IMPLEMENTATION:
 #    - DO NOT implement magic methods (__add__, __mul__, etc.)
-#    - These are handled by AbstractTensorOperations
+#    - These are handled by AbstractTensor
 #    - Only implement the single designated operator method from the abstract class
 #
 # 2. TEST COMPLIANCE:
@@ -14,7 +14,7 @@
 #    - Failed tests are preferable to false implementations
 #
 # 3. BACKEND RESPONSIBILITIES:
-#    - Implement only the core tensor operations defined in AbstractTensorOperations
+#    - Implement only the core tensor operations defined in AbstractTensor
 #    - All operator routing happens through the abstract class
 #    - Let test failures expose missing functionality naturally
 #
@@ -24,7 +24,7 @@
 #    - Do not add dummy fallbacks for missing dependencies
 #
 # Remember: Magic methods and operator overloading are EXCLUSIVELY handled by
-# AbstractTensorOperations. Backend implementations provide only the raw
+# AbstractTensor. Backend implementations provide only the raw
 # tensor operations.
 
 import os
@@ -36,7 +36,7 @@ from cffi import FFI
 
 # The tensor abstraction module was renamed to ``abstraction``. Update imports
 # accordingly so the C backend stays in sync with the other backends.
-from .abstraction import AbstractTensorOperations, _get_shape, _flatten
+from .abstraction import AbstractTensor, _get_shape, _flatten
 
 # --- END HEADER ---
 
@@ -203,10 +203,10 @@ class CTensor:
         buf = ffi.new("double[]", [float(x) for x in flat])
         return cls(shape, buf)
 
-class CTensorOperations(AbstractTensorOperations):
+class CTensorOperations(AbstractTensor):
     """C backend using cffi for all arithmetic ops."""
 
-    def _AbstractTensorOperations__apply_operator(self, op: str, left: CTensor, right: Any):
+    def _AbstractTensor__apply_operator(self, op: str, left: CTensor, right: Any):
         """Operate on ``CTensor`` objects or scalars."""
         if isinstance(right, CTensor) and isinstance(left, CTensor):
             if left.shape != right.shape:

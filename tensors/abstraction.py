@@ -24,15 +24,15 @@ except Exception:
     sys.exit(1)
 # --- END HEADER ---
 
-CONVERSION_REGISTRY: Dict[Tuple[type, type], Callable[["AbstractTensorOperations", Any, "AbstractTensorOperations"], Any]] = {}
+CONVERSION_REGISTRY: Dict[Tuple[type, type], Callable[["AbstractTensor", Any, "AbstractTensor"], Any]] = {}
 
-OPS_CACHE: Dict[type, "AbstractTensorOperations"] = {}
+OPS_CACHE: Dict[type, "AbstractTensor"] = {}
 
-def register_conversion(src_cls: type, tgt_cls: type, func: Callable[["AbstractTensorOperations", Any, "AbstractTensorOperations"], Any]) -> None:
+def register_conversion(src_cls: type, tgt_cls: type, func: Callable[["AbstractTensor", Any, "AbstractTensor"], Any]) -> None:
     """Register a direct tensor conversion function."""
     CONVERSION_REGISTRY[(src_cls, tgt_cls)] = func
 
-def _get_ops_for_class(cls: type) -> "AbstractTensorOperations":
+def _get_ops_for_class(cls: type) -> "AbstractTensor":
     if cls in OPS_CACHE:
         return OPS_CACHE[cls]
     if cls.__name__.startswith("PyTorch"):
@@ -63,7 +63,7 @@ def _find_conversion_path(src_cls: type, tgt_cls: type) -> List[Tuple[type, type
                 seen.add(b)
     return []
 
-class AbstractTensorOperations(ABC):
+class AbstractTensor(ABC):
     def __init__(self, track_time: bool = False) -> None:
         """Optional benchmark support for tensor operations."""
         self.track_time = track_time
@@ -81,22 +81,26 @@ class AbstractTensorOperations(ABC):
 
     # --- Tensor creation and manipulation methods ---
     def full(self, size: Tuple[int, ...], fill_value: Any, dtype: Any = None, device: Any = None):
-        self.data = self.full_(size, fill_value, dtype, device)
-        return self.data
+        result = type(self)(track_time=self.track_time)
+        result.data = self.full_(size, fill_value, dtype, device)
+        return result
 
     def zeros(self, size: Tuple[int, ...], dtype: Any = None, device: Any = None):
-        self.data = self.zeros_(size, dtype, device)
-        return self.data
+        result = type(self)(track_time=self.track_time)
+        result.data = self.zeros_(size, dtype, device)
+        return result
 
-    def clone(self, tensor: Any = None) -> Any:
-        tensor = self.data_or(tensor)
-        self.data = self.clone_(tensor)
-        return self.data
+    def clone(self, tensor: Any = None) -> "AbstractTensor":
+        tensor = self.ensure_tensor(self.data_or(tensor))
+        result = type(self)(track_time=self.track_time)
+        result.data = self.clone_(tensor)
+        return result
 
-    def to_device(self, tensor: Any = None, device: Any = None) -> Any:
-        tensor = self.data_or(tensor)
-        self.data = self.to_device_(tensor, device)
-        return self.data
+    def to_device(self, tensor: Any = None, device: Any = None) -> "AbstractTensor":
+        tensor = self.ensure_tensor(self.data_or(tensor))
+        result = type(self)(track_time=self.track_time)
+        result.data = self.to_device_(tensor, device)
+        return result
 
     def get_device(self, tensor: Any = None) -> Any:
         tensor = self.data_or(tensor)
@@ -110,79 +114,96 @@ class AbstractTensorOperations(ABC):
         tensor = self.data_or(tensor)
         return self.item_(tensor)
 
-    def max(self, tensor: Any = None) -> Any:
-        tensor = self.data_or(tensor)
-        self.data = self.max_(tensor)
-        return self.data
+    def max(self, tensor: Any = None) -> "AbstractTensor":
+        tensor = self.ensure_tensor(self.data_or(tensor))
+        result = type(self)(track_time=self.track_time)
+        result.data = self.max_(tensor)
+        return result
 
-    def long_cast(self, tensor: Any = None) -> Any:
-        tensor = self.data_or(tensor)
-        self.data = self.long_cast_(tensor)
-        return self.data
+    def long_cast(self, tensor: Any = None) -> "AbstractTensor":
+        tensor = self.ensure_tensor(self.data_or(tensor))
+        result = type(self)(track_time=self.track_time)
+        result.data = self.long_cast_(tensor)
+        return result
 
-    def not_equal(self, tensor1: Any = None, tensor2: Any = None) -> Any:
-        t1 = self.data_or(tensor1)
-        t2 = self.data_or(tensor2)
-        self.data = self.not_equal_(t1, t2)
-        return self.data
+    def not_equal(self, tensor1: Any = None, tensor2: Any = None) -> "AbstractTensor":
+        t1 = self.ensure_tensor(self.data_or(tensor1))
+        t2 = self.ensure_tensor(self.data_or(tensor2))
+        result = type(self)(track_time=self.track_time)
+        result.data = self.not_equal_(t1, t2)
+        return result
 
-    def arange(self, start: int, end: Optional[int] = None, step: int = 1, device: Any = None, dtype: Any = None) -> Any:
-        self.data = self.arange_(start, end, step, device, dtype)
-        return self.data
+    def arange(self, start: int, end: Optional[int] = None, step: int = 1, device: Any = None, dtype: Any = None) -> "AbstractTensor":
+        result = type(self)(track_time=self.track_time)
+        result.data = self.arange_(start, end, step, device, dtype)
+        return result
 
-    def select_by_indices(self, tensor: Any = None, indices_dim0: Any = None, indices_dim1: Any = None) -> Any:
-        tensor = self.data_or(tensor)
-        self.data = self.select_by_indices_(tensor, indices_dim0, indices_dim1)
-        return self.data
+    def select_by_indices(self, tensor: Any = None, indices_dim0: Any = None, indices_dim1: Any = None) -> "AbstractTensor":
+        tensor = self.ensure_tensor(self.data_or(tensor))
+        result = type(self)(track_time=self.track_time)
+        result.data = self.select_by_indices_(tensor, indices_dim0, indices_dim1)
+        return result
 
-    def log_softmax(self, tensor: Any = None, dim: int = -1) -> Any:
-        tensor = self.data_or(tensor)
-        self.data = self.log_softmax_(tensor, dim)
-        return self.data
+    def log_softmax(self, tensor: Any = None, dim: int = -1) -> "AbstractTensor":
+        tensor = self.ensure_tensor(self.data_or(tensor))
+        result = type(self)(track_time=self.track_time)
+        result.data = self.log_softmax_(tensor, dim)
+        return result
 
-    def pad(self, tensor: Any = None, pad: Tuple[int, ...] = (0, 0), value: float = 0) -> Any:
-        tensor = self.data_or(tensor)
-        self.data = self.pad_(tensor, pad, value)
-        return self.data
+    def pad(self, tensor: Any = None, pad: Tuple[int, ...] = (0, 0), value: float = 0) -> "AbstractTensor":
+        tensor = self.ensure_tensor(self.data_or(tensor))
+        result = type(self)(track_time=self.track_time)
+        result.data = self.pad_(tensor, pad, value)
+        return result
 
-    def cat(self, tensors: List[Any], dim: int = 0) -> Any:
-        self.data = self.cat_(tensors, dim)
-        return self.data
+    def cat(self, tensors: List[Any], dim: int = 0) -> "AbstractTensor":
+        tensors = [self.ensure_tensor(t) for t in tensors]
+        result = type(self)(track_time=self.track_time)
+        result.data = self.cat_(tensors, dim)
+        return result
 
-    def topk(self, tensor: Any = None, k: int = 1, dim: int = -1) -> Tuple[Any, Any]:
-        tensor = self.data_or(tensor)
+    def topk(self, tensor: Any = None, k: int = 1, dim: int = -1) -> Tuple["AbstractTensor", Any]:
+        tensor = self.ensure_tensor(self.data_or(tensor))
         values, idxs = self.topk_(tensor, k, dim)
-        self.data = values
-        return values, idxs
+        result = type(self)(track_time=self.track_time)
+        result.data = values
+        return result, idxs
 
-    def stack(self, tensors: List[Any], dim: int = 0) -> Any:
-        self.data = self.stack_(tensors, dim)
-        return self.data
+    def stack(self, tensors: List[Any], dim: int = 0) -> "AbstractTensor":
+        tensors = [self.ensure_tensor(t) for t in tensors]
+        result = type(self)(track_time=self.track_time)
+        result.data = self.stack_(tensors, dim)
+        return result
 
-    def repeat_interleave(self, tensor: Any = None, repeats: int = 1, dim: Optional[int] = None) -> Any:
-        tensor = self.data_or(tensor)
-        self.data = self.repeat_interleave_(tensor, repeats, dim)
-        return self.data
+    def repeat_interleave(self, tensor: Any = None, repeats: int = 1, dim: Optional[int] = None) -> "AbstractTensor":
+        tensor = self.ensure_tensor(self.data_or(tensor))
+        result = type(self)(track_time=self.track_time)
+        result.data = self.repeat_interleave_(tensor, repeats, dim)
+        return result
 
-    def view_flat(self, tensor: Any = None) -> Any:
-        tensor = self.data_or(tensor)
-        self.data = self.view_flat_(tensor)
-        return self.data
+    def view_flat(self, tensor: Any = None) -> "AbstractTensor":
+        tensor = self.ensure_tensor(self.data_or(tensor))
+        result = type(self)(track_time=self.track_time)
+        result.data = self.view_flat_(tensor)
+        return result
 
-    def assign_at_indices(self, tensor_to_modify: Any = None, indices_dim0: Any = None, indices_dim1: Any = None, values_to_assign: Any = None):
-        tensor_to_modify = self.data_or(tensor_to_modify)
-        self.data = self.assign_at_indices_(tensor_to_modify, indices_dim0, indices_dim1, values_to_assign)
-        return self.data
+    def assign_at_indices(self, tensor_to_modify: Any = None, indices_dim0: Any = None, indices_dim1: Any = None, values_to_assign: Any = None) -> "AbstractTensor":
+        tensor_to_modify = self.ensure_tensor(self.data_or(tensor_to_modify))
+        result = type(self)(track_time=self.track_time)
+        result.data = self.assign_at_indices_(tensor_to_modify, indices_dim0, indices_dim1, values_to_assign)
+        return result
 
-    def increment_at_indices(self, tensor_to_modify: Any = None, mask: Any = None):
-        tensor_to_modify = self.data_or(tensor_to_modify)
-        self.data = self.increment_at_indices_(tensor_to_modify, mask)
-        return self.data
+    def increment_at_indices(self, tensor_to_modify: Any = None, mask: Any = None) -> "AbstractTensor":
+        tensor_to_modify = self.ensure_tensor(self.data_or(tensor_to_modify))
+        result = type(self)(track_time=self.track_time)
+        result.data = self.increment_at_indices_(tensor_to_modify, mask)
+        return result
 
-    def clamp(self, tensor: Any = None, min_val: Optional[float] = None, max_val: Optional[float] = None) -> Any:
-        tensor = self.data_or(tensor)
-        self.data = self.clamp_(tensor, min_val, max_val)
-        return self.data
+    def clamp(self, tensor: Any = None, min_val: Optional[float] = None, max_val: Optional[float] = None) -> "AbstractTensor":
+        tensor = self.ensure_tensor(self.data_or(tensor))
+        result = type(self)(track_time=self.track_time)
+        result.data = self.clamp_(tensor, min_val, max_val)
+        return result
 
     def shape(self, tensor: Any = None) -> Tuple[int, ...]:
         tensor = self.data_or(tensor)
@@ -192,65 +213,77 @@ class AbstractTensorOperations(ABC):
         tensor = self.data_or(tensor)
         return self.numel_(tensor)
 
-    def mean(self, tensor: Any = None, dim: Optional[int] = None) -> Any:
-        tensor = self.data_or(tensor)
-        self.data = self.mean_(tensor, dim)
-        return self.data
+    def mean(self, tensor: Any = None, dim: Optional[int] = None) -> "AbstractTensor":
+        tensor = self.ensure_tensor(self.data_or(tensor))
+        result = type(self)(track_time=self.track_time)
+        result.data = self.mean_(tensor, dim)
+        return result
 
-    def pow(self, tensor: Any = None, exponent: float = 1.0) -> Any:
-        tensor = self.data_or(tensor)
-        self.data = self.pow_(tensor, exponent)
-        return self.data
+    def pow(self, tensor: Any = None, exponent: float = 1.0) -> "AbstractTensor":
+        tensor = self.ensure_tensor(self.data_or(tensor))
+        result = type(self)(track_time=self.track_time)
+        result.data = self.pow_(tensor, exponent)
+        return result
 
-    def sqrt(self, tensor: Any = None) -> Any:
-        tensor = self.data_or(tensor)
-        self.data = self.sqrt_(tensor)
-        return self.data
+    def sqrt(self, tensor: Any = None) -> "AbstractTensor":
+        tensor = self.ensure_tensor(self.data_or(tensor))
+        result = type(self)(track_time=self.track_time)
+        result.data = self.sqrt_(tensor)
+        return result
 
-    def tensor_from_list(self, data: List[Any], dtype: Any = None, device: Any = None) -> Any:
-        self.data = self.tensor_from_list_(data, dtype, device)
-        return self.data
+    def tensor_from_list(self, data: List[Any], dtype: Any = None, device: Any = None) -> "AbstractTensor":
+        result = type(self)(track_time=self.track_time)
+        result.data = self.tensor_from_list_(data, dtype, device)
+        return result
 
-    def boolean_mask_select(self, tensor: Any = None, mask: Any = None) -> Any:
-        tensor = self.data_or(tensor)
-        self.data = self.boolean_mask_select_(tensor, mask)
-        return self.data
+    def boolean_mask_select(self, tensor: Any = None, mask: Any = None) -> "AbstractTensor":
+        tensor = self.ensure_tensor(self.data_or(tensor))
+        result = type(self)(track_time=self.track_time)
+        result.data = self.boolean_mask_select_(tensor, mask)
+        return result
 
     def tolist(self, tensor: Any = None) -> List[Any]:
-        tensor = self.data_or(tensor)
+        tensor = self.ensure_tensor(self.data_or(tensor))
         return self.tolist_(tensor)
 
-    def less(self, tensor: Any = None, value: Any = None) -> Any:
-        tensor = self.data_or(tensor)
-        self.data = self.less_(tensor, value)
-        return self.data
+    def less(self, tensor: Any = None, value: Any = None) -> "AbstractTensor":
+        tensor = self.ensure_tensor(self.data_or(tensor))
+        result = type(self)(track_time=self.track_time)
+        result.data = self.less_(tensor, value)
+        return result
 
-    def index_select(self, tensor: Any = None, dim: int = 0, indices: Any = None) -> Any:
-        tensor = self.data_or(tensor)
-        self.data = self.index_select_(tensor, dim, indices)
-        return self.data
+    def index_select(self, tensor: Any = None, dim: int = 0, indices: Any = None) -> "AbstractTensor":
+        tensor = self.ensure_tensor(self.data_or(tensor))
+        result = type(self)(track_time=self.track_time)
+        result.data = self.index_select_(tensor, dim, indices)
+        return result
 
-    def argmin(self, tensor: Any = None, dim: Optional[int] = None) -> Any:
-        tensor = self.data_or(tensor)
-        self.data = self.argmin_(tensor, dim)
-        return self.data
+    def argmin(self, tensor: Any = None, dim: Optional[int] = None) -> "AbstractTensor":
+        tensor = self.ensure_tensor(self.data_or(tensor))
+        result = type(self)(track_time=self.track_time)
+        result.data = self.argmin_(tensor, dim)
+        return result
 
-    def interpolate(self, tensor: Any = None, size: Tuple[int, ...] = None) -> Any:
-        tensor = self.data_or(tensor)
-        self.data = self.interpolate_(tensor, size)
-        return self.data
+    def interpolate(self, tensor: Any = None, size: Tuple[int, ...] = None) -> "AbstractTensor":
+        tensor = self.ensure_tensor(self.data_or(tensor))
+        result = type(self)(track_time=self.track_time)
+        result.data = self.interpolate_(tensor, size)
+        return result
 
     def save(self, tensor: Any = None, filepath: str = None) -> None:
-        tensor = self.data_or(tensor)
-        return self.save_(tensor, filepath)
+        tensor = self.ensure_tensor(self.data_or(tensor))
+        self.save_(tensor, filepath)
 
-    def load(self, filepath: str, dtype: Any = None, device: Any = None) -> Any:
-        self.data = self.load_(filepath, dtype, device)
-        return self.data
+    def load(self, filepath: str, dtype: Any = None, device: Any = None) -> "AbstractTensor":
+        result = type(self)(track_time=self.track_time)
+        result.data = self.load_(filepath, dtype, device)
+        return result
 
-    def to_dtype(self, dtype: str = "float") -> None:
+    def to_dtype(self, dtype: str = "float") -> "AbstractTensor":
         """Convert self.data to the specified dtype using the backend's to_dtype_ method."""
-        self.data = self.to_dtype_(self.data, dtype)
+        result = type(self)(track_time=self.track_time)
+        result.data = self.to_dtype_(self.data, dtype)
+        return result
 
     # --- Dtype helpers ---
     @property
@@ -270,8 +303,8 @@ class AbstractTensorOperations(ABC):
         return self.tensor_type_
 
     # Lightweight helper to coerce arbitrary input to this backend's tensor type
-    def to_backend(self, target_ops: "AbstractTensorOperations") -> "AbstractTensorOperations":
-        """Convert this tensor to the target backend, returning a new AbstractTensorOperations instance with .data set."""
+    def to_backend(self, target_ops: "AbstractTensor") -> "AbstractTensor":
+        """Convert this tensor to the target backend, returning a new AbstractTensor instance with .data set."""
         if type(self) is type(target_ops):
             # Same backend: clone or return self
             new_tensor = type(self)()
@@ -294,8 +327,8 @@ class AbstractTensorOperations(ABC):
             raise ValueError("ensure_tensor called with tensor=None")
         if isinstance(tensor, self.tensor_type):
             return tensor
-        # If tensor is an AbstractTensorOperations instance, convert using to_backend
-        if isinstance(tensor, AbstractTensorOperations):
+        # If tensor is an AbstractTensor instance, convert using to_backend
+        if isinstance(tensor, AbstractTensor):
             return tensor.to_backend(self).data
         if torch is not None and isinstance(tensor, torch.Tensor):
             torch_ops = get_tensor_operations(Faculty.TORCH)
@@ -306,18 +339,19 @@ class AbstractTensorOperations(ABC):
             numpy_tensor.data = tensor
             return numpy_tensor.to_backend(self).data
         if isinstance(tensor, list):
-            return self.tensor_from_list(tensor, dtype=None, device=None)
+            return self.tensor_from_list(tensor, dtype=None, device=None).data
         if hasattr(tensor, "tolist"):
-            return self.tensor_from_list(tensor.tolist(), dtype=None, device=None)
-        return self.tensor_from_list([tensor], dtype=None, device=None)
+            return self.tensor_from_list(tensor.tolist(), dtype=None, device=None).data
+        return self.tensor_from_list([tensor], dtype=None, device=None).data
 
     # --- Operator routing ---
     def __apply_operator(self, op: str, left: Any, right: Any):
-        # If left or right is None, use self.data
-        l = self.data_or(left)
-        r = self.data_or(right)
-        self.data = self.__apply_operator_(op, l, r)
-        return self.data
+        """Apply ``op`` to ``left`` and ``right`` returning a new tensor."""
+        l = self.ensure_tensor(self.data_or(left))
+        r = self.ensure_tensor(self.data_or(right))
+        result = type(self)(track_time=self.track_time)
+        result.data = self.__apply_operator_(op, l, r)
+        return result
 
     # legacy entry point should be inaccessible
     def _apply_operator(self, *args, **kwargs):  # pragma: no cover - convenience
@@ -420,7 +454,7 @@ def _flatten(data):
 
 
 def default_to_backend(
-    source_ops: "AbstractTensorOperations", tensor: Any, target_ops: "AbstractTensorOperations"
+    source_ops: "AbstractTensor", tensor: Any, target_ops: "AbstractTensor"
 ) -> Any:
     """Fallback conversion using :meth:`tolist` and :meth:`tensor_from_list`."""
     if type(source_ops) is type(target_ops):
@@ -439,7 +473,7 @@ def default_to_backend(
     return target_ops.tensor_from_list(data, dtype=dtype, device=device)
 
 
-def get_tensor_operations(faculty: Faculty | None = None, *, track_time: bool = False) -> AbstractTensorOperations:
+def get_tensor_operations(faculty: Faculty | None = None, *, track_time: bool = False) -> AbstractTensor:
     """Return a tensor operations backend based on the faculty tier."""
 
     faculty = faculty or DEFAULT_FACULTY

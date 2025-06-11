@@ -1,10 +1,10 @@
-"""PyTorch implementation of :class:`AbstractTensorOperations`."""
+"""PyTorch implementation of :class:`AbstractTensor`."""
 
 # TENSOR BACKEND IMPLEMENTATION GUIDELINES:
 # ----------------------------------------
 # 1. OPERATOR IMPLEMENTATION:
 #    - DO NOT implement magic methods (__add__, __mul__, etc.)
-#    - These are handled by AbstractTensorOperations
+#    - These are handled by AbstractTensor
 #    - Only implement the single designated operator method from the abstract class
 #
 # 2. TEST COMPLIANCE:
@@ -14,7 +14,7 @@
 #    - Failed tests are preferable to false implementations
 #
 # 3. BACKEND RESPONSIBILITIES:
-#    - Implement only the core tensor operations defined in AbstractTensorOperations
+#    - Implement only the core tensor operations defined in AbstractTensor
 #    - All operator routing happens through the abstract class
 #    - Let test failures expose missing functionality naturally
 #
@@ -24,14 +24,14 @@
 #    - Do not add dummy fallbacks for missing dependencies
 #
 # Remember: Magic methods and operator overloading are EXCLUSIVELY handled by
-# AbstractTensorOperations. Backend implementations provide only the raw
+# AbstractTensor. Backend implementations provide only the raw
 # tensor operations.
 
 try:
     from AGENTS.tools.header_utils import ENV_SETUP_BOX
     from typing import Any, Tuple, List, Optional, Union
 
-    from .abstraction import AbstractTensorOperations
+    from .abstraction import AbstractTensor
 
     import torch
     import torch.nn.functional as F
@@ -44,14 +44,14 @@ except Exception:
     sys.exit(1)
 # --- END HEADER ---
 
-class PyTorchTensorOperations(AbstractTensorOperations):
+class PyTorchTensorOperations(AbstractTensor):
     def __init__(self, default_device: Union[str, "torch.device"] = "cpu", track_time: bool = False):
         super().__init__(track_time=track_time)
         if torch is None:
             raise RuntimeError("PyTorch is required for this backend")
         self.default_device = torch.device(default_device)
 
-    def _AbstractTensorOperations__apply_operator_(self, op: str, left: Any, right: Any):
+    def _AbstractTensor__apply_operator_(self, op: str, left: Any, right: Any):
         """Delegate arithmetic ops to PyTorch tensors."""
         a = left
         b = right

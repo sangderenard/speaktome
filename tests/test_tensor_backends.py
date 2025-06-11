@@ -217,7 +217,7 @@ def test_pure_python_matmul():
     ops = PurePythonTensorOperations()
     a = [[1, 2], [3, 4]]
     b = [[5, 6], [7, 8]]
-    result = ops._AbstractTensorOperations__apply_operator("matmul", a, b)
+    result = ops._AbstractTensor__apply_operator("matmul", a, b)
     assert result == [[19, 22], [43, 50]]
 
 

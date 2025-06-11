@@ -1,4 +1,4 @@
-"""JAX implementation of :class:`AbstractTensorOperations`."""
+"""JAX implementation of :class:`AbstractTensor`."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ from __future__ import annotations
 # ----------------------------------------
 # 1. OPERATOR IMPLEMENTATION:
 #    - DO NOT implement magic methods (__add__, __mul__, etc.)
-#    - These are handled by AbstractTensorOperations
+#    - These are handled by AbstractTensor
 #    - Only implement the single designated operator method from the abstract class
 #
 # 2. TEST COMPLIANCE:
@@ -16,7 +16,7 @@ from __future__ import annotations
 #    - Failed tests are preferable to false implementations
 #
 # 3. BACKEND RESPONSIBILITIES:
-#    - Implement only the core tensor operations defined in AbstractTensorOperations
+#    - Implement only the core tensor operations defined in AbstractTensor
 #    - All operator routing happens through the abstract class
 #    - Let test failures expose missing functionality naturally
 #
@@ -26,12 +26,12 @@ from __future__ import annotations
 #    - Do not add dummy fallbacks for missing dependencies
 #
 # Remember: Magic methods and operator overloading are EXCLUSIVELY handled by
-# AbstractTensorOperations. Backend implementations provide only the raw
+# AbstractTensor. Backend implementations provide only the raw
 # tensor operations.
 
 from typing import Any, Tuple, List, Optional
 
-from .abstraction import AbstractTensorOperations
+from .abstraction import AbstractTensor
 
 try:
     from AGENTS.tools.header_utils import ENV_SETUP_BOX
@@ -48,7 +48,7 @@ except Exception:
     sys.exit(1)
 # --- END HEADER ---
 
-class JAXTensorOperations(AbstractTensorOperations):
+class JAXTensorOperations(AbstractTensor):
     """Tensor operations powered by `jax.numpy`."""
 
     def __init__(self, default_device: Optional[Any] = None, track_time: bool = False) -> None:
@@ -84,7 +84,7 @@ class JAXTensorOperations(AbstractTensorOperations):
         
         return jax.device_put(self._to_jnp(tensor), target_device)
 
-    def _AbstractTensorOperations__apply_operator_(self, op: str, left: Any, right: Any):
+    def _AbstractTensor__apply_operator_(self, op: str, left: Any, right: Any):
         """Apply arithmetic ops using JAX arrays."""
         a = self._to_jnp(left)
         b = self._to_jnp(right)
