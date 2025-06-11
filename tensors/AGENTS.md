@@ -2,7 +2,7 @@
 
 ## Quick Setup
 
-Run `setup_env_dev.sh` to install this codebase. Extras for specific backends can be added via pip, e.g. `pip install -e .[jax]`.
+Refer to `AGENTS/HEADLESS_SETUP_GUIDE.md` for setup instructions.
 
 This directory hosts the implementations of tensor operations for different numerical libraries (NumPy, PyTorch, JAX, etc.).
 

@@ -16,7 +16,7 @@ Any reusable Python scripts or binary utilities meant for agents must live in `A
 
 For deeper historical context, read through all prior reports. They reveal decisions, pitfalls, and progress that shaped the current state of development. If you are tempted to install packages manually with `pip`, stop and read `AGENTS_DO_NOT_PIP_MANUALLY.md` first. The provided setup scripts manage dependencies for you and explain how optional groups work. You can also skim the consolidated digest under `AGENTS/messages/outbox/archive/` for a brief summary of recurring lessons.
 
-**CI and Headless Agents:** invoke `setup_env_dev.sh` without any extras or prefetch flags. Past documentation suggested running `AGENTS/tools/dev_group_menu.py` directly, but this approach proved unreliable. See `AGENTS/OBSOLETE_SETUP_GUIDE.md` for details.
+**CI and Headless Agents:** see `AGENTS/HEADLESS_SETUP_GUIDE.md`.
 
 If you crave an immediate, exhaustive overview, run this one-liner. It will spew every markdown, script and source file to your terminal. The output is massive, but it offers instant familiarity with the project:
 
