@@ -4,6 +4,9 @@
 from __future__ import annotations
 
 import torch
+from torch import nn
+from torch.nn import functional as F
+from pathlib import Path
 from scipy.sparse import coo_matrix
 from typing import Callable, Tuple
 
@@ -70,13 +73,60 @@ class PeriodicLinspace:
 # OUTPUTS: metric tensor of shape (N,3,3)
 # KEY ASSUMPTIONS/DEPENDENCIES: depends on a trained neural network model
 # TODO:
-#   - Implement neural network forward pass
-# NOTES: Placeholder uses identity metric everywhere.
+#   - Load pretrained weights from ``neural_metric.pt`` if available.
+#   - Implement full training pipeline for the network.
+# NOTES: Fallbacks to identity metrics when no model is present.
 # ###########################################################################
+
+
+class _NeuralMetricNet(nn.Module):
+    """Minimal feedforward network predicting symmetric 3x3 metrics."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.layers = nn.Sequential(
+            nn.Linear(3, 32),
+            nn.Tanh(),
+            nn.Linear(32, 32),
+            nn.Tanh(),
+            nn.Linear(32, 6),
+        )
+
+    def forward(self, pts: torch.Tensor) -> torch.Tensor:  # (N,3)
+        out = self.layers(pts)
+        diag = F.softplus(out[:, :3]) + 1.0
+        off = out[:, 3:]
+        g = torch.zeros(pts.shape[0], 3, 3, device=pts.device)
+        g[:, 0, 0] = diag[:, 0]
+        g[:, 1, 1] = diag[:, 1]
+        g[:, 2, 2] = diag[:, 2]
+        g[:, 0, 1] = g[:, 1, 0] = off[:, 0]
+        g[:, 0, 2] = g[:, 2, 0] = off[:, 1]
+        g[:, 1, 2] = g[:, 2, 1] = off[:, 2]
+        return g
+
+
+_METRIC_MODEL: _NeuralMetricNet | None = None
+
+
 def neural_metric_tensor(coords: torch.Tensor) -> torch.Tensor:
-    size = coords.shape[0]
-    eye = torch.eye(3, device=coords.device).expand(size, 3, 3)
-    return eye
+    """Return a metric tensor for each coordinate."""
+    global _METRIC_MODEL
+    if _METRIC_MODEL is None:
+        model_path = Path(__file__).with_name("neural_metric.pt")
+        if model_path.exists():
+            _METRIC_MODEL = _NeuralMetricNet()
+            state = torch.load(model_path, map_location="cpu")
+            _METRIC_MODEL.load_state_dict(state)
+            _METRIC_MODEL.eval()
+
+    if _METRIC_MODEL is None:
+        size = coords.shape[0]
+        eye = torch.eye(3, device=coords.device).expand(size, 3, 3)
+        return eye
+
+    with torch.no_grad():
+        return _METRIC_MODEL(coords)
 
 
 class BuildLaplace3D:
