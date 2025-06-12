@@ -8,7 +8,8 @@ param(
 
 # Manual flag parsing for all arguments (case-insensitive, -flag=value style)
 $NoVenv = $false
-$NoTorch = $false
+$UseTorch = $false
+$UseGpuTorch = $false
 $headless = $false
 $FromDev = $false
 $Codebases = @()
@@ -16,7 +17,9 @@ $Groups = @()
 foreach ($arg in $args) {
     $arg_lc = $arg.ToLower()
     if ($arg_lc -eq '-novenv') { $NoVenv = $true }
-    elseif ($arg_lc -eq '-notorch') { $NoTorch = $true }
+    elseif ($arg_lc -eq '-torch') { $UseTorch = $true }
+    elseif ($arg_lc -eq '-gpu' -or $arg_lc -eq '-gpu-torch') { $UseTorch = $true; $UseGpuTorch = $true }
+    elseif ($arg_lc -eq '-notorch') { $UseTorch = $false }
     elseif ($arg_lc -eq '-headless') { $headless = $true }
     elseif ($arg_lc -eq '-fromdev') { $FromDev = $true }
     elseif ($arg_lc -like '-codebases=*') {
@@ -34,8 +37,9 @@ foreach ($arg in $args) {
 }
 
 # All options for this script should be used with single-dash PowerShell-style flags, e.g.:
-#   -NoTorch -NoVenv -Codebases projectA,projectB -Groups groupX
-# Do not use double-dash flags (e.g., --notorch) with this script.
+#   -Torch -NoVenv -Codebases projectA,projectB -Groups groupX
+# Use -Torch or -Gpu to request torch. If omitted, torch is skipped.
+# Do not use double-dash flags with this script.
 
 $activeFile = $env:SPEAKTOME_ACTIVE_FILE
 if (-not $activeFile) {
@@ -73,7 +77,6 @@ if ($Groups) {
         }
     }
 }
-if ($NoTorch) { $menuArgs += '-NoTorch' }
 Write-Host "[DEBUG] Codebases: $($Codebases -join ';')"
 Write-Host "[DEBUG] Groups: $($Groups -join ';')"
 
@@ -170,16 +173,16 @@ Safe-Run { & $venvPython -m pip install --upgrade pip }
 Safe-Run { & $venvPython -m pip install wheel }  # <-- Add this line
 
 # Torch install logic
-if ($NoTorch) {
-    Write-Host '[INFO] -NoTorch: Skipping torch installation and torch-dependent codebases/groups.'
-} else {
-    if ($env:GITHUB_ACTIONS -eq 'true') {
-        Write-Host 'Installing CPU-only torch (CI environment)'
-        Install-Quiet $venvPip "install torch==2.3.1+cpu -f https://download.pytorch.org/whl/torch_stable.html"
+if ($UseTorch) {
+    if ($UseGpuTorch) {
+        Write-Host 'Installing torch with GPU support'
+        Install-Quiet $venvPip "install torch==2.3.1"
     } else {
-        Write-Host 'Installing CPU-only torch (default)'
+        Write-Host 'Installing CPU-only torch'
         Install-Quiet $venvPip "install torch==2.3.1+cpu -f https://download.pytorch.org/whl/torch_stable.html"
     }
+} else {
+    Write-Host '[INFO] Torch not requested; skipping installation.'
 }
 
 # If not called from a dev script, launch the dev menu for all codebase/group installs
