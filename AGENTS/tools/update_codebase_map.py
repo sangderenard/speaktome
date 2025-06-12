@@ -35,7 +35,32 @@ def extract_groups(toml_path: Path) -> dict[str, list[str]]:
         data = tomllib.loads(toml_path.read_text())
     except Exception:
         return {}
-    return data.get('project', {}).get('optional-dependencies', {})
+
+    groups = data.get('project', {}).get('optional-dependencies')
+    if groups:
+        return groups
+
+    # Poetry style
+    tool = data.get('tool', {}).get('poetry', {})
+    group_section = tool.get('group', {})
+    if group_section:
+        out: dict[str, list[str]] = {}
+        for name, meta in group_section.items():
+            deps = meta.get('dependencies', {})
+            items = []
+            for pkg, spec in deps.items():
+                if isinstance(spec, str):
+                    items.append(f"{pkg}{spec if spec != '*' else ''}")
+                else:
+                    items.append(pkg)
+            out[name] = items
+        return out
+
+    extras = tool.get('extras')
+    if extras:
+        return extras
+
+    return {}
 
 
 def build_map(root: Path) -> dict[str, dict[str, object]]:

@@ -102,8 +102,14 @@ install_quiet() {
 }
 
 if [ $USE_VENV -eq 1 ]; then
-  safe_run python -m venv .venv
-  source .venv/bin/activate
+  poetry config virtualenvs.in-project true
+  INSTALL_ARGS=()
+  if [ -n "$TORCH_CHOICE" ]; then
+    INSTALL_ARGS+=("--with" "${TORCH_CHOICE}-torch")
+  else
+    INSTALL_ARGS+=("--without" "cpu-torch" "--without" "gpu-torch")
+  fi
+  safe_run poetry install --sync --no-interaction "${INSTALL_ARGS[@]}"
   VENV_PYTHON="./.venv/bin/python"
   VENV_PIP="./.venv/bin/pip"
 else
@@ -111,8 +117,6 @@ else
   VENV_PIP="pip"
 fi
 
-safe_run $VENV_PYTHON -m pip install --upgrade pip
-safe_run $VENV_PYTHON -m pip install wheel
 CODEBASES=""
 GROUPS=()
 MENU_ARGS=()
@@ -125,17 +129,7 @@ for arg in "$@"; do
   esac
 done
 
-if [ -n "$TORCH_CHOICE" ]; then
-  if [ "$TORCH_CHOICE" = "gpu" ]; then
-    echo "Installing torch with GPU support"
-    install_quiet "$VENV_PIP" install torch==2.3.1
-  else
-    echo "Installing CPU-only torch"
-    install_quiet "$VENV_PIP" install torch==2.3.1+cpu -f https://download.pytorch.org/whl/torch_stable.html
-  fi
-else
-  echo "[INFO] Torch not requested; skipping installation."
-fi
+# Torch handled via poetry groups
 
 # If not called from a dev script, launch the dev menu for all codebase/group installs
 CALLED_BY_DEV=0

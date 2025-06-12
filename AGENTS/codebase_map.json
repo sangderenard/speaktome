@@ -1,28 +1,7 @@
 {
-  "speaktome": {
-    "path": "speaktome",
+  "tensor printing": {
+    "path": "tensor printing",
     "groups": {
-      "plot": [
-        "matplotlib>=3.7",
-        "networkx>=3.1",
-        "scikit-learn>=1.2"
-      ],
-      "ml": [
-        "transformers>=4.30",
-        "sentence-transformers>=2.2"
-      ],
-      "dev": [
-        "pytest>=8.0",
-        "tools"
-      ]
-    }
-  },
-  "time_sync": {
-    "path": "time_sync",
-    "groups": {
-      "gui": [
-        "pygame>=2"
-      ],
       "dev": [
         "tools"
       ]
@@ -45,11 +24,37 @@
       "server": [
         "flask",
         "flask-cors",
-        "waitress; sys_platform == 'win32'"
+        "waitress"
       ],
       "gui": [
         "PyQt5"
       ],
+      "dev": [
+        "tools"
+      ]
+    }
+  },
+  "speaktome": {
+    "path": "speaktome",
+    "groups": {
+      "plot": [
+        "matplotlib>=3.7",
+        "networkx>=3.1",
+        "scikit-learn>=1.2"
+      ],
+      "ml": [
+        "transformers>=4.30",
+        "sentence-transformers>=2.2"
+      ],
+      "dev": [
+        "pytest>=8.0",
+        "tools"
+      ]
+    }
+  },
+  "laplace": {
+    "path": "laplace",
+    "groups": {
       "dev": [
         "tools"
       ]
@@ -83,17 +88,12 @@
       ]
     }
   },
-  "tensor printing": {
-    "path": "tensor printing",
+  "time_sync": {
+    "path": "time_sync",
     "groups": {
-      "dev": [
-        "tools"
-      ]
-    }
-  },
-  "laplace": {
-    "path": "laplace",
-    "groups": {
+      "gui": [
+        "pygame>=2"
+      ],
       "dev": [
         "tools"
       ]
