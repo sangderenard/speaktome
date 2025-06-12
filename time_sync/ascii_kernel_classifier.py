@@ -69,11 +69,13 @@ class AsciiKernelClassifier:
             font_files=[self.font_path], font_size=self.font_size, complexity_level=0
         )
         filtered = [(c, bm) for c, bm in zip(charset, charBitmasks) if c in self.ramp and bm is not None]
-        self.charset = [c for c, _ in filtered]
-        self.charBitmasks = [AbstractTensor.F.interpolate(AbstractTensor.get_tensor(bm), size=self.char_size) for _, bm in filtered]
+        self.charset = [c for c, _ in filtered] # type: ignore
+        # self.char_size is (W, H), interpolate expects (H, W) for size
+        self.charBitmasks = [AbstractTensor.F.interpolate(AbstractTensor.get_tensor(bm), size=(self.char_size[1], self.char_size[0])) for _, bm in filtered] # type: ignore
 
     def _resize_tensor_to_char(self, tensor: AbstractTensor) -> AbstractTensor:
-        return AbstractTensor.F.interpolate(tensor, size=self.char_size)
+        # self.char_size is (W, H), interpolate expects (H, W) for size
+        return AbstractTensor.F.interpolate(tensor, size=(self.char_size[1], self.char_size[0]))
 
     def sad_loss(self, candidate: AbstractTensor, reference: AbstractTensor) -> float:
         """Sum of absolute differences between ``candidate`` and ``reference``."""
@@ -103,16 +105,19 @@ class AsciiKernelClassifier:
         elif len(batch_shape) == 3:
             luminance_tensor = batch / 255.0
         else:
-            luminance_tensor = AbstractTensor.get_tensor().zeros((N, *self.char_size), dtype=batch.float_dtype)
-        if luminance_tensor.shape()[1:] != tuple(self.char_size):
-            resized = [AbstractTensor.F.interpolate(luminance_tensor[i], size=self.char_size) for i in range(N)]
+            # self.char_size is (W,H), tensor shape should be (N,H,W)
+            luminance_tensor = AbstractTensor.get_tensor().zeros((N, self.char_size[1], self.char_size[0]), dtype=batch.float_dtype)
+        
+        # Compare tensor's (H,W) with classifier's (target_H, target_W)
+        expected_hw_shape = (self.char_size[1], self.char_size[0])
+        if luminance_tensor.shape()[1:] != expected_hw_shape:
+            resized = [AbstractTensor.F.interpolate(luminance_tensor[i], size=expected_hw_shape) for i in range(N)]
             luminance_tensor = AbstractTensor.get_tensor().stack(resized, dim=0)
         refs = AbstractTensor.get_tensor().stack(self.charBitmasks, dim=0)
         expanded_inputs = luminance_tensor[:, None, :, :].repeat_interleave(repeats=refs.shape[0], dim=1)
         expanded_refs = refs[None, :, :, :].repeat_interleave(repeats=N, dim=0)
         diff = expanded_inputs - expanded_refs
         abs_diff = (diff ** 2) ** 0.5
-        print(abs_diff.shape())
         losses = abs_diff.mean(dim=(2, 3))
         idxs = losses.argmin(dim=1)
         row_indices = AbstractTensor.get_tensor().arange(N, dtype=losses.long_dtype)

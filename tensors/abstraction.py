@@ -28,7 +28,7 @@ CONVERSION_REGISTRY: Dict[Tuple[type, type], Callable[["AbstractTensor", Any, "A
 
 OPS_CACHE: Dict[type, "AbstractTensor"] = {}
 
-DEBUG = True
+DEBUG = False#True
 class ShapeAccessor:
     """Proxy object allowing both ``tensor.shape`` and ``tensor.shape()``."""
 
@@ -507,10 +507,21 @@ class AbstractTensor(ABC):
         data = self.data
         if data is None:
             raise ValueError("__getitem__ called on empty tensor")
-        # c_backend tensors lack Python slicing support
-        if data.__class__.__name__ == "CTensor":
-            raise NotImplementedError("__getitem__ not implemented for CTensor backend")
-        index = idx._AbstractTensor__unwrap() if isinstance(idx, AbstractTensor) else idx
+
+        # Ensure backend-native tensor type for indexing
+        if hasattr(data, "__class__") and data.__class__.__name__ == "CTensor": # TODO: Improve CTensor check
+            # CTensor might require special handling or might not support all Python slicing.
+            # For now, assume it needs unwrapped indices if idx contains AbstractTensors.
+            # This part might need specific logic if CTensor's __getitem__ is different.
+            pass # Fall through to generic index processing for now
+
+        if isinstance(idx, tuple):
+            index = tuple(item._AbstractTensor__unwrap() if isinstance(item, AbstractTensor) else item for item in idx)
+        elif isinstance(idx, AbstractTensor):
+            index = idx._AbstractTensor__unwrap()
+        else:
+            index = idx
+
         result = data[index]
         if isinstance(result, self.tensor_type):
             wrapped = type(self)(track_time=self.track_time)
@@ -637,7 +648,8 @@ class AbstractTensor(ABC):
         if DEBUG:
             print(f"__len__ called on {self.__class__.__name__}")
         data = self.data
-        print(f"{type(data)}, {data.shape if hasattr(data, 'shape') else 'no shape'}")
+        # Removed unconditional print: print(f"{type(data)}, {data.shape if hasattr(data, 'shape') else 'no shape'}")
+
         if data is None:
             raise ValueError("__len__ called on empty tensor")
         return len(data)
@@ -873,5 +885,3 @@ if JAXTensorOperations is not None:
                         PurePythonTensorOperations.from_jax)
     register_conversion(PurePythonTensorOperations, JAXTensorOperations,
                         JAXTensorOperations.from_pure)
-
-

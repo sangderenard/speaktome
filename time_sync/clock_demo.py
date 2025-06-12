@@ -19,8 +19,6 @@ from colorama import Style, Fore, Back  # For colored terminal output
 from time_sync import (
         get_offset,
         sync_offset,
-        print_analog_clock,
-        print_digital_clock,
         init_colorama_for_windows,
         reset_cursor_to_top,
         full_clear_and_reset_cursor,
@@ -34,9 +32,9 @@ from time_sync.frame_buffer import PixelFrameBuffer
 from time_sync.render_thread import render_loop
 from time_sync.draw import draw_diff
 from time_sync.time_sync.ascii_digits import (
-        compose_ascii_digits,
         ASCII_RAMP_BLOCK,
     )
+from time_sync.time_sync.clock_renderer import ClockRenderer
 from time_sync.draw import draw_text_overlay  # Import the new text drawing function
 from PIL import Image
 import queue
@@ -66,21 +64,24 @@ else:  # Unix-like
 
 # --- END HEADER ---
 
-CHAR_ROWS = 35   # Set your desired ASCII grid height
-CHAR_COLS = 120  # Set your desired ASCII grid width
 
 
-def parse_rect(rect_str: str) -> tuple[int, int, int, int] | None:
-    """Parses a string 'x,y,width,height' into a tuple of ints."""
+
+def parse_norm_rect(rect_str: str) -> tuple[float, float, float, float]:
+    """
+    Parses 'x,y,width,height' as normalized floats in [0..1].
+    Example: '0.1,0.2,0.5,0.4' => (0.1, 0.2, 0.5, 0.4).
+    Clamps values between 0.0 and 1.0.
+    """
     try:
-        parts = [int(p.strip()) for p in rect_str.split(",")]
+        parts = [float(p.strip()) for p in rect_str.split(",")]
         if len(parts) == 4:
-            return tuple(parts)  # type: ignore
+            # clamp each value to [0.0..1.0]
+            parts = [max(0.0, min(1.0, v)) for v in parts]
+            return tuple(parts)
     except ValueError:
         pass
-    raise argparse.ArgumentTypeError(
-        f"Invalid rect format: '{rect_str}'. Expected 'x,y,width,height'."
-    )
+    raise argparse.ArgumentTypeError(f"Invalid normalized rect: '{rect_str}'.")
 
 
 def load_config_from_json(
@@ -417,8 +418,8 @@ def main() -> None:
     )
     parser.add_argument(
         "--analog-clock-rect",
-        type=parse_rect,
-        help="Rectangle 'x,y,width,height' for analog clock drawing on its canvas.",
+        type=parse_norm_rect,
+        help="Normalized 'x,y,w,h' in [0..1] for analog clock placement on its canvas.",
     )
     parser.add_argument(
         "--refresh-rate",
@@ -559,9 +560,10 @@ def main() -> None:
     TEXT_FIELD_SCALE = args.initial_text_field_scale
 
     # Base dimensions for 1.0 scale
-    BASE_FB_ROWS = 35  # Reduced to make space for text overlays
-    BASE_FB_COLS = 120
-
+    BASE_FB_ROWS = 756  # Reduced to make space for text overlays
+    BASE_FB_COLS = 1024
+    CHAR_ROWS = 30   # Set your desired ASCII grid height
+    CHAR_COLS = 100  # Set your desired ASCII grid width
     init_colorama_for_windows()
 
     # Load configurations from JSON files
@@ -661,8 +663,8 @@ def main() -> None:
     # These are base parameters, specific clock instances might have their own loaded configs
     base_analog_params = load_config_from_json("analog_config.json")
     if args.analog_clock_rect:
-        base_analog_params["clock_drawing_rect_on_canvas"] = args.analog_clock_rect
-    # Backdrop for analog_params is now handled by theme_manager.current_theme.current_backdrop_path
+        # Store normalized rect instead of a pixel-based rect
+        base_analog_params["clock_drawing_norm_rect"] = args.analog_clock_rect
 
     base_digital_params = load_config_from_json("digital_config.json")
     # Backdrop for digital_params is now handled by theme_manager.current_theme.current_backdrop_path
@@ -728,164 +730,24 @@ def main() -> None:
         slow_digital_format = get_format_string_for_key(current_slow_digital_format_key)
         fast_digital_format = get_format_string_for_key(current_fast_digital_format_key)
 
-        if display_state["analog_clocks"]:
-            # Scale analog row pixel height based on TEXT_FIELD_SCALE (char height) and PIXEL_BUFFER_SCALE (pixel density)
-            # Base character height for analog might be around 15-20 chars
-            base_analog_char_h = 15
-            analog_row_pixel_height = int(
-                base_analog_char_h * TEXT_FIELD_SCALE * (PIXEL_BUFFER_SCALE * 1.5)
-            )  # Heuristic for char cell to pixel
-            analog_width_each = available_width // 2
+        # Unified clock rendering using ascii_digits.generate_clock
+        # Render analog face as an image, then convert to raw pixels
+        img = ClockRenderer.render_analog(
+            time_obj=system_time_obj,
+            units=slow_analog_units,
+            bounding_size=(current_fb_cols, current_fb_rows),
+            backdrop_image_path=current_backdrop_path,
+            theme_manager=theme_manager,
+            render_backend=render_backend,
+            **base_analog_params
+        )
+        unified_clock = np.array(img.convert("RGB"))
 
-            # Slow Analog Clock (Left)
-            analog_slow_params = clock_configs["slow_analog"].copy()
-            analog_slow_params["target_ascii_diameter"] = int(
-                base_analog_char_h * TEXT_FIELD_SCALE
-            )
-            analog_slow_params["canvas_size_px"] = int(
-                analog_slow_params["target_ascii_diameter"] * 7 * PIXEL_BUFFER_SCALE
-            )  # Scale canvas
-            analog_slow_params["backdrop_image_path"] = current_backdrop_path
-
-            slow_analog_arr = print_analog_clock(
-                slow_time_obj,
-                active_units_override=slow_analog_units,
-                theme_manager=theme_manager,
-                render_backend=render_backend,
-                as_pixel=True,
-                **analog_slow_params,
-            )
-            if slow_analog_arr is not None:
-                h, w, _ = slow_analog_arr.shape
-                place_h = min(h, analog_row_pixel_height)
-                place_w = min(w, analog_width_each)
-                y_offset = (analog_row_pixel_height - place_h) // 2
-                x_offset = (analog_width_each - place_w) // 2  # Center horizontally
-                if row + y_offset + place_h <= current_fb_rows:
-                    buf[
-                        row + y_offset : row + y_offset + place_h,
-                        x_offset : x_offset + place_w,
-                    ] = slow_analog_arr[:place_h, :place_w]
-
-            # Fast Analog Clock (Right)
-            analog_fast_params = clock_configs["fast_analog"].copy()
-            analog_fast_params["target_ascii_diameter"] = int(
-                base_analog_char_h * TEXT_FIELD_SCALE
-            )
-            analog_fast_params["canvas_size_px"] = int(
-                analog_fast_params["target_ascii_diameter"] * 7 * PIXEL_BUFFER_SCALE
-            )
-            analog_fast_params["backdrop_image_path"] = current_backdrop_path
-
-            fast_analog_arr = print_analog_clock(
-                fast_time_obj,  # Stopwatch time
-                active_units_override=fast_analog_units,
-                theme_manager=theme_manager,
-                render_backend=render_backend,
-                as_pixel=True,
-                **analog_fast_params,
-            )
-            if fast_analog_arr is not None:
-                h, w, _ = fast_analog_arr.shape
-                place_h = min(h, analog_row_pixel_height)
-                place_w = min(w, analog_width_each)
-                y_offset = (analog_row_pixel_height - place_h) // 2
-                x_offset_fast = analog_width_each + (analog_width_each - place_w) // 2
-                if row + y_offset + place_h <= current_fb_rows:
-                    buf[
-                        row + y_offset : row + y_offset + place_h,
-                        x_offset_fast : x_offset_fast + place_w,
-                    ] = fast_analog_arr[:place_h, :place_w]
-
-            row += analog_row_pixel_height
-            if row < current_fb_rows:
-                buf[row, :available_width] = spacer_color
-                row += spacer_height
-
-        if display_state["slow_digital_clock"]:
-            digital_slow_params = clock_configs[
-                "slow_digital"
-            ].copy()  # Use specific config
-            base_digital_char_h = digital_slow_params.get("target_ascii_height", 7)
-            digital_row_pixel_height = int(
-                base_digital_char_h * TEXT_FIELD_SCALE * (PIXEL_BUFFER_SCALE * 1.5)
-            )  # Heuristic
-            digital_slow_params["target_ascii_height"] = int(
-                base_digital_char_h * TEXT_FIELD_SCALE
-            )  # Text field scale
-            digital_slow_params["target_ascii_width"] = int(
-                digital_slow_params.get("target_ascii_width", 60) * TEXT_FIELD_SCALE
-            )
-            digital_slow_params["font_size"] = int(
-                digital_slow_params.get("font_size", 40) * PIXEL_BUFFER_SCALE
-            )  # Font size scales with buffer
-            digital_slow_params["backdrop_image_path"] = current_backdrop_path
-
-            slow_digital_arr = print_digital_clock(
-                slow_time_obj,
-                active_units=slow_digital_units,
-                display_format_template=slow_digital_format,
-                theme_manager=theme_manager,
-                render_backend=render_backend,
-                as_pixel=True,
-                **digital_slow_params,
-            )
-            if slow_digital_arr is not None:
-                h, w, _ = slow_digital_arr.shape
-                place_h = min(h, digital_row_pixel_height)
-                place_w = min(w, available_width)
-                if row + place_h <= current_fb_rows:
-                    buf[row : row + place_h, :place_w] = slow_digital_arr[
-                        :place_h, :place_w
-                    ]
-                row += place_h
-            if row < current_fb_rows:
-                buf[row, :available_width] = spacer_color
-                row += spacer_height
-
-        if display_state["fast_digital_clock"]:
-            digital_fast_params = clock_configs[
-                "fast_digital"
-            ].copy()  # Use specific config
-            base_digital_char_h = digital_fast_params.get("target_ascii_height", 7)
-            digital_row_pixel_height = int(
-                base_digital_char_h * TEXT_FIELD_SCALE * (PIXEL_BUFFER_SCALE * 1.5)
-            )
-            digital_fast_params["target_ascii_height"] = int(
-                base_digital_char_h * TEXT_FIELD_SCALE
-            )
-            digital_fast_params["target_ascii_width"] = int(
-                digital_fast_params.get("target_ascii_width", 60) * TEXT_FIELD_SCALE
-            )
-            digital_fast_params["font_size"] = int(
-                digital_fast_params.get("font_size", 40) * PIXEL_BUFFER_SCALE
-            )
-            digital_fast_params["backdrop_image_path"] = current_backdrop_path
-
-            fast_digital_arr = print_digital_clock(
-                fast_time_obj,  # Stopwatch time
-                active_units=fast_digital_units,
-                display_format_template=fast_digital_format,
-                theme_manager=theme_manager,
-                render_backend=render_backend,
-                as_pixel=True,
-                **digital_fast_params,
-            )
-            if fast_digital_arr is not None:
-                h, w, _ = fast_digital_arr.shape
-                place_h = min(h, digital_row_pixel_height)
-                place_w = min(w, available_width)
-                if row + place_h <= current_fb_rows:
-                    buf[row : row + place_h, :place_w] = fast_digital_arr[
-                        :place_h, :place_w
-                    ]
-                row += place_h
-            if row < current_fb_rows:
-                buf[row, :available_width] = spacer_color
-                row += spacer_height
-
-        # Stopwatch, Offset, and Legend are now drawn as text overlays AFTER the pixel buffer
-        # So they are NOT rendered into 'buf' here.
+        if unified_clock is not None:
+            h_arr, w_arr, _ = unified_clock.shape
+            crop_h = min(h_arr, current_fb_rows)
+            crop_w = min(w_arr, current_fb_cols)
+            buf[:crop_h, :crop_w] = unified_clock[:crop_h, :crop_w]
 
         return buf
 
@@ -940,10 +802,6 @@ def main() -> None:
     input_thread.start()
 
     # text_overlay_start_row tracks where text drawing begins relative to the
-    # pixel buffer.  It must be recalculated whenever scaling changes, so do not
-    # treat it as a constant.
-    text_overlay_start_row = get_scaled_fb_dims()[0] + 1
-    current_text_overlay_row = text_overlay_start_row
 
     # For periodic keyframe redraw
     KEYFRAME_INTERVAL_SECONDS = 30  # Redraw everything every 30 seconds
@@ -1179,8 +1037,6 @@ def main() -> None:
 
     try:
         while True:
-            # Recalculate overlay start row in case scaling changed
-            text_overlay_start_row = get_scaled_fb_dims()[0] + 1
             # --- Drawing Phase ---
             # The render_thread updates the framebuffer's render buffer.
             # The main loop gets the diff from the framebuffer and draws it.
@@ -1189,23 +1045,37 @@ def main() -> None:
             diff_pixels = framebuffer.get_diff_and_promote()
             cell_h, cell_w = get_char_cell_dims()
             unique_cells: dict[tuple[int, int], np.ndarray] = {}
+
             for y, x, color in diff_pixels:
-                cell_y = (y // cell_h) * cell_h
-                cell_x = (x // cell_w) * cell_w
-                if (cell_y, cell_x) not in unique_cells:
-                    sub = framebuffer.buffer_display[
-                        cell_y : cell_y + cell_h,
-                        cell_x : cell_x + cell_w,
+                # Determine the top-left pixel coordinates of the character cell this pixel belongs to
+                cell_y_start_pixel = (y // cell_h) * cell_h
+                cell_x_start_pixel = (x // cell_w) * cell_w
+
+                if (cell_y_start_pixel, cell_x_start_pixel) not in unique_cells:
+                    # Extract the subunit using the target cell dimensions.
+                    # NumPy slicing will handle edges by returning a smaller array.
+                    sub_slice = framebuffer.buffer_display[
+                        cell_y_start_pixel : cell_y_start_pixel + cell_h,
+                        cell_x_start_pixel : cell_x_start_pixel + cell_w,
                     ]
-                    unique_cells[(cell_y, cell_x)] = sub
+
+                    # Ensure 'sub_slice' is padded to (cell_h, cell_w, 3) if it's smaller.
+                    # This typically happens for subunits at the right or bottom edges.
+                    if sub_slice.shape[0] != cell_h or sub_slice.shape[1] != cell_w:
+                        padded_sub = np.full((cell_h, cell_w, 3), [0, 0, 0], dtype=np.uint8)  # Default to black
+                        padded_sub[:sub_slice.shape[0], :sub_slice.shape[1], :] = sub_slice
+                        sub_to_store = padded_sub
+                    else:
+                        sub_to_store = sub_slice
+                    unique_cells[(cell_y_start_pixel, cell_x_start_pixel)] = sub_to_store
+
             changed = [(cy, cx, data) for (cy, cx), data in unique_cells.items()]
             # Draw the changed pixels (the clocks)
             # If diff_pixels is empty but a redraw was forced, 'changed' will also be empty.
             # The draw_diff will still be called, but it won't do much if 'changed' is empty.
             # The key is that get_diff_and_promote() would have returned all pixels if forced.
             # However, the current draw_diff takes 'changed_subunits' which are already diffed.
-            # The PixelFrameBuffer.get_diff_and_promote() now returns all pixels if forced.
-            # So, `diff_pixels` will contain all pixels, and thus `changed` will too.
+            # The PixelFrameBuffer.get_diff_and_promote() now returns all pixels, and thus `changed` will too.
             # We need to pass the correct char_cell_pixel_height/width to draw_diff
             # These should correspond to the pixel dimensions of a single character cell
             # as used by the rendering functions (print_analog_clock, print_digital_clock).
@@ -1224,11 +1094,13 @@ def main() -> None:
 
             # --- Text Overlay Drawing Phase ---
             # Draw text elements directly as overlays below the pixel buffer
-            current_text_overlay_row = text_overlay_start_row
-            available_cols = get_scaled_fb_dims()[
-                1
-            ]  # Use scaled width for text overlays
+            # The main ASCII display (from draw_diff) occupies CHAR_ROWS lines, starting at base_row=1.
+            # So, text overlays should start at character row CHAR_ROWS + 1.
+            text_overlay_actual_start_row = CHAR_ROWS + 1 # Assumes draw_diff base_row=1
+            current_text_overlay_row = text_overlay_actual_start_row
 
+            # Use CHAR_COLS for the width of the overlay area to align with the main display
+            overlay_available_cols = CHAR_COLS
             # Clear the text overlay area before drawing new text
             # This prevents old text from lingering if new text is shorter
             text_overlay_height = (
@@ -1245,14 +1117,11 @@ def main() -> None:
             # Let's clear 15 lines from text_overlay_start_row.
             clear_lines_count = 15
             for r in range(
-                text_overlay_start_row, text_overlay_start_row + clear_lines_count
+                current_text_overlay_row, current_text_overlay_row + clear_lines_count
             ):
                 draw_text_overlay(
-                    r, 1, " " * available_cols, Style.RESET_ALL
+                    r, 1, " " * overlay_available_cols, Style.RESET_ALL
                 )  # Clear line with spaces
-
-            # Reset row counter for drawing overlays
-            current_text_overlay_row = text_overlay_start_row
 
             # Get current time objects for text overlays
             elapsed = time.perf_counter() - start
@@ -1269,7 +1138,7 @@ def main() -> None:
                 draw_text_overlay(
                     current_text_overlay_row,
                     1,
-                    stopwatch_text,
+                    stopwatch_text[:overlay_available_cols], # Truncate if necessary
                     Style.BRIGHT + Fore.YELLOW,
                 )  # Example color
                 current_text_overlay_row += 1  # Move to next line
@@ -1277,13 +1146,13 @@ def main() -> None:
             if display_state["offset_info"]:
                 offset_text = f"Offset: {_dt.timedelta(seconds=offset)}"
                 draw_text_overlay(
-                    current_text_overlay_row, 1, offset_text, Style.BRIGHT + Fore.CYAN
-                )  # Example color
+                    current_text_overlay_row, 1, offset_text[:overlay_available_cols], Style.BRIGHT + Fore.CYAN
+                )
                 current_text_overlay_row += 1  # Move to next line
 
             if display_state["legend"]:
                 legend_start_col = 1
-                legend_col_width = available_cols // 2  # Split legend into two columns
+                legend_col_width = overlay_available_cols // 2  # Split legend into two columns
 
                 def collect_legend_parts(mapping):
                     legend = []
@@ -1316,11 +1185,11 @@ def main() -> None:
                 for i in range(max(len(col1_items), len(col2_items))):
                     if (
                         current_text_overlay_row
-                        > get_scaled_fb_dims()[0] + clear_lines_count
+                        >= text_overlay_actual_start_row + clear_lines_count
                     ):  # Prevent drawing outside cleared area
                         break
                     line_text_parts = []
-                    ljust_val = 30
+                    ljust_val = max(10, overlay_available_cols // 2 - 2) # Adjust ljust based on available width
                     if i < len(col1_items):
                         line_text_parts.append(col1_items[i].ljust(ljust_val))
                     if i < len(col2_items):
@@ -1329,7 +1198,7 @@ def main() -> None:
                     draw_text_overlay(
                         current_text_overlay_row,
                         legend_start_col,
-                        legend_line_text,
+                        legend_line_text[:overlay_available_cols], # Truncate legend line
                         Style.RESET_ALL,
                     )
                     current_text_overlay_row += 1
@@ -1374,6 +1243,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
-
-

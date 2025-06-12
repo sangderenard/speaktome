@@ -20,10 +20,9 @@ from .core import (
 )
 from .ascii_digits import (
     compose_ascii_digits,
-    print_analog_clock,
-    print_digital_clock,
     render_ascii_to_array,
 )
+from .clock_renderer import ClockRenderer
 from .console import (
     init_colorama_for_windows,
     full_clear_and_reset_cursor,
@@ -48,8 +47,7 @@ __all__ = [
     "utcnow",
     "compose_ascii_digits",
     "render_ascii_to_array",
-    "print_analog_clock",
-    "print_digital_clock",
+    "ClockRenderer",
     "init_colorama_for_windows",
     "full_clear_and_reset_cursor",
     "reset_cursor_to_top",

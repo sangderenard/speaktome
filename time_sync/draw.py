@@ -66,33 +66,35 @@ def flexible_subunit_kernel(
 
 # Module-level cache for classifier and ramp
 _classifier_cache = {
-    "ramp": None,
+    "ramp_char_size": None, # Cache key will be a tuple (ramp, char_width, char_height)
     "classifier": None,
 }
 
 def default_subunit_batch_to_chars(
     subunit_batch: np.ndarray,
     ramp: str = DEFAULT_DRAW_ASCII_RAMP,
+    char_width: int = 16, # Add parameters for desired char_size
+    char_height: int = 16, # These will be the actual cell_w, cell_h from clock_demo
 ) -> list[str]:
     """Return characters for ``subunit_batch`` using a cached classifier."""
-    if _classifier_cache["ramp"] != ramp or _classifier_cache["classifier"] is None:
-        classifier = AsciiKernelClassifier(ramp)
-        classifier.set_font("fontmapper/FM16/consola.ttf", 16, (16, 16))
-        _classifier_cache["ramp"] = ramp
+    # Removed: (subunit_height, subunit_width) = get_char_cell_dims(),
+    # Removed: print(subunit_height, subunit_width)
+    # Removed: exit()
+    # Now use the passed-in char_width and char_height
+
+    cache_key = (ramp, char_width, char_height)
+    if _classifier_cache["ramp_char_size"] != cache_key or _classifier_cache["classifier"] is None:
+        # AsciiKernelClassifier expects char_size as (width, height)
+        classifier = AsciiKernelClassifier(ramp, char_size=(char_width, char_height))
+        # font_size is for rendering reference characters, which are then scaled to char_size
+        classifier.set_font(font_path="fontmapper/FM16/consola.ttf", font_size=16, char_size=(char_width, char_height))
+        _classifier_cache["ramp_char_size"] = cache_key
         _classifier_cache["classifier"] = classifier
     else:
         classifier = _classifier_cache["classifier"]
 
     result = classifier.classify_batch(subunit_batch)
     return result["chars"]
-
-
-def default_subunit_to_char_kernel(
-    subunit_data: np.ndarray,
-    ramp: str = DEFAULT_DRAW_ASCII_RAMP,
-) -> str:
-    """Map a single subunit's pixel data to an ASCII character."""
-    return default_subunit_batch_to_chars(np.expand_dims(subunit_data, axis=0), ramp)[0]
 
 
 def draw_text_overlay(
@@ -110,7 +112,7 @@ def draw_diff(
     changed_subunits: list[tuple[int, int, np.ndarray]],  # List of (y_pixel, x_pixel, subunit_pixel_data)
     char_cell_pixel_height: int = 1,  # The height of a character cell in pixels
     char_cell_pixel_width: int = 1,  # The width of a character cell in pixels
-    subunit_to_char_kernel: callable[[np.ndarray, str], list[str]] = default_subunit_batch_to_chars,
+    subunit_to_char_kernel: callable[[np.ndarray, str, int, int], list[str]] = default_subunit_batch_to_chars, # Update signature
     active_ascii_ramp: str = DEFAULT_DRAW_ASCII_RAMP,  # The ASCII ramp to use for character conversion
     base_row: int = 1, 
     base_col: int = 1
@@ -127,10 +129,11 @@ def draw_diff(
     """
     if char_cell_pixel_height <= 0: char_cell_pixel_height = 1
     if char_cell_pixel_width <= 0: char_cell_pixel_width = 1
-
+    if not changed_subunits:
+        return
     subunit_batch = np.stack([data for _, _, data in changed_subunits], axis=0)
-
-    chars = subunit_to_char_kernel(subunit_batch, active_ascii_ramp)
+    # Pass the actual char_cell_pixel_width and char_cell_pixel_height to the kernel
+    chars = subunit_to_char_kernel(subunit_batch, active_ascii_ramp, char_cell_pixel_width, char_cell_pixel_height)
 
     for (y_pixel, x_pixel, subunit_data), char_to_draw in zip(changed_subunits, chars):
         char_y = y_pixel // char_cell_pixel_height
