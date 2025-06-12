@@ -556,6 +556,26 @@ class AbstractTensor(ABC):
             wrapped.data = result
             return wrapped
         return result
+    def __str__(self):
+        # Unified print: show the underlying tensor's string representation
+        return self.datastring(self.data)
+        
+    def datastring(self, data: Any) -> str:
+        """Return a string representation of the underlying tensor data."""
+        if data is None:
+            return "AbstractTensor (None)"
+        if isinstance(data, list):
+            return f"AbstractTensor ({_flatten(data)})"
+        if hasattr(data, 'tolist'):
+            return f"AbstractTensor ({data.tolist()})"
+        return f"AbstractTensor ({data})"
+
+    def __repr__(self):
+        # Unified repr: AbstractTensor (BackendClass (backend data repr))
+        backend_class = type(self.data).__name__ if self.data is not None else 'NoneType'
+        backend_data_repr = repr(self.data)
+        return f"AbstractTensor ({backend_class} ({backend_data_repr}))"
+
 
     def __setitem__(self, idx, value):
         """Assign to the underlying tensor using Python indexing."""
@@ -567,6 +587,14 @@ class AbstractTensor(ABC):
         if isinstance(value, AbstractTensor):
             value = value.data
         data[idx] = value
+
+    def __len__(self):
+        """Return the length of the underlying tensor along the first dimension."""
+        data = self.data
+        print(f"{type(data)}, {data.shape if hasattr(data, 'shape') else 'no shape'}")
+        if data is None:
+            raise ValueError("__len__ called on empty tensor")
+        return len(data)
 
     def data_or(self, obj: Any = None) -> Any:
         """Return self.data if no argument is passed, otherwise return the argument unchanged."""

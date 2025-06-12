@@ -129,6 +129,7 @@ def draw_diff(
     if char_cell_pixel_width <= 0: char_cell_pixel_width = 1
 
     subunit_batch = np.stack([data for _, _, data in changed_subunits], axis=0)
+
     chars = subunit_to_char_kernel(subunit_batch, active_ascii_ramp)
 
     for (y_pixel, x_pixel, subunit_data), char_to_draw in zip(changed_subunits, chars):

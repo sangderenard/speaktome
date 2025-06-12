@@ -140,9 +140,14 @@ class AsciiKernelClassifier:
         abs_diff = self.tensor_ops.sqrt(self.tensor_ops.pow(diff, 2))
 
         losses = self.tensor_ops.mean(abs_diff, dim=(2, 3))
+        print(f"Losses shape: {losses.shape()}")
+        print(f"Losses: {losses}")
         idxs = self.tensor_ops.argmin(losses, dim=1)
         row_indices = self.tensor_ops.arange(N, device=device, dtype=self.tensor_ops.long_dtype)
-        selected_losses = self.tensor_ops.select_by_indices(losses, row_indices, idxs)
+        print(row_indices, idxs)
+        print(f"{row_indices.shape()} {idxs.shape()}")
+        exit()
+        selected_losses = losses[row_indices, idxs]
 
         chars = [self.charset[int(i)] for i in idxs.tolist()]
         return {
