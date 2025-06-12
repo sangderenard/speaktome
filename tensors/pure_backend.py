@@ -59,7 +59,7 @@ class PurePythonTensorOperations(AbstractTensor):
         # ###############################################################
         pass
 
-    def _AbstractTensor__apply_operator(self, op: str, left: Any, right: Any):
+    def _apply_operator__(self, op: str, left: Any, right: Any):
         """Dispatch basic arithmetic for nested lists."""
         left = self._AbstractTensor__unwrap(left)
         right = self._AbstractTensor__unwrap(right)
@@ -326,6 +326,10 @@ class PurePythonTensorOperations(AbstractTensor):
                 result.extend([item] * repeats)
             return result
         raise NotImplementedError("repeat_interleave only implemented for dim 0 or None")
+
+    def repeat_(self, repeats: Any = None, dim: int = 0) -> Any:
+        """Repeat tensor along ``dim`` ``repeats`` times (stub)."""
+        raise NotImplementedError("repeat not implemented for PurePython backend")
 
     def view_flat_(self, tensor: Any) -> Any:
         return _flatten(tensor)
