@@ -16,3 +16,11 @@ Character set generation functions and model evaluation helpers now live in
 `FM16/modules/charset_ops.py` and `FM16/modules/model_ops.py`. Import these
 utilities instead of relying on the large scripts when integrating with other
 projects.
+
+## FontMapper V2
+
+The simplified rewrite of the rendering utilities now resides directly in this
+folder under `ascii_mapper.py`. The legacy implementation remains in the
+`FM16` subdirectory for historical reference. Use `ascii_preview` from
+`ascii_mapper.py` for new code paths. See `AGENTS/HEADLESS_SETUP_GUIDE.md` for
+setup details.

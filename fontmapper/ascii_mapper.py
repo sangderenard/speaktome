@@ -6,8 +6,6 @@ try:
     from AGENTS.tools.header_utils import ENV_SETUP_BOX
     from fontmapper import FM16
     from fontmapper.FM16.modules import charset_ops
-    from PIL import Image
-    from pathlib import Path
 except Exception:
     import sys
     print(ENV_SETUP_BOX)
