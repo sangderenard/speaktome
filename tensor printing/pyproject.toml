@@ -11,6 +11,11 @@ requires-python = ">=3.8"
 license = { text = "MIT" }
 authors = [{ name = "Tensor Printing Authors" }]
 
+[project.optional-dependencies]
+dev = [
+    "tools"
+]
+
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["tensor_printing*"]

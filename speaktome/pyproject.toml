@@ -37,7 +37,8 @@ ml = [
   # torch & torch_geometric handled by setup_env.sh for CPU vs GPU installs
 ]
 dev = [
-  "pytest>=8.0"
+  "pytest>=8.0",
+  "tools"
 ]
 
 [tool.setuptools.packages.find]

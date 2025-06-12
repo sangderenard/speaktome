@@ -12,7 +12,7 @@ except Exception:
 # --- END HEADER ---
 
 setup(
-    name='speaktome-agent-tools',
+    name='tools',
     version='0.1.0',
     packages=find_packages(),
     install_requires=[

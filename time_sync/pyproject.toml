@@ -20,6 +20,9 @@ dependencies = [
 gui = [
     "pygame>=2",
 ]
+dev = [
+    "tools"
+]
 
 [tool.setuptools.packages.find]
 where = ["."]

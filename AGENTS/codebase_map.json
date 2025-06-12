@@ -1,4 +1,33 @@
 {
+  "speaktome": {
+    "path": "speaktome",
+    "groups": {
+      "plot": [
+        "matplotlib>=3.7",
+        "networkx>=3.1",
+        "scikit-learn>=1.2"
+      ],
+      "ml": [
+        "transformers>=4.30",
+        "sentence-transformers>=2.2"
+      ],
+      "dev": [
+        "pytest>=8.0",
+        "tools"
+      ]
+    }
+  },
+  "time_sync": {
+    "path": "time_sync",
+    "groups": {
+      "gui": [
+        "pygame>=2"
+      ],
+      "dev": [
+        "tools"
+      ]
+    }
+  },
   "fontmapper": {
     "path": "fontmapper",
     "groups": {
@@ -20,20 +49,11 @@
       ],
       "gui": [
         "PyQt5"
+      ],
+      "dev": [
+        "tools"
       ]
     }
-  },
-  "laplace": {
-    "path": "laplace",
-    "groups": {}
-  },
-  "speaktome": {
-    "path": "speaktome",
-    "groups": {}
-  },
-  "tensor printing": {
-    "path": "tensor printing",
-    "groups": {}
   },
   "tensors": {
     "path": "tensors",
@@ -52,21 +72,35 @@
       "numpy": [
         "numpy>=1.26"
       ],
+      "opengl": [
+        "PyOpenGL>=3.1",
+        "glfw",
+        "numpy>=1.26"
+      ],
       "dev": [
-        "pytest>=8.0"
+        "pytest>=8.0",
+        "tools"
       ]
     }
   },
-  "time_sync": {
-    "path": "time_sync",
+  "tensor printing": {
+    "path": "tensor printing",
     "groups": {
-      "gui": [
-        "pygame>=2"
+      "dev": [
+        "tools"
+      ]
+    }
+  },
+  "laplace": {
+    "path": "laplace",
+    "groups": {
+      "dev": [
+        "tools"
       ]
     }
   },
   "tools": {
-    "path": "AGENTS\\tools",
+    "path": "AGENTS/tools",
     "groups": {}
   }
 }
