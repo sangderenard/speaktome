@@ -176,7 +176,9 @@ class NumPyTensorOperations(AbstractTensor):
 
     def select_by_indices_(self, tensor, indices_dim0, indices_dim1):
         tensor = self._AbstractTensor__unwrap(tensor)
-        return tensor[indices_dim0, indices_dim1]
+        i0 = self._AbstractTensor__unwrap(indices_dim0)
+        i1 = self._AbstractTensor__unwrap(indices_dim1)
+        return tensor[i0, i1]
 
     def log_softmax_(self, tensor, dim):
         tensor = self._AbstractTensor__unwrap(tensor)
@@ -230,12 +232,15 @@ class NumPyTensorOperations(AbstractTensor):
     def assign_at_indices_(self, tensor_to_modify, indices_dim0, indices_dim1, values_to_assign):
         t = self._AbstractTensor__unwrap(tensor_to_modify)
         v = self._AbstractTensor__unwrap(values_to_assign)
-        t[indices_dim0, indices_dim1] = v
+        i0 = self._AbstractTensor__unwrap(indices_dim0)
+        i1 = self._AbstractTensor__unwrap(indices_dim1)
+        t[i0, i1] = v
         return t
 
     def increment_at_indices_(self, tensor_to_modify, mask):
         t = self._AbstractTensor__unwrap(tensor_to_modify)
-        t[mask] += 1
+        m = self._AbstractTensor__unwrap(mask)
+        t[m] += 1
         return t
 
     def clamp_(self, tensor, min_val=None, max_val=None):
@@ -261,7 +266,8 @@ class NumPyTensorOperations(AbstractTensor):
 
     def boolean_mask_select_(self, tensor, mask):
         tensor = self._AbstractTensor__unwrap(tensor)
-        return tensor[mask]
+        m = self._AbstractTensor__unwrap(mask)
+        return tensor[m]
 
     def tolist_(self, tensor):
         return self._AbstractTensor__unwrap(tensor).tolist()
@@ -271,7 +277,8 @@ class NumPyTensorOperations(AbstractTensor):
 
     def index_select_(self, tensor, dim, indices):
         tensor = self._AbstractTensor__unwrap(tensor)
-        return np.take(tensor, indices, axis=dim)
+        idx = self._AbstractTensor__unwrap(indices)
+        return np.take(tensor, idx, axis=dim)
 
     def argmin_(self, tensor, dim=None):
         return np.argmin(self._AbstractTensor__unwrap(tensor), axis=dim)

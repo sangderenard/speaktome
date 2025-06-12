@@ -223,15 +223,17 @@ class PurePythonTensorOperations(AbstractTensor):
     def select_by_indices_(self, tensor: Any, indices_dim0: Any, indices_dim1: Any) -> Any:
         if not isinstance(tensor, list) or not isinstance(tensor[0], list):
             raise NotImplementedError("select_by_indices only supports 2D lists for now")
-        selected_rows = [tensor[i] for i in indices_dim0]
-        if isinstance(indices_dim1, list):
-            if len(indices_dim0) != len(indices_dim1):
+        i0 = self._AbstractTensor__unwrap(indices_dim0)
+        i1 = self._AbstractTensor__unwrap(indices_dim1)
+        selected_rows = [tensor[i] for i in i0]
+        if isinstance(i1, list):
+            if len(i0) != len(i1):
                 raise ValueError("Index lists must have same length for element-wise selection")
-            return [selected_rows[i][indices_dim1[i]] for i in range(len(selected_rows))]
-        elif isinstance(indices_dim1, slice):
-            return [row[indices_dim1] for row in selected_rows]
+            return [selected_rows[i][i1[i]] for i in range(len(selected_rows))]
+        elif isinstance(i1, slice):
+            return [row[i1] for row in selected_rows]
         else:
-            return [row[indices_dim1] for row in selected_rows]
+            return [row[i1] for row in selected_rows]
 
     def log_softmax_(self, tensor: Any, dim: int) -> Any:
         if dim != -1 and dim != len(_get_shape(tensor)) - 1:
@@ -331,15 +333,17 @@ class PurePythonTensorOperations(AbstractTensor):
     def assign_at_indices_(self, tensor_to_modify: Any, indices_dim0: Any, indices_dim1: Any, values_to_assign: Any):
         tensor_to_modify = self._AbstractTensor__unwrap(tensor_to_modify)
         values_to_assign = self._AbstractTensor__unwrap(values_to_assign)
+        i0 = self._AbstractTensor__unwrap(indices_dim0)
+        i1 = self._AbstractTensor__unwrap(indices_dim1)
         if not isinstance(tensor_to_modify, list) or not isinstance(tensor_to_modify[0], list):
             raise NotImplementedError("assign_at_indices only supports 2D lists for now")
-        if not isinstance(indices_dim0, list) or not isinstance(indices_dim1, list):
+        if not isinstance(i0, list) or not isinstance(i1, list):
             raise ValueError("indices_dim0 and indices_dim1 must be lists")
-        if len(indices_dim0) != len(indices_dim1) or len(indices_dim0) != len(values_to_assign):
+        if len(i0) != len(i1) or len(i0) != len(values_to_assign):
             raise ValueError("Index lists and values list must have same length")
-        for i in range(len(indices_dim0)):
-            row_idx = indices_dim0[i]
-            col_idx = indices_dim1[i]
+        for i in range(len(i0)):
+            row_idx = i0[i]
+            col_idx = i1[i]
             value = values_to_assign[i]
             tensor_to_modify[row_idx][col_idx] = value
         return tensor_to_modify
@@ -426,10 +430,11 @@ class PurePythonTensorOperations(AbstractTensor):
 
     def index_select_(self, tensor: Any, dim: int, indices: Any) -> Any:
         tensor = self._AbstractTensor__unwrap(tensor)
+        idx = self._AbstractTensor__unwrap(indices)
         if dim == 0:
-            return [tensor[i] for i in indices]
+            return [tensor[i] for i in idx]
         if dim == 1:
-            return [[row[i] for i in indices] for row in tensor]
+            return [[row[i] for i in idx] for row in tensor]
         raise NotImplementedError("index_select only implemented for dim 0 or 1")
 
     def argmin_(self, tensor: Any, dim: Optional[int] = None) -> Any:
