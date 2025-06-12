@@ -141,7 +141,9 @@ class PyTorchTensorOperations(AbstractTensor):
 
     def select_by_indices_(self, tensor, indices_dim0, indices_dim1):
         t = self._AbstractTensor__unwrap(tensor)
-        return t[indices_dim0, indices_dim1]
+        i0 = self._AbstractTensor__unwrap(indices_dim0)
+        i1 = self._AbstractTensor__unwrap(indices_dim1)
+        return t[i0, i1]
 
     def log_softmax_(self, tensor, dim):
         return F.log_softmax(self._AbstractTensor__unwrap(tensor), dim=dim)
@@ -169,7 +171,9 @@ class PyTorchTensorOperations(AbstractTensor):
     def assign_at_indices_(self, tensor_to_modify, indices_dim0, indices_dim1, values_to_assign):
         t = self._AbstractTensor__unwrap(tensor_to_modify)
         v = self._AbstractTensor__unwrap(values_to_assign)
-        t[indices_dim0, indices_dim1] = v
+        i0 = self._AbstractTensor__unwrap(indices_dim0)
+        i1 = self._AbstractTensor__unwrap(indices_dim1)
+        t[i0, i1] = v
         return t
 
     def increment_at_indices_(self, tensor_to_modify, mask):
@@ -200,7 +204,9 @@ class PyTorchTensorOperations(AbstractTensor):
         return torch.tensor(data, dtype=dtype, device=device or self.default_device)
 
     def boolean_mask_select_(self, tensor, mask):
-        return self._AbstractTensor__unwrap(tensor)[mask]
+        t = self._AbstractTensor__unwrap(tensor)
+        m = self._AbstractTensor__unwrap(mask)
+        return t[m]
 
     def tolist_(self, tensor):
         return self._AbstractTensor__unwrap(tensor).tolist()
@@ -209,7 +215,9 @@ class PyTorchTensorOperations(AbstractTensor):
         return self._AbstractTensor__unwrap(tensor) < value
 
     def index_select_(self, tensor, dim, indices):
-        return torch.index_select(self._AbstractTensor__unwrap(tensor), dim, indices)
+        t = self._AbstractTensor__unwrap(tensor)
+        idx = self._AbstractTensor__unwrap(indices)
+        return torch.index_select(t, dim, idx)
 
     def argmin_(self, tensor, dim=None):
         t = self._AbstractTensor__unwrap(tensor)

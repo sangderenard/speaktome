@@ -543,7 +543,13 @@ class AbstractTensor(ABC):
 
     # --- Indexing helpers ---
     def __getitem__(self, idx):
-        """Return an indexed view wrapped as an AbstractTensor when possible."""
+        """Return an indexed view wrapped as an AbstractTensor when possible.
+
+        Accepts either standard Python index types or another ``AbstractTensor``
+        instance as ``idx``. When given an ``AbstractTensor`` the underlying
+        value is extracted via ``__unwrap`` so all backends behave consistently
+        for tensor-based indexing.
+        """
         if DEBUG:
             print(f"__getitem__ called with idx={idx} on {self.__class__.__name__}")
         data = self.data
@@ -552,7 +558,8 @@ class AbstractTensor(ABC):
         # c_backend tensors lack Python slicing support
         if data.__class__.__name__ == "CTensor":
             raise NotImplementedError("__getitem__ not implemented for CTensor backend")
-        result = data[idx]
+        index = self._AbstractTensor__unwrap(idx)
+        result = data[index]
         if isinstance(result, self.tensor_type):
             wrapped = type(self)(track_time=self.track_time)
             wrapped.data = result
@@ -655,7 +662,12 @@ class AbstractTensor(ABC):
 
 
     def __setitem__(self, idx, value):
-        """Assign to the underlying tensor using Python indexing."""
+        """Assign to the underlying tensor using Python indexing.
+
+        Like ``__getitem__``, ``idx`` may itself be an ``AbstractTensor``.  The
+        raw value is extracted before performing the assignment so tensor-based
+        indices work across all backends.
+        """
         if DEBUG:
             print(f"__setitem__ called with idx={idx}, value={value} on {self.__class__.__name__}")
         data = self.data
@@ -665,7 +677,8 @@ class AbstractTensor(ABC):
             raise NotImplementedError("__setitem__ not implemented for CTensor backend")
         if isinstance(value, AbstractTensor):
             value = value.data
-        data[idx] = value
+        index = self._AbstractTensor__unwrap(idx)
+        data[index] = value
 
     def __len__(self):
         """Return the length of the underlying tensor along the first dimension."""
