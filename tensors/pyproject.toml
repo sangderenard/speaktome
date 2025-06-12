@@ -1,41 +1,45 @@
-[build-system]
-requires = ["setuptools>=61", "wheel"]
-build-backend = "setuptools.build_meta"
-
-[project]
+[tool.poetry]
 name = "tensors"
 version = "0.1.0"
 description = "Tensor backends and abstraction layer"
+authors = ["Tensors Authors"]
+license = "MIT"
 readme = "README.md"
-requires-python = ">=3.8"
-license = { text = "MIT" }
-authors = [{ name = "Tensors Authors" }]
 
-[project.optional-dependencies]
-jax = [
-  "jax[cpu]>=0.4"
-]
-ctensor = [
-  "cffi>=1.15",
-  "setuptools>=61",
-  "ziglang>=0.14"
-]
-torch = [
-  "torch",
-]
-numpy = [
-  "numpy>=1.26"
-]
-opengl = [
-  "PyOpenGL>=3.1",
-  "glfw",
-  "numpy>=1.26",
-]
-dev = [
-  "pytest>=8.0",
-  "tools"
-]
+[tool.poetry.dependencies]
+python = ">=3.8"
 
-[tool.setuptools.packages.find]
-where = ["."]
-include = ["tensors*"]
+[tool.poetry.group.jax.dependencies]
+"jax[cpu]" = ">=0.4"
+
+[tool.poetry.group.ctensor.dependencies]
+cffi = ">=1.15"
+setuptools = ">=61"
+ziglang = ">=0.14"
+
+[tool.poetry.group.torch.dependencies]
+torch = "*"
+
+[tool.poetry.group.numpy.dependencies]
+numpy = ">=1.26"
+
+[tool.poetry.group.opengl.dependencies]
+PyOpenGL = ">=3.1"
+glfw = "*"
+numpy = ">=1.26"
+
+[tool.poetry.group.dev.dependencies]
+pytest = ">=8.0"
+tools = {path = "../AGENTS/tools", develop = true}
+
+[tool.poetry.extras]
+jax = []
+ctensor = []
+torch = []
+numpy = []
+opengl = []
+dev = []
+
+[build-system]
+requires = ["poetry-core>=1.5.0"]
+build-backend = "poetry.core.masonry.api"

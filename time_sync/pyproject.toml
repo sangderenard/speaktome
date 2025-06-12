@@ -1,29 +1,27 @@
-[build-system]
-requires = ["setuptools>=61", "wheel"]
-build-backend = "setuptools.build_meta"
-
-[project]
+[tool.poetry]
 name = "time_sync"
 version = "0.1.0"
 description = "System time synchronization utilities"
+authors = ["Time Sync Authors"]
+license = "MIT"
 readme = "README.md"
-requires-python = ">=3.8"
-license = { text = "MIT" }
-authors = [{ name = "Time Sync Authors" }]
-dependencies = [
-    "ntplib",  # Network Time Protocol client library
-    "colorama",
-    "pillow",
-]
 
-[project.optional-dependencies]
-gui = [
-    "pygame>=2",
-]
-dev = [
-    "tools"
-]
+[tool.poetry.dependencies]
+python = ">=3.8"
+ntplib = "*"
+colorama = "*"
+pillow = "*"
 
-[tool.setuptools.packages.find]
-where = ["."]
-include = ["time_sync*"]
+[tool.poetry.group.gui.dependencies]
+pygame = ">=2"
+
+[tool.poetry.group.dev.dependencies]
+tools = {path = "../AGENTS/tools", develop = true}
+
+[tool.poetry.extras]
+gui = []
+dev = []
+
+[build-system]
+requires = ["poetry-core>=1.5.0"]
+build-backend = "poetry.core.masonry.api"
