@@ -40,6 +40,12 @@ try:  # optional C backend
 except Exception:  # pragma: no cover - c backend missing
     CTensorOperations = None  # type: ignore
 
+OpenGLTensorOperations = None
+try:  # optional OpenGL backend
+    from .opengl_backend import OpenGLTensorOperations  # type: ignore
+except Exception:  # pragma: no cover - opengl missing
+    OpenGLTensorOperations = None  # type: ignore
+
 __all__ = [
     "AbstractTensor",
     "get_tensor_operations",
@@ -57,3 +63,6 @@ if JAXTensorOperations is not None:
 
 if CTensorOperations is not None:
     __all__.append("CTensorOperations")
+
+if OpenGLTensorOperations is not None:
+    __all__.append("OpenGLTensorOperations")
