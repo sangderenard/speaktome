@@ -76,22 +76,9 @@ class AsciiKernelClassifier:
         )
         filtered = [(c, bm) for c, bm in zip(charset, charBitmasks) if c in self.ramp and bm is not None]
         self.charset = [c for c, _ in filtered]
-        processed = [self._resize_to_char_size(bm) for _, bm in filtered]
+        processed = [self._resize_tensor_to_char(bm) for _, bm in filtered]
         self.charBitmasks = processed
 
-    def _resize_to_char_size(self, arr: np.ndarray):
-        """Resize ``arr`` to ``self.char_size`` using the tensor abstraction."""
-        np_ops = get_tensor_operations(Faculty.NUMPY)
-        tensor_np = np_ops.tensor_from_list(arr.tolist(), dtype=np_ops.float_dtype, device=None)
-        tensor_ops = tensor_np.to_backend(self.tensor_ops)
-        normalized = tensor_ops / 255.0
-        resized = self.tensor_ops.interpolate(normalized, self.char_size)
-        out_np_converted = resized.to_backend(np_ops)
-        if out_np_converted.shape() != self.char_size:
-            raise ValueError(f"Resized shape {out_np_converted.shape()} does not match char_size {self.char_size}")
-        if getattr(out_np_converted, "data", None) is None:
-            raise ValueError("Bitmask conversion failed: .data is None after resizing/conversion.")
-        return out_np_converted  # Store backend-native data, not a NumPy array
 
     def _resize_tensor_to_char(self, tensor: Any) -> Any:
         """Resize ``tensor`` to ``self.char_size`` using the tensor abstraction."""
@@ -144,7 +131,7 @@ class AsciiKernelClassifier:
 
         refs = self.tensor_ops.stack(self.charBitmasks, dim=0)
         expanded_inputs = self.tensor_ops.repeat_interleave(
-            luminance_tensor[:, None, :, :], self.vocab_size, dim=1
+            luminance_tensor[:, None, :, :], refs.shape[0], dim=1
         )
         expanded_refs = self.tensor_ops.repeat_interleave(
             refs[None, :, :, :], N, dim=0
