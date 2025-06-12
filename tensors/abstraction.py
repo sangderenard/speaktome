@@ -28,7 +28,7 @@ CONVERSION_REGISTRY: Dict[Tuple[type, type], Callable[["AbstractTensor", Any, "A
 
 OPS_CACHE: Dict[type, "AbstractTensor"] = {}
 
-
+DEBUG = True
 class ShapeAccessor:
     """Proxy object allowing both ``tensor.shape`` and ``tensor.shape()``."""
 
@@ -544,6 +544,8 @@ class AbstractTensor(ABC):
     # --- Indexing helpers ---
     def __getitem__(self, idx):
         """Return an indexed view wrapped as an AbstractTensor when possible."""
+        if DEBUG:
+            print(f"__getitem__ called with idx={idx} on {self.__class__.__name__}")
         data = self.data
         if data is None:
             raise ValueError("__getitem__ called on empty tensor")
@@ -559,7 +561,7 @@ class AbstractTensor(ABC):
     def __str__(self):
         # Unified print: show the underlying tensor's string representation
         return self.datastring(self.data)
-        
+
     def datastring(self, data: Any) -> str:
         """Return a pretty string representation of ``data`` for console output."""
 
@@ -619,7 +621,7 @@ class AbstractTensor(ABC):
             norm = (float(v) - min_val) / spread
             palette = [Fore.BLUE, Fore.CYAN, Fore.GREEN, Fore.YELLOW, Fore.RED]
             idx = int(norm * (len(palette) - 1))
-            return f"{palette[idx]}{v:.3e}{Style.RESET_ALL}"
+            return f"{palette[idx]}{v:.4e}{Style.RESET_ALL}"
 
         cell_w = 10
         col_cap = 6
@@ -643,7 +645,7 @@ class AbstractTensor(ABC):
         lines.append(border)
 
         table = "\n".join(lines)
-        return f"{header}\n{table}"
+        return f"\n\n{header}\n{table}\n\n"
 
     def __repr__(self):
         # Unified repr: AbstractTensor (BackendClass (backend data repr))
@@ -654,6 +656,8 @@ class AbstractTensor(ABC):
 
     def __setitem__(self, idx, value):
         """Assign to the underlying tensor using Python indexing."""
+        if DEBUG:
+            print(f"__setitem__ called with idx={idx}, value={value} on {self.__class__.__name__}")
         data = self.data
         if data is None:
             raise ValueError("__setitem__ called on empty tensor")
@@ -665,6 +669,8 @@ class AbstractTensor(ABC):
 
     def __len__(self):
         """Return the length of the underlying tensor along the first dimension."""
+        if DEBUG:
+            print(f"__len__ called on {self.__class__.__name__}")
         data = self.data
         print(f"{type(data)}, {data.shape if hasattr(data, 'shape') else 'no shape'}")
         if data is None:

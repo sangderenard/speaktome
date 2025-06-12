@@ -146,9 +146,9 @@ class AsciiKernelClassifier:
         row_indices = self.tensor_ops.arange(N, device=device, dtype=self.tensor_ops.long_dtype)
         print(row_indices, idxs)
         print(f"{row_indices.shape()} {idxs.shape()}")
-        exit()
-        selected_losses = losses[row_indices, idxs]
 
+        selected_losses = losses[row_indices, idxs]
+        exit()
         chars = [self.charset[int(i)] for i in idxs.tolist()]
         return {
             "indices": idxs,
