@@ -686,14 +686,14 @@ class CTensorOperations(AbstractTensor):
         return CTensor
 
     # Implementation hooks required by AbstractTensor
-    def get_shape(self, tensor=None):
-        t = tensor if tensor is not None else self.data
+    def get_shape(self) -> tuple[int, ...]:
+        t = self.data
         if not isinstance(t, CTensor):
             t = CTensor.from_list(t, _get_shape(t))
         return t.shape
 
-    def get_ndims(self, tensor=None):
-        return len(self.get_shape(tensor))
+    def get_ndims(self) -> int:
+        return len(self.get_shape())
 
     def to_dtype_(self, tensor, dtype: str = "float"):
         """Simple dtype conversion placeholder."""
