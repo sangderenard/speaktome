@@ -17,6 +17,8 @@ export SPEAKTOME_ACTIVE_FILE="$ACTIVE_FILE"
 USE_VENV=1
 HEADLESS=0
 TORCH_CHOICE=""
+CODEBASES=""
+GROUPS=()
 for arg in "$@"; do
   arg_lc="${arg,,}"
   case $arg_lc in
@@ -170,3 +172,28 @@ PY
 )
 echo "   * Torch = ${TORCH_INFO:-missing}"
 echo "Selections recorded to $SPEAKTOME_ACTIVE_FILE"
+
+# Create `.venv` symlinks in selected codebases so editors opened
+# in those directories automatically find the repo environment.
+python - "$MAP_FILE" "$SPEAKTOME_ACTIVE_FILE" <<'PY'
+import json, os, sys, pathlib
+
+map_file, active_file = sys.argv[1:3]
+try:
+    mapping = json.load(open(map_file))
+    active = json.load(open(active_file))
+except Exception:
+    sys.exit(0)
+
+root = pathlib.Path(map_file).resolve().parents[1]
+env_dir = root / '.venv'
+for cb in active.get('codebases', []):
+    info = mapping.get(cb, {})
+    cb_path = root / info.get('path', cb)
+    link = cb_path / '.venv'
+    if not link.exists():
+        try:
+            link.symlink_to(os.path.relpath(env_dir, cb_path))
+        except Exception as exc:
+            print(f"[WARN] Could not link {link}: {exc}", file=sys.stderr)
+PY
