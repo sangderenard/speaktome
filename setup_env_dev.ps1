@@ -16,14 +16,10 @@ if (-not $activeFile) { $activeFile = Join-Path ([System.IO.Path]::GetTempPath()
 $env:SPEAKTOME_ACTIVE_FILE = $activeFile
 $menuArgs = @()
 $useVenv = $true
-$useTorch = $true
 foreach ($arg in $args) {
     $arg_lc = $arg.ToLower()
     if ($arg_lc -eq '-no-venv') {
         $useVenv = $false
-    }
-    elseif ($arg_lc -eq '-notorch' -or $arg_lc -eq '-no-torch') {
-        $useTorch = $false
     }
     elseif ($arg_lc -like '-codebases=*' -or $arg_lc -like '-cb=*') {
         $cbVal = $arg.Split('=')[1]
@@ -40,8 +36,7 @@ foreach ($arg in $args) {
         }
     }
 }
-if (-not $useTorch) { $menuArgs += '-notorch' }
-Safe-Run { & "$scriptRoot\setup_env.ps1" @args -from-dev $(if (-not $useTorch) { '-NoTorch' }) }
+Safe-Run { & "$scriptRoot\setup_env.ps1" @args -from-dev }
 
 # Update the venv path handling section:
 if ($useVenv) {
@@ -158,5 +153,6 @@ if (Test-Path $activeFile) {
 }
 
 # All options for this script should be used with single-dash PowerShell-style flags, e.g.:
-#   -NoTorch -NoVenv -Codebases projectA,projectB -Groups groupX
-# Do not use double-dash flags (e.g., --notorch) with this script.
+#   -Torch -NoVenv -Codebases projectA,projectB -Groups groupX
+# Use -Torch or -Gpu to request torch. If omitted, torch is skipped.
+# Do not use double-dash flags with this script.

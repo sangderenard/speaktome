@@ -9,19 +9,22 @@ set -uo pipefail
 
 # Resolve repository root so this script works from any directory
 SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+MAP_FILE="$SCRIPT_ROOT/AGENTS/codebase_map.json"
 
 ACTIVE_FILE=${SPEAKTOME_ACTIVE_FILE:-/tmp/speaktome_active.json}
 export SPEAKTOME_ACTIVE_FILE="$ACTIVE_FILE"
 
 USE_VENV=1
 HEADLESS=0
-NOTORCH=0
+TORCH_CHOICE=""
 for arg in "$@"; do
   arg_lc="${arg,,}"
   case $arg_lc in
     -no-venv) USE_VENV=0 ;;
     -headless) HEADLESS=1 ;;
-    -notorch|-no-torch) NOTORCH=1 ;;
+    -torch) TORCH_CHOICE="cpu" ;;
+    -gpu|-gpu-torch) TORCH_CHOICE="gpu" ;;
+    -notorch|-no-torch) TORCH_CHOICE="" ;;
   esac
 done
 
@@ -108,8 +111,6 @@ fi
 
 safe_run $VENV_PYTHON -m pip install --upgrade pip
 safe_run $VENV_PYTHON -m pip install wheel
-
-MAP_FILE="$SCRIPT_ROOT/AGENTS/codebase_map.json"
 CODEBASES=""
 GROUPS=()
 MENU_ARGS=()
@@ -122,17 +123,16 @@ for arg in "$@"; do
   esac
 done
 
-if [ $NOTORCH -eq 1 ]; then
-  echo "[INFO] -notorch: Skipping torch installation and torch-dependent codebases/groups."
-else
-  # Always install torch first for CPU safety
-  if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
-      echo "Installing latest stable CPU-only torch (CI environment)"
-      install_quiet "$VENV_PIP" install torch==2.3.1+cpu -f https://download.pytorch.org/whl/torch_stable.html
+if [ -n "$TORCH_CHOICE" ]; then
+  if [ "$TORCH_CHOICE" = "gpu" ]; then
+    echo "Installing torch with GPU support"
+    install_quiet "$VENV_PIP" install torch==2.3.1
   else
-      echo "Installing latest stable CPU-only torch (default)"
-      install_quiet "$VENV_PIP" install torch==2.3.1+cpu -f https://download.pytorch.org/whl/torch_stable.html
+    echo "Installing CPU-only torch"
+    install_quiet "$VENV_PIP" install torch==2.3.1+cpu -f https://download.pytorch.org/whl/torch_stable.html
   fi
+else
+  echo "[INFO] Torch not requested; skipping installation."
 fi
 
 # If not called from a dev script, launch the dev menu for all codebase/group installs
