@@ -49,7 +49,7 @@ class DummyModel(AbstractModelWrapper):
             width = len(input_ids[0]) if batch else 0
             flat_ids = [tok for row in input_ids for tok in row]
 
-        one_hot = ops.index_select(self.embed, 0, flat_ids)
+        one_hot = self.embed[flat_ids]
         logits_flat = self.model.forward(one_hot, None)["logits"]
 
         if hasattr(input_ids, "shape"):
@@ -120,8 +120,8 @@ def test_lookahead_across_backends(faculty, caplog):
     with caplog.at_level(logging.INFO):
         result = ops.benchmark(lambda: controller.run(ptoks, pscores, plens, pidx))
     tokens, _, lengths, *_ = result
-    assert ops.shape(tokens)[0] > 0
-    assert ops.shape(lengths)[0] > 0
+    assert tokens.shape()[0] > 0
+    assert lengths.shape()[0] > 0
     if ops.last_op_time is not None:
         logger.info("%s backend lookahead time: %.6f", faculty.name, ops.last_op_time)
 
@@ -155,5 +155,5 @@ def test_lookahead_default_backend(steps):
 
     result = ops.benchmark(lambda: controller.run(ptoks, pscores, plens, pidx))
     tokens, _, _, *_ = result
-    assert ops.shape(tokens)[0] > 0
+    assert tokens.shape()[0] > 0
     assert ops.last_op_time is not None

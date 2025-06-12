@@ -341,18 +341,13 @@ class AbstractTensor(ABC):
         """Return the number of dimensions (property, numpy style)."""
         return self.get_ndims(self.data)
 
-    @property
-    def ndims(self):
-        """Return the number of dimensions (property, project style)."""
+    def dim(self) -> int:
+        """Return the number of dimensions (method, torch style)."""
         return self.get_ndims(self.data)
 
-    def dim(self, tensor=None):
-        """Return the number of dimensions (method, torch style)."""
-        return self.get_ndims(self.data_or(tensor))
-
-    def ndims(self, tensor=None):
+    def ndims(self) -> int:
         """Return the number of dimensions (method, project style)."""
-        return self.get_ndims(self.data_or(tensor))
+        return self.get_ndims(self.data)
 
     # Lightweight helper to coerce arbitrary input to this backend's tensor type
     def to_backend(
@@ -661,18 +656,19 @@ class AbstractTensor(ABC):
         return obj
 
     @abstractmethod
-    def get_shape(self, tensor=None):
-        """Return the shape of the tensor as a tuple."""
+    def get_shape(self) -> Tuple[int, ...]:
+        """Return the shape of ``self`` as a tuple."""
         pass
 
     @abstractmethod
-    def get_ndims(self, tensor=None):
-        """Return the number of dimensions of the tensor."""
+    def get_ndims(self) -> int:
+        """Return the number of dimensions of ``self``."""
         pass
 
 
-    def repeat(self, tensor: Any = None, repeats: Any = None, dim: int = 0) -> "AbstractTensor":
-        return self.repeat_(tensor if tensor is not None else self, repeats, dim)
+    def repeat(self, repeats: Any = None, dim: int = 0) -> "AbstractTensor":
+        """Repeat ``self`` along ``dim`` ``repeats`` times."""
+        return self.repeat_(repeats, dim)
     @staticmethod
     def get_tensor(data=None, faculty: 'Faculty' = None, *, track_time: bool = False) -> 'AbstractTensor':
         """

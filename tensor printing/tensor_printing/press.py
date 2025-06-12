@@ -39,8 +39,8 @@ class GrandPrintingPress:
     ) -> Any:
         """Apply a glyph tensor at the given position."""
         y_idx, x_idx = self.ruler.coordinates_to_tensor(position[0], position[1], unit)
-        g_height, g_width = self.tensor_ops.shape(glyph)
-        c_height, c_width = self.tensor_ops.shape(self.canvas)
+        g_height, g_width = glyph.shape()
+        c_height, c_width = self.canvas.shape()
 
         end_y = min(y_idx + g_height, c_height)
         end_x = min(x_idx + g_width, c_width)
@@ -48,10 +48,10 @@ class GrandPrintingPress:
             return self.canvas
 
         sub_glyph = glyph[: end_y - y_idx, : end_x - x_idx]
-        for row in range(self.tensor_ops.shape(sub_glyph)[0]):
+        for row in range(sub_glyph.shape()[0]):
             indices_dim0 = [y_idx + row] * (end_x - x_idx)
             indices_dim1 = list(range(x_idx, end_x))
-            values = self.tensor_ops.tolist(sub_glyph[row])
+            values = sub_glyph[row].tolist()
             self.tensor_ops.assign_at_indices(
                 self.canvas, indices_dim0, indices_dim1, values
             )
@@ -121,7 +121,7 @@ class GrandPrintingPress:
         for ch in text:
             if ch == "\n":
                 sample = next(iter(library.values()))
-                g_height = self.tensor_ops.shape(sample)[0]
+                g_height = sample.shape()[0]
                 # move down by glyph height in tensor units
                 y -= self.ruler.tensor_to_coordinates(0, g_height, unit)[1]
                 x = position[0]
@@ -130,7 +130,7 @@ class GrandPrintingPress:
             if glyph is None:
                 continue
             self.print_glyph(glyph, (x, y), unit=unit)
-            g_width = self.tensor_ops.shape(glyph)[1]
+            g_width = glyph.shape()[1]
             x += self.ruler.tensor_to_coordinates(g_width, 0, unit)[0]
         return self.canvas
 

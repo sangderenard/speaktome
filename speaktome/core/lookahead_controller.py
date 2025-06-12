@@ -83,8 +83,8 @@ class LookaheadController:
         Any,   # final_parent_prefix_lengths: [K]
         List[int]           # pruned_original_parent_beam_idxs
     ]:
-        B_initial = self.tensor_ops.shape(prefix_tokens)[0]
-        initial_prefix_width = self.tensor_ops.shape(prefix_tokens)[1]
+        B_initial = prefix_tokens.shape()[0]
+        initial_prefix_width = prefix_tokens.shape()[1]
         final_width = min(self.max_len, initial_prefix_width + self.lookahead_steps)
 
         # 1) Initialize current_* tensors by copying prefix into padded buffers
@@ -109,10 +109,10 @@ class LookaheadController:
         current_parent_beam_idxs = self.tensor_ops.to_device(self.tensor_ops.clone(original_parent_beam_idxs), self.device)
         current_parent_prefix_lengths = self.tensor_ops.to_device(self.tensor_ops.clone(prefix_lengths), self.device)
 
-        original_parents_set: Set[int] = set(self.tensor_ops.tolist(original_parent_beam_idxs))
+        original_parents_set: Set[int] = set(original_parent_beam_idxs.tolist())
 
         for step in range(self.lookahead_steps):
-            B_cur = self.tensor_ops.shape(current_tokens)[0]
+            B_cur = current_tokens.shape()[0]
             if B_cur == 0:
                 break
 
@@ -187,13 +187,13 @@ class LookaheadController:
             else:
                 keep_indices = self.tensor_ops.arange(0, N_total, device=self.device)
 
-            current_tokens = self.tensor_ops.index_select(next_tokens, 0, keep_indices)
-            current_scores = self.tensor_ops.index_select(next_scores, 0, keep_indices)
-            current_lengths = self.tensor_ops.index_select(next_lengths, 0, keep_indices)
-            current_parent_beam_idxs = self.tensor_ops.index_select(expanded_parent_idxs, 0, keep_indices)
-            current_parent_prefix_lengths = self.tensor_ops.index_select(expanded_parent_prefix_lens, 0, keep_indices)
+            current_tokens = next_tokens[keep_indices]
+            current_scores = next_scores[keep_indices]
+            current_lengths = next_lengths[keep_indices]
+            current_parent_beam_idxs = expanded_parent_idxs[keep_indices]
+            current_parent_prefix_lengths = expanded_parent_prefix_lens[keep_indices]
 
-        final_parents: Set[int] = set(self.tensor_ops.tolist(current_parent_beam_idxs))
+        final_parents: Set[int] = set(current_parent_beam_idxs.tolist())
         pruned_original_parents = list(original_parents_set - final_parents)
 
         return (

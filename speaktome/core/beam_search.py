@@ -325,7 +325,7 @@ class BeamSearch:
         score_matrix = self.tensor_ops.stack(
             [self.scorer.bins[name]['scores'] for name in bin_names], dim=0
         )
-        num_candidates = self.tensor_ops.shape(score_matrix)[1]
+        num_candidates = score_matrix.shape()[1]
         k = min(self.gpu_limit, num_candidates)
         top_scores, top_idx = self.tensor_ops.topk(score_matrix, k=k, dim=1)
 
