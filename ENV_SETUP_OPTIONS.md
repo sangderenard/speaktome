@@ -34,6 +34,10 @@ The environment setup scripts automate the creation of a Python virtual environm
   - `setup_env.sh` — Main environment setup (Linux/macOS)
   - `setup_env_dev.sh` — Developer-oriented setup (Linux/macOS)
 
+Each project root also includes quick-start wrappers `setup_env.sh` and
+`setup_env.ps1`. These wrappers change to the repository root and invoke the
+installation-choice Python tool in headless mode with default arguments.
+
 ---
 
 ## All Options and Flags
