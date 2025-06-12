@@ -1,6 +1,6 @@
 try:
     from AGENTS.tools.header_utils import ENV_SETUP_BOX
-    from fontmapper2 import ascii_preview
+    from fontmapper import ascii_preview
 except Exception:
     import sys
     print(ENV_SETUP_BOX)

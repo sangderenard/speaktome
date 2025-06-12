@@ -19,6 +19,7 @@ from .FM16.modules.charset_ops import (
     bytemaps_as_ascii,
     obtain_charset,
 )
+from .ascii_mapper import ascii_preview
 
 __all__ = [
     "charset_ops",
@@ -27,4 +28,5 @@ __all__ = [
     "generate_variants",
     "bytemaps_as_ascii",
     "obtain_charset",
+    "ascii_preview",
 ]
