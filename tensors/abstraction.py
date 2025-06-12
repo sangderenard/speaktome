@@ -561,14 +561,89 @@ class AbstractTensor(ABC):
         return self.datastring(self.data)
         
     def datastring(self, data: Any) -> str:
-        """Return a string representation of the underlying tensor data."""
+        """Return a pretty string representation of ``data`` for console output."""
+
         if data is None:
             return "AbstractTensor (None)"
-        if isinstance(data, list):
-            return f"AbstractTensor ({_flatten(data)})"
-        if hasattr(data, 'tolist'):
-            return f"AbstractTensor ({data.tolist()})"
-        return f"AbstractTensor ({data})"
+
+        try:
+            shape = self.get_shape(data)
+        except Exception:
+            shape = ()
+
+        try:
+            dtype = self.get_dtype(data)
+        except Exception:
+            dtype = getattr(data, "dtype", None)
+
+        try:
+            device = self.get_device(data)
+        except Exception:
+            device = getattr(data, "device", None)
+
+        header = f"shape={shape} dtype={dtype} device={device}"
+
+        # Attempt color support via colorama
+        try:
+            from colorama import Fore, Style
+        except Exception:  # pragma: no cover - optional dependency
+            class _NoColor:
+                RED = BLUE = CYAN = YELLOW = GREEN = MAGENTA = WHITE = RESET_ALL = ""
+
+            Fore = Style = _NoColor()  # type: ignore
+
+        if hasattr(data, "tolist"):
+            values = data.tolist()
+        else:
+            values = data
+
+        if not isinstance(values, list):
+            values = [values]
+
+        if shape and len(shape) == 1:
+            values = [values]
+
+        rows = len(values)
+        cols = len(values[0]) if rows and isinstance(values[0], list) else 1
+
+        flat_vals = [float(x) for row in values for x in (row if isinstance(row, list) else [row]) if isinstance(x, (int, float))]
+        if flat_vals:
+            min_val, max_val = min(flat_vals), max(flat_vals)
+            spread = max_val - min_val or 1.0
+        else:
+            min_val, max_val, spread = 0.0, 0.0, 1.0
+
+        def colorize(v: Any) -> str:
+            if not isinstance(v, (int, float)):
+                return str(v)
+            norm = (float(v) - min_val) / spread
+            palette = [Fore.BLUE, Fore.CYAN, Fore.GREEN, Fore.YELLOW, Fore.RED]
+            idx = int(norm * (len(palette) - 1))
+            return f"{palette[idx]}{v:.3e}{Style.RESET_ALL}"
+
+        cell_w = 10
+        col_cap = 6
+        row_cap = 10
+        lines = []
+        border = "+" + "+".join(["-" * cell_w] * min(cols, col_cap)) + "+"
+        lines.append(border)
+        for r in range(min(rows, row_cap)):
+            row = values[r] if isinstance(values[r], list) else [values[r]]
+            cells = []
+            for c in range(min(cols, col_cap)):
+                if c < len(row):
+                    cell = colorize(row[c]).ljust(cell_w)
+                else:
+                    cell = "".ljust(cell_w)
+                cells.append(cell)
+            lines.append("|" + "|".join(cells) + "|")
+        if rows > row_cap or cols > col_cap:
+            ell = "...".center(cell_w)
+            lines.append("|" + "|".join([ell] * min(cols, col_cap)) + "|")
+        lines.append(border)
+
+        table = "\n".join(lines)
+        return f"{header}\n{table}"
 
     def __repr__(self):
         # Unified repr: AbstractTensor (BackendClass (backend data repr))
