@@ -35,7 +35,8 @@ class ShapeAccessor:
     def __init__(self, owner: "AbstractTensor") -> None:
         self.owner = owner
 
-    def __call__(self, tensor: Any | None = None) -> Tuple[int, ...]:
+    def __call__(self) -> Tuple[int, ...]:
+        """Return the shape of ``owner`` as a tuple."""
         return self.owner.shape_()
 
     def __iter__(self):  # type: ignore[override]
