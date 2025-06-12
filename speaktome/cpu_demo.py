@@ -90,7 +90,7 @@ class RandomModel(AbstractModelWrapper):
             width = len(input_ids[0]) if batch > 0 else 0
             flat_ids = [tok for row in input_ids for tok in row]
 
-        one_hot = ops.index_select(self.embed, 0, flat_ids)
+        one_hot = self.embed[flat_ids]
         logits_flat = self.model.forward(one_hot, None)["logits"]
 
         if NUMPY_AVAILABLE:
