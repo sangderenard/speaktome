@@ -78,6 +78,12 @@ REGISTRY = ROOT / "AGENTS" / "CODEBASE_REGISTRY.md"
 MAP_FILE = ROOT / "AGENTS" / "codebase_map.json"
 ACTIVE_ENV = "SPEAKTOME_ACTIVE_FILE"
 
+if "PYTHONPATH" not in os.environ:
+    os.environ["PYTHONPATH"] = str(ROOT)
+    # Ensure imports find local packages when executed directly
+    if str(ROOT) not in sys.path:
+        sys.path.insert(0, str(ROOT))
+
 
 def discover_codebases(registry_path: Path) -> list[Path]:
     """Return valid codebase directories listed in ``CODEBASE_REGISTRY.md``."""
