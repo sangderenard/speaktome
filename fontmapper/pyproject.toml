@@ -38,6 +38,9 @@ server = [
 gui = [
     "PyQt5",
 ]
+dev = [
+    "tools"
+]
 
 [tool.setuptools.packages.find]
 where = ["."]

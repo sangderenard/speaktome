@@ -44,7 +44,8 @@ def build_map(root: Path) -> dict[str, dict[str, object]]:
     for cb in discover_codebases(root):
         groups = extract_groups(cb / 'pyproject.toml')
         mapping[cb.name] = {
-            'path': str(cb.relative_to(root)),
+            # Use POSIX separators for cross-platform consistency
+            'path': cb.relative_to(root).as_posix(),
             'groups': groups,
         }
     return mapping

@@ -1,5 +1,5 @@
 [project]
-name = "speaktome-agent-tools"
+name = "tools"
 version = "0.1.0"
 description = "Agent tools and repo management utilities for SpeakToMe"
 authors = [ { name = "Your Name", email = "your@email.com" } ]
