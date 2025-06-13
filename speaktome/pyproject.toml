@@ -7,8 +7,8 @@ license = "MIT"
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = ">=3.8"
-numpy = ">=1.26"
+python = ">=3.10"
+numpy = ">=1.26,<2.3"
 tensors = ">=0.1.0"
 
 [tool.poetry.group.plot]

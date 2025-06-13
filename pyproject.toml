@@ -6,7 +6,7 @@ authors = ["SpeakToMe Authors"]
 license = "MIT"
 
 [tool.poetry.dependencies]
-python = ">=3.8"
+python = ">=3.10"
 speaktome = {path = "speaktome", develop = true}
 fontmapper = {path = "fontmapper", develop = true}
 laplace = {path = "laplace", develop = true}
