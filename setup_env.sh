@@ -11,7 +11,9 @@ SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 MAP_FILE="$SCRIPT_ROOT/AGENTS/codebase_map.json"
 
 # Provide ENV_SETUP_BOX for modules that fail to import early
-export ENV_SETUP_BOX="\n+-----------------------------------------------------------------------+\n| Imports failed. See ENV_SETUP_OPTIONS.md for environment guidance.  |\n| Missing packages usually mean setup was skipped or incomplete.      |\n| Please file a DOC, TTICKET, or AUDIT report under AGENTS/experience_reports. |\n+-----------------------------------------------------------------------+\n"
+ENV_BOX_FILE="$SCRIPT_ROOT/ENV_SETUP_BOX.md"
+ENV_SETUP_BOX="\n$(cat "$ENV_BOX_FILE")\n"
+export ENV_SETUP_BOX
 
 ACTIVE_FILE=${SPEAKTOME_ACTIVE_FILE:-/tmp/speaktome_active.json}
 export SPEAKTOME_ACTIVE_FILE="$ACTIVE_FILE"

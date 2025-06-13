@@ -6,7 +6,8 @@ param(
     [string[]]$args
 )
 
-$env:ENV_SETUP_BOX = "`n+-----------------------------------------------------------------------+`n| Imports failed. See ENV_SETUP_OPTIONS.md for environment guidance.  |`n| Missing packages usually mean setup was skipped or incomplete.      |`n| Please file a DOC, TTICKET, or AUDIT report under AGENTS/experience_reports. |`n+-----------------------------------------------------------------------+`n"
+$env_box_file = Join-Path $PSScriptRoot "ENV_SETUP_BOX.md"
+$env:ENV_SETUP_BOX = "`n$(Get-Content $env_box_file -Raw)`n"
 
 # Manual flag parsing for all arguments (case-insensitive, -flag=value style)
 $UseVenv = $true

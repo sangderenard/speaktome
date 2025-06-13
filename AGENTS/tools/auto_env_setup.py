@@ -75,3 +75,33 @@ def run_setup_script(root: Path | None = None, *, use_venv: bool = True) -> subp
         return subprocess.run(cmd, check=False, capture_output=True, text=True)
     except Exception:
         return None
+
+
+def main(argv: list[str] | None = None) -> int:
+    """Run the setup script from the command line."""
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Run repo setup script")
+    parser.add_argument(
+        "root",
+        nargs="?",
+        default=None,
+        help="Path to the project root (containing pyproject.toml)",
+    )
+    parser.add_argument(
+        "--no-venv",
+        action="store_true",
+        help="Install packages outside a virtualenv",
+    )
+    args = parser.parse_args(argv)
+    root_path = Path(args.root) if args.root else None
+    result = run_setup_script(root_path, use_venv=not args.no_venv)
+    if result is None:
+        return 1
+    sys.stdout.write(result.stdout)
+    sys.stderr.write(result.stderr)
+    return result.returncode
+
+
+if __name__ == "__main__":  # pragma: no cover - manual invocation
+    raise SystemExit(main())
