@@ -10,9 +10,23 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from . import find_repo_root
+def _find_repo_root(start: Path) -> Path:
+    current = start.resolve()
+    required = {
+        "speaktome",
+        "laplace",
+        "tensor_printing",
+        "time_sync",
+        "AGENTS",
+        "fontmapper",
+        "tensors",
+    }
+    for parent in [current, *current.parents]:
+        if all((parent / name).exists() for name in required):
+            return parent
+    return current
 
-JOB_DIR = find_repo_root(Path(__file__)) / "job_descriptions"
+JOB_DIR = _find_repo_root(Path(__file__)) / "job_descriptions"
 OUT_FILE = JOB_DIR / "job_priority.json"
 # --- END HEADER ---
 
