@@ -14,21 +14,28 @@ try:
     import speaktome.config as config
     import torch
     import numpy as np
+    from .accelerator_backends.c_backend import CTensor
 except ModuleNotFoundError:
     torch = None  # type: ignore
     np = None  # type: ignore
+    CTensor = None  # type: ignore
 except Exception:
     print("Failed to import required modules for tensor operations.")
     import sys
+
     print(ENV_SETUP_BOX)
     sys.exit(1)
 # --- END HEADER ---
 
-CONVERSION_REGISTRY: Dict[Tuple[type, type], Callable[["AbstractTensor", Any, "AbstractTensor"], Any]] = {}
+CONVERSION_REGISTRY: Dict[
+    Tuple[type, type], Callable[["AbstractTensor", Any, "AbstractTensor"], Any]
+] = {}
 
 OPS_CACHE: Dict[type, "AbstractTensor"] = {}
 
-DEBUG = False#True
+DEBUG = False  # True
+
+
 class ShapeAccessor:
     """Proxy object allowing both ``tensor.shape`` and ``tensor.shape()``."""
 
@@ -51,9 +58,15 @@ class ShapeAccessor:
     def __repr__(self) -> str:  # type: ignore[override]
         return repr(self())
 
-def register_conversion(src_cls: type, tgt_cls: type, func: Callable[["AbstractTensor", Any, "AbstractTensor"], Any]) -> None:
+
+def register_conversion(
+    src_cls: type,
+    tgt_cls: type,
+    func: Callable[["AbstractTensor", Any, "AbstractTensor"], Any],
+) -> None:
     """Register a direct tensor conversion function."""
     CONVERSION_REGISTRY[(src_cls, tgt_cls)] = func
+
 
 def _get_ops_for_class(cls: type) -> "AbstractTensor":
     if cls in OPS_CACHE:
@@ -71,6 +84,7 @@ def _get_ops_for_class(cls: type) -> "AbstractTensor":
     OPS_CACHE[cls] = ops
     return ops
 
+
 def _find_conversion_path(src_cls: type, tgt_cls: type) -> List[Tuple[type, type]]:
     if src_cls == tgt_cls:
         return []
@@ -85,6 +99,7 @@ def _find_conversion_path(src_cls: type, tgt_cls: type) -> List[Tuple[type, type
                 q.append((b, path + [(a, b)]))
                 seen.add(b)
     return []
+
 
 class AbstractTensor(ABC):
     def __init__(self, track_time: bool = False) -> None:
@@ -115,7 +130,13 @@ class AbstractTensor(ABC):
         return call()
 
     # --- Tensor creation and manipulation methods ---
-    def full(self, size: Tuple[int, ...], fill_value: Any, dtype: Any = None, device: Any = None):
+    def full(
+        self,
+        size: Tuple[int, ...],
+        fill_value: Any,
+        dtype: Any = None,
+        device: Any = None,
+    ):
         result = type(self)(track_time=self.track_time)
         result.data = self.full_(size, fill_value, dtype, device)
         return result
@@ -184,12 +205,21 @@ class AbstractTensor(ABC):
         result.data = self.not_equal_(other)
         return result
 
-    def arange(self, start: int, end: Optional[int] = None, step: int = 1, device: Any = None, dtype: Any = None) -> "AbstractTensor":
+    def arange(
+        self,
+        start: int,
+        end: Optional[int] = None,
+        step: int = 1,
+        device: Any = None,
+        dtype: Any = None,
+    ) -> "AbstractTensor":
         result = type(self)(track_time=self.track_time)
         result.data = self.arange_(start, end, step, device, dtype)
         return result
 
-    def select_by_indices(self, indices_dim0: Any = None, indices_dim1: Any = None) -> "AbstractTensor":
+    def select_by_indices(
+        self, indices_dim0: Any = None, indices_dim1: Any = None
+    ) -> "AbstractTensor":
         result = type(self)(track_time=self.track_time)
         result.data = self.select_by_indices_(indices_dim0, indices_dim1)
         return result
@@ -222,7 +252,9 @@ class AbstractTensor(ABC):
         result.data = self.stack_(tensors, dim)
         return result
 
-    def repeat_interleave(self, repeats: int = 1, dim: Optional[int] = None) -> "AbstractTensor":
+    def repeat_interleave(
+        self, repeats: int = 1, dim: Optional[int] = None
+    ) -> "AbstractTensor":
         result = AbstractTensor.get_tensor(self.repeat_interleave_(repeats, dim))
         return result
 
@@ -231,9 +263,16 @@ class AbstractTensor(ABC):
         result.data = self.view_flat_()
         return result
 
-    def assign_at_indices(self, indices_dim0: Any = None, indices_dim1: Any = None, values_to_assign: Any = None) -> "AbstractTensor":
+    def assign_at_indices(
+        self,
+        indices_dim0: Any = None,
+        indices_dim1: Any = None,
+        values_to_assign: Any = None,
+    ) -> "AbstractTensor":
         result = type(self)(track_time=self.track_time)
-        result.data = self.assign_at_indices_(indices_dim0, indices_dim1, values_to_assign)
+        result.data = self.assign_at_indices_(
+            indices_dim0, indices_dim1, values_to_assign
+        )
         return result
 
     def increment_at_indices(self, mask: Any = None) -> "AbstractTensor":
@@ -241,7 +280,9 @@ class AbstractTensor(ABC):
         result.data = self.increment_at_indices_(mask)
         return result
 
-    def clamp(self, min_val: Optional[float] = None, max_val: Optional[float] = None) -> "AbstractTensor":
+    def clamp(
+        self, min_val: Optional[float] = None, max_val: Optional[float] = None
+    ) -> "AbstractTensor":
         result = type(self)(track_time=self.track_time)
         result.data = self.clamp_(min_val, max_val)
         return result
@@ -264,7 +305,9 @@ class AbstractTensor(ABC):
         result.data = self.sqrt_()
         return result
 
-    def tensor_from_list(self, data: List[Any], dtype: Any = None, device: Any = None) -> "AbstractTensor":
+    def tensor_from_list(
+        self, data: List[Any], dtype: Any = None, device: Any = None
+    ) -> "AbstractTensor":
         result = type(self)(track_time=self.track_time)
         result.data = self.tensor_from_list_(data, dtype, device)
         return result
@@ -300,7 +343,9 @@ class AbstractTensor(ABC):
     def save(self, filepath: str = None) -> None:
         self.save_(filepath)
 
-    def load(self, filepath: str, dtype: Any = None, device: Any = None) -> "AbstractTensor":
+    def load(
+        self, filepath: str, dtype: Any = None, device: Any = None
+    ) -> "AbstractTensor":
         result = type(self)(track_time=self.track_time)
         result.data = self.load_(filepath, dtype, device)
         return result
@@ -408,86 +453,90 @@ class AbstractTensor(ABC):
     def _apply_operator(self, op: str, left: Any, right: Any):
         """Apply ``op`` to ``left`` and ``right`` returning a new tensor."""
         l = left._AbstractTensor__unwrap() if isinstance(left, AbstractTensor) else left
-        r = right._AbstractTensor__unwrap() if isinstance(right, AbstractTensor) else right
-        
+        r = (
+            right._AbstractTensor__unwrap()
+            if isinstance(right, AbstractTensor)
+            else right
+        )
+
         result = type(self)(track_time=self.track_time)
 
         result.data = self._apply_operator__(op, l, r)
         return result
 
     def __add__(self, other):
-        return self._apply_operator('add', self, other)
+        return self._apply_operator("add", self, other)
 
     def __sub__(self, other):
-        return self._apply_operator('sub', self, other)
+        return self._apply_operator("sub", self, other)
 
     def __mul__(self, other):
-        return self._apply_operator('mul', self, other)
+        return self._apply_operator("mul", self, other)
 
     def __truediv__(self, other):
-        return self._apply_operator('truediv', self, other)
+        return self._apply_operator("truediv", self, other)
 
     def __floordiv__(self, other):
-        return self._apply_operator('floordiv', self, other)
+        return self._apply_operator("floordiv", self, other)
 
     def __mod__(self, other):
-        return self._apply_operator('mod', self, other)
+        return self._apply_operator("mod", self, other)
 
     def __pow__(self, other):
-        return self._apply_operator('pow', self, other)
+        return self._apply_operator("pow", self, other)
 
     def __matmul__(self, other):
-        return self._apply_operator('matmul', self, other)
+        return self._apply_operator("matmul", self, other)
 
     # Reverse operators
     def __radd__(self, other):
-        return self._apply_operator('radd', other, self)
+        return self._apply_operator("radd", other, self)
 
     def __rsub__(self, other):
-        return self._apply_operator('rsub', other, self)
+        return self._apply_operator("rsub", other, self)
 
     def __rmul__(self, other):
-        return self._apply_operator('rmul', other, self)
+        return self._apply_operator("rmul", other, self)
 
     def __rtruediv__(self, other):
-        return self._apply_operator('rtruediv', other, self)
+        return self._apply_operator("rtruediv", other, self)
 
     def __rfloordiv__(self, other):
-        return self._apply_operator('rfloordiv', other, self)
+        return self._apply_operator("rfloordiv", other, self)
 
     def __rmod__(self, other):
-        return self._apply_operator('rmod', other, self)
+        return self._apply_operator("rmod", other, self)
 
     def __rpow__(self, other):
-        return self._apply_operator('rpow', other, self)
+        return self._apply_operator("rpow", other, self)
 
     def __rmatmul__(self, other):
-        return self._apply_operator('rmatmul', other, self)
+        return self._apply_operator("rmatmul", other, self)
 
     # In-place operators
     def __iadd__(self, other):
-        return self._apply_operator('iadd', self, other)
+        return self._apply_operator("iadd", self, other)
 
     def __isub__(self, other):
-        return self._apply_operator('isub', self, other)
+        return self._apply_operator("isub", self, other)
 
     def __imul__(self, other):
-        return self._apply_operator('imul', self, other)
+        return self._apply_operator("imul", self, other)
 
     def __itruediv__(self, other):
-        return self._apply_operator('itruediv', self, other)
+        return self._apply_operator("itruediv", self, other)
 
     def __ifloordiv__(self, other):
-        return self._apply_operator('ifloordiv', self, other)
+        return self._apply_operator("ifloordiv", self, other)
 
     def __imod__(self, other):
-        return self._apply_operator('imod', self, other)
+        return self._apply_operator("imod", self, other)
 
     def __ipow__(self, other):
-        return self._apply_operator('ipow', self, other)
+        return self._apply_operator("ipow", self, other)
 
     def __imatmul__(self, other):
-        return self._apply_operator('imatmul', self, other)
+        return self._apply_operator("imatmul", self, other)
 
     # --- Indexing helpers ---
     def __getitem__(self, idx):
@@ -505,14 +554,21 @@ class AbstractTensor(ABC):
             raise ValueError("__getitem__ called on empty tensor")
 
         # Ensure backend-native tensor type for indexing
-        if hasattr(data, "__class__") and data.__class__.__name__ == "CTensor": # TODO: Improve CTensor check
+        if CTensor is not None and isinstance(data, CTensor):
             # CTensor might require special handling or might not support all Python slicing.
             # For now, assume it needs unwrapped indices if idx contains AbstractTensors.
-            # This part might need specific logic if CTensor's __getitem__ is different.
-            pass # Fall through to generic index processing for now
+            # This placeholder allows future CTensor-specific indexing logic.
+            pass  # Fall through to generic index processing for now
 
         if isinstance(idx, tuple):
-            index = tuple(item._AbstractTensor__unwrap() if isinstance(item, AbstractTensor) else item for item in idx)
+            index = tuple(
+                (
+                    item._AbstractTensor__unwrap()
+                    if isinstance(item, AbstractTensor)
+                    else item
+                )
+                for item in idx
+            )
         elif isinstance(idx, AbstractTensor):
             index = idx._AbstractTensor__unwrap()
         else:
@@ -524,6 +580,7 @@ class AbstractTensor(ABC):
             wrapped.data = result
             return wrapped
         return result
+
     def __str__(self):
         # Unified print: show the underlying tensor's string representation
         return self.datastring(self.data)
@@ -555,6 +612,7 @@ class AbstractTensor(ABC):
         try:
             from colorama import Fore, Style
         except Exception:  # pragma: no cover - optional dependency
+
             class _NoColor:
                 RED = BLUE = CYAN = YELLOW = GREEN = MAGENTA = WHITE = RESET_ALL = ""
 
@@ -574,7 +632,12 @@ class AbstractTensor(ABC):
         rows = len(values)
         cols = len(values[0]) if rows and isinstance(values[0], list) else 1
 
-        flat_vals = [float(x) for row in values for x in (row if isinstance(row, list) else [row]) if isinstance(x, (int, float))]
+        flat_vals = [
+            float(x)
+            for row in values
+            for x in (row if isinstance(row, list) else [row])
+            if isinstance(x, (int, float))
+        ]
         if flat_vals:
             min_val, max_val = min(flat_vals), max(flat_vals)
             spread = max_val - min_val or 1.0
@@ -615,10 +678,11 @@ class AbstractTensor(ABC):
 
     def __repr__(self):
         # Unified repr: AbstractTensor (BackendClass (backend data repr))
-        backend_class = type(self.data).__name__ if self.data is not None else 'NoneType'
+        backend_class = (
+            type(self.data).__name__ if self.data is not None else "NoneType"
+        )
         backend_data_repr = repr(self.data)
         return f"AbstractTensor ({backend_class} ({backend_data_repr}))"
-
 
     def __setitem__(self, idx, value):
         """Assign to the underlying tensor using Python indexing.
@@ -628,11 +692,13 @@ class AbstractTensor(ABC):
         indices work across all backends.
         """
         if DEBUG:
-            print(f"__setitem__ called with idx={idx}, value={value} on {self.__class__.__name__}")
+            print(
+                f"__setitem__ called with idx={idx}, value={value} on {self.__class__.__name__}"
+            )
         data = self.data
         if data is None:
             raise ValueError("__setitem__ called on empty tensor")
-        if data.__class__.__name__ == "CTensor":
+        if CTensor is not None and isinstance(data, CTensor):
             raise NotImplementedError("__setitem__ not implemented for CTensor backend")
         if isinstance(value, AbstractTensor):
             value = value.data
@@ -666,12 +732,14 @@ class AbstractTensor(ABC):
         """Return the number of dimensions of ``self``."""
         pass
 
-
     def repeat(self, repeats: Any = None, dim: int = 0) -> "AbstractTensor":
         """Repeat ``self`` along ``dim`` ``repeats`` times."""
         return self.repeat_(repeats, dim)
+
     @staticmethod
-    def get_tensor(data=None, faculty: 'Faculty' = None, *, track_time: bool = False) -> 'AbstractTensor':
+    def get_tensor(
+        data=None, faculty: "Faculty" = None, *, track_time: bool = False
+    ) -> "AbstractTensor":
         """
         Create and return an AbstractTensor instance from any data, auto-selecting the best backend if faculty is None.
         If faculty is provided, use the corresponding backend.
@@ -679,25 +747,33 @@ class AbstractTensor(ABC):
         faculty = faculty or DEFAULT_FACULTY
         if faculty in (Faculty.TORCH, Faculty.PYGEO):
             from .torch_backend import PyTorchTensorOperations
-            tensor = PyTorchTensorOperations(default_device=config.DEVICE, track_time=track_time)
+
+            tensor = PyTorchTensorOperations(
+                default_device=config.DEVICE, track_time=track_time
+            )
         elif faculty is Faculty.NUMPY and np is not None:
             from .numpy_backend import NumPyTensorOperations
+
             tensor = NumPyTensorOperations(track_time=track_time)
         elif faculty is Faculty.CTENSOR:
             from .c_backend import CTensorOperations
+
             tensor = CTensorOperations(track_time=track_time)
         else:
             from .pure_backend import PurePythonTensorOperations
+
             tensor = PurePythonTensorOperations(track_time=track_time)
         if data is not None:
             return tensor.ensure_tensor(data)
         return tensor
+
 
 class AbstractF:
     """
     Functional API for advanced tensor operations (e.g., interpolation).
     Decides the best backend and dispatches accordingly.
     """
+
     @staticmethod
     def interpolate(
         tensor,
@@ -708,7 +784,7 @@ class AbstractF:
         channel_dim=1,
         backend: str = None,
         align_corners=False,
-        **kwargs
+        **kwargs,
     ):
         """
         Interpolate a tensor to a new size using the best available backend.
@@ -733,12 +809,14 @@ class AbstractF:
             try:
                 import torch
                 import torch.nn.functional as F
+
                 chosen = "torch"
             except ImportError:
                 chosen = "numpy"
         if chosen == "torch":
             import torch
             import torch.nn.functional as F
+
             arr = tensor.to_backend(AbstractTensor.get_tensor(faculty=Faculty.TORCH))
             data = arr.data if hasattr(arr, "data") else arr
             # Ensure shape is (N, C, H, W) or (N, 1, H, W)
@@ -757,7 +835,11 @@ class AbstractF:
                 size=size,
                 scale_factor=scale_factor,
                 mode=mode,
-                align_corners=align_corners if mode in ("linear", "bilinear", "bicubic", "trilinear") else None,
+                align_corners=(
+                    align_corners
+                    if mode in ("linear", "bilinear", "bicubic", "trilinear")
+                    else None
+                ),
             )
             # Remove added batch/channel dims if needed
             if nd == 2:
@@ -770,23 +852,32 @@ class AbstractF:
             arr = tensor.to_backend(AbstractTensor.get_tensor(faculty=Faculty.NUMPY))
             data = arr.data if hasattr(arr, "data") else arr
             import numpy as np
+
             if data.ndim == 2:
                 from PIL import Image
+
                 img = Image.fromarray((data * 255).astype(np.uint8))
-                img = img.resize(size[::-1], Image.BILINEAR if mode == "bilinear" else Image.NEAREST)
+                img = img.resize(
+                    size[::-1], Image.BILINEAR if mode == "bilinear" else Image.NEAREST
+                )
                 out = np.array(img) / 255.0
             else:
                 # Use scipy.ndimage.zoom for nD
                 try:
                     from scipy.ndimage import zoom
+
                     zoom_factors = [size[i] / data.shape[i] for i in range(len(size))]
                     out = zoom(data, zoom_factors, order=1 if mode == "bilinear" else 0)
                 except ImportError:
-                    raise RuntimeError("No suitable interpolation backend available (need torch or scipy)")
+                    raise RuntimeError(
+                        "No suitable interpolation backend available (need torch or scipy)"
+                    )
             return AbstractTensor.get_tensor(out)
+
 
 # Attach to AbstractTensor
 AbstractTensor.F = AbstractF
+
 
 def _get_shape(data):
     if not isinstance(data, list):
@@ -822,9 +913,15 @@ def default_to_backend(
     return target_ops.tensor_from_list(data, dtype=dtype, device=device)
 
 
-def get_tensor_operations(faculty: Faculty | None = None, *, track_time: bool = False) -> AbstractTensor:
+def get_tensor_operations(
+    faculty: Faculty | None = None, *, track_time: bool = False
+) -> AbstractTensor:
     """[REMOVED] Use AbstractTensor.get_tensor instead."""
-    raise RuntimeError("get_tensor_operations is obsolete. Use AbstractTensor.get_tensor instead.")
+    raise RuntimeError(
+        "get_tensor_operations is obsolete. Use AbstractTensor.get_tensor instead."
+    )
+
+
 # --- Conversion registration ---
 try:
     from .torch_backend import PyTorchTensorOperations
@@ -837,20 +934,40 @@ except Exception:  # pragma: no cover - optional backend
 from .pure_backend import PurePythonTensorOperations
 
 if np is not None and NumPyTensorOperations is not None:
-    register_conversion(NumPyTensorOperations, PurePythonTensorOperations,
-                        PurePythonTensorOperations.from_numpy)
-    register_conversion(PurePythonTensorOperations, NumPyTensorOperations,
-                        NumPyTensorOperations.from_pure)
+    register_conversion(
+        NumPyTensorOperations,
+        PurePythonTensorOperations,
+        PurePythonTensorOperations.from_numpy,
+    )
+    register_conversion(
+        PurePythonTensorOperations,
+        NumPyTensorOperations,
+        NumPyTensorOperations.from_pure,
+    )
 
-if torch is not None and PyTorchTensorOperations is not None and NumPyTensorOperations is not None:
-    register_conversion(PyTorchTensorOperations, NumPyTensorOperations,
-                        NumPyTensorOperations.from_torch)
-    register_conversion(NumPyTensorOperations, PyTorchTensorOperations,
-                        PyTorchTensorOperations.from_numpy)
-    register_conversion(PyTorchTensorOperations, PurePythonTensorOperations,
-                        PurePythonTensorOperations.from_torch)
-    register_conversion(PurePythonTensorOperations, PyTorchTensorOperations,
-                        PyTorchTensorOperations.from_pure)
+if (
+    torch is not None
+    and PyTorchTensorOperations is not None
+    and NumPyTensorOperations is not None
+):
+    register_conversion(
+        PyTorchTensorOperations, NumPyTensorOperations, NumPyTensorOperations.from_torch
+    )
+    register_conversion(
+        NumPyTensorOperations,
+        PyTorchTensorOperations,
+        PyTorchTensorOperations.from_numpy,
+    )
+    register_conversion(
+        PyTorchTensorOperations,
+        PurePythonTensorOperations,
+        PurePythonTensorOperations.from_torch,
+    )
+    register_conversion(
+        PurePythonTensorOperations,
+        PyTorchTensorOperations,
+        PyTorchTensorOperations.from_pure,
+    )
 
 try:
     from .jax_backend import JAXTensorOperations
@@ -862,23 +979,31 @@ if (
     and NumPyTensorOperations is not None
     and JAXTensorOperations is not None
 ):
-    register_conversion(JAXTensorOperations, NumPyTensorOperations,
-                        NumPyTensorOperations.from_jax)
-    register_conversion(NumPyTensorOperations, JAXTensorOperations,
-                        JAXTensorOperations.from_numpy)
+    register_conversion(
+        JAXTensorOperations, NumPyTensorOperations, NumPyTensorOperations.from_jax
+    )
+    register_conversion(
+        NumPyTensorOperations, JAXTensorOperations, JAXTensorOperations.from_numpy
+    )
 
 if (
     torch is not None
     and PyTorchTensorOperations is not None
     and JAXTensorOperations is not None
 ):
-    register_conversion(PyTorchTensorOperations, JAXTensorOperations,
-                        JAXTensorOperations.from_torch)
-    register_conversion(JAXTensorOperations, PyTorchTensorOperations,
-                        PyTorchTensorOperations.from_jax)
+    register_conversion(
+        PyTorchTensorOperations, JAXTensorOperations, JAXTensorOperations.from_torch
+    )
+    register_conversion(
+        JAXTensorOperations, PyTorchTensorOperations, PyTorchTensorOperations.from_jax
+    )
 
 if JAXTensorOperations is not None:
-    register_conversion(JAXTensorOperations, PurePythonTensorOperations,
-                        PurePythonTensorOperations.from_jax)
-    register_conversion(PurePythonTensorOperations, JAXTensorOperations,
-                        JAXTensorOperations.from_pure)
+    register_conversion(
+        JAXTensorOperations,
+        PurePythonTensorOperations,
+        PurePythonTensorOperations.from_jax,
+    )
+    register_conversion(
+        PurePythonTensorOperations, JAXTensorOperations, JAXTensorOperations.from_pure
+    )
