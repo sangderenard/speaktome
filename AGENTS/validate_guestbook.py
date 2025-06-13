@@ -6,7 +6,12 @@ try:
     import re
     import sys
 except Exception:
+    import os
     import sys
+    ENV_SETUP_BOX = os.environ.get(
+        "SPEAKTOME_ENV_SETUP_BOX",
+        "Environment setup incomplete. See ENV_SETUP_OPTIONS.md",
+    )
     print(ENV_SETUP_BOX)
     sys.exit(1)
 # --- END HEADER ---

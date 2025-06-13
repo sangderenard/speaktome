@@ -3,12 +3,18 @@
 """Shared constants for header compliance utilities."""
 from __future__ import annotations
 
-ENV_SETUP_BOX = (
-    "\n"
-    "+-----------------------------------------------------------------------+\n"
-    "| Imports failed. See ENV_SETUP_OPTIONS.md for environment guidance.  |\n"
-    "| Missing packages usually mean setup was skipped or incomplete.      |\n"
-    "+-----------------------------------------------------------------------+\n"
+import os
+
+ENV_BOX_ENV = "SPEAKTOME_ENV_SETUP_BOX"
+ENV_SETUP_BOX = os.environ.get(
+    ENV_BOX_ENV,
+    (
+        "\n"
+        "+-----------------------------------------------------------------------+\n"
+        "| Imports failed. See ENV_SETUP_OPTIONS.md for environment guidance.  |\n"
+        "| Missing packages usually mean setup was skipped or incomplete.      |\n"
+        "+-----------------------------------------------------------------------+\n"
+    ),
 )
 
 HEADER_START = "# --- BEGIN HEADER ---"
