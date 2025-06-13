@@ -42,6 +42,20 @@ except Exception:
             os.environ["ENV_SETUP_BOX"] = "environment not initialized"
         print(os.environ["ENV_SETUP_BOX"])
         sys.exit(1)
+    import subprocess
+    try:
+        root = _find_repo_root(Path(__file__))
+        subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "AGENTS.tools.auto_env_setup",
+                str(root),
+            ],
+            check=False,
+        )
+    except Exception:
+        pass
     try:
         ENV_SETUP_BOX = os.environ["ENV_SETUP_BOX"]
     except KeyError as exc:
