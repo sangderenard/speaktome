@@ -30,7 +30,7 @@ except Exception:
     import os
     import sys
     try:
-        ENV_SETUP_BOX = os.environ["SPEAKTOME_ENV_SETUP_BOX"]
+        ENV_SETUP_BOX = os.environ["ENV_SETUP_BOX"]
     except KeyError as exc:
         raise RuntimeError("environment not initialized") from exc
     print(ENV_SETUP_BOX)
@@ -73,7 +73,25 @@ if os.name == 'nt':  # Windows
 
         if result:
             return result[0]
-        return None # Timeout occurred or thread failed to get a character
+        return None  # Timeout occurred or thread failed to get a character
+else:
+    import select
+    import sys
+    import termios
+    import tty
+
+    def getch_timeout(timeout: float) -> str | None:
+        """Get a single character with timeout on Unix-like systems."""
+        fd = sys.stdin.fileno()
+        old_settings = termios.tcgetattr(fd)
+        try:
+            tty.setraw(fd)
+            ready, _, _ = select.select([sys.stdin], [], [], timeout)
+            if ready:
+                return sys.stdin.read(1)
+            return None
+        finally:
+            termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
 # --- END HEADER ---
 
 ROOT = Path(__file__).resolve().parents[2]

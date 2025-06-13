@@ -10,7 +10,7 @@ except Exception:
     import os
     import sys
     try:
-        ENV_SETUP_BOX = os.environ["SPEAKTOME_ENV_SETUP_BOX"]
+        ENV_SETUP_BOX = os.environ["ENV_SETUP_BOX"]
     except KeyError as exc:
         raise RuntimeError("environment not initialized") from exc
     IMPORT_FAILURE_PREFIX = "[HEADER] import failure in"
@@ -73,7 +73,7 @@ def fix_file(path: Path) -> None:
             for token in (
                 "import sys",
                 "import os",
-                "ENV_SETUP_BOX = os.environ[\"SPEAKTOME_ENV_SETUP_BOX\"]",
+                "ENV_SETUP_BOX = os.environ[\"ENV_SETUP_BOX\"]",
                 "print(ENV_SETUP_BOX)",
                 "sys.exit(1)",
                 IMPORT_FAILURE_PREFIX,
@@ -116,7 +116,7 @@ def fix_file(path: Path) -> None:
         if try_idx is not None:
             try_region = lines[try_idx:except_idx]
             if not any(
-                "ENV_SETUP_BOX = os.environ[\"SPEAKTOME_ENV_SETUP_BOX\"]" in ln
+                "ENV_SETUP_BOX = os.environ[\"ENV_SETUP_BOX\"]" in ln
                 for ln in try_region
             ):
                 indent_try = " " * (
@@ -125,7 +125,7 @@ def fix_file(path: Path) -> None:
                 lines.insert(try_idx + 1, f"{indent_try}import os")
                 lines.insert(
                     try_idx + 2,
-                    f"{indent_try}ENV_SETUP_BOX = os.environ['SPEAKTOME_ENV_SETUP_BOX']",
+                    f"{indent_try}ENV_SETUP_BOX = os.environ['ENV_SETUP_BOX']",
                 )
                 modified = True
         if HEADER_START_SENTINEL not in lines[:3]:
@@ -191,7 +191,7 @@ def fix_file(path: Path) -> None:
     out_lines.append("    import os")
     out_lines.append("    import sys")
     out_lines.append(
-        "    ENV_SETUP_BOX = os.environ['SPEAKTOME_ENV_SETUP_BOX']"
+        "    ENV_SETUP_BOX = os.environ['ENV_SETUP_BOX']"
     )
     out_lines.append(f"    print(f'{IMPORT_FAILURE_PREFIX} {{__file__}}')")
     out_lines.append("    print(ENV_SETUP_BOX)")

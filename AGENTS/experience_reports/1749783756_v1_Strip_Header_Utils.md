@@ -10,7 +10,7 @@ Removed imports of `AGENTS.tools.header_utils` from various setup and tool scrip
 - "strip any reference to trying to import header_utils in any script anywhere in the repo, that is obsolete and we can't require a package installed by the script that installs the packages."
 
 ## Steps Taken
-1. Updated multiple scripts in `AGENTS/tools/` to fetch `SPEAKTOME_ENV_SETUP_BOX` via `os.environ` instead of importing from `header_utils`.
+1. Updated multiple scripts in `AGENTS/tools/` to fetch `ENV_SETUP_BOX` via `os.environ` instead of importing from `header_utils`.
 2. Adjusted `testing/test_hub.py` and `validate_guestbook.py` accordingly.
 3. Added this experience report.
 

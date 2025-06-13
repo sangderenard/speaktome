@@ -6,7 +6,7 @@ param(
     [string[]]$args
 )
 
-$env:SPEAKTOME_ENV_SETUP_BOX = "`n+----------------------------------------------------------------------+`n| Imports failed. See ENV_SETUP_OPTIONS.md for environment guidance.  |`n| Missing packages usually mean setup was skipped or incomplete.      |`n+----------------------------------------------------------------------+`n"
+$env:ENV_SETUP_BOX = "`n+----------------------------------------------------------------------+`n| Imports failed. See ENV_SETUP_OPTIONS.md for environment guidance.  |`n| Missing packages usually mean setup was skipped or incomplete.      |`n+----------------------------------------------------------------------+`n"
 
 # Manual flag parsing for all arguments (case-insensitive, -flag=value style)
 $UseVenv = $true
@@ -175,6 +175,26 @@ if ($FromDev) {
 
 Write-Host "Environment setup complete. Activate with '.venv\Scripts\Activate' on Windows or 'source .venv/bin/activate' on Unix-like systems"
 Write-Host "Selections recorded to $activeFile"
+
+# Mark the environment so pytest knows setup completed with at least one codebase
+$marker = Join-Path $PSScriptRoot '.venv\pytest_enabled'
+if (Test-Path $activeFile) {
+    try {
+        $data = Get-Content $activeFile | ConvertFrom-Json
+        if ($data.codebases.Count -gt 0) {
+            New-Item $marker -ItemType File -Force | Out-Null
+        } else {
+            Remove-Item $marker -ErrorAction SilentlyContinue
+            Write-Warning "No codebases recorded; pytest will remain disabled."
+        }
+    } catch {
+        Remove-Item $marker -ErrorAction SilentlyContinue
+        Write-Warning "Unable to read selections; pytest will remain disabled."
+    }
+} else {
+    Remove-Item $marker -ErrorAction SilentlyContinue
+    Write-Warning "Active selection file not found; pytest will remain disabled."
+}
 try {
     $torchInfo = & $venvPython -c "import importlib,sys;spec=importlib.util.find_spec('torch');print('missing' if spec is None else __import__('torch').__version__)"
 } catch {
