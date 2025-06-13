@@ -61,3 +61,10 @@ except Exception:  # <try:end> <except:start>
     sys.exit(1)  # <exit> <except:end>
 # --- END HEADER ---  # <header:end>
 ```
+
+## Dynamic Header Recognition
+
+The module `AGENTS.tools.dynamic_header_recognition` provides a skeleton
+implementation for parsing and comparing headers using a tree structure.
+It exposes :class:`HeaderNode` and helpers like :func:`parse_header` to
+serve as building blocks for future validation logic.
