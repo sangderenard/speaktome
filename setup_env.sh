@@ -5,6 +5,11 @@
 
 set -uo pipefail
 
+# Initialize argument-related variables early so they exist when referenced
+CODEBASES=""
+GROUPS=()
+MENU_ARGS=()
+
 
 # Resolve repository root so this script works from any directory
 SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -37,16 +42,6 @@ for arg in "$@"; do
   esac
 done
 
-CODEBASES=""
-GROUPS=()
-MENU_ARGS=()
-
-[ -n "$CODEBASES" ] && MENU_ARGS+=("-codebases" "$CODEBASES")
-for g in "${GROUPS[@]}"; do
-  MENU_ARGS+=("-groups" "$g")
-done
-echo "[DEBUG] Codebases: ${CODEBASES:-}" >&2
-echo "[DEBUG] Groups: ${GROUPS[*]:-}" >&2
 
 # Helper: run a command but never terminate on failure
 safe_run() {
@@ -126,6 +121,13 @@ for arg in "$@"; do
     -groups=*|-grp=*)   GROUPS+=("${arg#*=}") ;;
   esac
 done
+
+[ -n "$CODEBASES" ] && MENU_ARGS+=("-codebases" "$CODEBASES")
+for g in "${GROUPS[@]}"; do
+  MENU_ARGS+=("-groups" "$g")
+done
+echo "[DEBUG] Codebases: ${CODEBASES:-}" >&2
+echo "[DEBUG] Groups: ${GROUPS[*]:-}" >&2
 
 
 # If not called from a dev script, launch the dev menu for all codebase/group installs

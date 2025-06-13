@@ -4,10 +4,10 @@
 Initial stub for a C-based GPT model with vendored dependencies.
 
 ## Prompts
-- "create code stubs and skeleton for a c version of gpt in speaktome/tensors/models..."
+- "create code stubs and skeleton for a c version of gpt in tensors/models..."
 
 ## Steps Taken
-1. Added `speaktome/tensors/models/c_gpt` with C and Python stubs.
+1. Added `tensors/models/c_gpt` with C and Python stubs.
 2. Created `third_party` directory with placeholder dependencies.
 3. Wrote a basic Zig build file to fetch BLIS if missing.
 

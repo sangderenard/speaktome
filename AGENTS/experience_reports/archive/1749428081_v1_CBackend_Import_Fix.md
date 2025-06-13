@@ -7,7 +7,7 @@ Quick session to ensure the C backend uses the proper tensor abstraction module.
 - "finish all the operations for the c backend in the tensors folder in speaktome"
 
 ## Steps Taken
-1. Inspected `speaktome/tensors/c_backend.py` and noticed an outdated import of `tensor_abstraction`.
+1. Inspected `tensors/c_backend.py` and noticed an outdated import of `tensor_abstraction`.
 2. Updated the import to `abstraction` with a clarifying comment.
 3. Ran `python testing/test_hub.py` to ensure the suite still passes.
 

@@ -10,7 +10,7 @@ Added `colorama` to `pyproject.toml` dependencies. Extended ASCII digit support 
 - Repository AGENTS guidelines and coding standards.
 
 ## Steps Taken
-1. Added `ListTensor` wrapper in `speaktome/tensors/pure_backend.py` and patched tensor utilities.
+1. Added `ListTensor` wrapper in `tensors/pure_backend.py` and patched tensor utilities.
 2. Updated `time_sync` package with `print_digital_clock`, additional ASCII digit, and new demo script.
 3. Registered `colorama` dependency in `time_sync/pyproject.toml`.
 4. Created tests for new digit support and digital clock printing.

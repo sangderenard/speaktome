@@ -12,7 +12,7 @@ Updated several Python files that were missing the required header sentinel. Thi
 ## Steps Taken
 1. Located Python files missing the header sentinel using `grep`.
 2. Added the standardized header with `from __future__ import annotations`, a guarded import block, and the `# --- END HEADER ---` marker.
-3. Updated files in `speaktome/tensors`, `tests`, and `training/notebook`.
+3. Updated files in `tensors`, `tests`, and `training/notebook`.
 4. Created this experience report.
 
 ## Observed Behaviour

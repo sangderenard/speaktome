@@ -8,7 +8,7 @@
 Cleaned `c_backend.py` by deleting the embedded C source fallback. The module now requires `ctensor_ops.c` to exist. Verified the `ctensor` extras group already includes `cffi`, `setuptools`, and `ziglang`.
 
 ## Steps Taken
-1. Edited `speaktome/tensors/c_backend.py` to remove the huge inline C string.
+1. Edited `tensors/c_backend.py` to remove the huge inline C string.
 2. Added a check for the presence of `ctensor_ops.c`.
 3. Installed missing test dependencies in the virtual environment and ran `pytest`.
 

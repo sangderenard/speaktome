@@ -4,7 +4,7 @@
 **Title:** CBackend Mean Dim Implementation
 
 ## Overview
-Implemented the first stub in `speaktome/tensors/c_backend.py` to support `mean` with the `dim` argument. Added recursive reduction logic and handled negative dimensions.
+Implemented the first stub in `tensors/c_backend.py` to support `mean` with the `dim` argument. Added recursive reduction logic and handled negative dimensions.
 
 ## Prompts
 - System: "You are ChatGPT, a large language model trained by OpenAI."

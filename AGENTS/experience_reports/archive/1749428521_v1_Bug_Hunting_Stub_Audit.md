@@ -17,7 +17,7 @@ Ran the bug hunting and stub audit jobs as instructed. Verified tests pass clean
 2. Saw 26 tests passed and 20 skipped with no warnings.
 3. Executed `python -m AGENTS.tools.dispense_job` as directed when tests were clean.
 4. Reviewed each file in `AGENTS/stub_audit_list.txt` for `STUB` markers.
-5. Updated `AGENTS/stub_audit_signoff.txt` to reflect current status of `speaktome/tensors/abstraction.py`.
+5. Updated `AGENTS/stub_audit_signoff.txt` to reflect current status of `tensors/abstraction.py`.
 6. Validated guestbook with `python AGENTS/validate_guestbook.py`.
 
 ## Observed Behaviour

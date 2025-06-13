@@ -7,7 +7,7 @@ Adjusted tensor backend tests to use public helpers instead of the `_apply_opera
 The helper has been marked internal and operator overloads are now exercised via a lightweight wrapper.
 
 ## Prompts
-verify that tests, in tests or testing or agents/tools if any are there, for the abstract tensor classes, in speaktome/tensors, is still in line with the abstract tensor class definition. Ensure that now all basic operators are tested, the ones now supplied by magic functions in the abstract that funnel to backend operator centralized functions
+verify that tests, in tests or testing or agents/tools if any are there, for the abstract tensor classes, in tensors, is still in line with the abstract tensor class definition. Ensure that now all basic operators are tested, the ones now supplied by magic functions in the abstract that funnel to backend operator centralized functions
 
 this is unacceptable, use the actual operators do not use the _apply_operator, and in fact, please make it so _apply_operator is unavailable, if private methods are a thing that can be restricted to the abstract class only. 
 

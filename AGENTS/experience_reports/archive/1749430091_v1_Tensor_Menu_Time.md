@@ -11,7 +11,7 @@ Tested `testing/tensor_ops_menu.py` to confirm that running all sample tests pri
 
 ## Steps Taken
 1. Attempted to run the script which initially failed due to JAX optional dependency.
-2. Added `from __future__ import annotations` to `speaktome/tensors/jax_backend.py` so the module loads even when JAX is missing.
+2. Added `from __future__ import annotations` to `tensors/jax_backend.py` so the module loads even when JAX is missing.
 3. Ran `python testing/tensor_ops_menu.py` with inputs selecting the PurePython backend, enabling timing, running all tests, then exiting.
 
 ## Observed Behaviour

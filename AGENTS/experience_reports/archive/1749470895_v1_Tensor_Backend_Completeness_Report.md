@@ -4,10 +4,10 @@
 **Title:** Tensor Backend Completeness Report
 
 ## Overview
-Examine tensor backends under `speaktome/tensors` and compare their implementation coverage with `AbstractTensorOperations`.
+Examine tensor backends under `tensors` and compare their implementation coverage with `AbstractTensorOperations`.
 
 ## Prompts
-- "prepare a completeness report in experience reports that highlights any discrepancies or shortfalls in the readiness of each tensor back end in speaktome\tensors and the abstract class."
+- "prepare a completeness report in experience reports that highlights any discrepancies or shortfalls in the readiness of each tensor back end in tensors and the abstract class."
 - "always check the files in the repo ecosystem for your benefit..." (developer instructions summary)
 
 ## Steps Taken
