@@ -11,14 +11,23 @@ python = ">=3.8"
 numpy = ">=1.26"
 tensors = ">=0.1.0"
 
+[tool.poetry.group.plot]
+optional = true
+
 [tool.poetry.group.plot.dependencies]
 matplotlib = ">=3.7"
 networkx = ">=3.1"
 scikit-learn = ">=1.2"
 
+[tool.poetry.group.ml]
+optional = true
+
 [tool.poetry.group.ml.dependencies]
 transformers = ">=4.30"
 "sentence-transformers" = ">=2.2"
+
+[tool.poetry.group.dev]
+optional = true
 
 [tool.poetry.group.dev.dependencies]
 pytest = ">=8.0"

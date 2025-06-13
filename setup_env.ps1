@@ -1,5 +1,5 @@
 # Windows PowerShell environment setup script for SpeakToMe
-# No Unicode. All pip/python commands run inside venv unless -NoVenv is used.
+# No Unicode. All pip/python commands run inside venv unless -no-venv is used.
 
 param(
     [Parameter(ValueFromRemainingArguments=$true)]
@@ -7,13 +7,13 @@ param(
 )
 
 # Manual flag parsing for all arguments (case-insensitive, -flag=value style)
-$NoVenv = $false
+$UseVenv = $true
 $FromDev = $false
 $Codebases = @()
 $Groups = @()
 foreach ($arg in $args) {
     $arg_lc = $arg.ToLower()
-    if ($arg_lc -eq '-novenv') { $NoVenv = $true }
+    if ($arg_lc -eq '-no-venv') { $UseVenv = $false }
     elseif ($arg_lc -eq '-fromdev') { $FromDev = $true }
     elseif ($arg_lc -like '-codebases=*') {
         $cbVal = $arg.Substring($arg.IndexOf('=')+1)
@@ -30,7 +30,7 @@ foreach ($arg in $args) {
 }
 
 # All options for this script should be used with single-dash PowerShell-style flags, e.g.:
-#   -NoVenv -Codebases projectA,projectB -Groups groupX
+#   -no-venv -Codebases projectA,projectB -Groups groupX
 # Do not use double-dash flags with this script.
 
 $activeFile = $env:SPEAKTOME_ACTIVE_FILE
@@ -121,7 +121,7 @@ function Install-Quiet($exePath, [string]$commandArguments) {
     }
 }
 
-if (-not $NoVenv) {
+if ($UseVenv) {
     # 1. Create venv
     Safe-Run { python -m venv .venv }
     
@@ -143,22 +143,8 @@ if (-not $NoVenv) {
     $venvPip = "pip"
 }
 
-# 2. Install core requirements via Poetry
-Safe-Run { poetry config virtualenvs.in-project $true }
-$installArgs = @('--sync', '--no-interaction')
-$argString = $installArgs -join ' '
-if ($env:SPEAKTOME_POETRY_ARGS) {
-    $argString += " " + $env:SPEAKTOME_POETRY_ARGS
-} else {
-    $argString += ' --without cpu-torch --without gpu-torch'
-}
-if ($argString -like '*with*torch*') {
-    Write-Host '[INFO] Torch groups requested; attempting install'
-    Safe-Run { Invoke-Expression "poetry install $argString" }
-} else {
-    Write-Host '[INFO] Skipping torch groups'
-    Safe-Run { Invoke-Expression "poetry install $argString" }
-}
+
+# 2. Delegate package installation to dev_group_menu.py
 
 # If not called from a dev script, launch the dev menu for all codebase/group installs
 

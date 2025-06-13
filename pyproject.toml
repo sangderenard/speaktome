@@ -15,11 +15,20 @@ time_sync = {path = "time_sync", develop = true}
 tensor_printing = {path = "tensor printing", develop = true}
 tools = {path = "AGENTS/tools", develop = true}
 
+[tool.poetry.group.dev]
+optional = true
+
 [tool.poetry.group.dev.dependencies]
 pytest = ">=8.0"
 
+[tool.poetry.group.cpu-torch]
+optional = true
+
 [tool.poetry.group.cpu-torch.dependencies]
-torch = {version = "2.3.1+cpu", source = "pytorch"}
+torch = "2.3.1"
+
+[tool.poetry.group.gpu-torch]
+optional = true
 
 [tool.poetry.group.gpu-torch.dependencies]
 torch = "2.3.1"
@@ -28,10 +37,6 @@ torch = "2.3.1"
 cpu-torch = []
 gpu-torch = []
 
-[[tool.poetry.source]]
-name = "pytorch"
-url = "https://download.pytorch.org/whl/torch_stable.html"
-priority = "supplemental"
 
 [build-system]
 requires = ["poetry-core>=1.5.0"]

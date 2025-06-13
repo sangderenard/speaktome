@@ -12,24 +12,42 @@ fonttools = "*"
 Pillow = "*"
 numpy = ">=1.26"
 
+[tool.poetry.group.ml]
+optional = true
+
 [tool.poetry.group.ml.dependencies]
 torch = "*"
 torchvision = "*"
 pynvml = "*"
 
+[tool.poetry.group.ssim]
+optional = true
+
 [tool.poetry.group.ssim.dependencies]
 "scikit-image" = "*"
 
+[tool.poetry.group.amqp]
+optional = true
+
 [tool.poetry.group.amqp.dependencies]
 pika = "*"
+
+[tool.poetry.group.server]
+optional = true
 
 [tool.poetry.group.server.dependencies]
 flask = "*"
 "flask-cors" = "*"
 "waitress" = {version = "*", markers = "sys_platform == 'win32'"}
 
+[tool.poetry.group.gui]
+optional = true
+
 [tool.poetry.group.gui.dependencies]
 PyQt5 = "*"
+
+[tool.poetry.group.dev]
+optional = true
 
 [tool.poetry.group.dev.dependencies]
 tools = {path = "../AGENTS/tools", develop = true}
