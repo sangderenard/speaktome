@@ -11,7 +11,7 @@ Implemented the previously stubbed `JAXTensorOperations` so that the tensor abst
 
 ## Steps Taken
 1. Installed the `jax` package via `pip`.
-2. Implemented methods in `speaktome/tensors/jax_backend.py` using `jax.numpy`.
+2. Implemented methods in `tensors/jax_backend.py` using `jax.numpy`.
 3. Added the backend to `tests/test_pure_python_tensor_ops.py`.
 4. Ran `pytest -v` to ensure the new backend passes existing tests.
 

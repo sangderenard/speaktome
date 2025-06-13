@@ -7,7 +7,7 @@
 Added matrix multiplication support to the pure Python tensor backend and updated tests accordingly.
 
 ## Prompts
-- "correctly implement the pure python basic arithmetic by following precisely the standard for speaktome\tensors regarding never overriding the basic operations in the backend, only defining the abstract method the parent class of going to be using to issue commands from its basic operators"
+- "correctly implement the pure python basic arithmetic by following precisely the standard for tensors regarding never overriding the basic operations in the backend, only defining the abstract method the parent class of going to be using to issue commands from its basic operators"
 
 ## Steps Taken
 1. Implemented `_matmul` routine in `pure_backend.py` and routed `'matmul'`, `'rmatmul'`, and `'imatmul'` through it.

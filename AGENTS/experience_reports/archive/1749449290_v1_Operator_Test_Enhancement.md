@@ -6,7 +6,7 @@
 Add coverage for all basic tensor operators routed through `_apply_operator`. Ensures tests align with the abstract class design.
 
 ## Prompts
-verify that tests, in tests or testing or agents/tools if any are there, for the abstract tensor classes, in speaktome/tensors, is still in line with the abstract tensor class definition. Ensure that now all basic operators are tested, the ones now supplied by magic functions in the abstract that funnel to backend operator centralized functions
+verify that tests, in tests or testing or agents/tools if any are there, for the abstract tensor classes, in tensors, is still in line with the abstract tensor class definition. Ensure that now all basic operators are tested, the ones now supplied by magic functions in the abstract that funnel to backend operator centralized functions
 
 ## Steps Taken
 1. Reviewed existing tensor backend tests.

@@ -9,7 +9,7 @@ are you serious? The request was to implement the single operator dispatch funct
 ```
 
 ## Summary
-- Updated `speaktome/tensors/AGENTS.md` to state that `_apply_operator` is the sole operator primitive backends must implement.
+- Updated `tensors/AGENTS.md` to state that `_apply_operator` is the sole operator primitive backends must implement.
 - Removed obsolete scalar helpers from the JAX backend.
 - Replaced their uses in code and tests with direct calls to `_apply_operator`.
 

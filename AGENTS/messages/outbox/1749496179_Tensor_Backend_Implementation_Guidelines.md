@@ -29,11 +29,11 @@ tensor operations.
 ```
 
 This comment should be added to:
-- `speaktome/tensors/numpy_backend.py`
-- `speaktome/tensors/torch_backend.py` 
-- `speaktome/tensors/jax_backend.py`
-- `speaktome/tensors/c_backend.py`
-- `speaktome/tensors/pure_backend.py`
+- `tensors/numpy_backend.py`
+- `tensors/torch_backend.py` 
+- `tensors/jax_backend.py`
+- `tensors/c_backend.py`
+- `tensors/pure_backend.py`
 
 The comment emphasizes:
 1. No magic method implementations (these belong in AbstractTensor)
@@ -41,4 +41,4 @@ The comment emphasizes:
 3. Clear delineation of responsibilities
 4. Proper dependency handling
 
-This aligns with the architectural decisions shown in the experience reports and maintains the clean backend separation evidenced in the codebase.# filepath: speaktome\tensors\*_backend.py
+This aligns with the architectural decisions shown in the experience reports and maintains the clean backend separation evidenced in the codebase.# filepath: tensors\*_backend.py
