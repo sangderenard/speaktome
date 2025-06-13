@@ -68,28 +68,10 @@ arrive. Do **not** wrap away these failures. Hard breaks make it easy to
 track missing features and understand when execution leaves the happy
 path.
 
-## Standard Header End Comment
+## Header Standard
 
-Every Python file should begin with a shebang and module docstring followed by
-``from __future__ import annotations``. All subsequent imports must appear in a
-``try`` block. If an exception occurs, first import ``sys``, then print the
-shared ``ENV_SETUP_BOX`` message from ``AGENTS.tools.header_utils``, and finally
-call ``sys.exit(1)``. After the ``except`` block, include the sentinel line:
-
-```python
-#!/usr/bin/env python3
-"""Optional module description."""
-from __future__ import annotations
-
-try:
-    from AGENTS.tools.header_utils import ENV_SETUP_BOX
-    import your_modules
-except Exception:
-    import sys
-    print(ENV_SETUP_BOX)
-    sys.exit(1)
-# --- END HEADER ---
-```
-
-The `AGENTS/tools/dump_headers.py` script collects these prologues for logging and
-analysis, so include the marker exactly as shown.
+The required header template and helper scripts are documented separately under
+``AGENTS/headers.md``. Refer to that file for the full description of the
+standard header, how it runs environment setup, and tools for validating or
+fixing headers. This section previously contained the entire header listing but
+has been simplified to keep the main guidelines concise.
