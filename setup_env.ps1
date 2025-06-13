@@ -171,7 +171,13 @@ if ($env:SPEAKTOME_POETRY_ARGS) {
 } else {
     $argString += ' --without cpu-torch --without gpu-torch'
 }
-Safe-Run { Invoke-Expression "poetry install $argString" }
+if ($argString -like '*with*torch*') {
+    Write-Host '[INFO] Torch groups requested; attempting install'
+    Safe-Run { Invoke-Expression "poetry install $argString" }
+} else {
+    Write-Host '[INFO] Skipping torch groups'
+    Safe-Run { Invoke-Expression "poetry install $argString" }
+}
 
 # If not called from a dev script, launch the dev menu for all codebase/group installs
 

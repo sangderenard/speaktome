@@ -23,6 +23,11 @@ This document details all options, flags, and usage patterns for the environment
 
 The environment setup scripts automate the creation of a Python virtual environment, installation of dependencies, and selection of codebases/groups for development or testing. They support both interactive and headless (non-interactive) modes, and can be configured to skip installation of PyTorch and any codebase/group that requires it.
 
+**Default Behavior:** Torch groups are skipped unless explicitly requested with
+`-torch` or `-gpu`. This avoids any network access to the PyTorch wheel index on
+systems without connectivity. Pass one of those flags only if torch is truly
+needed.
+
 ---
 
 ## Script List
