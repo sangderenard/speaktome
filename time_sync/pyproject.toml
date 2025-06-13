@@ -12,8 +12,14 @@ ntplib = "*"
 colorama = "*"
 pillow = "*"
 
+[tool.poetry.group.gui]
+optional = true
+
 [tool.poetry.group.gui.dependencies]
 pygame = ">=2"
+
+[tool.poetry.group.dev]
+optional = true
 
 [tool.poetry.group.dev.dependencies]
 tools = {path = "../AGENTS/tools", develop = true}

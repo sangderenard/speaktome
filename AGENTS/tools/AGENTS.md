@@ -8,7 +8,8 @@ This codebase provides helper scripts for managing the repository and coordinati
 
 ## Optional Dependency Groups
 
-No optional dependency groups are defined in `pyproject.toml`.
+The root `pyproject.toml` defines optional groups `dev`, `cpu-torch`, and `gpu-torch`.
+These are all skipped by default and may be installed through `dev_group_menu.py`.
 
 ## Non-Interactive Setup
 

@@ -163,5 +163,5 @@ if (Test-Path $activeFile) {
 }
 
 # All options for this script should be used with single-dash PowerShell-style flags, e.g.:
-#   -NoVenv -Codebases projectA,projectB -Groups groupX
+#   -no-venv -Codebases projectA,projectB -Groups groupX
 # Do not use double-dash flags with this script.
