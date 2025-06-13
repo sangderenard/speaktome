@@ -7,7 +7,7 @@ license = "MIT"
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = ">=3.8"
+python = ">=3.10"
 
 [tool.poetry.group.jax]
 optional = true
@@ -33,7 +33,7 @@ torch = "*"
 optional = true
 
 [tool.poetry.group.numpy.dependencies]
-numpy = ">=1.26"
+numpy = ">=1.26,<2.3"
 
 [tool.poetry.group.opengl]
 optional = true
@@ -41,7 +41,7 @@ optional = true
 [tool.poetry.group.opengl.dependencies]
 PyOpenGL = ">=3.1"
 glfw = "*"
-numpy = ">=1.26"
+numpy = ">=1.26,<2.3"
 
 [tool.poetry.group.dev]
 optional = true

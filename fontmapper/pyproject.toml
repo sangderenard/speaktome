@@ -7,15 +7,15 @@ license = "MIT"
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = ">=3.8"
+python = ">=3.10"
 fonttools = "*"
 Pillow = "*"
-numpy = ">=1.26"
+numpy = ">=1.26,<2.3"
 
-[tool.poetry.group.ml]
+[tool.poetry.group.torch]
 optional = true
 
-[tool.poetry.group.ml.dependencies]
+[tool.poetry.group.torch.dependencies]
 torch = "*"
 torchvision = "*"
 pynvml = "*"

@@ -10,7 +10,7 @@
   "fontmapper": {
     "path": "fontmapper",
     "groups": {
-      "ml": [
+      "torch": [
         "torch",
         "torchvision",
         "pynvml"
@@ -75,12 +75,12 @@
         "torch"
       ],
       "numpy": [
-        "numpy>=1.26"
+        "numpy>=1.26,<2.3"
       ],
       "opengl": [
         "PyOpenGL>=3.1",
         "glfw",
-        "numpy>=1.26"
+        "numpy>=1.26,<2.3"
       ],
       "dev": [
         "pytest>=8.0",

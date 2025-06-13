@@ -7,7 +7,7 @@ readme = "README.md"
 packages = [{include = "AGENTS", from = ".."}]
 
 [tool.poetry.dependencies]
-python = ">=3.8"
+python = ">=3.10"
 tomli = {version = "*", python = "<3.11"}
 "importlib-metadata" = {version = "*", python = "<3.8"}
 pytz = "*"
