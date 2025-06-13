@@ -175,6 +175,7 @@ echo "Selections recorded to $SPEAKTOME_ACTIVE_FILE"
 # in those directories automatically find the repo environment.
 python - "$MAP_FILE" "$SPEAKTOME_ACTIVE_FILE" <<'PY'
 import json, os, sys, pathlib
+from AGENTS.tools.path_utils import find_repo_root
 
 map_file, active_file = sys.argv[1:3]
 try:
@@ -183,7 +184,7 @@ try:
 except Exception:
     sys.exit(0)
 
-root = pathlib.Path(map_file).resolve().parents[1]
+root = find_repo_root(pathlib.Path(map_file))
 env_dir = root / '.venv'
 for cb in active.get('codebases', []):
     info = mapping.get(cb, {})

@@ -4,14 +4,27 @@
 from __future__ import annotations
 
 try:
-    from AGENTS.tools.auto_env_setup import run_setup_script
     import your_modules
 except Exception:
     import os
     import sys
     from pathlib import Path
+    import subprocess
     try:
-        run_setup_script(Path(__file__).resolve().parents[1])
+        root = Path(__file__).resolve()
+        for parent in [root, *root.parents]:
+            if (parent / "pyproject.toml").is_file():
+                root = parent
+                break
+        subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "AGENTS.tools.auto_env_setup",
+                str(root),
+            ],
+            check=False,
+        )
     except Exception:
         pass
     try:

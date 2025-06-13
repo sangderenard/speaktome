@@ -2,6 +2,6 @@
 
 # --- END HEADER ---
 
-from .auto_env_setup import run_setup_script, ask_no_venv
+from .path_utils import find_repo_root
 
-__all__ = ["run_setup_script", "ask_no_venv"]
+__all__ = ["find_repo_root"]

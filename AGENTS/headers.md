@@ -12,14 +12,22 @@ generate or validate headers programmatically.
 from __future__ import annotations  # <future>
 
 try:  # <try:start>
-    from AGENTS.tools.auto_env_setup import run_setup_script  # <import>
     import your_modules  # <import>
 except Exception:  # <try:end> <except:start>
     import os  # <import>
     import sys  # <import>
     from pathlib import Path  # <import>
+    import subprocess  # <import>
     try:  # <setup-call:start>
-        run_setup_script(Path(__file__).resolve().parents[1])  # <setup-call>
+        root = Path(__file__).resolve()
+        for parent in [root, *root.parents]:
+            if (parent / "pyproject.toml").is_file():
+                root = parent
+                break
+        subprocess.run(
+            [sys.executable, '-m', 'AGENTS.tools.auto_env_setup', str(root)],
+            check=False,
+        )  # <setup-call>
     except Exception:  # <setup-call:end>
         pass
     try:  # <env-fetch:start>

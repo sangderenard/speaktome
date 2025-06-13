@@ -52,7 +52,7 @@ HEADER:
   - Description: "Template for SPEAKTOME module headers."
   - Components:
       - IMPORT_FAILURE_PREFIX: "Prefix for import failure messages."
-      - run_setup_script: "Function to initialize the environment."
+      - auto_env_setup: "Module invoked via subprocess to initialize the environment."
       - ENV_SETUP_BOX: "Environment variable for setup box."
   - Error Handling:
       - KeyError: "Raised if ENV_SETUP_BOX is not set."

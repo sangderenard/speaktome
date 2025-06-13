@@ -9,13 +9,41 @@ import pytest
 import logging
 import time
 from pathlib import Path
+from AGENTS.tools import find_repo_root
 import sys
 import os  # For FORCE_ENV
 import re
 import importlib.util
 from io import StringIO
 import json
-from AGENTS.tools.auto_env_setup import run_setup_script, ask_no_venv
+
+import subprocess
+
+def _call_auto_env_setup(project_root: Path, *, use_venv: bool = True) -> None:
+    """Invoke the repository setup script as a separate process."""
+    cmd = [sys.executable, "-m", "AGENTS.tools.auto_env_setup", str(project_root)]
+    if not use_venv:
+        cmd.append("-no-venv")
+    try:
+        subprocess.run(cmd, check=False)
+    except Exception:  # pragma: no cover - setup best effort
+        pass
+
+def _ask_no_venv(timeout: float = 5.0) -> bool:
+    """Prompt the user to allow a system-wide install with a timeout."""
+    prompt = f"Install without virtualenv? [y/N] (auto-N in {int(timeout)}s): "
+    print(prompt, end="", flush=True)
+    try:
+        import select
+        ready, _, _ = select.select([sys.stdin], [], [], timeout)
+        if ready:
+            ch = sys.stdin.read(1)
+            print()
+            return ch.lower() == "y"
+    except Exception:
+        pass
+    print()
+    return False
 
 # Deferred imports after environment check
 PrettyLogger = None
@@ -23,7 +51,7 @@ DEFAULT_FACULTY = None
 FORCE_ENV = "SPEAKTOME_FACULTY"
 Faculty = None
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = find_repo_root(Path(__file__))
 ACTIVE_FILE = Path(os.environ.get("SPEAKTOME_ACTIVE_FILE", "/tmp/speaktome_active.json"))
 
 def _venv_marker_ok() -> bool:
@@ -50,11 +78,11 @@ def _auto_setup_and_check() -> bool:
     """Attempt to run the setup script and re-check the environment."""
     if _venv_marker_ok():
         return True
-    run_setup_script(ROOT)
+    _call_auto_env_setup(ROOT)
     if _venv_marker_ok():
         return True
-    if ask_no_venv(timeout=3):
-        run_setup_script(ROOT, use_venv=False)
+    if _ask_no_venv(timeout=3):
+        _call_auto_env_setup(ROOT, use_venv=False)
         return True
     return False
 
