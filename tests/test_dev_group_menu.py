@@ -1,14 +1,14 @@
 from __future__ import annotations
 
 try:
-    from AGENTS.tools.header_utils import ENV_SETUP_BOX
-    import json
     import os
+    import json
     import subprocess
     import sys
     from pathlib import Path
-    
-    
+
+    ENV_SETUP_BOX = os.environ["ENV_SETUP_BOX"]
+
 except Exception:
     import sys
     print(ENV_SETUP_BOX)

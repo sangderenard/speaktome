@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 try:
-    from AGENTS.tools.header_utils import ENV_SETUP_BOX
+    import os
     import importlib
 
+    ENV_SETUP_BOX = os.environ["ENV_SETUP_BOX"]
     from tensors.models.c_gpt import cgpt
 except Exception:
     import sys

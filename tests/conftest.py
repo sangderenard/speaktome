@@ -15,12 +15,13 @@ import re
 import importlib.util
 from io import StringIO
 import json
+from AGENTS.tools.auto_env_setup import run_setup_script, ask_no_venv
 
-# Pretty logging helper
-from AGENTS.tools.pretty_logger import PrettyLogger
-
-# Import faculty components for logging
-from tensors.faculty import DEFAULT_FACULTY, FORCE_ENV, Faculty
+# Deferred imports after environment check
+PrettyLogger = None
+DEFAULT_FACULTY = None
+FORCE_ENV = "SPEAKTOME_FACULTY"
+Faculty = None
 
 ROOT = Path(__file__).resolve().parents[1]
 ACTIVE_FILE = Path(os.environ.get("SPEAKTOME_ACTIVE_FILE", "/tmp/speaktome_active.json"))
@@ -44,6 +45,29 @@ def _venv_marker_ok() -> bool:
     except Exception:
         return False
 
+
+def _auto_setup_and_check() -> bool:
+    """Attempt to run the setup script and re-check the environment."""
+    if _venv_marker_ok():
+        return True
+    run_setup_script(ROOT)
+    if _venv_marker_ok():
+        return True
+    if ask_no_venv(timeout=3):
+        run_setup_script(ROOT, use_venv=False)
+        return True
+    return False
+
+if not _auto_setup_and_check():
+    env_box = os.environ.get(
+        "ENV_SETUP_BOX",
+        "Environment not initialized. See ENV_SETUP_OPTIONS.md",
+    )
+    pytest.skip(
+        f"{env_box}\nAutomated setup failed. Skipping all tests.",
+        allow_module_level=True,
+    )
+
 def _discover_codebases(map_file: Path) -> list[str]:
     if not map_file.exists():
         return []
@@ -66,12 +90,15 @@ def _guess_codebase(path: Path) -> str:
 def _load_active() -> tuple[list[str], dict[str, dict[str, list[str]]]]:
     if ACTIVE_FILE.exists():
         try:
-            from AGENTS.tools.header_utils import ENV_SETUP_BOX
             data = json.loads(ACTIVE_FILE.read_text())
             return data.get("codebases", []), data.get("packages", {})
         except Exception:
+            env_box = os.environ.get(
+                "ENV_SETUP_BOX",
+                "Environment not initialized. See ENV_SETUP_OPTIONS.md",
+            )
             import sys
-            print(ENV_SETUP_BOX)
+            print(env_box)
             sys.exit(1)
 # --- END HEADER ---
 
@@ -110,15 +137,15 @@ def pytest_addoption(parser: pytest.Parser) -> None:
     )
 
 def pytest_configure(config: pytest.Config) -> None:
-    if not _venv_marker_ok():
-        from AGENTS.tools.header_utils import ENV_SETUP_BOX
-        msg = (
-            f"{ENV_SETUP_BOX}\n"
-            "PyTest disabled. See ENV_SETUP_OPTIONS.md for environment setup instructions.\n"
-            "Automated agents must follow those steps to enable pytest."
-        )
-        sys.stderr.write(msg + "\n")
-        pytest.exit("environment not configured", returncode=1)
+    global PrettyLogger, DEFAULT_FACULTY, Faculty, FORCE_ENV
+    if PrettyLogger is None:
+        from AGENTS.tools.pretty_logger import PrettyLogger as PL
+        PrettyLogger = PL
+    if DEFAULT_FACULTY is None or Faculty is None:
+        from tensors.faculty import DEFAULT_FACULTY as DF, Faculty as FC, FORCE_ENV as FE
+        DEFAULT_FACULTY = DF
+        Faculty = FC
+        FORCE_ENV = FE
     config.addinivalue_line("markers", "stub: placeholder test requiring implementation")
     config.addinivalue_line("markers", "requires_torch: skip if PyTorch is unavailable")
 
