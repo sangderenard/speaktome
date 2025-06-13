@@ -49,8 +49,8 @@ Open the printed file under `AGENTS/job_descriptions/` and follow its steps. Rec
 
 - **speaktome** — main beam search controllers and utilities.
 - **laplace** — Laplace builder and DEC utilities.
-- **tensor_printing** — experimental Grand Printing Press package.
-- **time_sync** — system clock offset helpers.
+- **tensorprinting** — experimental Grand Printing Press package.
+- **timesync** — system clock offset helpers.
 - **AGENTS/tools** — shared helper scripts for repository management.
 
 See `AGENTS/CODEBASE_REGISTRY.md` for details and future additions.

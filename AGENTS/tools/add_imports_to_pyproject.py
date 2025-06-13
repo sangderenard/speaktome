@@ -120,7 +120,7 @@ def main() -> int:
     imports = extract_imports(args.script)
     project = PyProject(args.pyproject)
 
-    local_pkgs = {"speaktome", "fontmapper", "laplace", "tensors", "time_sync", "tensor printing", "tools"}
+    local_pkgs = {"speaktome", "fontmapper", "laplace", "tensors", "timesync", "tensorprinting", "tools"}
 
     project.ensure_group("unsorted", optional=False)
     project.ensure_group("cpu-torch", optional=True)

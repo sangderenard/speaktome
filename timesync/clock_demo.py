@@ -16,29 +16,29 @@ import threading
 import sys
 import numpy as np
 from colorama import Style, Fore, Back  # For colored terminal output
-from time_sync import (
+from timesync import (
         get_offset,
         sync_offset,
         init_colorama_for_windows,
         reset_cursor_to_top,
         full_clear_and_reset_cursor,
     )
-from time_sync.time_sync.theme_manager import (
+from timesync.timesync.theme_manager import (
         ThemeManager,
         ClockTheme,
     )
-from time_sync.time_sync.render_backend import RenderingBackend
-from time_sync.frame_buffer import PixelFrameBuffer
-from time_sync.render_thread import render_loop
-from time_sync.draw import draw_diff
-from time_sync.time_sync.ascii_digits import (
+from timesync.timesync.render_backend import RenderingBackend
+from timesync.frame_buffer import PixelFrameBuffer
+from timesync.render_thread import render_loop
+from timesync.draw import draw_diff
+from timesync.timesync.ascii_digits import (
         ASCII_RAMP_BLOCK,
     )
-from time_sync.time_sync.clock_renderer import ClockRenderer
-from time_sync.draw import draw_text_overlay  # Import the new text drawing function
+from timesync.timesync.clock_renderer import ClockRenderer
+from timesync.draw import draw_text_overlay  # Import the new text drawing function
 from PIL import Image
 import queue
-from time_sync.menu_resolver import MenuResolver
+from timesync.menu_resolver import MenuResolver
 
     # Platform-specific input handling (adapted from AGENTS/tools/dev_group_menu.py)
 if os.name == "nt":  # Windows
@@ -147,7 +147,7 @@ def interactive_configure_mode(
         full_clear_and_reset_cursor()
         current_time = _dt.datetime.utcnow().replace(
             tzinfo=_dt.timezone.utc
-        )  # Or use time_sync.now()
+        )  # Or use timesync.now()
         stopwatch_td = _dt.timedelta(
             seconds=time.perf_counter()
         )  # Dummy stopwatch for config
@@ -311,7 +311,7 @@ def input_thread_fn(input_queue, stop_event):
 
 # Path to key mappings JSON
 KEY_MAPPINGS_PATH = os.path.join(
-    os.path.dirname(__file__), "time_sync", "key_mappings.json"
+    os.path.dirname(__file__), "timesync", "key_mappings.json"
 )
 
 
@@ -327,9 +327,9 @@ def load_key_mappings(path: str = KEY_MAPPINGS_PATH) -> dict:
         # Try alternate locations
         alt_paths = [
             os.path.join(os.path.dirname(__file__), "key_mappings.json"),
-            os.path.join(os.path.dirname(__file__), "time_sync", "key_mappings.json"),
+            os.path.join(os.path.dirname(__file__), "timesync", "key_mappings.json"),
             os.path.join(
-                os.path.dirname(__file__), "..", "time_sync", "key_mappings.json"
+                os.path.dirname(__file__), "..", "timesync", "key_mappings.json"
             ),
         ]
         for alt_path in alt_paths:
@@ -589,7 +589,7 @@ def main() -> None:
         # ThemeManager needs to be initialized for backdrop cycling in config mode
         temp_theme_manager = ThemeManager(
             presets_path=os.path.join(
-                os.path.dirname(__file__), "time_sync", "presets", "default_themes.json"
+                os.path.dirname(__file__), "timesync", "presets", "default_themes.json"
             )
         )
         if args.backdrops:
@@ -609,10 +609,10 @@ def main() -> None:
 
     # Initialize ThemeManager and set current theme from args
     presets_file_path = os.path.join(
-        os.path.dirname(__file__), "time_sync", "presets", "default_themes.json"
+        os.path.dirname(__file__), "timesync", "presets", "default_themes.json"
     )
     # Simplified path finding, assuming ThemeManager's default is usually correct
-    # or the user runs from a location where `time_sync/time_sync/presets` is valid.
+    # or the user runs from a location where `timesync/timesync/presets` is valid.
 
     theme_manager = ThemeManager(presets_path=presets_file_path)
     if args.backdrops:

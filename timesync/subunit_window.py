@@ -19,7 +19,7 @@ class SubunitWindow:
         """Create a window sized for ``grid_shape``."""
         if not _HAS_PYGAME:
             raise RuntimeError(
-                "pygame is required for SubunitWindow. Install time_sync[gui]."
+                "pygame is required for SubunitWindow. Install timesync[gui]."
             )
         pygame.init()
         self.subunit_size = max(1, subunit_size)
@@ -35,7 +35,7 @@ class SubunitWindow:
         """Update the window with ``changes`` in-place."""
         if not _HAS_PYGAME:
             raise RuntimeError(
-                "pygame is required for SubunitWindow. Install time_sync[gui]."
+                "pygame is required for SubunitWindow. Install timesync[gui]."
             )
         for y, x, sub in changes:
             surf = pygame.surfarray.make_surface(sub.swapaxes(0, 1))

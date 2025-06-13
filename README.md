@@ -6,8 +6,8 @@ This repository hosts several independent codebases that share a common virtual 
 
 - **speaktome** — main beam search controllers and utilities.
 - **laplace** — Laplace builder and DEC utilities.
-- **tensor_printing** — experimental Grand Printing Press package.
-- **time_sync** — system clock offset helpers.
+- **tensorprinting** — experimental Grand Printing Press package.
+- **timesync** — system clock offset helpers.
 - **AGENTS/tools** — shared helper scripts for repository management.
 
 See `AGENTS/CODEBASE_REGISTRY.md` for the canonical list.

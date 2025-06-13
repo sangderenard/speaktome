@@ -181,8 +181,8 @@ def _find_repo_root(start: pathlib.Path) -> pathlib.Path:
     required = {
         "speaktome",
         "laplace",
-        "tensor_printing",
-        "time_sync",
+        "tensorprinting",
+        "timesync",
         "AGENTS",
         "fontmapper",
         "tensors",

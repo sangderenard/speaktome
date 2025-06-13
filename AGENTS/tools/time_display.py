@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Display current adjusted time using :mod:`time_sync`."""
+"""Display current adjusted time using :mod:`timesync`."""
 from __future__ import annotations
 
 import argparse
 
-from time_sync import (
+from timesync import (
     sync_offset, now,
     compose_ascii_digits, print_analog_clock, print_digital_clock, # Added print_digital_clock for consistency
     init_colorama_for_windows
