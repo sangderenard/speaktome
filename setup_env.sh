@@ -100,7 +100,13 @@ install_quiet() {
 if [ $USE_VENV -eq 1 ]; then
   poetry config virtualenvs.in-project true
   INSTALL_ARGS="${SPEAKTOME_POETRY_ARGS:-'--without cpu-torch --without gpu-torch'}"
-  safe_run poetry install --sync --no-interaction $INSTALL_ARGS
+  if [[ "$INSTALL_ARGS" == *"with"*torch* ]]; then
+    echo "[INFO] Torch groups requested; attempting install" >&2
+    install_quiet poetry install --sync --no-interaction $INSTALL_ARGS
+  else
+    echo "[INFO] Skipping torch groups" >&2
+    safe_run poetry install --sync --no-interaction $INSTALL_ARGS
+  fi
   VENV_PYTHON="./.venv/bin/python"
   VENV_PIP="./.venv/bin/pip"
 else
