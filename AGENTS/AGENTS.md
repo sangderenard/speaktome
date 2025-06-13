@@ -37,3 +37,11 @@ for troubleshooting, and detailed **AUDIT** analyses.
   `messages/outbox/2025-06-07_Proposal_AgentProfileJSON.md`.
 - `RING_NETWORK_PROTOCOL.md` outlines the message review loop and how identities
   are affixed to communications.
+
+## Diff Proposal Workflow
+
+Agents are encouraged to convert potential commits into `.diff` files and place
+them in `AGENTS/messages/outbox/` with an explanatory memo. Delete the local
+commit after generating the patch so reviewers can inspect the diff before it is
+applied. Keeping these patches archived creates a reversible changelog for
+future analysis.
