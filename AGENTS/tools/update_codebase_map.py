@@ -13,7 +13,7 @@ except Exception:
     import os
     import sys
     try:
-        ENV_SETUP_BOX = os.environ["SPEAKTOME_ENV_SETUP_BOX"]
+        ENV_SETUP_BOX = os.environ["ENV_SETUP_BOX"]
     except KeyError as exc:
         raise RuntimeError("environment not initialized") from exc
     print(ENV_SETUP_BOX)

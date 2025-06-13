@@ -14,7 +14,7 @@ try:
 except Exception:
     import os
     try:
-        print(os.environ["SPEAKTOME_ENV_SETUP_BOX"])
+        print(os.environ["ENV_SETUP_BOX"])
     except KeyError:
         print("env missing")
     raise
