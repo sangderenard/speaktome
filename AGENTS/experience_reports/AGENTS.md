@@ -10,3 +10,6 @@ Include a **Prompt History** section quoting any instructions or conversations t
 
 After adding or updating a report, run `python AGENTS/validate_guestbook.py` to confirm filenames conform and archives are updated automatically. This keeps the park map tidy and easy to read.
 
+
+For unusually detailed analyses, create a "long documentation" report. See `1749791541_v1_Long_Documentation_Guidelines.md` for the recommended format and extended instructions.
+

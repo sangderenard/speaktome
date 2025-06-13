@@ -39,6 +39,20 @@ with or without heavy numerical dependencies. The experimental
 `tensor_printing` package also builds upon these classes to explore novel tensor
 visualization techniques.
 
+## Project Ethos
+
+The abstraction aims to feel like PyTorch while remaining approachable for users
+accustomed to NumPy, JAX, or simple Python lists.  We overload functions just
+enough to mask backend differences – as seen with the `shape` accessor – so
+code reads naturally no matter which library you prefer.  When behaviour differs
+between frameworks we follow PyTorch's lead.
+
+We prioritize work in this order:
+1. Define and test operations in the abstract base.
+2. Keep all Python backends in sync with those definitions.
+3. Fill missing pieces of a particular backend when gaps appear.
+4. Only then extend the optional C backend, aside from easy stub completions.
+
 ## Further Reading
 
 See `abstraction_functions.md` for an auto-generated list of methods and pending

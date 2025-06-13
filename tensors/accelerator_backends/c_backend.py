@@ -190,6 +190,14 @@ class CTensor:
 
         return build(0, self.shape)
 
+    def __getitem__(self, idx):
+        """Return a Python value or CTensor slice using Python-level indexing."""
+        data_list = self.tolist()
+        result = data_list[idx]
+        if isinstance(result, list):
+            return CTensor.from_list(result, _get_shape(result))
+        return float(result)
+
     @classmethod
     def from_list(cls, data: list, shape: Tuple[int, ...]):
         flat = []

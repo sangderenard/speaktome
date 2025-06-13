@@ -7,3 +7,7 @@ This subdirectory documents the design rules for the C backend implementation.
 * **Mirror the behavior of PyTorch**. Operations implemented in C must produce the same results as equivalent Torch functions for the supported dtypes.
 
 Follow the repository's general coding standards and keep tests passing.
+
+Development of this backend waits until the abstract interface and all Python
+backends (Torch, NumPy, JAX, pure) are stable.  Only quick fixes or trivial
+stub completions are accepted before then.
