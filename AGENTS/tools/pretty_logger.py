@@ -79,3 +79,68 @@ class PrettyLogger:
     def enable_color(self) -> None:
         """Enable colored output (not yet implemented)."""
         raise NotImplementedError
+
+
+@dataclass
+class TreeNode:
+    """Simple tree node for :class:`AsciiTreeRenderer`."""
+
+    label: str
+    children: List["TreeNode"] | None = None
+
+
+class AsciiTreeRenderer:
+    """Render tree structures using ASCII boxes and connectors."""
+
+    COLORS = [
+        "\x1b[48;5;24m",
+        "\x1b[48;5;25m",
+        "\x1b[48;5;26m",
+        "\x1b[48;5;27m",
+        "\x1b[48;5;28m",
+        "\x1b[48;5;29m",
+    ]
+    RESET = "\x1b[0m"
+
+    def __init__(self, use_color: bool = True) -> None:
+        self.use_color = use_color
+        if self.use_color and sys.platform.startswith("win"):
+            try:
+                from time_sync import init_colorama_for_windows
+            except Exception:  # pragma: no cover - optional
+                init_colorama_for_windows = None
+            if init_colorama_for_windows:
+                init_colorama_for_windows()
+
+    def render(self, root: TreeNode) -> str:
+        lines: List[str] = []
+        self._render_node(root, "", 0, True, lines)
+        return "\n".join(lines)
+
+    def _colorize(self, depth: int, text: str) -> str:
+        if not self.use_color:
+            return text
+        color = self.COLORS[depth % len(self.COLORS)]
+        return f"{color}{text}{self.RESET}"
+
+    def _render_node(
+        self,
+        node: TreeNode,
+        prefix: str,
+        depth: int,
+        is_last: bool,
+        lines: List[str],
+    ) -> None:
+        label_box = f"[ {node.label} ]"
+        connector = prefix[:-3] if prefix.endswith("│  ") else prefix
+        if prefix:
+            branch = "└── " if is_last else "├── "
+            lines.append(connector + branch + self._colorize(depth, label_box))
+        else:
+            lines.append(self._colorize(depth, label_box))
+
+        child_prefix = prefix + ("    " if is_last else "│   ")
+        children = node.children or []
+        for idx, child in enumerate(children):
+            self._render_node(child, child_prefix, depth + 1, idx == len(children) - 1, lines)
+
