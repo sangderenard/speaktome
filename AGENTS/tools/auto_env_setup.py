@@ -69,35 +69,42 @@ def parse_pyproject_dependencies(pyproject_path: Path) -> list[str]:
     return sorted(optdeps.keys())  # example: alphabetical
 
 
-def run_setup_script(project_root: Path, *, use_venv: bool = True) -> None:
+def run_setup_script(project_root: Path | None = None, *, use_venv: bool = True) -> subprocess.CompletedProcess | None:
+    """Run the repository setup script and return the result object."""
+    if project_root is None:
+        from AGENTS.tools.path_utils import find_repo_root
+
+        project_root = find_repo_root(Path(__file__))
+
+    project_root = project_root.resolve()
     pyproject_file = project_root / "pyproject.toml"
     groups = parse_pyproject_dependencies(pyproject_file)
     script = project_root / ("setup_env.ps1" if os.name == "nt" else "setup_env.sh")
     if not script.exists():
         print(f"Error: setup script not found in {project_root}", file=sys.stderr)
-        return
+        return None
 
-    # Invoke setup_env with no groups first
+    script = script.resolve()
     base_cmd = [str(script)]
     if not use_venv:
         base_cmd.append("-no-venv")
 
-    def invoke(cmd_args: list[str]) -> None:
+    def invoke(cmd_args: list[str]) -> subprocess.CompletedProcess | None:
         if os.name == "nt":
             full_cmd = ["powershell", "-ExecutionPolicy", "Bypass", "-File"] + cmd_args
         else:
             full_cmd = ["bash"] + cmd_args
         try:
-            subprocess.run(full_cmd, check=False)
+            return subprocess.run(full_cmd, check=False, capture_output=True, text=True)
         except Exception:
-            pass
+            return None
 
-    # 1) Base install with no groups
-    invoke(base_cmd)
+    result = invoke(base_cmd)
 
-    # 2) Try each group individually, ignoring errors
     for grp in groups:
         invoke(base_cmd + [f"-groups={grp}"])
+
+    return result
 
 
 def main(argv: list[str] | None = None) -> int:
