@@ -8,6 +8,7 @@ license = "MIT"
 [tool.poetry.dependencies]
 python = ">=3.12"
 tools = {path = "AGENTS/tools", develop = true}
+testenv = {path = "testenv", develop = true}
 
 [tool.poetry.group.dev]
 optional = true
@@ -37,7 +38,6 @@ laplace = {path = "laplace", develop = true}
 tensors = {path = "tensors", develop = true}
 time_sync = {path = "time_sync", develop = true}
 tensor_printing = {path = "tensor printing", develop = true}
-testenv = {path = "testenv", develop = true}
 
 [tool.poetry.extras]
 cpu-torch = []
