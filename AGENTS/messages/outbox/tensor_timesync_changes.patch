@@ -1,0 +1,897 @@
+diff --git a/AGENTS.md b/AGENTS.md
+index 7c7a8cf..73bdaf6 100644
+--- a/AGENTS.md
++++ b/AGENTS.md
+@@ -49,8 +49,8 @@ Open the printed file under `AGENTS/job_descriptions/` and follow its steps. Rec
+ 
+ - **speaktome** — main beam search controllers and utilities.
+ - **laplace** — Laplace builder and DEC utilities.
+-- **tensor_printing** — experimental Grand Printing Press package.
+-- **time_sync** — system clock offset helpers.
++- **tensorprinting** — experimental Grand Printing Press package.
++- **timesync** — system clock offset helpers.
+ - **AGENTS/tools** — shared helper scripts for repository management.
+ 
+ See `AGENTS/CODEBASE_REGISTRY.md` for details and future additions.
+diff --git a/AGENTS/CODEBASE_REGISTRY.md b/AGENTS/CODEBASE_REGISTRY.md
+index 3116428..5eb0f38 100644
+--- a/AGENTS/CODEBASE_REGISTRY.md
++++ b/AGENTS/CODEBASE_REGISTRY.md
+@@ -4,8 +4,8 @@ This document lists the independent project directories maintained in this repos
+ 
+ - **speaktome** — main beam search controllers and utilities.
+ - **laplace** — Laplace builder and DEC utilities.
+-- **tensor_printing** — experimental Grand Printing Press package.
+-- **time_sync** — system clock offset helpers.
++- **tensorprinting** — experimental Grand Printing Press package.
++- **timesync** — system clock offset helpers.
+ - **AGENTS/tools** — shared helper scripts for repository management.
+ - **fontmapper** — ASCII rendering and font mapping experiments. The v2
+   modules live alongside the legacy `FM16` folder.
+diff --git a/AGENTS/codebase_map.json b/AGENTS/codebase_map.json
+index c1c5421..d644ae8 100644
+--- a/AGENTS/codebase_map.json
++++ b/AGENTS/codebase_map.json
+@@ -1,6 +1,6 @@
+ {
+-  "tensor printing": {
+-    "path": "tensor printing",
++  "tensorprinting": {
++    "path": "tensorprinting",
+     "groups": {
+       "dev": [
+         "tools"
+@@ -88,8 +88,8 @@
+       ]
+     }
+   },
+-  "time_sync": {
+-    "path": "time_sync",
++  "timesync": {
++    "path": "timesync",
+     "groups": {
+       "gui": [
+         "pygame>=2"
+diff --git a/AGENTS/conceptual_flags/Tensor_Printing_Class.md b/AGENTS/conceptual_flags/Tensor_Printing_Class.md
+index 7f7bd2d..11d8d87 100644
+--- a/AGENTS/conceptual_flags/Tensor_Printing_Class.md
++++ b/AGENTS/conceptual_flags/Tensor_Printing_Class.md
+@@ -17,8 +17,8 @@ allowing custom pipelines.
+ 
+ ## Relevant Files and Components
+ 
+-- `tensor printing/tensor_printing/press.py`
+-- `tensor printing/inspiration/` (archived notebooks)
++- `tensorprinting/press.py`
++- `tensorprinting/inspiration/` (archived notebooks)
+ 
+ ## Implementation and Usage Guidance
+ 
+diff --git a/AGENTS/header_template.py b/AGENTS/header_template.py
+index 6bbb3f9..4871442 100644
+--- a/AGENTS/header_template.py
++++ b/AGENTS/header_template.py
+@@ -15,8 +15,8 @@ except Exception:
+         required = {
+             "speaktome",
+             "laplace",
+-            "tensor printing",
+-            "time_sync",
++            "tensorprinting",
++            "timesync",
+             "AGENTS",
+             "fontmapper",
+             "tensors",
+diff --git a/AGENTS/headers.md b/AGENTS/headers.md
+index 4ebd6c4..83d7134 100644
+--- a/AGENTS/headers.md
++++ b/AGENTS/headers.md
+@@ -23,8 +23,8 @@ except Exception:  # <try:end> <except:start>
+         required = {
+             "speaktome",
+             "laplace",
+-            "tensor printing",
+-            "time_sync",
++            "tensorprinting",
++            "timesync",
+             "AGENTS",
+             "fontmapper",
+             "tensors",
+diff --git a/AGENTS/tools/add_imports_to_pyproject.py b/AGENTS/tools/add_imports_to_pyproject.py
+index 25c55dc..5ff6ed2 100644
+--- a/AGENTS/tools/add_imports_to_pyproject.py
++++ b/AGENTS/tools/add_imports_to_pyproject.py
+@@ -120,7 +120,7 @@ def main() -> int:
+     imports = extract_imports(args.script)
+     project = PyProject(args.pyproject)
+ 
+-    local_pkgs = {"speaktome", "fontmapper", "laplace", "tensors", "time_sync", "tensor printing", "tools"}
++    local_pkgs = {"speaktome", "fontmapper", "laplace", "tensors", "timesync", "tensorprinting", "tools"}
+ 
+     project.ensure_group("unsorted", optional=False)
+     project.ensure_group("cpu-torch", optional=True)
+diff --git a/AGENTS/tools/auto_env_setup.py b/AGENTS/tools/auto_env_setup.py
+index ba91516..ccf1231 100644
+--- a/AGENTS/tools/auto_env_setup.py
++++ b/AGENTS/tools/auto_env_setup.py
+@@ -81,8 +81,8 @@ def run_setup_script(project_root: Path | None = None, *, use_venv: bool = True)
+             required = {
+                 "speaktome",
+                 "laplace",
+-                "tensor printing",
+-                "time_sync",
++                "tensorprinting",
++                "timesync",
+                 "AGENTS",
+                 "fontmapper",
+                 "tensors",
+diff --git a/AGENTS/tools/auto_fix_headers.py b/AGENTS/tools/auto_fix_headers.py
+index 4755fc9..5debeea 100644
+--- a/AGENTS/tools/auto_fix_headers.py
++++ b/AGENTS/tools/auto_fix_headers.py
+@@ -17,8 +17,8 @@ except Exception:
+         required = {
+             "speaktome",
+             "laplace",
+-            "tensor printing",
+-            "time_sync",
++            "tensorprinting",
++            "timesync",
+             "AGENTS",
+             "fontmapper",
+             "tensors",
+@@ -66,8 +66,8 @@ EXCLUDE_DIRS = {
+     "third_party",
+     "laplace",
+     "training",
+-    "tensor printing",
+-    "tensor_printing",
++    "tensorprinting",
++    "tensorprinting",
+ }
+ 
+ HEADER_START = "# --- BEGIN HEADER ---"
+@@ -75,9 +75,9 @@ HEADER_END = "# --- END HEADER ---"
+ IMPORT_FAILURE_PREFIX = "[HEADER] import failure in"
+ 
+ 
+-def in_tensor_printing_inspiration(path: Path) -> bool:
++def in_tensorprinting_inspiration(path: Path) -> bool:
+     parts = path.parts
+-    return "tensor printing" in parts and "inspiration" in parts
++    return "tensorprinting" in parts and "inspiration" in parts
+ 
+ 
+ HEADER_START_SENTINEL = HEADER_START
+@@ -91,7 +91,7 @@ def should_skip(path: Path) -> bool:
+     for d in EXCLUDE_DIRS:
+         if d in parts:
+             return True
+-    if in_tensor_printing_inspiration(path):
++    if in_tensorprinting_inspiration(path):
+         return True
+     return False
+ 
+@@ -243,8 +243,8 @@ def fix_file(path: Path) -> None:
+     out_lines.append("        required = {")
+     out_lines.append("            'speaktome',")
+     out_lines.append("            'laplace',")
+-    out_lines.append("            'tensor printing',")
+-    out_lines.append("            'time_sync',")
++    out_lines.append("            'tensorprinting',")
++    out_lines.append("            'timesync',")
+     out_lines.append("            'AGENTS',")
+     out_lines.append("            'fontmapper',")
+     out_lines.append("            'tensors',")
+diff --git a/AGENTS/tools/dump_headers.py b/AGENTS/tools/dump_headers.py
+index 38c91eb..d5bd0fe 100644
+--- a/AGENTS/tools/dump_headers.py
++++ b/AGENTS/tools/dump_headers.py
+@@ -19,8 +19,8 @@ except Exception:
+         required = {
+             "speaktome",
+             "laplace",
+-            "tensor printing",
+-            "time_sync",
++            "tensorprinting",
++            "timesync",
+             "AGENTS",
+             "fontmapper",
+             "tensors",
+@@ -70,8 +70,8 @@ EXCLUDE_DIRS = {
+     "third_party",
+     "laplace",
+     "training",
+-    "tensor printing",
+-    "tensor_printing",
++    "tensorprinting",
++    "tensorprinting",
+ }
+ 
+ 
+diff --git a/AGENTS/tools/dynamic_header_recognition.py b/AGENTS/tools/dynamic_header_recognition.py
+index 437f26a..7c9ec84 100644
+--- a/AGENTS/tools/dynamic_header_recognition.py
++++ b/AGENTS/tools/dynamic_header_recognition.py
+@@ -17,8 +17,8 @@ except Exception:
+         required = {
+             "speaktome",
+             "laplace",
+-            "tensor_printing",
+-            "time_sync",
++            "tensorprinting",
++            "timesync",
+             "AGENTS",
+             "fontmapper",
+             "tensors",
+diff --git a/AGENTS/tools/ensure_pyproject_deps.py b/AGENTS/tools/ensure_pyproject_deps.py
+index 99f8768..3b5356c 100644
+--- a/AGENTS/tools/ensure_pyproject_deps.py
++++ b/AGENTS/tools/ensure_pyproject_deps.py
+@@ -22,8 +22,8 @@ except Exception:
+         required = {
+             "speaktome",
+             "laplace",
+-            "tensor printing",
+-            "time_sync",
++            "tensorprinting",
++            "timesync",
+             "AGENTS",
+             "fontmapper",
+             "tensors",
+diff --git a/AGENTS/tools/header_audit.py b/AGENTS/tools/header_audit.py
+index 8490e9a..ab3b94e 100644
+--- a/AGENTS/tools/header_audit.py
++++ b/AGENTS/tools/header_audit.py
+@@ -16,8 +16,8 @@ except Exception:
+         required = {
+             "speaktome",
+             "laplace",
+-            "tensor printing",
+-            "time_sync",
++            "tensorprinting",
++            "timesync",
+             "AGENTS",
+             "fontmapper",
+             "tensors",
+diff --git a/AGENTS/tools/header_guard_precommit.py b/AGENTS/tools/header_guard_precommit.py
+index ce798c4..36c58db 100644
+--- a/AGENTS/tools/header_guard_precommit.py
++++ b/AGENTS/tools/header_guard_precommit.py
+@@ -19,8 +19,8 @@ except Exception:
+         required = {
+             "speaktome",
+             "laplace",
+-            "tensor printing",
+-            "time_sync",
++            "tensorprinting",
++            "timesync",
+             "AGENTS",
+             "fontmapper",
+             "tensors",
+diff --git a/AGENTS/tools/header_utils.py b/AGENTS/tools/header_utils.py
+index 15db6d5..2bcb668 100644
+--- a/AGENTS/tools/header_utils.py
++++ b/AGENTS/tools/header_utils.py
+@@ -15,8 +15,8 @@ except Exception:
+         required = {
+             "speaktome",
+             "laplace",
+-            "tensor printing",
+-            "time_sync",
++            "tensorprinting",
++            "timesync",
+             "AGENTS",
+             "fontmapper",
+             "tensors",
+diff --git a/AGENTS/tools/prioritize_jobs.py b/AGENTS/tools/prioritize_jobs.py
+index 1e96461..c3f03b6 100644
+--- a/AGENTS/tools/prioritize_jobs.py
++++ b/AGENTS/tools/prioritize_jobs.py
+@@ -15,8 +15,8 @@ def _find_repo_root(start: Path) -> Path:
+     required = {
+         "speaktome",
+         "laplace",
+-        "tensor printing",
+-        "time_sync",
++        "tensorprinting",
++        "timesync",
+         "AGENTS",
+         "fontmapper",
+         "tensors",
+diff --git a/AGENTS/tools/run_header_checks.py b/AGENTS/tools/run_header_checks.py
+index 89bff26..acbea99 100644
+--- a/AGENTS/tools/run_header_checks.py
++++ b/AGENTS/tools/run_header_checks.py
+@@ -18,8 +18,8 @@ except Exception:
+         required = {
+             "speaktome",
+             "laplace",
+-            "tensor printing",
+-            "time_sync",
++            "tensorprinting",
++            "timesync",
+             "AGENTS",
+             "fontmapper",
+             "tensors",
+diff --git a/AGENTS/tools/test_all_headers.py b/AGENTS/tools/test_all_headers.py
+index dcd9c27..34da50b 100644
+--- a/AGENTS/tools/test_all_headers.py
++++ b/AGENTS/tools/test_all_headers.py
+@@ -23,8 +23,8 @@ except Exception:
+         required = {
+             "speaktome",
+             "laplace",
+-            "tensor printing",
+-            "time_sync",
++            "tensorprinting",
++            "timesync",
+             "AGENTS",
+             "fontmapper",
+             "tensors",
+diff --git a/AGENTS/tools/time_display.py b/AGENTS/tools/time_display.py
+index aaab9ab..32a806e 100755
+--- a/AGENTS/tools/time_display.py
++++ b/AGENTS/tools/time_display.py
+@@ -1,10 +1,10 @@
+ #!/usr/bin/env python3
+-"""Display current adjusted time using :mod:`time_sync`."""
++"""Display current adjusted time using :mod:`timesync`."""
+ from __future__ import annotations
+ 
+ import argparse
+ 
+-from time_sync import (
++from timesync import (
+     sync_offset, now,
+     compose_ascii_digits, print_analog_clock, print_digital_clock, # Added print_digital_clock for consistency
+     init_colorama_for_windows
+diff --git a/AGENTS/tools/validate_headers.py b/AGENTS/tools/validate_headers.py
+index f40afd9..5576362 100644
+--- a/AGENTS/tools/validate_headers.py
++++ b/AGENTS/tools/validate_headers.py
+@@ -19,8 +19,8 @@ except Exception:
+         required = {
+             "speaktome",
+             "laplace",
+-            "tensor printing",
+-            "time_sync",
++            "tensorprinting",
++            "timesync",
+             "AGENTS",
+             "fontmapper",
+             "tensors",
+diff --git a/README.md b/README.md
+index 870512c..a02ac31 100644
+--- a/README.md
++++ b/README.md
+@@ -6,8 +6,8 @@ This repository hosts several independent codebases that share a common virtual
+ 
+ - **speaktome** — main beam search controllers and utilities.
+ - **laplace** — Laplace builder and DEC utilities.
+-- **tensor_printing** — experimental Grand Printing Press package.
+-- **time_sync** — system clock offset helpers.
++- **tensorprinting** — experimental Grand Printing Press package.
++- **timesync** — system clock offset helpers.
+ - **AGENTS/tools** — shared helper scripts for repository management.
+ 
+ See `AGENTS/CODEBASE_REGISTRY.md` for the canonical list.
+diff --git a/pyproject.toml b/pyproject.toml
+index b554a51..96114b6 100644
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -35,8 +35,8 @@ speaktome = {path = "speaktome", develop = true}
+ fontmapper = {path = "fontmapper", develop = true}
+ laplace = {path = "laplace", develop = true}
+ tensors = {path = "tensors", develop = true}
+-time_sync = {path = "time_sync", develop = true}
+-tensor_printing = {path = "tensor printing", develop = true}
++timesync = {path = "timesync", develop = true}
++tensorprinting = {path = "tensorprinting", develop = true}
+ testenv = {path = "testenv", develop = true}
+ 
+ [tool.poetry.extras]
+diff --git a/setup_env.sh b/setup_env.sh
+index e0899f8..6863156 100644
+--- a/setup_env.sh
++++ b/setup_env.sh
+@@ -181,8 +181,8 @@ def _find_repo_root(start: pathlib.Path) -> pathlib.Path:
+     required = {
+         "speaktome",
+         "laplace",
+-        "tensor_printing",
+-        "time_sync",
++        "tensorprinting",
++        "timesync",
+         "AGENTS",
+         "fontmapper",
+         "tensors",
+diff --git a/tensor printing/AGENTS.md b/tensorprinting/AGENTS.md
+similarity index 100%
+rename from tensor printing/AGENTS.md
+rename to tensorprinting/AGENTS.md
+diff --git a/tensor printing/README.md b/tensorprinting/README.md
+similarity index 100%
+rename from tensor printing/README.md
+rename to tensorprinting/README.md
+diff --git a/tensor printing/tensor_printing/__init__.py b/tensorprinting/__init__.py
+similarity index 100%
+rename from tensor printing/tensor_printing/__init__.py
+rename to tensorprinting/__init__.py
+diff --git a/tensor printing/inspiration/1733096305_PrintingPress.py b/tensorprinting/inspiration/1733096305_PrintingPress.py
+similarity index 100%
+rename from tensor printing/inspiration/1733096305_PrintingPress.py
+rename to tensorprinting/inspiration/1733096305_PrintingPress.py
+diff --git a/tensor printing/inspiration/1733164805_GrandPress_Granulator_Inkmaker_Inkstone_PaperMaker_Pigment_Ruler_Xuanzhi.py b/tensorprinting/inspiration/1733164805_GrandPress_Granulator_Inkmaker_Inkstone_PaperMaker_Pigment_Ruler_Xuanzhi.py
+similarity index 100%
+rename from tensor printing/inspiration/1733164805_GrandPress_Granulator_Inkmaker_Inkstone_PaperMaker_Pigment_Ruler_Xuanzhi.py
+rename to tensorprinting/inspiration/1733164805_GrandPress_Granulator_Inkmaker_Inkstone_PaperMaker_Pigment_Ruler_Xuanzhi.py
+diff --git a/tensor printing/inspiration/1733218107_Digitizer_GlyphAssembler_GradientMaker_GrandPress_Ink_InkWorker_Machine_Material_Paper_PaperWorker_PressOperator_Shop_Tool_Worker.py b/tensorprinting/inspiration/1733218107_Digitizer_GlyphAssembler_GradientMaker_GrandPress_Ink_InkWorker_Machine_Material_Paper_PaperWorker_PressOperator_Shop_Tool_Worker.py
+similarity index 100%
+rename from tensor printing/inspiration/1733218107_Digitizer_GlyphAssembler_GradientMaker_GrandPress_Ink_InkWorker_Machine_Material_Paper_PaperWorker_PressOperator_Shop_Tool_Worker.py
+rename to tensorprinting/inspiration/1733218107_Digitizer_GlyphAssembler_GradientMaker_GrandPress_Ink_InkWorker_Machine_Material_Paper_PaperWorker_PressOperator_Shop_Tool_Worker.py
+diff --git a/tensor printing/tensor_printing/press.py b/tensorprinting/press.py
+similarity index 100%
+rename from tensor printing/tensor_printing/press.py
+rename to tensorprinting/press.py
+diff --git a/tensor printing/pyproject.toml b/tensorprinting/pyproject.toml
+similarity index 94%
+rename from tensor printing/pyproject.toml
+rename to tensorprinting/pyproject.toml
+index f9f82f8..17fa0eb 100644
+--- a/tensor printing/pyproject.toml	
++++ b/tensorprinting/pyproject.toml
+@@ -1,5 +1,5 @@
+ [tool.poetry]
+-name = "tensor_printing"
++name = "tensorprinting"
+ version = "0.1.0"
+ description = "Grand Printing Press experiments"
+ authors = ["Tensor Printing Authors"]
+diff --git a/tensor printing/tensor_printing/ruler.py b/tensorprinting/ruler.py
+similarity index 100%
+rename from tensor printing/tensor_printing/ruler.py
+rename to tensorprinting/ruler.py
+diff --git a/tensor printing/setup_env.sh b/tensorprinting/setup_env.sh
+similarity index 100%
+rename from tensor printing/setup_env.sh
+rename to tensorprinting/setup_env.sh
+diff --git a/tensors/EXPLAINER.md b/tensors/EXPLAINER.md
+index 7a81de0..9f81f21 100644
+--- a/tensors/EXPLAINER.md
++++ b/tensors/EXPLAINER.md
+@@ -36,7 +36,7 @@ operate on tensors without binding to a specific backend.
+ 
+ The `speaktome` core components rely on this abstraction layer so they can run
+ with or without heavy numerical dependencies. The experimental
+-`tensor_printing` package also builds upon these classes to explore novel tensor
++`tensorprinting` package also builds upon these classes to explore novel tensor
+ visualization techniques.
+ 
+ ## Project Ethos
+diff --git a/testenv/__init__.py b/testenv/__init__.py
+index c04933b..b2f3e53 100644
+--- a/testenv/__init__.py
++++ b/testenv/__init__.py
+@@ -15,8 +15,8 @@ except Exception:
+         required = {
+             "speaktome",
+             "laplace",
+-            "tensor printing",
+-            "time_sync",
++            "tensorprinting",
++            "timesync",
+             "AGENTS",
+             "fontmapper",
+             "tensors",
+diff --git a/testing/__init__.py b/testing/__init__.py
+index e639ac4..a0dfd3a 100644
+--- a/testing/__init__.py
++++ b/testing/__init__.py
+@@ -15,8 +15,8 @@ except Exception:
+         required = {
+             "speaktome",
+             "laplace",
+-            "tensor printing",
+-            "time_sync",
++            "tensorprinting",
++            "timesync",
+             "AGENTS",
+             "fontmapper",
+             "tensors",
+diff --git a/testing/benchmark_tensor_ops.py b/testing/benchmark_tensor_ops.py
+index 78ecc14..b137006 100644
+--- a/testing/benchmark_tensor_ops.py
++++ b/testing/benchmark_tensor_ops.py
+@@ -17,8 +17,8 @@ except Exception:
+         required = {
+             "speaktome",
+             "laplace",
+-            "tensor_printing",
+-            "time_sync",
++            "tensorprinting",
++            "timesync",
+             "AGENTS",
+             "fontmapper",
+             "tensors",
+diff --git a/testing/lookahead_demo.py b/testing/lookahead_demo.py
+index e6e3c8c..86c2b76 100644
+--- a/testing/lookahead_demo.py
++++ b/testing/lookahead_demo.py
+@@ -18,8 +18,8 @@ except Exception:
+         required = {
+             "speaktome",
+             "laplace",
+-            "tensor_printing",
+-            "time_sync",
++            "tensorprinting",
++            "timesync",
+             "AGENTS",
+             "fontmapper",
+             "tensors",
+diff --git a/testing/tensor_ops_menu.py b/testing/tensor_ops_menu.py
+index eff7e6a..90d9eb6 100644
+--- a/testing/tensor_ops_menu.py
++++ b/testing/tensor_ops_menu.py
+@@ -19,8 +19,8 @@ except Exception:
+         required = {
+             "speaktome",
+             "laplace",
+-            "tensor_printing",
+-            "time_sync",
++            "tensorprinting",
++            "timesync",
+             "AGENTS",
+             "fontmapper",
+             "tensors",
+diff --git a/tests/conftest.py b/tests/conftest.py
+index 75c2805..873d7ef 100644
+--- a/tests/conftest.py
++++ b/tests/conftest.py
+@@ -15,8 +15,8 @@ def _find_repo_root(start: Path) -> Path:
+     required = {
+         "speaktome",
+         "laplace",
+-        "tensor printing",
+-        "time_sync",
++        "tensorprinting",
++        "timesync",
+         "AGENTS",
+         "fontmapper",
+         "tensors",
+diff --git a/tests/test_cli.py b/tests/test_cli.py
+index 2895a50..a3d5a61 100644
+--- a/tests/test_cli.py
++++ b/tests/test_cli.py
+@@ -21,8 +21,8 @@ except Exception:
+         required = {
+             "speaktome",
+             "laplace",
+-            "tensor printing",
+-            "time_sync",
++            "tensorprinting",
++            "timesync",
+             "AGENTS",
+             "fontmapper",
+             "tensors",
+diff --git a/tests/test_draw.py b/tests/test_draw.py
+index 316ec64..a0ae895 100644
+--- a/tests/test_draw.py
++++ b/tests/test_draw.py
+@@ -5,7 +5,7 @@ from __future__ import annotations
+ try:
+     import os
+     import numpy as np
+-    from time_sync.draw import (
++    from timesync.draw import (
+         get_changed_subunits,
+         default_subunit_batch_to_chars,
+         flexible_subunit_kernel,
+diff --git a/tests/test_pixel_frame_buffer.py b/tests/test_pixel_frame_buffer.py
+index 963c7da..92a44cf 100644
+--- a/tests/test_pixel_frame_buffer.py
++++ b/tests/test_pixel_frame_buffer.py
+@@ -2,7 +2,7 @@ from __future__ import annotations
+ 
+ try:
+     import os
+-    from time_sync.frame_buffer import PixelFrameBuffer
++    from timesync.frame_buffer import PixelFrameBuffer
+     import numpy as np
+ 
+     ENV_SETUP_BOX = os.environ["ENV_SETUP_BOX"]
+diff --git a/tests/test_time_sync.py b/tests/test_time_sync.py
+index 201f5c8..6034621 100644
+--- a/tests/test_time_sync.py
++++ b/tests/test_time_sync.py
+@@ -1,4 +1,4 @@
+-"""Tests for the :mod:`time_sync` utilities."""
++"""Tests for the :mod:`timesync` utilities."""
+ 
+ import datetime as dt
+ from unittest import mock
+@@ -6,7 +6,7 @@ from unittest import mock
+ import pytest
+ 
+ ntplib = pytest.importorskip("ntplib")
+-from time_sync import (
++from timesync import (
+     adjust_datetime,
+     compose_ascii_digits,
+     get_offset,
+@@ -15,7 +15,7 @@ from time_sync import (
+     print_digital_clock,
+     RenderingBackend,
+ )
+-from time_sync.time_sync.theme_manager import ThemeManager
++from timesync.timesync.theme_manager import ThemeManager
+ 
+ # --- END HEADER ---
+ 
+@@ -29,7 +29,7 @@ def test_adjust_datetime(monkeypatch):
+ 
+ def test_sync_offset_fallback(monkeypatch):
+     monkeypatch.setenv("SPEAKTOME_TIME_OFFSET", "5")
+-    with mock.patch("time_sync._internet.fetch_internet_utc", side_effect=OSError):
++    with mock.patch("timesync._internet.fetch_internet_utc", side_effect=OSError):
+         val = sync_offset()
+     assert val == 5
+     assert get_offset() == 5
+diff --git a/tests/test_validate_headers.py b/tests/test_validate_headers.py
+index b275888..927b001 100644
+--- a/tests/test_validate_headers.py
++++ b/tests/test_validate_headers.py
+@@ -22,8 +22,8 @@ except Exception:
+         required = {
+             "speaktome",
+             "laplace",
+-            "tensor printing",
+-            "time_sync",
++            "tensorprinting",
++            "timesync",
+             "AGENTS",
+             "fontmapper",
+             "tensors",
+diff --git a/time_sync/__init__.py b/time_sync/__init__.py
+deleted file mode 100644
+index 5f2478f..0000000
+--- a/time_sync/__init__.py
++++ /dev/null
+@@ -1,3 +0,0 @@
+-"""Namespace package for time_sync."""
+-# --- END HEADER ---
+-from .time_sync import *
+diff --git a/time_sync/AGENTS.md b/timesync/AGENTS.md
+similarity index 100%
+rename from time_sync/AGENTS.md
+rename to timesync/AGENTS.md
+diff --git a/time_sync/README.md b/timesync/README.md
+similarity index 100%
+rename from time_sync/README.md
+rename to timesync/README.md
+diff --git a/time_sync/time_sync/__init__.py b/timesync/__init__.py
+similarity index 100%
+rename from time_sync/time_sync/__init__.py
+rename to timesync/__init__.py
+diff --git a/time_sync/time_sync/_internet.py b/timesync/_internet.py
+similarity index 100%
+rename from time_sync/time_sync/_internet.py
+rename to timesync/_internet.py
+diff --git a/time_sync/analogback.png b/timesync/analogback.png
+similarity index 100%
+rename from time_sync/analogback.png
+rename to timesync/analogback.png
+diff --git a/time_sync/time_sync/ascii_digits.py b/timesync/ascii_digits.py
+similarity index 100%
+rename from time_sync/time_sync/ascii_digits.py
+rename to timesync/ascii_digits.py
+diff --git a/time_sync/ascii_kernel_classifier.py b/timesync/ascii_kernel_classifier.py
+similarity index 100%
+rename from time_sync/ascii_kernel_classifier.py
+rename to timesync/ascii_kernel_classifier.py
+diff --git a/time_sync/clock_demo.py b/timesync/clock_demo.py
+similarity index 97%
+rename from time_sync/clock_demo.py
+rename to timesync/clock_demo.py
+index bbf7e25..22d7d9d 100644
+--- a/time_sync/clock_demo.py
++++ b/timesync/clock_demo.py
+@@ -16,29 +16,29 @@ import threading
+ import sys
+ import numpy as np
+ from colorama import Style, Fore, Back  # For colored terminal output
+-from time_sync import (
++from timesync import (
+         get_offset,
+         sync_offset,
+         init_colorama_for_windows,
+         reset_cursor_to_top,
+         full_clear_and_reset_cursor,
+     )
+-from time_sync.time_sync.theme_manager import (
++from timesync.timesync.theme_manager import (
+         ThemeManager,
+         ClockTheme,
+     )
+-from time_sync.time_sync.render_backend import RenderingBackend
+-from time_sync.frame_buffer import PixelFrameBuffer
+-from time_sync.render_thread import render_loop
+-from time_sync.draw import draw_diff
+-from time_sync.time_sync.ascii_digits import (
++from timesync.timesync.render_backend import RenderingBackend
++from timesync.frame_buffer import PixelFrameBuffer
++from timesync.render_thread import render_loop
++from timesync.draw import draw_diff
++from timesync.timesync.ascii_digits import (
+         ASCII_RAMP_BLOCK,
+     )
+-from time_sync.time_sync.clock_renderer import ClockRenderer
+-from time_sync.draw import draw_text_overlay  # Import the new text drawing function
++from timesync.timesync.clock_renderer import ClockRenderer
++from timesync.draw import draw_text_overlay  # Import the new text drawing function
+ from PIL import Image
+ import queue
+-from time_sync.menu_resolver import MenuResolver
++from timesync.menu_resolver import MenuResolver
+ 
+     # Platform-specific input handling (adapted from AGENTS/tools/dev_group_menu.py)
+ if os.name == "nt":  # Windows
+@@ -147,7 +147,7 @@ def interactive_configure_mode(
+         full_clear_and_reset_cursor()
+         current_time = _dt.datetime.utcnow().replace(
+             tzinfo=_dt.timezone.utc
+-        )  # Or use time_sync.now()
++        )  # Or use timesync.now()
+         stopwatch_td = _dt.timedelta(
+             seconds=time.perf_counter()
+         )  # Dummy stopwatch for config
+@@ -311,7 +311,7 @@ def input_thread_fn(input_queue, stop_event):
+ 
+ # Path to key mappings JSON
+ KEY_MAPPINGS_PATH = os.path.join(
+-    os.path.dirname(__file__), "time_sync", "key_mappings.json"
++    os.path.dirname(__file__), "timesync", "key_mappings.json"
+ )
+ 
+ 
+@@ -327,9 +327,9 @@ def load_key_mappings(path: str = KEY_MAPPINGS_PATH) -> dict:
+         # Try alternate locations
+         alt_paths = [
+             os.path.join(os.path.dirname(__file__), "key_mappings.json"),
+-            os.path.join(os.path.dirname(__file__), "time_sync", "key_mappings.json"),
++            os.path.join(os.path.dirname(__file__), "timesync", "key_mappings.json"),
+             os.path.join(
+-                os.path.dirname(__file__), "..", "time_sync", "key_mappings.json"
++                os.path.dirname(__file__), "..", "timesync", "key_mappings.json"
+             ),
+         ]
+         for alt_path in alt_paths:
+@@ -589,7 +589,7 @@ def main() -> None:
+         # ThemeManager needs to be initialized for backdrop cycling in config mode
+         temp_theme_manager = ThemeManager(
+             presets_path=os.path.join(
+-                os.path.dirname(__file__), "time_sync", "presets", "default_themes.json"
++                os.path.dirname(__file__), "timesync", "presets", "default_themes.json"
+             )
+         )
+         if args.backdrops:
+@@ -609,10 +609,10 @@ def main() -> None:
+ 
+     # Initialize ThemeManager and set current theme from args
+     presets_file_path = os.path.join(
+-        os.path.dirname(__file__), "time_sync", "presets", "default_themes.json"
++        os.path.dirname(__file__), "timesync", "presets", "default_themes.json"
+     )
+     # Simplified path finding, assuming ThemeManager's default is usually correct
+-    # or the user runs from a location where `time_sync/time_sync/presets` is valid.
++    # or the user runs from a location where `timesync/timesync/presets` is valid.
+ 
+     theme_manager = ThemeManager(presets_path=presets_file_path)
+     if args.backdrops:
+diff --git a/time_sync/time_sync/clock_renderer.py b/timesync/clock_renderer.py
+similarity index 100%
+rename from time_sync/time_sync/clock_renderer.py
+rename to timesync/clock_renderer.py
+diff --git a/time_sync/consola.ttf b/timesync/consola.ttf
+similarity index 100%
+rename from time_sync/consola.ttf
+rename to timesync/consola.ttf
+diff --git a/time_sync/time_sync/console.py b/timesync/console.py
+similarity index 100%
+rename from time_sync/time_sync/console.py
+rename to timesync/console.py
+diff --git a/time_sync/time_sync/core.py b/timesync/core.py
+similarity index 100%
+rename from time_sync/time_sync/core.py
+rename to timesync/core.py
+diff --git a/time_sync/draw.py b/timesync/draw.py
+similarity index 99%
+rename from time_sync/draw.py
+rename to timesync/draw.py
+index 17483fb..d64440a 100644
+--- a/time_sync/draw.py
++++ b/timesync/draw.py
+@@ -7,7 +7,7 @@ try:
+     import sys
+     import numpy as np
+     from colorama import Style, Fore, Back
+-    from time_sync.ascii_kernel_classifier import AsciiKernelClassifier
++    from timesync.ascii_kernel_classifier import AsciiKernelClassifier
+ except Exception:
+     import sys
+     print(ENV_SETUP_BOX)
+diff --git a/time_sync/frame_buffer.py b/timesync/frame_buffer.py
+similarity index 100%
+rename from time_sync/frame_buffer.py
+rename to timesync/frame_buffer.py
+diff --git a/time_sync/time_sync/key_mappings.json b/timesync/key_mappings.json
+similarity index 100%
+rename from time_sync/time_sync/key_mappings.json
+rename to timesync/key_mappings.json
+diff --git a/time_sync/menu_resolver.py b/timesync/menu_resolver.py
+similarity index 100%
+rename from time_sync/menu_resolver.py
+rename to timesync/menu_resolver.py
+diff --git a/time_sync/time_sync/presets/default_themes.json b/timesync/presets/default_themes.json
+similarity index 100%
+rename from time_sync/time_sync/presets/default_themes.json
+rename to timesync/presets/default_themes.json
+diff --git a/time_sync/pyproject.toml b/timesync/pyproject.toml
+similarity index 96%
+rename from time_sync/pyproject.toml
+rename to timesync/pyproject.toml
+index ecbff49..fb93198 100644
+--- a/time_sync/pyproject.toml
++++ b/timesync/pyproject.toml
+@@ -1,5 +1,5 @@
+ [tool.poetry]
+-name = "time_sync"
++name = "timesync"
+ version = "0.1.0"
+ description = "System time synchronization utilities"
+ authors = ["Time Sync Authors"]
+diff --git a/time_sync/time_sync/render_backend.py b/timesync/render_backend.py
+similarity index 100%
+rename from time_sync/time_sync/render_backend.py
+rename to timesync/render_backend.py
+diff --git a/time_sync/render_thread.py b/timesync/render_thread.py
+similarity index 100%
+rename from time_sync/render_thread.py
+rename to timesync/render_thread.py
+diff --git a/time_sync/setup_env.sh b/timesync/setup_env.sh
+similarity index 100%
+rename from time_sync/setup_env.sh
+rename to timesync/setup_env.sh
+diff --git a/time_sync/subunit_window.py b/timesync/subunit_window.py
+similarity index 98%
+rename from time_sync/subunit_window.py
+rename to timesync/subunit_window.py
+index 23f4398..d0488ed 100644
+--- a/time_sync/subunit_window.py
++++ b/timesync/subunit_window.py
+@@ -25,7 +25,7 @@ class SubunitWindow:
+         """Create a window sized for ``grid_shape``."""
+         if not _HAS_PYGAME:
+             raise RuntimeError(
+-                "pygame is required for SubunitWindow. Install time_sync[gui]."
++                "pygame is required for SubunitWindow. Install timesync[gui]."
+             )
+         pygame.init()
+         self.subunit_size = max(1, subunit_size)
+@@ -41,7 +41,7 @@ class SubunitWindow:
+         """Update the window with ``changes`` in-place."""
+         if not _HAS_PYGAME:
+             raise RuntimeError(
+-                "pygame is required for SubunitWindow. Install time_sync[gui]."
++                "pygame is required for SubunitWindow. Install timesync[gui]."
+             )
+         for y, x, sub in changes:
+             surf = pygame.surfarray.make_surface(sub.swapaxes(0, 1))
+diff --git a/time_sync/time_sync/theme_manager.py b/timesync/theme_manager.py
+similarity index 100%
+rename from time_sync/time_sync/theme_manager.py
+rename to timesync/theme_manager.py
+diff --git a/time_sync/time_sync/time_units.py b/timesync/time_units.py
+similarity index 100%
+rename from time_sync/time_sync/time_units.py
+rename to timesync/time_units.py
