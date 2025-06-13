@@ -1,7 +1,7 @@
 # PowerShell developer environment setup script for SpeakToMe
 
 $ErrorActionPreference = 'Stop'
-$env:ENV_SETUP_BOX = "`n+----------------------------------------------------------------------+`n| Imports failed. See ENV_SETUP_OPTIONS.md for environment guidance.  |`n| Missing packages usually mean setup was skipped or incomplete.      |`n+----------------------------------------------------------------------+`n"
+$env:ENV_SETUP_BOX = "`n+-----------------------------------------------------------------------+`n| Imports failed. See ENV_SETUP_OPTIONS.md for environment guidance.  |`n| Missing packages usually mean setup was skipped or incomplete.      |`n| Please file a DOC, TTICKET, or AUDIT report under AGENTS/experience_reports. |`n+-----------------------------------------------------------------------+`n"
 
 function Safe-Run([ScriptBlock]$cmd) {
     try { & $cmd }

@@ -190,9 +190,10 @@ def fix_file(path: Path) -> None:
     out_lines.append("except Exception:")
     out_lines.append("    import os")
     out_lines.append("    import sys")
-    out_lines.append(
-        "    ENV_SETUP_BOX = os.environ['ENV_SETUP_BOX']"
-    )
+    out_lines.append("    from pathlib import Path")
+    out_lines.append("    from AGENTS.tools.auto_env_setup import run_setup_script")
+    out_lines.append("    run_setup_script(Path(__file__).resolve().parents[1])")
+    out_lines.append("    ENV_SETUP_BOX = os.environ['ENV_SETUP_BOX']")
     out_lines.append(f"    print(f'{IMPORT_FAILURE_PREFIX} {{__file__}}')")
     out_lines.append("    print(ENV_SETUP_BOX)")
     out_lines.append("    sys.exit(1)")

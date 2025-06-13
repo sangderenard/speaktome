@@ -19,7 +19,7 @@ def test_check_try_header_pass(tmp_path: Path) -> None:
         "# --- BEGIN HEADER ---\n"
         '"""doc"""\n'
         "from __future__ import annotations\n"
-        "try:\n    import os\nexcept Exception:\n    import sys\n    print(f'[HEADER] import failure in {__file__}')\n    print(ENV_SETUP_BOX)\n    sys.exit(1)\n# --- END HEADER ---\n"
+        "try:\n    import os\nexcept Exception:\n    import sys\n    from pathlib import Path\n    from AGENTS.tools.auto_env_setup import run_setup_script\n    run_setup_script(Path(__file__).resolve().parents[1])\n    print(f'[HEADER] import failure in {__file__}')\n    print(ENV_SETUP_BOX)\n    sys.exit(1)\n# --- END HEADER ---\n"
     )
     assert hg.check_try_header(path) == []
 
@@ -70,3 +70,16 @@ def test_check_sys_exit_missing(tmp_path: Path) -> None:
     )
     errors = hg.check_try_header(path)
     assert "Missing 'sys.exit(1)' in except block" in errors
+
+
+def test_check_run_setup_missing(tmp_path: Path) -> None:
+    path = tmp_path / "nosetup.py"
+    path.write_text(
+        "#!/usr/bin/env python3\n"
+        "# --- BEGIN HEADER ---\n"
+        '"""doc"""\n'
+        "from __future__ import annotations\n"
+        "try:\n    import os\nexcept Exception:\n    import sys\n    print(ENV_SETUP_BOX)\n    sys.exit(1)\n# --- END HEADER ---\n"
+    )
+    errors = hg.check_try_header(path)
+    assert "Missing 'run_setup_script' in except block" in errors
