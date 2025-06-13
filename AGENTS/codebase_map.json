@@ -1,6 +1,6 @@
 {
-  "tensor printing": {
-    "path": "tensor printing",
+  "tensorprinting": {
+    "path": "tensorprinting",
     "groups": {
       "dev": [
         "tools"
@@ -88,8 +88,8 @@
       ]
     }
   },
-  "time_sync": {
-    "path": "time_sync",
+  "timesync": {
+    "path": "timesync",
     "groups": {
       "gui": [
         "pygame>=2"

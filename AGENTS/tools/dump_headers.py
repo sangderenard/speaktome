@@ -19,8 +19,8 @@ except Exception:
         required = {
             "speaktome",
             "laplace",
-            "tensor printing",
-            "time_sync",
+            "tensorprinting",
+            "timesync",
             "AGENTS",
             "fontmapper",
             "tensors",
@@ -70,8 +70,8 @@ EXCLUDE_DIRS = {
     "third_party",
     "laplace",
     "training",
-    "tensor printing",
-    "tensor_printing",
+    "tensorprinting",
+    "tensorprinting",
 }
 
 

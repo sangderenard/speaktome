@@ -17,8 +17,8 @@ allowing custom pipelines.
 
 ## Relevant Files and Components
 
-- `tensor printing/tensor_printing/press.py`
-- `tensor printing/inspiration/` (archived notebooks)
+- `tensorprinting/press.py`
+- `tensorprinting/inspiration/` (archived notebooks)
 
 ## Implementation and Usage Guidance
 

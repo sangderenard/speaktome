@@ -2,7 +2,7 @@ from __future__ import annotations
 
 try:
     import os
-    from time_sync.frame_buffer import PixelFrameBuffer
+    from timesync.frame_buffer import PixelFrameBuffer
     import numpy as np
 
     ENV_SETUP_BOX = os.environ["ENV_SETUP_BOX"]

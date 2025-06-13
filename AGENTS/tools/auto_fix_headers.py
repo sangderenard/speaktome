@@ -17,8 +17,8 @@ except Exception:
         required = {
             "speaktome",
             "laplace",
-            "tensor printing",
-            "time_sync",
+            "tensorprinting",
+            "timesync",
             "AGENTS",
             "fontmapper",
             "tensors",
@@ -66,8 +66,8 @@ EXCLUDE_DIRS = {
     "third_party",
     "laplace",
     "training",
-    "tensor printing",
-    "tensor_printing",
+    "tensorprinting",
+    "tensorprinting",
 }
 
 HEADER_START = "# --- BEGIN HEADER ---"
@@ -75,9 +75,9 @@ HEADER_END = "# --- END HEADER ---"
 IMPORT_FAILURE_PREFIX = "[HEADER] import failure in"
 
 
-def in_tensor_printing_inspiration(path: Path) -> bool:
+def in_tensorprinting_inspiration(path: Path) -> bool:
     parts = path.parts
-    return "tensor printing" in parts and "inspiration" in parts
+    return "tensorprinting" in parts and "inspiration" in parts
 
 
 HEADER_START_SENTINEL = HEADER_START
@@ -91,7 +91,7 @@ def should_skip(path: Path) -> bool:
     for d in EXCLUDE_DIRS:
         if d in parts:
             return True
-    if in_tensor_printing_inspiration(path):
+    if in_tensorprinting_inspiration(path):
         return True
     return False
 
@@ -243,8 +243,8 @@ def fix_file(path: Path) -> None:
     out_lines.append("        required = {")
     out_lines.append("            'speaktome',")
     out_lines.append("            'laplace',")
-    out_lines.append("            'tensor printing',")
-    out_lines.append("            'time_sync',")
+    out_lines.append("            'tensorprinting',")
+    out_lines.append("            'timesync',")
     out_lines.append("            'AGENTS',")
     out_lines.append("            'fontmapper',")
     out_lines.append("            'tensors',")
