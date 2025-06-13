@@ -6,12 +6,16 @@ try:
     import argparse
     import json
     from pathlib import Path
-    from AGENTS.tools.header_utils import ENV_SETUP_BOX
     import tomllib
 except ModuleNotFoundError:  # Python < 3.11
     import tomli as tomllib
 except Exception:
+    import os
     import sys
+    try:
+        ENV_SETUP_BOX = os.environ["SPEAKTOME_ENV_SETUP_BOX"]
+    except KeyError as exc:
+        raise RuntimeError("environment not initialized") from exc
     print(ENV_SETUP_BOX)
     sys.exit(1)
 # --- END HEADER ---

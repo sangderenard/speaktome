@@ -5,19 +5,20 @@
 from __future__ import annotations
 
 try:
-    from AGENTS.tools.header_utils import (
-        ENV_SETUP_BOX,
-        IMPORT_FAILURE_PREFIX,
-        HEADER_START,
-        HEADER_END,
-    )
-    from .header_utils import ENV_SETUP_BOX
     import subprocess
     import ast
     import os
     from pathlib import Path
 except Exception:
+    import os
     import sys
+    try:
+        ENV_SETUP_BOX = os.environ["SPEAKTOME_ENV_SETUP_BOX"]
+    except KeyError as exc:
+        raise RuntimeError("environment not initialized") from exc
+    IMPORT_FAILURE_PREFIX = "[HEADER] import failure in"
+    HEADER_START = "# --- BEGIN HEADER ---"
+    HEADER_END = "# --- END HEADER ---"
     print(f"{IMPORT_FAILURE_PREFIX} {__file__}")
     print(ENV_SETUP_BOX)
     sys.exit(1)

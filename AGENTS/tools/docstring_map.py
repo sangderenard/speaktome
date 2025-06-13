@@ -7,9 +7,14 @@ try:
     import argparse
     import ast
     from pathlib import Path
-    from AGENTS.tools.header_utils import ENV_SETUP_BOX, IMPORT_FAILURE_PREFIX
 except Exception:
+    import os
     import sys
+    try:
+        ENV_SETUP_BOX = os.environ["SPEAKTOME_ENV_SETUP_BOX"]
+    except KeyError as exc:
+        raise RuntimeError("environment not initialized") from exc
+    IMPORT_FAILURE_PREFIX = "[HEADER] import failure in"
     print(f"{IMPORT_FAILURE_PREFIX} {__file__}")
     print(ENV_SETUP_BOX)
     sys.exit(1)
