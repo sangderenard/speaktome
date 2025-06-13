@@ -180,6 +180,14 @@
         for (int i = 0; i < n; ++i) out[i] = sqrt(a[i]);
     }
 
+    void cast_double_to_int(const double* a, int* out, int n) {
+        for (int i = 0; i < n; ++i) out[i] = (int)a[i];
+    }
+
+    void cast_double_to_float(const double* a, float* out, int n) {
+        for (int i = 0; i < n; ++i) out[i] = (float)a[i];
+    }
+
     void log_softmax_1d(const double* a, double* out, int n) {
         double max_val = a[0];
         for (int i = 1; i < n; ++i) {

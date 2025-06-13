@@ -93,6 +93,9 @@ ffi.cdef("""
         int batch_dim,
         void (*callback)(const double*, int, int, void*),
         void* user_data);
+
+    void cast_double_to_int(const double* a, int* out, int n);
+    void cast_double_to_float(const double* a, float* out, int n);
 """)
 
 from pathlib import Path
@@ -708,18 +711,30 @@ class CTensorOperations(AbstractTensor):
         return len(self.get_shape())
 
     def to_dtype_(self, tensor, dtype: str = "float"):
-        """Simple dtype conversion placeholder."""
+        """Convert ``tensor`` data type using C helpers."""
         # ########## STUB: CTensorOperations.to_dtype_ ##########
         # PURPOSE: Convert CTensor data to specified dtype.
         # EXPECTED BEHAVIOR: Return new CTensor with values cast to dtype.
         # INPUTS: CTensor instance and dtype string.
-        # OUTPUTS: CTensor with cast data.
-        # KEY ASSUMPTIONS/DEPENDENCIES: Only primitive Python dtypes supported.
+        # OUTPUTS: CTensor with cast data as contiguous byte array.
+        # KEY ASSUMPTIONS/DEPENDENCIES: Only primitive dtypes ``float`` or ``int`` supported.
         # TODO:
-        #   - Integrate with compiled routines for different types.
-        # NOTES: Current implementation simply returns the original tensor.
+        #   - Extend to additional dtypes and integrate with other operations.
         # ############################################################
-        return tensor
+        if not isinstance(tensor, CTensor):
+            tensor = CTensor.from_list(tensor, _get_shape(tensor))
+
+        dtype = dtype.lower()
+        if dtype == "int":
+            buf = ffi.new("int[]", tensor.size)
+            C.cast_double_to_int(tensor.as_c_ptr(), buf, tensor.size)
+        elif dtype == "float":
+            buf = ffi.new("double[]", tensor.size)
+            C.cast_double_to_float(tensor.as_c_ptr(), buf, tensor.size)
+        else:
+            raise ValueError("dtype must be 'float' or 'int'")
+
+        return CTensor(tensor.shape, buf)
 
     @staticmethod
     def test() -> None:
