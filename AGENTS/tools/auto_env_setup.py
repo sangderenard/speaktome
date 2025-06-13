@@ -7,6 +7,7 @@ import subprocess
 import sys
 import threading
 from pathlib import Path
+import tomllib
 
 if os.name == "nt":
     import msvcrt
@@ -56,48 +57,78 @@ def ask_no_venv(timeout: float = 5.0) -> bool:
     return ch is not None and ch.lower() == "y"
 
 
-def run_setup_script(root: Path | None = None, *, use_venv: bool = True) -> subprocess.CompletedProcess | None:
-    """Run setup_env.sh or setup_env.ps1 if present and return the result."""
-    if root is None:
-        root = Path(__file__).resolve().parents[1]
-    script = root / ("setup_env.ps1" if os.name == "nt" else "setup_env.sh")
+def parse_pyproject_dependencies(pyproject_path: Path) -> list[str]:
+    """Return a priority-sorted list of optional dependency groups from pyproject.toml."""
+    # Here we just load them in alphabetical order as an example.
+    # You may implement your own priority logic.
+    if not pyproject_path.is_file():
+        raise FileNotFoundError(f"pyproject.toml not found at {pyproject_path}")
+    with pyproject_path.open("rb") as f:
+        data = tomllib.load(f)
+    optdeps = data.get("project", {}).get("optional-dependencies", {})
+    return sorted(optdeps.keys())  # example: alphabetical
+
+
+def run_setup_script(project_root: Path, *, use_venv: bool = True) -> None:
+    pyproject_file = project_root / "pyproject.toml"
+    groups = parse_pyproject_dependencies(pyproject_file)
+    script = project_root / ("setup_env.ps1" if os.name == "nt" else "setup_env.sh")
     if not script.exists():
-        return None
-    if os.name == "nt":
-        cmd = ["powershell", "-ExecutionPolicy", "Bypass", "-File", str(script)]
-        if not use_venv:
-            cmd.append("-no-venv")
-    else:
-        cmd = ["bash", str(script)]
-        if not use_venv:
-            cmd.append("-no-venv")
-    try:
-        return subprocess.run(cmd, check=False, capture_output=True, text=True)
-    except Exception:
-        return None
+        print(f"Error: setup script not found in {project_root}", file=sys.stderr)
+        return
+
+    # Invoke setup_env with no groups first
+    base_cmd = [str(script)]
+    if not use_venv:
+        base_cmd.append("-no-venv")
+
+    def invoke(cmd_args: list[str]) -> None:
+        if os.name == "nt":
+            full_cmd = ["powershell", "-ExecutionPolicy", "Bypass", "-File"] + cmd_args
+        else:
+            full_cmd = ["bash"] + cmd_args
+        try:
+            subprocess.run(full_cmd, check=False)
+        except Exception:
+            pass
+
+    # 1) Base install with no groups
+    invoke(base_cmd)
+
+    # 2) Try each group individually, ignoring errors
+    for grp in groups:
+        invoke(base_cmd + [f"-groups={grp}"])
 
 
 def main(argv: list[str] | None = None) -> int:
     """Run the setup script from the command line."""
     import argparse
 
-    parser = argparse.ArgumentParser(description="Run repo setup script")
-    parser.add_argument(
-        "root",
-        nargs="?",
-        default=None,
-        help="Path to the project root (containing pyproject.toml)",
+    parser = argparse.ArgumentParser(
+        description="Auto env setup (requires a path to the project root containing pyproject.toml)."
     )
     parser.add_argument(
-        "--no-venv",
+        "project_root",
+        help="Path to the project root (must contain pyproject.toml)."
+    )
+    parser.add_argument(
+        "-no-venv",
+        dest="no_venv",
         action="store_true",
-        help="Install packages outside a virtualenv",
+        help="Install packages outside a virtualenv (single-dash style)."
     )
     args = parser.parse_args(argv)
-    root_path = Path(args.root) if args.root else None
-    result = run_setup_script(root_path, use_venv=not args.no_venv)
-    if result is None:
+
+    root_path = Path(args.project_root).resolve()
+    if not (root_path / "pyproject.toml").is_file():
+        print(f"Error: pyproject.toml not found in {root_path}", file=sys.stderr)
         return 1
+
+    result = run_setup_script(root_path, use_venv=(not args.no_venv))
+    if result is None:
+        print("Error: setup script not found or could not be run.", file=sys.stderr)
+        return 1
+
     sys.stdout.write(result.stdout)
     sys.stderr.write(result.stderr)
     return result.returncode
