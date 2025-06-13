@@ -12,7 +12,7 @@ SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 MAP_FILE="$SCRIPT_ROOT/AGENTS/codebase_map.json"
 
 # Provide ENV_SETUP_BOX for modules that fail to import early
-export SPEAKTOME_ENV_SETUP_BOX="\n+-----------------------------------------------------------------------+\n| Imports failed. See ENV_SETUP_OPTIONS.md for environment guidance.  |\n| Missing packages usually mean setup was skipped or incomplete.      |\n+-----------------------------------------------------------------------+\n"
+export ENV_SETUP_BOX="\n+-----------------------------------------------------------------------+\n| Imports failed. See ENV_SETUP_OPTIONS.md for environment guidance.  |\n| Missing packages usually mean setup was skipped or incomplete.      |\n+-----------------------------------------------------------------------+\n"
 
 ACTIVE_FILE=${SPEAKTOME_ACTIVE_FILE:-/tmp/speaktome_active.json}
 export SPEAKTOME_ACTIVE_FILE="$ACTIVE_FILE"
@@ -178,3 +178,28 @@ for cb in active.get('codebases', []):
         except Exception as exc:
             print(f"[WARN] Could not link {link}: {exc}", file=sys.stderr)
 PY
+
+# Mark the environment so pytest knows setup completed with at least one codebase
+PYTEST_MARKER="$SCRIPT_ROOT/.venv/pytest_enabled"
+if [ -f "$SPEAKTOME_ACTIVE_FILE" ]; then
+  if "$VENV_PYTHON" - <<'PY'
+import json, os, sys
+path = os.environ.get("SPEAKTOME_ACTIVE_FILE")
+try:
+    data = json.load(open(path))
+    if data.get("codebases"):
+        sys.exit(0)
+except Exception:
+    pass
+sys.exit(1)
+PY
+  then
+    touch "$PYTEST_MARKER"
+  else
+    rm -f "$PYTEST_MARKER"
+    echo "Warning: No codebases recorded; pytest will remain disabled." >&2
+  fi
+else
+  rm -f "$PYTEST_MARKER"
+  echo "Warning: Active selection file not found; pytest will remain disabled." >&2
+fi

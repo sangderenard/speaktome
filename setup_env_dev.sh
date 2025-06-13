@@ -8,7 +8,7 @@ set -uo pipefail
 # changing directories with pushd. This allows the script to be invoked
 # from anywhere while still locating `.venv`.
 SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-export SPEAKTOME_ENV_SETUP_BOX="\n+----------------------------------------------------------------------+\n| Imports failed. See ENV_SETUP_OPTIONS.md for environment guidance.  |\n| Missing packages usually mean setup was skipped or incomplete.      |\n+----------------------------------------------------------------------+\n"
+export ENV_SETUP_BOX="\n+----------------------------------------------------------------------+\n| Imports failed. See ENV_SETUP_OPTIONS.md for environment guidance.  |\n| Missing packages usually mean setup was skipped or incomplete.      |\n+----------------------------------------------------------------------+\n"
 ACTIVE_FILE=${SPEAKTOME_ACTIVE_FILE:-/tmp/speaktome_active.json}
 export SPEAKTOME_ACTIVE_FILE="$ACTIVE_FILE"
 MENU_ARGS=()
@@ -41,7 +41,8 @@ if [ "$TORCH_CHOICE" = "cpu" ]; then
 elif [ "$TORCH_CHOICE" = "gpu" ]; then
   POETRY_ARGS="--with gpu-torch"
 fi
-export SPEAKTOME_POETRY_ARGS="$POETRY_ARGS"
+# Pass poetry args to the base setup script without exporting globally
+ENV_OVERRIDE=(SPEAKTOME_POETRY_ARGS="$POETRY_ARGS")
 
 ARGS=()
 for arg in "$@"; do
@@ -51,7 +52,7 @@ for arg in "$@"; do
   esac
 done
 
-safe_run bash "$SCRIPT_ROOT/setup_env.sh" "${ARGS[@]}" --from-dev
+safe_run env "${ENV_OVERRIDE[@]}" bash "$SCRIPT_ROOT/setup_env.sh" "${ARGS[@]}" --from-dev
 
 # Define the venv Python path (assumes setup_env.sh created it at .venv)
 if [ $USE_VENV -eq 1 ]; then
@@ -124,31 +125,6 @@ dev_menu() {
 dev_menu
 echo "For advanced codebase/group selection, run: python AGENTS/tools/dev_group_menu.py"
 echo "Selections recorded to $SPEAKTOME_ACTIVE_FILE"
-
-# Mark the environment so pytest knows setup completed with at least one codebase
-PYTEST_MARKER="$SCRIPT_ROOT/.venv/pytest_enabled"
-if [ -f "$SPEAKTOME_ACTIVE_FILE" ]; then
-  if "$VENV_PYTHON" - <<'PY'
-import json, os, sys
-path = os.environ.get("SPEAKTOME_ACTIVE_FILE")
-try:
-    data = json.load(open(path))
-    if data.get("codebases"):
-        sys.exit(0)
-except Exception:
-    pass
-sys.exit(1)
-PY
-  then
-    touch "$PYTEST_MARKER"
-  else
-    rm -f "$PYTEST_MARKER"
-    echo "Warning: No codebases recorded; pytest will remain disabled." >&2
-  fi
-else
-  rm -f "$PYTEST_MARKER"
-  echo "Warning: Active selection file not found; pytest will remain disabled." >&2
-fi
 
 # All options for this script should be used with double-dash GNU-style flags, e.g.:
 #   --torch --no-venv --codebases=projectA,projectB --groups=groupX

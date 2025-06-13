@@ -11,7 +11,7 @@ except Exception:
     import os
     import sys
     try:
-        ENV_SETUP_BOX = os.environ["SPEAKTOME_ENV_SETUP_BOX"]
+        ENV_SETUP_BOX = os.environ["ENV_SETUP_BOX"]
     except KeyError as exc:
         raise RuntimeError("environment not initialized") from exc
     print(f"{IMPORT_FAILURE_PREFIX} {__file__}")
@@ -120,7 +120,7 @@ def validate(root: Path, *, rewrite: bool = False) -> int:
                     new_lines.append(f"{indent}    import os")
                     new_lines.append(f"{indent}    import sys")
                     new_lines.append(
-                        f"{indent}    ENV_SETUP_BOX = os.environ['SPEAKTOME_ENV_SETUP_BOX']"
+                        f"{indent}    ENV_SETUP_BOX = os.environ['ENV_SETUP_BOX']"
                     )
                     new_lines.append(f"{indent}    print(ENV_SETUP_BOX)")
                     new_lines.append(f"{indent}    sys.exit(1)")
@@ -151,7 +151,7 @@ def main() -> None:
         exit_code = validate(args.path, rewrite=args.rewrite)
     except Exception as exc:  # pragma: no cover - unexpected failure
         try:
-            env_box = os.environ["SPEAKTOME_ENV_SETUP_BOX"]
+            env_box = os.environ["ENV_SETUP_BOX"]
         except KeyError:
             env_box = "environment not initialized"
         print(
