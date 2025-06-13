@@ -26,10 +26,16 @@ logger = logging.getLogger(__name__)
 def temp_reports(tmp_path, monkeypatch):
     dst = tmp_path / 'experience_reports'
     dst.mkdir()
-    (dst / 'template_experience_report.md').write_text('')
+    for name in (
+        'template_experience_report.md',
+        'template_doc_report.md',
+        'template_tticket_report.md',
+        'template_audit_report.md',
+    ):
+        (dst / name).write_text('')
     base = 1749417600
     for i in range(12):
-        fname = dst / f'{base + i}_v1_Test{i}.md'
+        fname = dst / f'{base + i}_DOC_Test{i}.md'
         fname.write_text('x')
     vg_mod = reload(vg)
     monkeypatch.setattr(vg_mod, 'REPORTS_DIR', str(dst))
