@@ -23,7 +23,7 @@ except Exception:  # <try:end> <except:start>
         required = {
             "speaktome",
             "laplace",
-            "tensor_printing",
+            "tensor printing",
             "time_sync",
             "AGENTS",
             "fontmapper",

@@ -6,13 +6,7 @@ authors = ["SpeakToMe Authors"]
 license = "MIT"
 
 [tool.poetry.dependencies]
-python = ">=3.10"
-speaktome = {path = "speaktome", develop = true}
-fontmapper = {path = "fontmapper", develop = true}
-laplace = {path = "laplace", develop = true}
-tensors = {path = "tensors", develop = true}
-time_sync = {path = "time_sync", develop = true}
-tensor_printing = {path = "tensor printing", develop = true}
+python = ">=3.12"
 tools = {path = "AGENTS/tools", develop = true}
 
 [tool.poetry.group.dev]
@@ -32,6 +26,18 @@ optional = true
 
 [tool.poetry.group.gpu-torch.dependencies]
 torch = "2.3.1"
+
+[tool.poetry.group.projects]
+optional = true
+
+[tool.poetry.group.projects.dependencies]
+speaktome = {path = "speaktome", develop = true}
+fontmapper = {path = "fontmapper", develop = true}
+laplace = {path = "laplace", develop = true}
+tensors = {path = "tensors", develop = true}
+time_sync = {path = "time_sync", develop = true}
+tensor_printing = {path = "tensor printing", develop = true}
+testenv = {path = "testenv", develop = true}
 
 [tool.poetry.extras]
 cpu-torch = []

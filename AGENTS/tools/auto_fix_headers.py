@@ -17,7 +17,7 @@ except Exception:
         required = {
             "speaktome",
             "laplace",
-            "tensor_printing",
+            "tensor printing",
             "time_sync",
             "AGENTS",
             "fontmapper",
@@ -243,7 +243,7 @@ def fix_file(path: Path) -> None:
     out_lines.append("        required = {")
     out_lines.append("            'speaktome',")
     out_lines.append("            'laplace',")
-    out_lines.append("            'tensor_printing',")
+    out_lines.append("            'tensor printing',")
     out_lines.append("            'time_sync',")
     out_lines.append("            'AGENTS',")
     out_lines.append("            'fontmapper',")
