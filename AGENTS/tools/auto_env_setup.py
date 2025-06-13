@@ -72,9 +72,23 @@ def parse_pyproject_dependencies(pyproject_path: Path) -> list[str]:
 def run_setup_script(project_root: Path | None = None, *, use_venv: bool = True) -> subprocess.CompletedProcess | None:
     """Run the repository setup script and return the result object."""
     if project_root is None:
-        from AGENTS.tools.path_utils import find_repo_root
+        def _find_repo_root(start: Path) -> Path:
+            current = start.resolve()
+            required = {
+                "speaktome",
+                "laplace",
+                "tensor_printing",
+                "time_sync",
+                "AGENTS",
+                "fontmapper",
+                "tensors",
+            }
+            for parent in [current, *current.parents]:
+                if all((parent / name).exists() for name in required):
+                    return parent
+            return current
 
-        project_root = find_repo_root(Path(__file__))
+        project_root = _find_repo_root(Path(__file__))
 
     project_root = project_root.resolve()
     pyproject_file = project_root / "pyproject.toml"

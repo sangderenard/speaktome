@@ -17,9 +17,25 @@ except Exception:  # <try:end> <except:start>
     import os  # <import>
     import sys  # <import>
     from pathlib import Path  # <import>
-    from AGENTS.tools.path_utils import find_repo_root  # <import>
+
+    def _find_repo_root(start: Path) -> Path:  # <find-root:start>
+        current = start.resolve()
+        required = {
+            "speaktome",
+            "laplace",
+            "tensor_printing",
+            "time_sync",
+            "AGENTS",
+            "fontmapper",
+            "tensors",
+        }
+        for parent in [current, *current.parents]:
+            if all((parent / name).exists() for name in required):
+                return parent
+        return current
+
     if "ENV_SETUP_BOX" not in os.environ:  # <env-check:start>
-        root = find_repo_root(Path(__file__))
+        root = _find_repo_root(Path(__file__))
         box = root / "ENV_SETUP_BOX.md"
         try:
             os.environ["ENV_SETUP_BOX"] = f"\n{box.read_text()}\n"
@@ -29,7 +45,7 @@ except Exception:  # <try:end> <except:start>
         sys.exit(1)  # <env-check:end>
     import subprocess  # <import>
     try:  # <setup-call:start>
-        root = find_repo_root(Path(__file__))
+        root = _find_repo_root(Path(__file__))
         subprocess.run(
             [sys.executable, '-m', 'AGENTS.tools.auto_env_setup', str(root)],
             check=False,

@@ -9,7 +9,22 @@ import pytest
 import logging
 import time
 from pathlib import Path
-from AGENTS.tools import find_repo_root
+
+def _find_repo_root(start: Path) -> Path:
+    current = start.resolve()
+    required = {
+        "speaktome",
+        "laplace",
+        "tensor_printing",
+        "time_sync",
+        "AGENTS",
+        "fontmapper",
+        "tensors",
+    }
+    for parent in [current, *current.parents]:
+        if all((parent / name).exists() for name in required):
+            return parent
+    return current
 import sys
 import os  # For FORCE_ENV
 import re
@@ -51,7 +66,7 @@ DEFAULT_FACULTY = None
 FORCE_ENV = "SPEAKTOME_FACULTY"
 Faculty = None
 
-ROOT = find_repo_root(Path(__file__))
+ROOT = _find_repo_root(Path(__file__))
 ACTIVE_FILE = Path(os.environ.get("SPEAKTOME_ACTIVE_FILE", "/tmp/speaktome_active.json"))
 
 def _venv_marker_ok() -> bool:
