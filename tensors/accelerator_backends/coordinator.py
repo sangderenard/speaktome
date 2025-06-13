@@ -7,6 +7,7 @@ try:
     from dataclasses import dataclass
     from typing import Any, Tuple
     from queue import Queue
+    from concurrent.futures import Future
     import threading
 
     from .c_backend import CTensorOperations
@@ -66,6 +67,24 @@ class AcceleratorCoordinator:
             raise ValueError(f"Unknown backend: {backend}")
         self._objects: dict[str, _BufferPair] = {}
 
+    # ------------------------------------------------------------------
+    # Context manager helpers
+    # ------------------------------------------------------------------
+    def __enter__(self) -> "AcceleratorCoordinator":
+        return self
+
+    def __exit__(self, exc_type, exc, tb) -> None:
+        self.close()
+
+    def close(self) -> None:
+        """Terminate all managed tensors and worker threads."""
+        for name in list(self._objects):
+            self.terminate(name)
+
+    def terminate_all(self) -> None:
+        """Alias for :meth:`close` for API completeness."""
+        self.close()
+
     def create_tensor(self, name: str, data: Any) -> None:
         """Create a double-buffered tensor object."""
         if isinstance(data, self.ops.tensor_type_):
@@ -80,17 +99,33 @@ class AcceleratorCoordinator:
         self._objects[name] = _BufferPair(front, back, q, ev, t)
         t.start()
 
-    def enqueue(self, name: str, op: str, *args: Any, **kwargs: Any) -> None:
-        """Queue an operation by name with arguments for a tensor."""
+    def enqueue(
+        self,
+        name: str,
+        op: str,
+        *args: Any,
+        return_future: bool = False,
+        **kwargs: Any,
+    ) -> Future | None:
+        """Queue an operation by name and optionally return a ``Future``."""
         pair = self._objects[name]
-        pair.queue.put((op, args, kwargs))
+        fut: Future | None = Future() if return_future else None
+        pair.queue.put((op, args, kwargs, fut))
+        return fut
 
     def synchronize(self, name: str) -> None:
         """Block until queued work is applied and buffers swapped."""
         pair = self._objects[name]
-        pair.queue.put(SYNC_TOKEN)
+        pair.queue.put((SYNC_TOKEN, None))
         pair.event.wait()
         pair.event.clear()
+
+    def synchronize_async(self, name: str) -> Future:
+        """Return a future resolved when pending work completes."""
+        pair = self._objects[name]
+        fut: Future = Future()
+        pair.queue.put((SYNC_TOKEN, fut))
+        return fut
 
     def get_tensor(self, name: str) -> Any:
         """Return the accessible front buffer, synchronizing if needed."""
@@ -111,12 +146,24 @@ class AcceleratorCoordinator:
             item = pair.queue.get()
             if item is STOP_TOKEN:
                 break
-            if item is SYNC_TOKEN:
+            fut: Future | None = None
+            if item is SYNC_TOKEN or (
+                isinstance(item, tuple) and item[0] is SYNC_TOKEN
+            ):
+                if isinstance(item, tuple):
+                    fut = item[1]
                 pair.front, pair.back = pair.back, pair.front
                 pair.event.set()
+                if fut is not None:
+                    fut.set_result(None)
                 continue
-            op, args, kwargs = item
+            if isinstance(item, tuple) and len(item) == 4:
+                op, args, kwargs, fut = item
+            else:
+                op, args, kwargs = item  # type: ignore[misc]
             func = getattr(self.ops, op)
             result = func(pair.back, *args, **kwargs)
             if isinstance(result, self.ops.tensor_type_):
                 pair.back = result
+            if fut is not None:
+                fut.set_result(result)

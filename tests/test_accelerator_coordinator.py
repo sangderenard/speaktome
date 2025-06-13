@@ -23,3 +23,14 @@ def test_double_buffer_synchronization():
     assert tensor.tolist() == [1.0, 2.0]
     coord.terminate("a")
 
+
+def test_future_completion():
+    """Operations may return a ``Future`` for async usage."""
+    coord = AcceleratorCoordinator("c")
+    coord.create_tensor("b", [4.0, 9.0])
+    fut = coord.enqueue("b", "sqrt_", return_future=True)
+    coord.synchronize("b")
+    result = fut.result(timeout=1)
+    assert result.tolist() == [2.0, 3.0]
+    coord.terminate("b")
+
