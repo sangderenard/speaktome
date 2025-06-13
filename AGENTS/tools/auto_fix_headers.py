@@ -67,6 +67,10 @@ def iter_py_files(root: Path):
 
 def fix_file(path: Path) -> None:
     text = path.read_text(encoding="utf-8")
+    # Skip when duplicate header sentinels are present to avoid infinite loops
+    if text.count(HEADER_START_SENTINEL) > 1 or text.count(HEADER_END_SENTINEL) > 1:
+        print(f"[auto_fix_headers] duplicate header in {path}")
+        return
     if HEADER_END_SENTINEL in text:
         if all(
             token in text

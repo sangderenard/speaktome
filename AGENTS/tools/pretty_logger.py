@@ -61,3 +61,21 @@ class PrettyLogger:
         """Log with current context indentation."""
         indent = "  " * len(self.contexts)
         self.logger.info(f"{indent}{msg}")
+
+    # ########## STUB: color_output_enhancements ##########
+    # PURPOSE: Provide optional ANSI color formatting for log messages.
+    # EXPECTED BEHAVIOR: Detect terminal capabilities and apply styling to
+    #   markdown headers and nested messages for improved readability.
+    # INPUTS: Log strings emitted by ``info`` and ``context``.
+    # OUTPUTS: Colored text written to the console.
+    # KEY ASSUMPTIONS/DEPENDENCIES: Terminal supports ANSI escape codes.
+    # TODO:
+    #   - Add feature detection for Windows terminals.
+    #   - Implement color themes configurable via environment variable.
+    #   - Expose simple API for other tools to enable or disable colors.
+    # NOTES: This stub illustrates the planned interface but does not yet
+    #   modify output.  The current implementation is monochrome.
+    # ###########################################################################
+    def enable_color(self) -> None:
+        """Enable colored output (not yet implemented)."""
+        raise NotImplementedError
