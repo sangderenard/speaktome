@@ -83,3 +83,17 @@ def test_check_run_setup_missing(tmp_path: Path) -> None:
     )
     errors = hg.check_try_header(path)
     assert "Missing call to auto_env_setup in except block" in errors
+    assert "Missing ENV_SETUP_BOX check in except block" in errors
+
+
+def test_check_env_check_missing(tmp_path: Path) -> None:
+    path = tmp_path / "nocheck.py"
+    path.write_text(
+        "#!/usr/bin/env python3\n"
+        "# --- BEGIN HEADER ---\n"
+        '"""doc"""\n'
+        "from __future__ import annotations\n"
+        "try:\n    import os\nexcept Exception:\n    import sys\n    from pathlib import Path\n    import subprocess\n    root = Path(__file__).resolve()\n    subprocess.run([sys.executable, '-m', 'AGENTS.tools.auto_env_setup', str(root)], check=False)\n    print(ENV_SETUP_BOX)\n    sys.exit(1)\n# --- END HEADER ---\n"
+    )
+    errors = hg.check_try_header(path)
+    assert "Missing ENV_SETUP_BOX check in except block" in errors
