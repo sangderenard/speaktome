@@ -1,30 +1,24 @@
-try:
-    from AGENTS.tools.header_utils import ENV_SETUP_BOX
-    # Standard library imports
-    import collections
-    from typing import Dict, List, Tuple, TYPE_CHECKING
+# Standard library imports
+import collections
+from typing import Dict, List, Tuple, TYPE_CHECKING
 
-    # Third-party imports
-    import torch
+# Third-party imports
+import torch
 
-    from tensors.faculty import Faculty
+from tensors.faculty import Faculty
 
-    FACULTY_REQUIREMENT = Faculty.PYGEO
+FACULTY_REQUIREMENT = Faculty.PYGEO
 
-    from ...util.lazy_loader import lazy_install
-    if TYPE_CHECKING:
-        from torch_geometric.data import Data as PyGData
-        import torch_geometric.nn as pyg_nn
+from ...util.lazy_loader import lazy_install
+if TYPE_CHECKING:
+    from torch_geometric.data import Data as PyGData
+    import torch_geometric.nn as pyg_nn
 
-    # Local application/library specific imports
-    from ...core.beam_search_instruction import BeamSearchInstruction
-    from ...core.compressed_beam_tree import CompressedBeamTree
-    from ...core.human_scorer_policy_manager import HumanScorerPolicyManager
-    from ...core.scorer import Scorer
-except Exception:
-    import sys
-    print(ENV_SETUP_BOX)
-    sys.exit(1)
+# Local application/library specific imports
+from ...core.beam_search_instruction import BeamSearchInstruction
+from ...core.compressed_beam_tree import CompressedBeamTree
+from ...core.human_scorer_policy_manager import HumanScorerPolicyManager
+from ...core.scorer import Scorer
 # --- END HEADER ---
 
 

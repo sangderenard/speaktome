@@ -2,14 +2,8 @@
 """Simplified ASCII rendering utilities for FontMapper v2."""
 from __future__ import annotations
 
-try:
-    from AGENTS.tools.header_utils import ENV_SETUP_BOX
-    from fontmapper import FM16
-    from fontmapper.FM16.modules import charset_ops
-except Exception:
-    import sys
-    print(ENV_SETUP_BOX)
-    sys.exit(1)
+from fontmapper import FM16
+from fontmapper.FM16.modules import charset_ops
 # --- END HEADER ---
 
 from typing import Iterable

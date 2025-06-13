@@ -1,19 +1,13 @@
-try:
-    from AGENTS.tools.header_utils import ENV_SETUP_BOX
-    # Standard library imports
-    from typing import Any, Callable, Dict, List, Optional, Tuple, TYPE_CHECKING
+# Standard library imports
+from typing import Any, Callable, Dict, List, Optional, Tuple, TYPE_CHECKING
 
-    import torch  # type: ignore
+import torch  # type: ignore
 
-    if TYPE_CHECKING:  # pragma: no cover - type hints only
-        from torch import Tensor
+if TYPE_CHECKING:  # pragma: no cover - type hints only
+    from torch import Tensor
 
-    # Local application/library specific imports
-    from .scorer import Scorer  # Assuming Scorer is in scorer.py
-except Exception:
-    import sys
-    print(ENV_SETUP_BOX)
-    sys.exit(1)
+# Local application/library specific imports
+from .scorer import Scorer  # Assuming Scorer is in scorer.py
 # --- END HEADER ---
 
 class BeamSearchInstruction:

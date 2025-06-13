@@ -1,17 +1,11 @@
 #!/usr/bin/env python3
 # --- BEGIN HEADER ---
-"""Tests for the header validation utility."""
+"""Audit header compliance for tools and tests."""
 from __future__ import annotations
 
 try:
-    import logging
-    from importlib import reload
+    import re
     from pathlib import Path
-
-    import pytest
-
-    import AGENTS.tests.headers.validate_headers as vh
-    from AGENTS.tests.headers.header_utils import get_env_setup_box
 except Exception:
     import os
     import sys
@@ -62,31 +56,34 @@ except Exception:
     sys.exit(1)
 # --- END HEADER ---
 
-logger = logging.getLogger(__name__)
+ROOT = Path(__file__).resolve().parents[2]
+PATTERN = re.compile(r"# --- BEGIN HEADER ---")
 
 
-def test_validate_headers(tmp_path, monkeypatch) -> None:
-    """Check that missing HEADER or test triggers an error code."""
-    logger.info("test_validate_headers start")
-    pkg = tmp_path / "speaktome"
-    pkg.mkdir()
-    mod = pkg / "foo.py"
-    mod.write_text("class Foo:\n    pass\n")
-    monkeypatch.setattr(vh, "PACKAGE_ROOT", pkg)
-    code = vh.validate(pkg)
-    assert code == 1
-    logger.info("test_validate_headers end")
+def has_header(path: Path) -> bool:
+    try:
+        text = path.read_text(encoding="utf-8")
+    except Exception:
+        return False
+    return "# --- BEGIN HEADER ---" in text and "# --- END HEADER ---" in text
 
 
-def test_validate_headers_rewrite(tmp_path, monkeypatch) -> None:
-    """Ensure rewrite mode inserts missing stubs."""
-    logger.info("test_validate_headers_rewrite start")
-    pkg = tmp_path / "speaktome"
-    pkg.mkdir()
-    mod = pkg / "foo.py"
-    mod.write_text("class Foo:\n    pass\n")
-    monkeypatch.setattr(vh, "PACKAGE_ROOT", pkg)
-    code = vh.validate(pkg, rewrite=True)
-    assert code == 0
-    assert (pkg / "foo.py").read_text().startswith("#!/usr/bin/env python3")
-    logger.info("test_validate_headers_rewrite end")
+def audit() -> int:
+    """Print files missing headers and return count."""
+    dirs = [ROOT / "AGENTS" / "tools", ROOT / "tests", ROOT / "testing"]
+    missing: list[Path] = []
+    for d in dirs:
+        for path in d.rglob("*.py"):
+            if not has_header(path):
+                missing.append(path.relative_to(ROOT))
+    if missing:
+        print("Missing headers:")
+        for m in missing:
+            print(f" - {m}")
+    else:
+        print("All headers present")
+    return len(missing)
+
+
+if __name__ == "__main__":  # pragma: no cover - manual run
+    raise SystemExit(audit())

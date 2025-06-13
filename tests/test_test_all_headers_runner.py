@@ -2,7 +2,7 @@
 
 import logging
 
-from AGENTS.tools.test_all_headers import run_test
+from AGENTS.tests.headers.test_all_headers import run_test
 from tensors.faculty import Faculty
 
 # --- END HEADER ---

@@ -2,16 +2,10 @@
 """Fetch the current UTC time from the internet."""
 from __future__ import annotations
 
-try:
-    from AGENTS.tools.header_utils import ENV_SETUP_BOX
-    import datetime as _dt
-    import json
-    import urllib.request
-    import ntplib  # type: ignore
-except Exception:
-    import sys
-    print(ENV_SETUP_BOX)
-    sys.exit(1)
+import datetime as _dt
+import json
+import urllib.request
+import ntplib  # type: ignore
 # --- END HEADER ---
 
 

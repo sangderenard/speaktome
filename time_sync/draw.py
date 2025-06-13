@@ -2,16 +2,10 @@
 """Terminal drawing helpers for ASCII frame diffs."""
 from __future__ import annotations
 
-try:
-    from AGENTS.tools.header_utils import ENV_SETUP_BOX
-    import sys
-    import numpy as np
-    from colorama import Style, Fore, Back
-    from time_sync.ascii_kernel_classifier import AsciiKernelClassifier
-except Exception:
-    import sys
-    print(ENV_SETUP_BOX)
-    sys.exit(1)
+import sys
+import numpy as np
+from colorama import Style, Fore, Back
+from time_sync.ascii_kernel_classifier import AsciiKernelClassifier
 # --- END HEADER ---
 
 

@@ -1,9 +1,7 @@
-try:
-    from AGENTS.tools.header_utils import ENV_SETUP_BOX
-    # Standard library imports
-    from __future__ import annotations
-    from typing import List, Optional, Tuple, Callable, Dict, Any, TYPE_CHECKING
-    import math
+# Standard library imports
+from __future__ import annotations
+from typing import List, Optional, Tuple, Callable, Dict, Any, TYPE_CHECKING
+import math
 
     # Third-party imports
     if TYPE_CHECKING:  # pragma: no cover - type hints only
@@ -30,10 +28,6 @@ try:
         PyTorchModelWrapper,
     )
     from .lookahead_controller import LookaheadConfig, LookaheadController
-except Exception:
-    import sys
-    print(ENV_SETUP_BOX)
-    sys.exit(1)
 # --- END HEADER ---
 
 class BeamSearch:

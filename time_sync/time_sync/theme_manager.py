@@ -2,17 +2,11 @@
 """Manage color themes and post-processing for clock rendering."""
 from __future__ import annotations
 
-try:
-    from AGENTS.tools.header_utils import ENV_SETUP_BOX
-    import json
-    import os    
-    from dataclasses import dataclass, field
-    from typing import Dict, List, Optional, Tuple
-    from PIL import Image, ImageEnhance, ImageFilter
-except Exception:
-    import sys
-    print(ENV_SETUP_BOX)
-    sys.exit(1)
+import json
+import os
+from dataclasses import dataclass, field
+from typing import Dict, List, Optional, Tuple
+from PIL import Image, ImageEnhance, ImageFilter
 # --- END HEADER ---
 from .time_units import TimeUnit # Import the new TimeUnit class
 

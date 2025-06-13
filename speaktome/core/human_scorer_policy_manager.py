@@ -1,15 +1,9 @@
-try:
-    from AGENTS.tools.header_utils import ENV_SETUP_BOX
-    # Standard library imports
-    import json
-    from typing import Dict, Callable, Optional, List, Tuple
+# Standard library imports
+import json
+from typing import Dict, Callable, Optional, List, Tuple
 
-    # Local application/library specific imports
-    from .scorer import Scorer
-except Exception:
-    import sys
-    print(ENV_SETUP_BOX)
-    sys.exit(1)
+# Local application/library specific imports
+from .scorer import Scorer
 # --- END HEADER ---
 
 class HumanScorerPolicyManager:

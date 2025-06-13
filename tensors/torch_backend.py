@@ -28,7 +28,6 @@
 # tensor operations.
 
 try:
-    from AGENTS.tools.header_utils import ENV_SETUP_BOX
     from typing import Any, Tuple, List, Optional, Union
 
     from .abstraction import AbstractTensor
@@ -40,7 +39,7 @@ except ModuleNotFoundError:
     F = None  # type: ignore
 except Exception:
     import sys
-    print(ENV_SETUP_BOX)
+    print("PyTorch backend failed to import")
     sys.exit(1)
 # --- END HEADER ---
 

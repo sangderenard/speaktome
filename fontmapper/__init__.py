@@ -2,12 +2,6 @@
 """FontMapper utilities package."""
 from __future__ import annotations
 
-try:
-    from AGENTS.tools.header_utils import ENV_SETUP_BOX
-except Exception:
-    import sys
-    print(ENV_SETUP_BOX)
-    sys.exit(1)
 # --- END HEADER ---
 
 from .FM16.modules import charset_ops

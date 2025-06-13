@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 try:
-    from AGENTS.tools.header_utils import ENV_SETUP_BOX
     from dataclasses import dataclass
     from typing import Any, Tuple
     from queue import Queue
@@ -14,7 +13,7 @@ try:
     from .opengl_backend import OpenGLTensorOperations
 except Exception:
     import sys
-    print(ENV_SETUP_BOX)
+    print("Accelerator coordinator imports failed")
     sys.exit(1)
 # --- END HEADER ---
 

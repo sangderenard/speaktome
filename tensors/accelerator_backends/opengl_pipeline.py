@@ -3,13 +3,12 @@
 from __future__ import annotations
 
 try:
-    from AGENTS.tools.header_utils import ENV_SETUP_BOX
     from typing import Any, Dict, Tuple
     from pathlib import Path
     from OpenGL import GL  # type: ignore
 except Exception:
     import sys
-    print(ENV_SETUP_BOX)
+    print("OpenGL pipeline failed to import")
     sys.exit(1)
 # --- END HEADER ---
 

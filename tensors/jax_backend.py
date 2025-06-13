@@ -34,7 +34,6 @@ from typing import Any, Tuple, List, Optional
 from .abstraction import AbstractTensor
 
 try:
-    from AGENTS.tools.header_utils import ENV_SETUP_BOX
     import jax
     import jax.numpy as jnp
     from jax import lax
@@ -44,7 +43,7 @@ except ModuleNotFoundError:  # pragma: no cover - optional dependency
     lax = None  # type: ignore
 except Exception:
     import sys
-    print(ENV_SETUP_BOX)
+    print("JAX backend failed to import")
     sys.exit(1)
 # --- END HEADER ---
 

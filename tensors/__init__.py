@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 try:
-    from AGENTS.tools.header_utils import ENV_SETUP_BOX
     from .abstraction import (
         AbstractTensor,
         get_tensor_operations,
@@ -12,7 +11,7 @@ try:
     from .pure_backend import PurePythonTensorOperations
 except Exception:
     import sys
-    print(ENV_SETUP_BOX)
+    print("Failed to import optional tensor backends")
     sys.exit(1)
 # --- END HEADER ---
 

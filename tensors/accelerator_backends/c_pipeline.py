@@ -3,13 +3,12 @@
 from __future__ import annotations
 
 try:
-    from AGENTS.tools.header_utils import ENV_SETUP_BOX
     from typing import Any, Dict, Tuple
     from pathlib import Path
     import ctypes
 except Exception:
     import sys
-    print(ENV_SETUP_BOX)
+    print("C pipeline failed to import")
     sys.exit(1)
 # --- END HEADER ---
 

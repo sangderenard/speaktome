@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 try:
-    from AGENTS.tools.header_utils import ENV_SETUP_BOX
     from typing import Any, Tuple
     from .abstraction import AbstractTensor
     import numpy as np
@@ -14,7 +13,7 @@ except ModuleNotFoundError:
     GL = None  # type: ignore
 except Exception:
     import sys
-    print(ENV_SETUP_BOX)
+    print("OpenGL backend failed to import")
     sys.exit(1)
 # --- END HEADER ---
 

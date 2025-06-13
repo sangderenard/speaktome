@@ -2,16 +2,10 @@
 """Backend-agnostic linear layers for small network experiments."""
 from __future__ import annotations
 
-try:
-    from AGENTS.tools.header_utils import ENV_SETUP_BOX
-    from typing import Any, Iterable, Dict
+from typing import Any, Iterable, Dict
 
-    from .model_abstraction import AbstractModelWrapper
-    from tensors.abstraction import AbstractTensor
-except Exception:
-    import sys
-    print(ENV_SETUP_BOX)
-    sys.exit(1)
+from .model_abstraction import AbstractModelWrapper
+from tensors.abstraction import AbstractTensor
 # --- END HEADER ---
 
 
