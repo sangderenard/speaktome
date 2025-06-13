@@ -1,16 +1,3 @@
-#!/usr/bin/env python3
-# --- BEGIN HEADER ---
-"""Stub for context reflection across system layers."""
-from __future__ import annotations
-
-try:
-    from AGENTS.tools.header_utils import ENV_SETUP_BOX
-except Exception:
-    import sys
-    print(ENV_SETUP_BOX)
-    sys.exit(1)
-# --- END HEADER ---
-
 # ########## STUB: context_mirror ##########
 # PURPOSE: Provide a high-level summary of project state by inspecting
 #          test logs, recent commits, and open tasks.

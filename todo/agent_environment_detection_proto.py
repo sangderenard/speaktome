@@ -1,16 +1,3 @@
-#!/usr/bin/env python3
-# --- BEGIN HEADER ---
-"""Pseudocode for detecting the running agent environment."""
-from __future__ import annotations
-
-try:
-    from AGENTS.tools.header_utils import ENV_SETUP_BOX
-except Exception:
-    import sys
-    print(ENV_SETUP_BOX)
-    sys.exit(1)
-# --- END HEADER ---
-
 # ########## STUB: detect_agent_environment ##########
 # PURPOSE: Determine if the current Python process is executed within a
 #          configured SPEAKTOME agent environment.
@@ -30,13 +17,15 @@ except Exception:
 #        development environments mark successful setup.
 # ###########################################################################
 
-import json
-import os
-from pathlib import Path
+
 
 
 def detect_agent_environment(flag_path: str | None = None) -> bool:
     """Return True if running inside a configured SPEAKTOME agent environment."""
+    import json
+    import os
+    from pathlib import Path
+
     if flag_path and Path(flag_path).is_file():
         return True
 
