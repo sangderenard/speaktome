@@ -6,6 +6,8 @@ param(
     [string[]]$args
 )
 
+$env:SPEAKTOME_ENV_SETUP_BOX = "`n+----------------------------------------------------------------------+`n| Imports failed. See ENV_SETUP_OPTIONS.md for environment guidance.  |`n| Missing packages usually mean setup was skipped or incomplete.      |`n+----------------------------------------------------------------------+`n"
+
 # Manual flag parsing for all arguments (case-insensitive, -flag=value style)
 $UseVenv = $true
 $FromDev = $false
