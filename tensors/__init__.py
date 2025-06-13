@@ -36,15 +36,21 @@ except Exception:  # pragma: no cover - jax missing
 
 CTensorOperations = None
 try:  # optional C backend
-    from .c_backend import CTensorOperations  # type: ignore
+    from .accelerator_backends.c_backend import CTensorOperations  # type: ignore
 except Exception:  # pragma: no cover - c backend missing
     CTensorOperations = None  # type: ignore
 
 OpenGLTensorOperations = None
 try:  # optional OpenGL backend
-    from .opengl_backend import OpenGLTensorOperations  # type: ignore
+    from .accelerator_backends.opengl_backend import OpenGLTensorOperations  # type: ignore
 except Exception:  # pragma: no cover - opengl missing
     OpenGLTensorOperations = None  # type: ignore
+
+AcceleratorCoordinator = None
+try:
+    from .accelerator_backends.coordinator import AcceleratorCoordinator  # type: ignore
+except Exception:  # pragma: no cover - missing dependencies
+    AcceleratorCoordinator = None  # type: ignore
 
 __all__ = [
     "AbstractTensor",
@@ -66,3 +72,6 @@ if CTensorOperations is not None:
 
 if OpenGLTensorOperations is not None:
     __all__.append("OpenGLTensorOperations")
+
+if AcceleratorCoordinator is not None:
+    __all__.append("AcceleratorCoordinator")

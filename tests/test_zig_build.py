@@ -10,7 +10,7 @@ try:
     import pytest
 
     from AGENTS.tools.header_utils import ENV_SETUP_BOX
-    from tensors import c_backend
+    from tensors.accelerator_backends import c_backend
 except Exception:
     import sys
     print(ENV_SETUP_BOX)
@@ -36,7 +36,7 @@ def test_ctensor_ops_from_zig(monkeypatch):
 
     monkeypatch.setenv("SPEAKTOME_CTENSOR_LIB", lib_path)
     import importlib
-    import tensors.c_backend as cb_reload
+    import tensors.accelerator_backends.c_backend as cb_reload
     cb_reload = importlib.reload(cb_reload)
     ops = cb_reload.CTensorOperations()
 
