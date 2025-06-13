@@ -87,8 +87,8 @@ install_quiet() {
 
 if [ $USE_VENV -eq 1 ]; then
   poetry config virtualenvs.in-project true
-  INSTALL_ARGS="${SPEAKTOME_POETRY_ARGS:-'--without cpu-torch --without gpu-torch'}"
-  if [[ "$INSTALL_ARGS" == *"with"*torch* ]]; then
+  INSTALL_ARGS="${SPEAKTOME_POETRY_ARGS:---without cpu-torch --without gpu-torch}"
+  if [[ "$INSTALL_ARGS" =~ (^|[[:space:]])--with([[:space:]]|=)[^[:space:]]*torch ]]; then
     echo "[INFO] Torch groups requested; attempting install" >&2
     install_quiet poetry install --sync --no-interaction $INSTALL_ARGS
   else

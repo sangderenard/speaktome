@@ -152,7 +152,7 @@ if ($env:SPEAKTOME_POETRY_ARGS) {
 } else {
     $argString += ' --without cpu-torch --without gpu-torch'
 }
-if ($argString -like '*with*torch*') {
+if ($argString -match '(^| )--with( |=).*torch') {
     Write-Host '[INFO] Torch groups requested; attempting install'
     Safe-Run { Invoke-Expression "poetry install $argString" }
 } else {
