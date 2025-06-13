@@ -14,7 +14,7 @@ A helper script `AGENTS/validate_guestbook.py` will scan the guest book and enfo
 
 Any reusable Python scripts or binary utilities meant for agents must live in `AGENTS/tools/` or `AGENTS/tools/bin/`. Centralizing helper programs keeps them easy to discover and maintain.
 
-For deeper historical context, read through all prior reports. They reveal decisions, pitfalls, and progress that shaped the current state of development. If you are tempted to install packages manually with `pip`, stop and read `AGENTS_DO_NOT_PIP_MANUALLY.md` first. The provided setup scripts manage dependencies for you and explain how optional groups work. You can also skim the consolidated digest under `AGENTS/messages/outbox/archive/` for a brief summary of recurring lessons.
+For deeper historical context, read through all prior reports. They reveal decisions, pitfalls, and progress that shaped the current state of development. If you are tempted to install packages manually with `pip`, read `AGENTS_DO_NOT_PIP_MANUALLY.md` and then consult `ENV_SETUP_OPTIONS.md` for the official setup guide. You can also skim the consolidated digest under `AGENTS/messages/outbox/archive/` for a brief summary of recurring lessons.
 
 **CI and Automated Agents:** see `ENV_SETUP_OPTIONS.md`.
 
