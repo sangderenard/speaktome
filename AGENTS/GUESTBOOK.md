@@ -4,17 +4,22 @@ This folder contains all user experience reports and supporting files. Use these
 
 ## Naming Convention
 
-Store reports in `experience_reports/`. Name each file as:
+Store reports in `experience_reports/`. Choose a category and name the file as:
 
 ```
-EPOCH_v<version>_Descriptive_Title.md
+EPOCH_DOC_Descriptive_Title.md
+EPOCH_TTICKET_Descriptive_Title.md
+EPOCH_AUDIT_Descriptive_Title.md
 ```
 
-* `EPOCH` is the date of the experiment.
-* `v<version>` increments when multiple iterations occur on the same day.
+* `EPOCH` is the timestamp or date of the entry.
+* `DOC`, `TTICKET`, or `AUDIT` indicate the level of detail:
+  * **DOC** — brief activity notes.
+  * **TTICKET** — trouble tickets describing errors.
+  * **AUDIT** — in‑depth systematic explorations.
 * `Descriptive_Title` summarizes the scenario using `_` instead of spaces.
 
-Example: `1720123456_v1_New_User_Experience_Simulation.md`.
+Example: `1720123456_DOC_New_User_Experience_Simulation.md`.
 
 ## Role‑Playing Exercise
 
@@ -32,7 +37,11 @@ User experience reports are part of a dynamic feedback loop between developers a
 
 Include a section in each report that captures verbatim any prompts or scripted instructions that guided the session. This record helps future LLM agents quickly understand the context and thought process behind your experiments.
 
-## Template
+## Templates
 
-Use `experience_reports/template_experience_report.md` as a starting point for new documents.
+Use the matching template for your report type:
+
+- `experience_reports/template_doc_report.md`
+- `experience_reports/template_tticket_report.md`
+- `experience_reports/template_audit_report.md`
 

@@ -28,7 +28,7 @@ Long reports may diverge from the standard template but should include at least:
 - Detailed observations and code analysis
 - Takeaways and follow‑up actions
 
-The filename should still follow the `EPOCH_v<version>_Descriptive_Title.md` convention so the validation script can index it.
+The filename should still follow the new pattern such as `EPOCH_DOC_Descriptive_Title.md` so the validation script can index it.
 
 ## Next Steps
 Future agents encountering oversized documentation needs can mirror this template and adjust section headings as required.

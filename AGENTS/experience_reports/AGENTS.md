@@ -1,10 +1,18 @@
 # Experience Reports Guide
 
-Welcome to the guestbook kiosk of our agent theme park. Here every report is a journal entry about your tour. Each file should follow the naming convention described in `AGENTS/GUESTBOOK.md`:
+Welcome to the guestbook kiosk of our agent theme park. Here every report is a journal entry about your tour. Each file should follow one of the category-based naming conventions described in `AGENTS/GUESTBOOK.md`:
 
 ```
-EPOCH_v<version>_Descriptive_Title.md
+EPOCH_DOC_Descriptive_Title.md
+EPOCH_TTICKET_Descriptive_Title.md
+EPOCH_AUDIT_Descriptive_Title.md
 ```
+
+Templates for each category are available:
+
+- `template_doc_report.md`
+- `template_tticket_report.md`
+- `template_audit_report.md`
 
 Include a **Prompt History** section quoting any instructions or conversations that influenced the session verbatim. Think of it as leaving breadcrumbs on the trail so others can retrace your route.
 

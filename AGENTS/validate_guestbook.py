@@ -16,17 +16,24 @@ except Exception:
 # --- END HEADER ---
 
 REPORTS_DIR = os.path.join(os.path.dirname(__file__), 'experience_reports')
-TEMPLATE = 'template_experience_report.md'
+TEMPLATES = {
+    'template_experience_report.md',
+    'template_doc_report.md',
+    'template_tticket_report.md',
+    'template_audit_report.md',
+}
 ARCHIVE_DIR = os.path.join(REPORTS_DIR, 'archive')
 STICKIES_FILE = os.path.join(REPORTS_DIR, 'stickies.txt')
-PATTERN = re.compile(r'(?:\d{4}-\d{2}-\d{2}|\d{10})_v\d+_[A-Za-z0-9_]+\.md')
+PATTERN = re.compile(
+    r'(?:\d{4}-\d{2}-\d{2}|\d{10})_(DOC|TTICKET|AUDIT)_[A-Za-z0-9_]+\.md'
+)
 
 
 def sanitize(name):
     stem = os.path.splitext(name)[0]
     stem = re.sub(r'[^A-Za-z0-9]+', '_', stem)
     stem = re.sub(r'_+', '_', stem).strip('_')
-    return f'0000000000_v0_{stem}.md'
+    return f'0000000000_DOC_{stem}.md'
 
 def validate_and_fix(interactive: bool = False):
     """Validate filenames in the guestbook folder.
@@ -42,7 +49,7 @@ def validate_and_fix(interactive: bool = False):
 
     changed = False
     for fname in os.listdir(REPORTS_DIR):
-        if fname in {TEMPLATE, 'AGENTS.md'} or not fname.endswith('.md'):
+        if fname in TEMPLATES or fname == 'AGENTS.md' or not fname.endswith('.md'):
             continue
         if PATTERN.fullmatch(fname):
             continue
@@ -108,8 +115,11 @@ def archive_old_reports():
 
     os.makedirs(ARCHIVE_DIR, exist_ok=True)
     stickies = load_stickies()
-    files = [f for f in os.listdir(REPORTS_DIR)
-             if f.endswith('.md') and f not in {TEMPLATE, 'AGENTS.md'}]
+    files = [
+        f
+        for f in os.listdir(REPORTS_DIR)
+        if f.endswith('.md') and f not in TEMPLATES and f != 'AGENTS.md'
+    ]
     files.sort(key=extract_epoch)
     keep = stickies.union(files[-10:])
     for fname in files:
