@@ -136,6 +136,8 @@ bash setup_env_dev.sh -groups=groupx
 - Available codebases and groups are defined in `AGENTS/codebase_map.json`.
 - The scripts will create a `.venv` directory by default unless `-NoVenv` is used.
 - Selections are recorded to the file specified by the `SPEAKTOME_ACTIVE_FILE` environment variable (or a default path).
+- Ensure `poetry` and `poetry-core` are installed. If you see a
+  `poetry.core.masonry.api` error, run `pip install --user 'poetry-core>=1.5'`.
 
 ---
 
