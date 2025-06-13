@@ -6,8 +6,8 @@ from __future__ import annotations
 try:
     import types
     import sys
-    from AGENTS.tools.header_utils import ENV_SETUP_BOX
     import numpy as np
+    from speaktome.core.model_abstraction import AbstractModelWrapper
 except Exception:
     import os
     import sys
