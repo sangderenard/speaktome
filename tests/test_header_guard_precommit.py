@@ -19,7 +19,7 @@ def test_check_try_header_pass(tmp_path: Path) -> None:
         "# --- BEGIN HEADER ---\n"
         '"""doc"""\n'
         "from __future__ import annotations\n"
-        "try:\n    import os\nexcept Exception:\n    import sys\n    from pathlib import Path\n    from AGENTS.tools.auto_env_setup import run_setup_script\n    run_setup_script(Path(__file__).resolve().parents[1])\n    print(f'[HEADER] import failure in {__file__}')\n    print(ENV_SETUP_BOX)\n    sys.exit(1)\n# --- END HEADER ---\n"
+        "try:\n    import os\nexcept Exception:\n    import sys\n    from pathlib import Path\n    import subprocess\n    root = Path(__file__).resolve()\n    for parent in [root, *root.parents]:\n        if (parent / 'pyproject.toml').is_file():\n            root = parent\n            break\n    subprocess.run([sys.executable, '-m', 'AGENTS.tools.auto_env_setup', str(root)], check=False)\n    print(f'[HEADER] import failure in {__file__}')\n    print(ENV_SETUP_BOX)\n    sys.exit(1)\n# --- END HEADER ---\n"
     )
     assert hg.check_try_header(path) == []
 
@@ -82,4 +82,4 @@ def test_check_run_setup_missing(tmp_path: Path) -> None:
         "try:\n    import os\nexcept Exception:\n    import sys\n    print(ENV_SETUP_BOX)\n    sys.exit(1)\n# --- END HEADER ---\n"
     )
     errors = hg.check_try_header(path)
-    assert "Missing 'run_setup_script' in except block" in errors
+    assert "Missing call to auto_env_setup in except block" in errors

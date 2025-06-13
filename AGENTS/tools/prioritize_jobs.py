@@ -10,8 +10,9 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from . import find_repo_root
 
-JOB_DIR = Path(__file__).resolve().parents[1] / "job_descriptions"
+JOB_DIR = find_repo_root(Path(__file__)) / "job_descriptions"
 OUT_FILE = JOB_DIR / "job_priority.json"
 # --- END HEADER ---
 
