@@ -65,8 +65,12 @@ def parse_pyproject_dependencies(pyproject_path: Path) -> list[str]:
         raise FileNotFoundError(f"pyproject.toml not found at {pyproject_path}")
     with pyproject_path.open("rb") as f:
         data = tomllib.load(f)
-    optdeps = data.get("project", {}).get("optional-dependencies", {})
-    return sorted(optdeps.keys())  # example: alphabetical
+    optdeps = set()
+    project_opts = data.get("project", {}).get("optional-dependencies", {})
+    optdeps.update(project_opts.keys())
+    poetry_groups = data.get("tool", {}).get("poetry", {}).get("group", {})
+    optdeps.update(poetry_groups.keys())
+    return sorted(optdeps)
 
 
 def run_setup_script(project_root: Path | None = None, *, use_venv: bool = True) -> subprocess.CompletedProcess | None:
@@ -77,7 +81,7 @@ def run_setup_script(project_root: Path | None = None, *, use_venv: bool = True)
             required = {
                 "speaktome",
                 "laplace",
-                "tensor_printing",
+                "tensor printing",
                 "time_sync",
                 "AGENTS",
                 "fontmapper",

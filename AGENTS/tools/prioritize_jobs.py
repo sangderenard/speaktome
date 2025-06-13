@@ -15,7 +15,7 @@ def _find_repo_root(start: Path) -> Path:
     required = {
         "speaktome",
         "laplace",
-        "tensor_printing",
+        "tensor printing",
         "time_sync",
         "AGENTS",
         "fontmapper",

@@ -1,0 +1,17 @@
+[tool.poetry]
+name = "speaktome-testenv"
+version = "0.1.0"
+description = "Unified tests and testing scripts for SpeakToMe"
+authors = ["SpeakToMe Authors"]
+packages = [
+    {include = "tests", from = ".."},
+    {include = "testing", from = ".."}
+]
+
+[tool.poetry.dependencies]
+python = ">=3.12"
+pytest = ">=8.0"
+
+[build-system]
+requires = ["poetry-core>=1.5.0"]
+build-backend = "poetry.core.masonry.api"

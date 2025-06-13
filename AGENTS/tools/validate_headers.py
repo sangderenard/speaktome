@@ -19,7 +19,7 @@ except Exception:
         required = {
             "speaktome",
             "laplace",
-            "tensor_printing",
+            "tensor printing",
             "time_sync",
             "AGENTS",
             "fontmapper",
@@ -60,7 +60,6 @@ except Exception:
     print(f"[HEADER] import failure in {__file__}")
     print(ENV_SETUP_BOX)
     sys.exit(1)
-# --- END HEADER ---
 # --- END HEADER ---
 
 PACKAGE_ROOT = Path(__file__).parent / "speaktome"

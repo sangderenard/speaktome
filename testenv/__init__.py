@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 # --- BEGIN HEADER ---
-"""Template for SPEAKTOME module headers."""
+"""Testing environment package bundling tests and utilities."""
 from __future__ import annotations
 
 try:
-    import your_modules
+    pass
 except Exception:
     import os
     import sys
@@ -38,15 +38,12 @@ except Exception:
     import subprocess
     try:
         root = _find_repo_root(Path(__file__))
-        subprocess.run(
-            [
-                sys.executable,
-                "-m",
-                "AGENTS.tools.auto_env_setup",
-                str(root),
-            ],
-            check=False,
-        )
+        subprocess.run([
+            sys.executable,
+            "-m",
+            "AGENTS.tools.auto_env_setup",
+            str(root),
+        ], check=False)
     except Exception:
         pass
     try:
