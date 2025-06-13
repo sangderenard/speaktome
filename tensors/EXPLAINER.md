@@ -36,7 +36,7 @@ operate on tensors without binding to a specific backend.
 
 The `speaktome` core components rely on this abstraction layer so they can run
 with or without heavy numerical dependencies. The experimental
-`tensor_printing` package also builds upon these classes to explore novel tensor
+`tensorprinting` package also builds upon these classes to explore novel tensor
 visualization techniques.
 
 ## Project Ethos

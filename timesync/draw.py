@@ -5,7 +5,7 @@ from __future__ import annotations
 import sys
 import numpy as np
 from colorama import Style, Fore, Back
-from time_sync.ascii_kernel_classifier import AsciiKernelClassifier
+from timesync.ascii_kernel_classifier import AsciiKernelClassifier
 # --- END HEADER ---
 
 

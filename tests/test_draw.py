@@ -5,7 +5,7 @@ from __future__ import annotations
 try:
     import os
     import numpy as np
-    from time_sync.draw import (
+    from timesync.draw import (
         get_changed_subunits,
         default_subunit_batch_to_chars,
         flexible_subunit_kernel,

@@ -18,8 +18,8 @@ except Exception:
         required = {
             "speaktome",
             "laplace",
-            "tensor_printing",
-            "time_sync",
+            "tensorprinting",
+            "timesync",
             "AGENTS",
             "fontmapper",
             "tensors",

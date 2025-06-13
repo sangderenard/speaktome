@@ -41,8 +41,8 @@ speaktome = {path = "speaktome", develop = true}
 fontmapper = {path = "fontmapper", develop = true}
 laplace = {path = "laplace", develop = true}
 tensors = {path = "tensors", develop = true}
-time_sync = {path = "time_sync", develop = true}
-tensor_printing = {path = "tensor printing", develop = true}
+timesync = {path = "timesync", develop = true}
+tensorprinting = {path = "tensorprinting", develop = true}
 
 [tool.poetry.extras]
 cpu-torch = []

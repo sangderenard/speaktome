@@ -81,8 +81,8 @@ def run_setup_script(project_root: Path | None = None, *, use_venv: bool = True)
             required = {
                 "speaktome",
                 "laplace",
-                "tensor printing",
-                "time_sync",
+                "tensorprinting",
+                "timesync",
                 "AGENTS",
                 "fontmapper",
                 "tensors",

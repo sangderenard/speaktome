@@ -1,4 +1,4 @@
-"""Tests for the :mod:`time_sync` utilities."""
+"""Tests for the :mod:`timesync` utilities."""
 
 import datetime as dt
 from unittest import mock
@@ -6,7 +6,7 @@ from unittest import mock
 import pytest
 
 ntplib = pytest.importorskip("ntplib")
-from time_sync import (
+from timesync import (
     adjust_datetime,
     compose_ascii_digits,
     get_offset,
@@ -15,7 +15,7 @@ from time_sync import (
     print_digital_clock,
     RenderingBackend,
 )
-from time_sync.time_sync.theme_manager import ThemeManager
+from timesync.timesync.theme_manager import ThemeManager
 
 # --- END HEADER ---
 
@@ -29,7 +29,7 @@ def test_adjust_datetime(monkeypatch):
 
 def test_sync_offset_fallback(monkeypatch):
     monkeypatch.setenv("SPEAKTOME_TIME_OFFSET", "5")
-    with mock.patch("time_sync._internet.fetch_internet_utc", side_effect=OSError):
+    with mock.patch("timesync._internet.fetch_internet_utc", side_effect=OSError):
         val = sync_offset()
     assert val == 5
     assert get_offset() == 5

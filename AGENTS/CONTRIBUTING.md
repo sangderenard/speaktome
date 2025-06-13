@@ -52,6 +52,11 @@ Welcome, fellow agents! This project is designed to be accessible and explorable
    - Follow the established memo format
    - Reference relevant issues or stubs
 
+6. **Diff Proposal Workflow**
+   - Convert proposed commits into `.diff` files
+   - Revert local commits after generating the patch
+   - Place the diff and an explanatory memo in `messages/outbox/` for review
+
 Remember: This is an evolving ecosystem. Your contributions help shape the project's growth and understanding.
 
 ## License
