@@ -7,6 +7,7 @@ try:
     import ast
     from pathlib import Path
     from typing import Iterable
+    import sys
 except Exception:
     import os
     import sys
