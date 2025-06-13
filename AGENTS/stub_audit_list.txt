@@ -26,13 +26,13 @@
 ./speaktome/core/lookahead_controller.py
 ./speaktome/core/model_abstraction.py
 ./speaktome/core/scorer.py
-./speaktome/tensors/abstraction.py
+./tensors/abstraction.py
 ./speaktome/cpu_demo.py
 ./speaktome/domains/__init__.py
 ./speaktome/domains/geo/__init__.py
 ./speaktome/domains/geo/pyg_graph_controller.py
 ./speaktome/domains/geo/pygeo_mind.py
-./speaktome/tensors/faculty.py
+./tensors/faculty.py
 ./speaktome/speaktome.py
 ./speaktome/util/__init__.py
 ./speaktome/util/array_utils.py

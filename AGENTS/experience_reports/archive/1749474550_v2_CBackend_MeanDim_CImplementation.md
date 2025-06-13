@@ -4,7 +4,7 @@
 **Title:** CBackend Mean Dim CImplementation
 
 ## Overview
-Implemented dimension-wise mean in `speaktome/tensors/c_backend.py` using a C helper `mean_dim`. Replaced previous Python logic with C-level loops.
+Implemented dimension-wise mean in `tensors/c_backend.py` using a C helper `mean_dim`. Replaced previous Python logic with C-level loops.
 
 ## Prompt History
 - User: "undo your code and redo it in c because its a c_backend and you can fucking see it uses c for operations, do it right or don't participate"

@@ -8,7 +8,7 @@ Fixes a syntax error in the C backend implementation embedded in `c_backend.py`.
 - System instructions encouraged signing the guest book and running the validation script.
 
 ## Steps Taken
-1. Located C source inside `speaktome/tensors/c_backend.py`.
+1. Located C source inside `tensors/c_backend.py`.
 2. Detected unmatched braces using a simple balance check.
 3. Added the missing closing brace after the cleanup section of `pad_double_nd`.
 4. Ran `python testing/test_hub.py` which failed due to missing dependencies (`cffi`, `torch`).

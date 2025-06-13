@@ -2,7 +2,7 @@
 
 Some modules still call PyTorch APIs directly. To keep the project backend
 agnostic, migrate these operations to use
-`AbstractTensor` (see `speaktome/tensors/abstraction.py`).
+`AbstractTensor` (see `tensors/abstraction.py`).
 
 Steps:
 1. Identify direct uses of `torch` or `torch.nn.functional`.

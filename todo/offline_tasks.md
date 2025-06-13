@@ -4,7 +4,7 @@ This document enumerates work items suitable for agents operating without networ
 
 ## 1. Convert To Tensor Abstraction
 - **Reference:** `AGENTS/job_descriptions/convert_to_tensor_abstraction_job.md`
-- Ensure all tensor operations use the abstraction layer from `speaktome/tensors/abstraction.py`.
+- Ensure all tensor operations use the abstraction layer from `tensors/abstraction.py`.
 - Replace direct PyTorch calls in modules under `speaktome/core/` with backend-agnostic calls.
 - Add tests verifying the pure Python backend produces identical outputs.
 
@@ -25,7 +25,7 @@ This document enumerates work items suitable for agents operating without networ
 - Capture results in JSON for `AGENTS/tools/format_test_digest.py`.
 
 ## 5. Pure Python Backend Initialization
-- **File:** `speaktome/tensors/pure_backend.py`
+- **File:** `tensors/pure_backend.py`
 - Determine if initialization needs configuration parameters for benchmarking or datatype handling.
 - Document decisions in the module header.
 

@@ -9,7 +9,7 @@ your agents file misses the reality and the point, these primitives DO need to b
 ```
 
 ## Summary
-- Updated `speaktome/tensors/AGENTS.md` to clarify backend operator policy.
+- Updated `tensors/AGENTS.md` to clarify backend operator policy.
 - Implemented missing arithmetic primitives in `jax_backend.py`.
 
 ## Next Steps

@@ -6,7 +6,7 @@ The repository originally stored all tensor backends in `speaktome/core/tensor_a
 Persistent storage (saving/loading tensors) was not available for any backend.
 
 To improve organization and enable persistence, the abstraction and backends were
-moved into a dedicated `speaktome.tensors` package. Simple `save` and `load`
+moved into a dedicated `tensors` package. Simple `save` and `load`
 methods were added to the pure Python, NumPy and PyTorch implementations.
 
 ## Prompts

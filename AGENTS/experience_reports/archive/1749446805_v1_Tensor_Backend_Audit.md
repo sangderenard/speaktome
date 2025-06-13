@@ -13,7 +13,7 @@ put an agents file in the tensors folder that highlights the fact that no backen
 1. Reviewed root guidance and tensor directory.
 2. Removed obsolete scalar helpers from `jax_backend.py`.
 3. Ensured `c_backend.py` ends with a newline.
-4. Created `speaktome/tensors/AGENTS.md` documenting the operator policy.
+4. Created `tensors/AGENTS.md` documenting the operator policy.
 5. Wrote this experience report and ran `AGENTS/validate_guestbook.py`.
 
 ## Observed Behaviour

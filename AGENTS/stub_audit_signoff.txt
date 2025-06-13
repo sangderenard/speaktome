@@ -27,13 +27,13 @@ speaktome/core/human_scorer_policy_manager.py - OK
 speaktome/core/lookahead_controller.py - OK
 speaktome/core/model_abstraction.py - OK
 speaktome/core/scorer.py - OK
-speaktome/tensors/abstraction.py - OK
+tensors/abstraction.py - OK
 speaktome/cpu_demo.py - OK
 speaktome/domains/__init__.py - OK
 speaktome/domains/geo/__init__.py - OK
 speaktome/domains/geo/pyg_graph_controller.py - OK
 speaktome/domains/geo/pygeo_mind.py - OK
-speaktome/tensors/faculty.py - OK
+tensors/faculty.py - OK
 speaktome/speaktome.py - OK
 speaktome/util/__init__.py - OK
 speaktome/util/array_utils.py - OK
