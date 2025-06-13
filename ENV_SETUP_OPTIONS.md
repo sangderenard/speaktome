@@ -125,7 +125,7 @@ bash setup_env.sh -headless -notorch -codebases=projectc,projectd -groups=groupy
 ## Avoiding Torch and Torch-Dependent Codebases/Groups
 
 - Use the `-notorch` flag to skip torch installation.
-- The setup scripts now rely on Poetry groups. Pass `-torch` for the CPU build or `-gpu` for the GPU variant. These map to the optional groups `cpu-torch` and `gpu-torch` in `pyproject.toml`.
+ - Pass `-torch` for the CPU build or `-gpu` for the GPU variant. These map to optional groups defined in `pyproject.toml`.
 - In headless mode, auto-selection will avoid torch-dependent codebases/groups if `-notorch` is set.
 - Interactive menus hide those choices when torch is skipped.
 

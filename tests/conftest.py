@@ -114,8 +114,7 @@ def pytest_configure(config: pytest.Config) -> None:
         from AGENTS.tools.header_utils import ENV_SETUP_BOX
         msg = (
             f"{ENV_SETUP_BOX}\n"
-            "PyTest disabled. Run setup_env_dev and select a codebase before running tests.\n"
-            "See AGENTS/CODEBASES_AND_ENVIRONMENT.md for environment setup instructions.\n"
+            "PyTest disabled. See ENV_SETUP_OPTIONS.md for environment setup instructions.\n"
             "CL or headless agents must follow those steps to enable pytest."
         )
         sys.stderr.write(msg + "\n")

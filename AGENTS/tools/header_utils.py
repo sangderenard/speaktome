@@ -6,9 +6,8 @@ from __future__ import annotations
 ENV_SETUP_BOX = (
     "\n"
     "+-----------------------------------------------------------------------+\n"
-    "| Imports failed. Run setup_env or setup_env_dev and select every    |\n"
-    "| project and module you plan to use. Missing packages mean setup was |\n"
-    "| skipped or incomplete.                                             |\n"
+    "| Imports failed. See ENV_SETUP_OPTIONS.md for environment guidance.  |\n"
+    "| Missing packages usually mean setup was skipped or incomplete.      |\n"
     "+-----------------------------------------------------------------------+\n"
 )
 

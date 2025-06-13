@@ -134,13 +134,7 @@ first time you enable the GNN with `--with_gnn`. You may also install the
 
 ## Testing
 
-Install the development requirements and run `pytest` from the virtual
-environment:
-
-```bash
-pip install -r requirements-dev.txt
-./.venv/bin/pytest -v  # Windows: .venv\Scripts\pytest.exe -v
-```
+Refer to `../ENV_SETUP_OPTIONS.md` for instructions on running the test suite.
 
 Each test run writes a log to `testing/logs/pytest_<TIMESTAMP>.log` so results
 are preserved across sessions. Older logs are automatically pruned to keep only

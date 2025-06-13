@@ -5,7 +5,7 @@ set -euo pipefail
 
 VENV_PY=".venv/bin/python"
 if [[ ! -x "$VENV_PY" ]]; then
-  echo "Virtual environment not found. Run setup_env.sh first." >&2
+  echo "Virtual environment not found. See ENV_SETUP_OPTIONS.md." >&2
   exit 1
 fi
 

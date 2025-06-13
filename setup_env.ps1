@@ -8,8 +8,6 @@ param(
 
 # Manual flag parsing for all arguments (case-insensitive, -flag=value style)
 $NoVenv = $false
-$UseTorch = $false
-$UseGpuTorch = $false
 $headless = $false
 $FromDev = $false
 $Codebases = @()
@@ -17,9 +15,6 @@ $Groups = @()
 foreach ($arg in $args) {
     $arg_lc = $arg.ToLower()
     if ($arg_lc -eq '-novenv') { $NoVenv = $true }
-    elseif ($arg_lc -eq '-torch') { $UseTorch = $true }
-    elseif ($arg_lc -eq '-gpu' -or $arg_lc -eq '-gpu-torch') { $UseTorch = $true; $UseGpuTorch = $true }
-    elseif ($arg_lc -eq '-notorch') { $UseTorch = $false }
     elseif ($arg_lc -eq '-headless') { $headless = $true }
     elseif ($arg_lc -eq '-fromdev') { $FromDev = $true }
     elseif ($arg_lc -like '-codebases=*') {
@@ -37,8 +32,7 @@ foreach ($arg in $args) {
 }
 
 # All options for this script should be used with single-dash PowerShell-style flags, e.g.:
-#   -Torch -NoVenv -Codebases projectA,projectB -Groups groupX
-# Use -Torch or -Gpu to request torch. If omitted, torch is skipped.
+#   -NoVenv -Codebases projectA,projectB -Groups groupX
 # Do not use double-dash flags with this script.
 
 $activeFile = $env:SPEAKTOME_ACTIVE_FILE
@@ -168,22 +162,16 @@ if (-not $NoVenv) {
     $venvPip = "pip"
 }
 
-# 2. Install core + dev requirements
-Safe-Run { & $venvPython -m pip install --upgrade pip }
-Safe-Run { & $venvPython -m pip install wheel }  # <-- Add this line
-
-# Torch install logic
-if ($UseTorch) {
-    if ($UseGpuTorch) {
-        Write-Host 'Installing torch with GPU support'
-        Install-Quiet $venvPip "install torch==2.3.1"
-    } else {
-        Write-Host 'Installing CPU-only torch'
-        Install-Quiet $venvPip "install torch==2.3.1+cpu -f https://download.pytorch.org/whl/torch_stable.html"
-    }
+# 2. Install core requirements via Poetry
+Safe-Run { poetry config virtualenvs.in-project $true }
+$installArgs = @('--sync', '--no-interaction')
+$argString = $installArgs -join ' '
+if ($env:SPEAKTOME_POETRY_ARGS) {
+    $argString += " " + $env:SPEAKTOME_POETRY_ARGS
 } else {
-    Write-Host '[INFO] Torch not requested; skipping installation.'
+    $argString += ' --without cpu-torch --without gpu-torch'
 }
+Safe-Run { Invoke-Expression "poetry install $argString" }
 
 # If not called from a dev script, launch the dev menu for all codebase/group installs
 

@@ -16,6 +16,7 @@ if (-not $activeFile) { $activeFile = Join-Path ([System.IO.Path]::GetTempPath()
 $env:SPEAKTOME_ACTIVE_FILE = $activeFile
 $menuArgs = @()
 $useVenv = $true
+$torchChoice = ''
 foreach ($arg in $args) {
     $arg_lc = $arg.ToLower()
     if ($arg_lc -eq '-no-venv') {
@@ -35,8 +36,24 @@ foreach ($arg in $args) {
             $menuArgs += $grpVal
         }
     }
+    elseif ($arg_lc -eq '-torch') { $torchChoice = 'cpu' }
+    elseif ($arg_lc -eq '-gpu' -or $arg_lc -eq '-gpu-torch') { $torchChoice = 'gpu' }
+    elseif ($arg_lc -eq '-notorch' -or $arg_lc -eq '-no-torch') { $torchChoice = '' }
 }
-Safe-Run { & "$scriptRoot\setup_env.ps1" @args -from-dev }
+$poetryArgs = '--without cpu-torch --without gpu-torch'
+if ($torchChoice -eq 'cpu') { $poetryArgs = '--with cpu-torch' }
+elseif ($torchChoice -eq 'gpu') { $poetryArgs = '--with gpu-torch' }
+$env:SPEAKTOME_POETRY_ARGS = $poetryArgs
+
+$filtered = @()
+foreach ($arg in $args) {
+    $arg_lc = $arg.ToLower()
+    if ($arg_lc -ne '-torch' -and $arg_lc -ne '-gpu' -and $arg_lc -ne '-gpu-torch' -and $arg_lc -ne '-notorch' -and $arg_lc -ne '-no-torch') {
+        $filtered += $arg
+    }
+}
+Safe-Run { & "$scriptRoot\setup_env.ps1" @filtered -from-dev }
+Remove-Item Env:SPEAKTOME_POETRY_ARGS
 
 # Update the venv path handling section:
 if ($useVenv) {
@@ -69,14 +86,8 @@ if ($useVenv) {
         return
     }
 
-    # Install dev requirements
-    $requirementsDev = Join-Path $scriptRoot "requirements-dev.txt"
-    if (Test-Path $requirementsDev) {
-        Write-Host "Installing requirements-dev.txt..."
-        Safe-Run { & $venvPip install -r $requirementsDev }
-    } else {
-        Write-Host "Warning: requirements-dev.txt not found at $requirementsDev"
-    }
+    # Install dev requirements via Poetry
+    Safe-Run { poetry install --with dev }
 }
 
 function Read-KeyWithTimeout([int]$seconds) {
@@ -153,6 +164,5 @@ if (Test-Path $activeFile) {
 }
 
 # All options for this script should be used with single-dash PowerShell-style flags, e.g.:
-#   -Torch -NoVenv -Codebases projectA,projectB -Groups groupX
-# Use -Torch or -Gpu to request torch. If omitted, torch is skipped.
+#   -NoVenv -Codebases projectA,projectB -Groups groupX
 # Do not use double-dash flags with this script.

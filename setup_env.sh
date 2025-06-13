@@ -16,7 +16,6 @@ export SPEAKTOME_ACTIVE_FILE="$ACTIVE_FILE"
 
 USE_VENV=1
 HEADLESS=0
-TORCH_CHOICE=""
 CODEBASES=""
 GROUPS=()
 for arg in "$@"; do
@@ -24,9 +23,6 @@ for arg in "$@"; do
   case $arg_lc in
     -no-venv) USE_VENV=0 ;;
     -headless) HEADLESS=1 ;;
-    -torch) TORCH_CHOICE="cpu" ;;
-    -gpu|-gpu-torch) TORCH_CHOICE="gpu" ;;
-    -notorch|-no-torch) TORCH_CHOICE="" ;;
   esac
 done
 
@@ -103,13 +99,8 @@ install_quiet() {
 
 if [ $USE_VENV -eq 1 ]; then
   poetry config virtualenvs.in-project true
-  INSTALL_ARGS=()
-  if [ -n "$TORCH_CHOICE" ]; then
-    INSTALL_ARGS+=("--with" "${TORCH_CHOICE}-torch")
-  else
-    INSTALL_ARGS+=("--without" "cpu-torch" "--without" "gpu-torch")
-  fi
-  safe_run poetry install --sync --no-interaction "${INSTALL_ARGS[@]}"
+  INSTALL_ARGS="${SPEAKTOME_POETRY_ARGS:-'--without cpu-torch --without gpu-torch'}"
+  safe_run poetry install --sync --no-interaction $INSTALL_ARGS
   VENV_PYTHON="./.venv/bin/python"
   VENV_PIP="./.venv/bin/pip"
 else
@@ -129,7 +120,6 @@ for arg in "$@"; do
   esac
 done
 
-# Torch handled via poetry groups
 
 # If not called from a dev script, launch the dev menu for all codebase/group installs
 CALLED_BY_DEV=0
