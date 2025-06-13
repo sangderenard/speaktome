@@ -23,15 +23,35 @@ safe_run() {
 
 # Run the regular setup script (this creates the venv)
 USE_VENV=1
+TORCH_CHOICE=""
 for arg in "$@"; do
   arg_lc="${arg,,}"
   case $arg_lc in
     -no-venv) USE_VENV=0 ;;
     -codebases=*|-cb=*) MENU_ARGS+=("-codebases" "${arg#*=}") ;;
     -groups=*|-grp=*)   MENU_ARGS+=("-groups" "${arg#*=}") ;;
+    -torch) TORCH_CHOICE="cpu" ;;
+    -gpu|-gpu-torch) TORCH_CHOICE="gpu" ;;
+    -notorch|-no-torch) TORCH_CHOICE="" ;;
   esac
 done
-safe_run bash "$SCRIPT_ROOT/setup_env.sh" "$@" --from-dev
+POETRY_ARGS="--without cpu-torch --without gpu-torch"
+if [ "$TORCH_CHOICE" = "cpu" ]; then
+  POETRY_ARGS="--with cpu-torch"
+elif [ "$TORCH_CHOICE" = "gpu" ]; then
+  POETRY_ARGS="--with gpu-torch"
+fi
+export SPEAKTOME_POETRY_ARGS="$POETRY_ARGS"
+
+ARGS=()
+for arg in "$@"; do
+  case "${arg,,}" in
+    -torch|-gpu|-gpu-torch|-notorch|-no-torch) ;;
+    *) ARGS+=("$arg") ;;
+  esac
+done
+
+safe_run bash "$SCRIPT_ROOT/setup_env.sh" "${ARGS[@]}" --from-dev
 
 # Define the venv Python path (assumes setup_env.sh created it at .venv)
 if [ $USE_VENV -eq 1 ]; then

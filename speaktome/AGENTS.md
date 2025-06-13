@@ -6,22 +6,9 @@ See `../ENV_SETUP_OPTIONS.md` for installation instructions.
 
 This directory contains the primary beam search controllers and utilities for generating text. When adding new modules or functions, accompany them with tests in `../tests` and keep all code compliant with `AGENTS/CODING_STANDARDS.md`.
 
-## Optional Dependency Groups
-
-The `pyproject.toml` defines these groups:
-
-- `plot`
-- `ml`
-- `jax`
-- `ctensor`
-- `numpy`
-- `dev`
-
-Use standard `pip` extras syntax when needed, e.g. `pip install -e .[plot]` inside the virtual environment.
-
 ## Non-Interactive Setup
 
-Refer to `../ENV_SETUP_OPTIONS.md` for non-interactive setup options.
+Refer to `../ENV_SETUP_OPTIONS.md` for all environment options.
 
 # Agents Documentation
 
