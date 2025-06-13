@@ -6,15 +6,16 @@ try:
     import os
     import re
     from pathlib import Path
-    from .header_utils import (
-        ENV_SETUP_BOX,
-        HEADER_START,
-        HEADER_END,
-        IMPORT_FAILURE_PREFIX,
-    )
 except Exception:
+    import os
     import sys
-
+    try:
+        ENV_SETUP_BOX = os.environ["SPEAKTOME_ENV_SETUP_BOX"]
+    except KeyError as exc:
+        raise RuntimeError("environment not initialized") from exc
+    IMPORT_FAILURE_PREFIX = "[HEADER] import failure in"
+    HEADER_START = "# --- BEGIN HEADER ---"
+    HEADER_END = "# --- END HEADER ---"
     print(f"{IMPORT_FAILURE_PREFIX} {__file__}")
     print(ENV_SETUP_BOX)
     sys.exit(1)
@@ -71,9 +72,10 @@ def fix_file(path: Path) -> None:
             token in text
             for token in (
                 "import sys",
+                "import os",
+                "ENV_SETUP_BOX = os.environ[\"SPEAKTOME_ENV_SETUP_BOX\"]",
                 "print(ENV_SETUP_BOX)",
                 "sys.exit(1)",
-                "from AGENTS.tools.header_utils import ENV_SETUP_BOX",
                 IMPORT_FAILURE_PREFIX,
                 HEADER_START_SENTINEL,
             )
@@ -114,15 +116,16 @@ def fix_file(path: Path) -> None:
         if try_idx is not None:
             try_region = lines[try_idx:except_idx]
             if not any(
-                "from AGENTS.tools.header_utils import ENV_SETUP_BOX" in ln
+                "ENV_SETUP_BOX = os.environ[\"SPEAKTOME_ENV_SETUP_BOX\"]" in ln
                 for ln in try_region
             ):
                 indent_try = " " * (
                     len(lines[try_idx]) - len(lines[try_idx].lstrip()) + 4
                 )
+                lines.insert(try_idx + 1, f"{indent_try}import os")
                 lines.insert(
-                    try_idx + 1,
-                    f"{indent_try}from AGENTS.tools.header_utils import ENV_SETUP_BOX",
+                    try_idx + 2,
+                    f"{indent_try}ENV_SETUP_BOX = os.environ['SPEAKTOME_ENV_SETUP_BOX']",
                 )
                 modified = True
         if HEADER_START_SENTINEL not in lines[:3]:
@@ -170,9 +173,6 @@ def fix_file(path: Path) -> None:
     out_lines.append("from __future__ import annotations")
     out_lines.append("")
     out_lines.append("try:")
-    out_lines.append(
-        "    from AGENTS.tools.header_utils import ENV_SETUP_BOX, IMPORT_FAILURE_PREFIX"
-    )
 
     # Move imports into try block
     while idx < len(lines):
@@ -188,7 +188,11 @@ def fix_file(path: Path) -> None:
         break
 
     out_lines.append("except Exception:")
+    out_lines.append("    import os")
     out_lines.append("    import sys")
+    out_lines.append(
+        "    ENV_SETUP_BOX = os.environ['SPEAKTOME_ENV_SETUP_BOX']"
+    )
     out_lines.append(f"    print(f'{IMPORT_FAILURE_PREFIX} {{__file__}}')")
     out_lines.append("    print(ENV_SETUP_BOX)")
     out_lines.append("    sys.exit(1)")

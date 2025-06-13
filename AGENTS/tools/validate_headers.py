@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 try:
-    from AGENTS.tools.header_utils import IMPORT_FAILURE_PREFIX
+    IMPORT_FAILURE_PREFIX = "[HEADER] import failure in"
     import ast
     from pathlib import Path
     from typing import Iterable

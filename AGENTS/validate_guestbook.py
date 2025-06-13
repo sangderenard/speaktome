@@ -1,17 +1,16 @@
 from __future__ import annotations
 
 try:
-    from AGENTS.tools.header_utils import ENV_SETUP_BOX
     import os
     import re
     import sys
 except Exception:
     import os
     import sys
-    ENV_SETUP_BOX = os.environ.get(
-        "SPEAKTOME_ENV_SETUP_BOX",
-        "Environment setup incomplete. See ENV_SETUP_OPTIONS.md",
-    )
+    try:
+        ENV_SETUP_BOX = os.environ["SPEAKTOME_ENV_SETUP_BOX"]
+    except KeyError as exc:
+        raise RuntimeError("environment not initialized") from exc
     print(ENV_SETUP_BOX)
     sys.exit(1)
 # --- END HEADER ---
