@@ -11,6 +11,9 @@ set -uo pipefail
 SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 MAP_FILE="$SCRIPT_ROOT/AGENTS/codebase_map.json"
 
+# Provide ENV_SETUP_BOX for modules that fail to import early
+export SPEAKTOME_ENV_SETUP_BOX="\n+-----------------------------------------------------------------------+\n| Imports failed. See ENV_SETUP_OPTIONS.md for environment guidance.  |\n| Missing packages usually mean setup was skipped or incomplete.      |\n+-----------------------------------------------------------------------+\n"
+
 ACTIVE_FILE=${SPEAKTOME_ACTIVE_FILE:-/tmp/speaktome_active.json}
 export SPEAKTOME_ACTIVE_FILE="$ACTIVE_FILE"
 
@@ -87,7 +90,7 @@ install_quiet() {
 
 if [ $USE_VENV -eq 1 ]; then
   poetry config virtualenvs.in-project true
-  INSTALL_ARGS="${SPEAKTOME_POETRY_ARGS:-'--without cpu-torch --without gpu-torch'}"
+  INSTALL_ARGS="${SPEAKTOME_POETRY_ARGS:---without cpu-torch --without gpu-torch}"
   if [[ "$INSTALL_ARGS" == *"with"*torch* ]]; then
     echo "[INFO] Torch groups requested; attempting install" >&2
     install_quiet poetry install --sync --no-interaction $INSTALL_ARGS

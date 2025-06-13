@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "Agent tools and repo management utilities for SpeakToMe"
 authors = ["Your Name <your@email.com>"]
 readme = "README.md"
+packages = [{include = "AGENTS", from = ".."}]
 
 [tool.poetry.dependencies]
 python = ">=3.8"
