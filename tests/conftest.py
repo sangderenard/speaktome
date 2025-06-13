@@ -115,7 +115,7 @@ def pytest_configure(config: pytest.Config) -> None:
         msg = (
             f"{ENV_SETUP_BOX}\n"
             "PyTest disabled. See ENV_SETUP_OPTIONS.md for environment setup instructions.\n"
-            "CL or headless agents must follow those steps to enable pytest."
+            "Automated agents must follow those steps to enable pytest."
         )
         sys.stderr.write(msg + "\n")
         pytest.exit("environment not configured", returncode=1)

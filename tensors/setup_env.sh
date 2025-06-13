@@ -13,29 +13,28 @@ try:
     groups=data.get(name, {}).get("groups", {})
 except Exception:
     groups={}
-notorch=[g for g,pkgs in groups.items() if not any("torch" in p for p in pkgs)]
-print(','.join(notorch))
+safe=[g for g,pkgs in groups.items() if not any("torch" in p for p in pkgs)]
+print(','.join(safe))
 print(','.join(groups))
 PY
 }
-read -r NOTORCH_GROUPS ALL_GROUPS <<< "$(get_groups)"
-MODE="notorch"
+read -r SAFE_GROUPS ALL_GROUPS <<< "$(get_groups)"
+MODE="skip"
 for arg in "$@"; do
   case $arg in
     -full|-torch) MODE="full" ;;
     -minimal) MODE="minimal" ;;
-    -notorch) MODE="notorch" ;;
   esac
 done
 case $MODE in
   full)
-    GROUPS="$ALL_GROUPS"; NOTORCH="" ;;
+    GROUPS="$ALL_GROUPS"; TORCH_FLAG="-torch" ;;
   minimal)
-    GROUPS=""; NOTORCH="-notorch" ;;
+    GROUPS="" ;;
   *)
-    GROUPS="$NOTORCH_GROUPS"; NOTORCH="-notorch" ;;
+    GROUPS="$SAFE_GROUPS" ;;
 esac
-ARGS=(-headless -codebases="$CODEBASE")
+ARGS=(-codebases="$CODEBASE")
 [ -n "$GROUPS" ] && ARGS+=(-groups="$CODEBASE:$GROUPS")
 cd "$REPO_ROOT"
-bash "$REPO_ROOT/setup_env_dev.sh" $NOTORCH "${ARGS[@]}"
+bash "$REPO_ROOT/setup_env_dev.sh" ${TORCH_FLAG:-} "${ARGS[@]}"
