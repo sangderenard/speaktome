@@ -20,6 +20,18 @@ export SPEAKTOME_ACTIVE_FILE="$ACTIVE_FILE"
 USE_VENV=1
 CODEBASES=""
 GROUPS=()
+
+# Ensure the Poetry build backend is available
+if ! python - <<'PY' 2>/dev/null
+import importlib.util, sys
+sys.exit(0 if importlib.util.find_spec("poetry.core.masonry.api") else 1)
+PY
+then
+  echo "[INFO] poetry-core missing; installing to enable editable builds" >&2
+  python -m pip install -q --user 'poetry-core>=1.5.0' || {
+    echo "[WARN] Automatic poetry-core install failed; please install it manually" >&2
+  }
+fi
 for arg in "$@"; do
   arg_lc="${arg,,}"
   case $arg_lc in

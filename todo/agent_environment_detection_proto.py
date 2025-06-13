@@ -30,9 +30,29 @@ except Exception:
 #        development environments mark successful setup.
 # ###########################################################################
 
+import json
+import os
+from pathlib import Path
+
+
 def detect_agent_environment(flag_path: str | None = None) -> bool:
     """Return True if running inside a configured SPEAKTOME agent environment."""
-    raise NotImplementedError('detect_agent_environment stub')
+    if flag_path and Path(flag_path).is_file():
+        return True
+
+    env_dir = Path(os.environ.get("VIRTUAL_ENV", "./.venv")).resolve()
+    marker = env_dir / "pytest_enabled"
+    active = Path(os.environ.get("SPEAKTOME_ACTIVE_FILE", "/tmp/speaktome_active.json"))
+
+    if not (marker.exists() and active.exists()):
+        return False
+
+    try:
+        data = json.loads(active.read_text())
+    except Exception:
+        return False
+
+    return bool(data.get("codebases"))
 
 
 if __name__ == "__main__":
