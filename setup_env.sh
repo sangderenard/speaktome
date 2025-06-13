@@ -23,6 +23,10 @@ export ENV_SETUP_BOX
 ACTIVE_FILE=${SPEAKTOME_ACTIVE_FILE:-/tmp/speaktome_active.json}
 export SPEAKTOME_ACTIVE_FILE="$ACTIVE_FILE"
 
+# Always operate from the repository root so the virtual environment is
+# created at the top level regardless of the caller's working directory.
+cd "$SCRIPT_ROOT"
+
 USE_VENV=1
 # Ensure the Poetry build backend is available
 if ! python - <<'PY' 2>/dev/null
@@ -98,14 +102,15 @@ install_quiet() {
 }
 
 if [ $USE_VENV -eq 1 ]; then
-  poetry config virtualenvs.in-project true
+  # Use the repo's central virtual environment ('.venv' in repository root)
+  # without modifying global Poetry config.
   INSTALL_ARGS="${SPEAKTOME_POETRY_ARGS:---without cpu-torch --without gpu-torch}"
   if [[ "$INSTALL_ARGS" == *"--with"* && "$INSTALL_ARGS" != *"--without"* ]]; then
     echo "[INFO] Torch groups requested; attempting install" >&2
-    install_quiet poetry install --sync --no-interaction $INSTALL_ARGS
+    install_quiet env POETRY_VIRTUALENVS_IN_PROJECT=true poetry install --sync --no-interaction $INSTALL_ARGS
   else
     echo "[INFO] Skipping torch groups" >&2
-    safe_run poetry install --sync --no-interaction $INSTALL_ARGS
+    safe_run env POETRY_VIRTUALENVS_IN_PROJECT=true poetry install --sync --no-interaction $INSTALL_ARGS
   fi
   VENV_PYTHON="./.venv/bin/python"
   VENV_PIP="./.venv/bin/pip"

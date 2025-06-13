@@ -9,7 +9,7 @@ try:
     import subprocess
     import time
     from pathlib import Path
-from AGENTS.tools.pretty_logger import PrettyLogger
+    from AGENTS.tools.pretty_logger import PrettyLogger
 except Exception:
     import os
     import sys
