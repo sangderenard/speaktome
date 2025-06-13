@@ -14,3 +14,4 @@ Each Markdown file documents a distinct idea or design direction.
 - `Laplace_Project_Framework.md`
 - `Tensor_Printing_Class.md`
 - `ASCII_Render_Pipeline.md`
+- `Weight_Drift_Constraint_Functions.md`
