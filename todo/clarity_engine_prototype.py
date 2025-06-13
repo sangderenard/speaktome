@@ -1,16 +1,3 @@
-#!/usr/bin/env python3
-# --- BEGIN HEADER ---
-"""Prototype for a documentation-oriented log summarizer."""
-from __future__ import annotations
-
-try:
-    from AGENTS.tools.header_utils import ENV_SETUP_BOX
-except Exception:
-    import sys
-    print(ENV_SETUP_BOX)
-    sys.exit(1)
-# --- END HEADER ---
-
 # ########## STUB: clarity_engine ##########
 # PURPOSE: Generate human-friendly summaries of failing test logs or
 #          environment setup output, highlighting actionable insights.
