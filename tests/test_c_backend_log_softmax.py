@@ -6,8 +6,9 @@ from __future__ import annotations
 try:
     import math
     import pytest
+    import os
 
-    from AGENTS.tools.header_utils import ENV_SETUP_BOX
+    ENV_SETUP_BOX = os.environ["ENV_SETUP_BOX"]
     from tensors.accelerator_backends.c_backend import CTensorOperations
 except Exception:
     import sys

@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 try:
+    import os
     import importlib.util
     from pathlib import Path
     import tempfile
 
     import pytest
 
-    from AGENTS.tools.header_utils import ENV_SETUP_BOX
+    ENV_SETUP_BOX = os.environ["ENV_SETUP_BOX"]
     from tensors.accelerator_backends import c_backend
 except Exception:
     import sys
