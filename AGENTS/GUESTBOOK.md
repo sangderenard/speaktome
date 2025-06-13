@@ -2,6 +2,12 @@
 
 This folder contains all user experience reports and supporting files. Use these guidelines when adding new reports. Treat the experience reports as a centralized log of automated instructions and AI-assisted experiments.
 
+We encourage **three complementary reporting modes**:
+
+1. **DOC** — documentation of repository activity.
+2. **TTICKET** — trouble tickets describing errors or unexpected behaviour.
+3. **AUDIT** — in‑depth auditing of functions and design decisions.
+
 ## Naming Convention
 
 Store reports in `experience_reports/`. Choose a category and name the file as:

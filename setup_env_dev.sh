@@ -8,16 +8,10 @@ set -uo pipefail
 # changing directories with pushd. This allows the script to be invoked
 # from anywhere while still locating `.venv`.
 SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-export ENV_SETUP_BOX="\n+----------------------------------------------------------------------+\n| Imports failed. See ENV_SETUP_OPTIONS.md for environment guidance.  |\n| Missing packages usually mean setup was skipped or incomplete.      |\n+----------------------------------------------------------------------+\n"
+export ENV_SETUP_BOX="\n+-----------------------------------------------------------------------+\n| Imports failed. See ENV_SETUP_OPTIONS.md for environment guidance.  |\n| Missing packages usually mean setup was skipped or incomplete.      |\n| Please file a DOC, TTICKET, or AUDIT report under AGENTS/experience_reports. |\n+-----------------------------------------------------------------------+\n"
 ACTIVE_FILE=${SPEAKTOME_ACTIVE_FILE:-/tmp/speaktome_active.json}
 export SPEAKTOME_ACTIVE_FILE="$ACTIVE_FILE"
 MENU_ARGS=()
-
-safe_run() {
-  "$@"
-  local status=$?
-  if [ $status -ne 0 ]; then
-    echo "Warning: command '$*' failed with status $status" >&2
   fi
   return 0
 }

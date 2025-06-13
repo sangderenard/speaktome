@@ -26,7 +26,9 @@ In this environment the term **codebase** refers to any directory listed in `COD
 Experience reports, guestbook messages, and the digest script in
 `messages/` collectively document the project's growth. Contribute
 thoughtfully and keep the historical record intact so future agents can
-build upon our shared knowledge.
+build upon our shared knowledge. Reports generally fall into three
+categories: **DOC** entries that summarize activity, **TTICKET** reports
+for troubleshooting, and detailed **AUDIT** analyses.
 
 ## Identity Resources
 
