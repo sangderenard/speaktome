@@ -40,9 +40,10 @@ HEADER_REQUIREMENTS = [
     "'from __future__ import annotations' before the try block",
     "imports wrapped in a try block",
     (
-        "except block imports sys, invokes the auto_env_setup module via"
-        " subprocess, retrieves 'ENV_SETUP_BOX' from the environment, "
-        "prints IMPORT_FAILURE_PREFIX and that variable, then exits"
+        "except block imports sys and pathlib, uses find_repo_root to locate"
+        " ENV_SETUP_BOX.md when the ENV_SETUP_BOX variable is missing,"
+        " then prints the message and exits without calling other scripts;"
+        " otherwise it invokes auto_env_setup",
     ),
     "'# --- END HEADER ---' sentinel after the except block",
 ]

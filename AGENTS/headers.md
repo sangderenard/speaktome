@@ -17,13 +17,19 @@ except Exception:  # <try:end> <except:start>
     import os  # <import>
     import sys  # <import>
     from pathlib import Path  # <import>
+    from AGENTS.tools.path_utils import find_repo_root  # <import>
+    if "ENV_SETUP_BOX" not in os.environ:  # <env-check:start>
+        root = find_repo_root(Path(__file__))
+        box = root / "ENV_SETUP_BOX.md"
+        try:
+            os.environ["ENV_SETUP_BOX"] = f"\n{box.read_text()}\n"
+        except Exception:
+            os.environ["ENV_SETUP_BOX"] = "environment not initialized"
+        print(os.environ["ENV_SETUP_BOX"])  # <print-env>
+        sys.exit(1)  # <env-check:end>
     import subprocess  # <import>
     try:  # <setup-call:start>
-        root = Path(__file__).resolve()
-        for parent in [root, *root.parents]:
-            if (parent / "pyproject.toml").is_file():
-                root = parent
-                break
+        root = find_repo_root(Path(__file__))
         subprocess.run(
             [sys.executable, '-m', 'AGENTS.tools.auto_env_setup', str(root)],
             check=False,

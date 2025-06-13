@@ -176,6 +176,7 @@ def check_try_header(filepath: Path) -> list[str]:
     sys_import = False
     sys_exit = False
     run_call = False
+    env_check = False
     if except_idx is not None:
         search_end = sentinel_idx if sentinel_idx is not None else len(lines)
         region = lines[except_idx:search_end]
@@ -183,6 +184,7 @@ def check_try_header(filepath: Path) -> list[str]:
         sys_import = any("import sys" in ln for ln in region)
         sys_exit = any("sys.exit(" in ln for ln in region)
         run_call = any("auto_env_setup" in ln for ln in region)
+        env_check = any("ENV_SETUP_BOX" in ln and "not in os.environ" in ln for ln in region)
 
     errors = []
     if HEADER_START not in lines[:3]:
@@ -209,8 +211,8 @@ def check_try_header(filepath: Path) -> list[str]:
             errors.append("Missing 'print(ENV_SETUP_BOX)' in except block")
         if not sys_exit:
             errors.append("Missing 'sys.exit(1)' in except block")
-        if not run_call:
-            errors.append("Missing call to auto_env_setup in except block")
+        if not (run_call or env_check):
+            errors.append("Missing auto_env_setup call or ENV_SETUP_BOX check")
     return errors
 
 
