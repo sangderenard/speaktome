@@ -8,14 +8,12 @@ param(
 
 # Manual flag parsing for all arguments (case-insensitive, -flag=value style)
 $NoVenv = $false
-$headless = $false
 $FromDev = $false
 $Codebases = @()
 $Groups = @()
 foreach ($arg in $args) {
     $arg_lc = $arg.ToLower()
     if ($arg_lc -eq '-novenv') { $NoVenv = $true }
-    elseif ($arg_lc -eq '-headless') { $headless = $true }
     elseif ($arg_lc -eq '-fromdev') { $FromDev = $true }
     elseif ($arg_lc -like '-codebases=*') {
         $cbVal = $arg.Substring($arg.IndexOf('=')+1)
@@ -41,25 +39,8 @@ if (-not $activeFile) {
 }
 $env:SPEAKTOME_ACTIVE_FILE = $activeFile
 if (-not $Codebases) {
-    if ($headless) {
-        Write-Host "[DEBUG] No codebases specified - headless mode: auto-loading from codebase_map.json."
-        $mapFile = Join-Path $PSScriptRoot 'AGENTS\codebase_map.json'
-        if (Test-Path $mapFile) {
-            try {
-                $Codebases = (Get-Content $mapFile | ConvertFrom-Json).psobject.Properties.Name
-                # Optionally load all groups for a full install:
-                # $Groups = @( 'groupA','groupB','...' )
-            }
-            catch {
-                Write-Host "[DEBUG] Could not parse codebase_map.json; continuing empty."
-                $Codebases = $null
-            }
-        }
-    }
-    else {
-        Write-Host "[DEBUG] No codebases specified - launching interactive menu."
-        # Let dev_group_menu handle interactive selection
-    }
+    Write-Host "[DEBUG] No codebases specified - launching interactive menu."
+    # Let dev_group_menu handle interactive selection
 }
 $menuArgs = @()
 if ($Codebases) { $menuArgs += '-Codebases'; $menuArgs += ($Codebases -join ',') }
@@ -183,7 +164,7 @@ if ($argString -like '*with*torch*') {
 
 # Always run dev_group_menu.py at the end
 if ($FromDev) {
-    Write-Host "Installing AGENTS/tools in headless mode..."
+    Write-Host "Installing AGENTS/tools..."
     $env:PIP_CMD = $venvPip
     & $venvPython (Join-Path $PSScriptRoot "AGENTS\tools\dev_group_menu.py") --install --codebases 'tools' --record $activeFile
     Write-Host "Launching codebase/group selection tool for editable installs (from-dev)..."

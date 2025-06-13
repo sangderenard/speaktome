@@ -32,7 +32,6 @@ for arg in "$@"; do
     -groups=*|-grp=*)   MENU_ARGS+=("-groups" "${arg#*=}") ;;
     -torch) TORCH_CHOICE="cpu" ;;
     -gpu|-gpu-torch) TORCH_CHOICE="gpu" ;;
-    -notorch|-no-torch) TORCH_CHOICE="" ;;
   esac
 done
 POETRY_ARGS="--without cpu-torch --without gpu-torch"
@@ -46,7 +45,7 @@ export SPEAKTOME_POETRY_ARGS="$POETRY_ARGS"
 ARGS=()
 for arg in "$@"; do
   case "${arg,,}" in
-    -torch|-gpu|-gpu-torch|-notorch|-no-torch) ;;
+    -torch|-gpu|-gpu-torch) ;;
     *) ARGS+=("$arg") ;;
   esac
 done

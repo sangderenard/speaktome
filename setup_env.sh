@@ -15,26 +15,14 @@ ACTIVE_FILE=${SPEAKTOME_ACTIVE_FILE:-/tmp/speaktome_active.json}
 export SPEAKTOME_ACTIVE_FILE="$ACTIVE_FILE"
 
 USE_VENV=1
-HEADLESS=0
 CODEBASES=""
 GROUPS=()
 for arg in "$@"; do
   arg_lc="${arg,,}"
   case $arg_lc in
     -no-venv) USE_VENV=0 ;;
-    -headless) HEADLESS=1 ;;
   esac
 done
-
-# Auto-load codebases from map file when running headless
-if [ -z "$CODEBASES" ] && [ $HEADLESS -eq 1 ] && [ -f "$MAP_FILE" ]; then
-  CODEBASES="$(python - "$MAP_FILE" <<'PY'
-import json,sys
-d=json.load(open(sys.argv[1]))
-print(",".join(d.keys()))
-PY
-)"
-fi
 
 [ -n "$CODEBASES" ] && MENU_ARGS+=("-codebases" "$CODEBASES")
 for g in "${GROUPS[@]}"; do
@@ -137,8 +125,8 @@ done
 
 # Always run dev_group_menu.py at the end
 if [ $CALLED_BY_DEV -eq 1 ]; then
-  # Headless install of AGENTS/tools
-  echo "Installing AGENTS/tools in headless mode..."
+  # Install AGENTS/tools without prompts
+  echo "Installing AGENTS/tools..."
   PIP_CMD="$VENV_PIP" "$VENV_PYTHON" "$SCRIPT_ROOT/AGENTS/tools/dev_group_menu.py" --install --codebases tools --record "$SPEAKTOME_ACTIVE_FILE"
   # Then run again with any arguments passed
   echo "Launching codebase/group selection tool for editable installs (from-dev)..."

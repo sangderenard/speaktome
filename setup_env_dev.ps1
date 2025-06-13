@@ -38,7 +38,6 @@ foreach ($arg in $args) {
     }
     elseif ($arg_lc -eq '-torch') { $torchChoice = 'cpu' }
     elseif ($arg_lc -eq '-gpu' -or $arg_lc -eq '-gpu-torch') { $torchChoice = 'gpu' }
-    elseif ($arg_lc -eq '-notorch' -or $arg_lc -eq '-no-torch') { $torchChoice = '' }
 }
 $poetryArgs = '--without cpu-torch --without gpu-torch'
 if ($torchChoice -eq 'cpu') { $poetryArgs = '--with cpu-torch' }
@@ -48,7 +47,7 @@ $env:SPEAKTOME_POETRY_ARGS = $poetryArgs
 $filtered = @()
 foreach ($arg in $args) {
     $arg_lc = $arg.ToLower()
-    if ($arg_lc -ne '-torch' -and $arg_lc -ne '-gpu' -and $arg_lc -ne '-gpu-torch' -and $arg_lc -ne '-notorch' -and $arg_lc -ne '-no-torch') {
+    if ($arg_lc -ne '-torch' -and $arg_lc -ne '-gpu' -and $arg_lc -ne '-gpu-torch') {
         $filtered += $arg
     }
 }
