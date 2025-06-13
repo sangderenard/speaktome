@@ -206,7 +206,7 @@ class CTensor:
 class CTensorOperations(AbstractTensor):
     """C backend using cffi for all arithmetic ops."""
 
-    def _AbstractTensor__apply_operator_(self, op: str, left: CTensor, right: Any):
+    def _apply_operator__(self, op: str, left: CTensor, right: Any):
         """Operate on ``CTensor`` objects or scalars."""
         if isinstance(right, CTensor) and isinstance(left, CTensor):
             if left.shape != right.shape:
@@ -518,6 +518,10 @@ class CTensorOperations(AbstractTensor):
         # NOTES: Only full flattening supported currently.
         # ############################################################
         raise NotImplementedError("repeat_interleave not implemented for C backend")
+
+    def repeat_(self, repeats: Any = None, dim: int = 0) -> Any:
+        """Repeat tensor along ``dim`` ``repeats`` times (stub)."""
+        raise NotImplementedError("repeat not implemented for C backend")
 
     def assign_at_indices_(
         self,

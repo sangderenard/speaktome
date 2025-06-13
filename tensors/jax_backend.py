@@ -85,7 +85,7 @@ class JAXTensorOperations(AbstractTensor):
         
         return jax.device_put(self._to_jnp(tensor), target_device)
 
-    def _AbstractTensor__apply_operator_(self, op: str, left: Any, right: Any):
+    def _apply_operator__(self, op: str, left: Any, right: Any):
         """Apply arithmetic ops using JAX arrays."""
         a = self._to_jnp(left)
         b = self._to_jnp(right)
@@ -221,6 +221,10 @@ class JAXTensorOperations(AbstractTensor):
 
     def repeat_interleave_(self, tensor: Any, repeats: int, dim: Optional[int] = None) -> Any:
         return jnp.repeat(self._to_jnp(tensor), repeats, axis=dim).tolist()
+
+    def repeat_(self, repeats: Any = None, dim: int = 0) -> Any:
+        """Repeat tensor along ``dim`` ``repeats`` times (stub)."""
+        raise NotImplementedError("repeat not implemented for JAX backend")
 
     def view_flat_(self, tensor: Any) -> Any:
         return jnp.ravel(self._to_jnp(tensor)).tolist()

@@ -23,4 +23,4 @@ The simplified rewrite of the rendering utilities now resides directly in this
 folder under `ascii_mapper.py`. The legacy implementation remains in the
 `FM16` subdirectory for historical reference. Use `ascii_preview` from
 `ascii_mapper.py` for new code paths. See `../ENV_SETUP_OPTIONS.md` for
-headless setup details.
+setup details.

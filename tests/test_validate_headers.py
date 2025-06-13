@@ -10,9 +10,13 @@ try:
     import pytest
 
     import AGENTS.tools.validate_headers as vh
-    from AGENTS.tools.header_utils import ENV_SETUP_BOX
+    from AGENTS.tools.header_utils import get_env_setup_box
 except Exception:
-    print(ENV_SETUP_BOX)
+    import os
+    try:
+        print(os.environ["SPEAKTOME_ENV_SETUP_BOX"])
+    except KeyError:
+        print("env missing")
     raise
 # --- END HEADER ---
 

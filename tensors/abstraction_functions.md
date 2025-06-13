@@ -121,9 +121,9 @@
 - c_backend.interpolate_
 - c_backend.stack_
 - c_backend.cat_
-- jax_backend._AbstractTensor__apply_operator_
+- jax_backend._apply_operator__
 - torch_backend._apply_operator__
-- numpy_backend._AbstractTensor__apply_operator_
+- numpy_backend._apply_operator__
 - pure_backend._apply_scalar_op
 - pure_backend._matmul
 - pure_backend.cat_

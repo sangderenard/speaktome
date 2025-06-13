@@ -3,14 +3,18 @@
 from __future__ import annotations
 
 try:
-    from AGENTS.tools.header_utils import ENV_SETUP_BOX
+    IMPORT_FAILURE_PREFIX = "[HEADER] import failure in"
     import ast
     from pathlib import Path
     from typing import Iterable
-    import sys
-    from .header_utils import ENV_SETUP_BOX
 except Exception:
+    import os
     import sys
+    try:
+        ENV_SETUP_BOX = os.environ["SPEAKTOME_ENV_SETUP_BOX"]
+    except KeyError as exc:
+        raise RuntimeError("environment not initialized") from exc
+    print(f"{IMPORT_FAILURE_PREFIX} {__file__}")
     print(ENV_SETUP_BOX)
     sys.exit(1)
 # --- END HEADER ---
@@ -112,8 +116,12 @@ def validate(root: Path, *, rewrite: bool = False) -> int:
                 if miss_head:
                     new_lines.append(f"{indent}try:")
                     new_lines.append(f'{indent}    HEADER = "TODO"')
-                    new_lines.append(f"{indent}except Exception as exc:")
+                    new_lines.append(f"{indent}except Exception:")
+                    new_lines.append(f"{indent}    import os")
                     new_lines.append(f"{indent}    import sys")
+                    new_lines.append(
+                        f"{indent}    ENV_SETUP_BOX = os.environ['SPEAKTOME_ENV_SETUP_BOX']"
+                    )
                     new_lines.append(f"{indent}    print(ENV_SETUP_BOX)")
                     new_lines.append(f"{indent}    sys.exit(1)")
                 if miss_test:
@@ -142,9 +150,13 @@ def main() -> None:
     try:
         exit_code = validate(args.path, rewrite=args.rewrite)
     except Exception as exc:  # pragma: no cover - unexpected failure
+        try:
+            env_box = os.environ["SPEAKTOME_ENV_SETUP_BOX"]
+        except KeyError:
+            env_box = "environment not initialized"
         print(
             "[AGENT_ACTIONABLE_ERROR] validate_headers failed: "
-            f"{exc}.\n{ENV_SETUP_BOX}"
+            f"{exc}.\n{env_box}"
         )
         sys.exit(1)
     sys.exit(exit_code)

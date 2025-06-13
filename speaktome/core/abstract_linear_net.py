@@ -40,10 +40,10 @@ class AbstractLinearLayer:
 
     def forward(self, inputs: Any) -> Any:
         # matrix multiply then add bias using backend operators
-        out = self.ops._AbstractTensor__apply_operator(
+        out = self.ops._apply_operator__(
             "matmul", inputs, self.weight
         )
-        out = self.ops._AbstractTensor__apply_operator(
+        out = self.ops._apply_operator__(
             "add", out, self.bias
         )
         return self._apply_activation(out)

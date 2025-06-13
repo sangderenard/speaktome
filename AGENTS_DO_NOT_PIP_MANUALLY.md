@@ -1,6 +1,6 @@
 # **Stop Installing with `pip` Like a Caveman**
 
-The `setup_env.sh` and `setup_env_dev.sh` scripts already know how to install everything for you. Manually invoking `pip` defeats the purpose of the curated environment. Study these scripts to understand how dependencies are configured, which optional groups exist, and how editable installs are performed.
+The `setup_env.sh` and `setup_env_dev.sh` scripts already know how to install everything for you. Manually invoking `pip` **or** `poetry` defeats the purpose of the curated environment. Study these scripts to understand how dependencies are configured, which optional groups exist, and how editable installs are performed.
 
 Running `setup_env.sh` creates a virtual environment and installs CPU Torch by default.
 

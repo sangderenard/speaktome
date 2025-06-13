@@ -1,45 +1,44 @@
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# pyproject.toml — modular extras, clear comments
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-[build-system]
-requires = ["setuptools>=61", "wheel"]
-build-backend = "setuptools.build_meta"
-
-[project]
+[tool.poetry]
 name = "speaktome"
 version = "0.1.0"
 description = "Beam search controllers and utilities for generating text"
+authors = ["SpeakToMe Authors"]
+license = "MIT"
 readme = "README.md"
-requires-python = ">=3.8"
-license = { text = "MIT" }
-authors = [{ name = "SpeakToMe Authors" }]
 
-# Core (always needed)
-dependencies = [
-  "numpy>=1.26",
-  "tensors>=0.1.0"
-]
+[tool.poetry.dependencies]
+python = ">=3.10"
+numpy = ">=1.26,<2.3"
+tensors = ">=0.1.0"
 
-# Named feature groups—install only what you need:
-#  • plot: visualization & analysis
-#  • ml: full ML stack & beam search
-#  • dev: testing & linting
-[project.optional-dependencies]
-plot = [
-  "matplotlib>=3.7",    # plotting
-  "networkx>=3.1",      # graph tools
-  "scikit-learn>=1.2"   # classical ML
-]
-ml = [
-  "transformers>=4.30",           # model interfaces
-  "sentence-transformers>=2.2"    # high-level embeddings
-  # torch & torch_geometric handled by setup_env.sh for CPU vs GPU installs
-]
-dev = [
-  "pytest>=8.0"
-]
+[tool.poetry.group.plot]
+optional = true
 
-[tool.setuptools.packages.find]
-where = ["."]
-include = ["speaktome*"]
+[tool.poetry.group.plot.dependencies]
+matplotlib = ">=3.7"
+networkx = ">=3.1"
+scikit-learn = ">=1.2"
+
+[tool.poetry.group.ml]
+optional = true
+
+[tool.poetry.group.ml.dependencies]
+transformers = ">=4.30"
+"sentence-transformers" = ">=2.2"
+
+[tool.poetry.group.dev]
+optional = true
+
+[tool.poetry.group.dev.dependencies]
+pytest = ">=8.0"
+tools = {path = "../AGENTS/tools", develop = true}
+
+[tool.poetry.extras]
+plot = []
+ml = []
+dev = []
+
+[build-system]
+requires = ["poetry-core>=1.5.0"]
+build-backend = "poetry.core.masonry.api"
+

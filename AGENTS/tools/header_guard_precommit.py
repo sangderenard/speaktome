@@ -5,19 +5,20 @@
 from __future__ import annotations
 
 try:
-    from AGENTS.tools.header_utils import (
-        ENV_SETUP_BOX,
-        IMPORT_FAILURE_PREFIX,
-        HEADER_START,
-        HEADER_END,
-    )
-    from .header_utils import ENV_SETUP_BOX
     import subprocess
     import ast
     import os
     from pathlib import Path
 except Exception:
+    import os
     import sys
+    try:
+        ENV_SETUP_BOX = os.environ["SPEAKTOME_ENV_SETUP_BOX"]
+    except KeyError as exc:
+        raise RuntimeError("environment not initialized") from exc
+    IMPORT_FAILURE_PREFIX = "[HEADER] import failure in"
+    HEADER_START = "# --- BEGIN HEADER ---"
+    HEADER_END = "# --- END HEADER ---"
     print(f"{IMPORT_FAILURE_PREFIX} {__file__}")
     print(ENV_SETUP_BOX)
     sys.exit(1)
@@ -35,7 +36,7 @@ If the pre-commit hook caught your changes, here's a friendly checklist:
    - A `@staticmethod test()` method in each class
     - `from __future__ import annotations` before the `try` block
     - Imports wrapped in a `try` block
-    - An `except` block that imports `sys`, prints guidance about running `setup_env_dev`, then calls `sys.exit(1)`
+    - An `except` block that imports `sys`, prints guidance to consult `ENV_SETUP_OPTIONS.md`, then calls `sys.exit(1)`
     - A `# --- END HEADER ---` sentinel after the `except` block
     - The `# --- BEGIN HEADER ---` sentinel after the shebang
 

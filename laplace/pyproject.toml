@@ -1,16 +1,23 @@
-[build-system]
-requires = ["setuptools>=61", "wheel"]
-build-backend = "setuptools.build_meta"
-
-[project]
+[tool.poetry]
 name = "laplace"
 version = "0.1.0"
 description = "Laplace builder with DEC and neural metric tensors"
+authors = ["Laplace Authors"]
+license = "MIT"
 readme = "README.md"
-requires-python = ">=3.8"
-license = { text = "MIT" }
-authors = [{ name = "Laplace Authors" }]
 
-[tool.setuptools.packages.find]
-where = ["."]
-include = ["laplace*"]
+[tool.poetry.dependencies]
+python = ">=3.10"
+
+[tool.poetry.group.dev]
+optional = true
+
+[tool.poetry.group.dev.dependencies]
+tools = {path = "../AGENTS/tools", develop = true}
+
+[tool.poetry.extras]
+dev = []
+
+[build-system]
+requires = ["poetry-core>=1.5.0"]
+build-backend = "poetry.core.masonry.api"

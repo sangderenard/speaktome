@@ -1,0 +1,43 @@
+[tool.poetry]
+name = "speaktome-hub"
+version = "0.1.0"
+description = "Monorepo hub for SpeakToMe projects"
+authors = ["SpeakToMe Authors"]
+license = "MIT"
+
+[tool.poetry.dependencies]
+python = ">=3.10"
+speaktome = {path = "speaktome", develop = true}
+fontmapper = {path = "fontmapper", develop = true}
+laplace = {path = "laplace", develop = true}
+tensors = {path = "tensors", develop = true}
+time_sync = {path = "time_sync", develop = true}
+tensor_printing = {path = "tensor printing", develop = true}
+tools = {path = "AGENTS/tools", develop = true}
+
+[tool.poetry.group.dev]
+optional = true
+
+[tool.poetry.group.dev.dependencies]
+pytest = ">=8.0"
+
+[tool.poetry.group.cpu-torch]
+optional = true
+
+[tool.poetry.group.cpu-torch.dependencies]
+torch = "2.3.1"
+
+[tool.poetry.group.gpu-torch]
+optional = true
+
+[tool.poetry.group.gpu-torch.dependencies]
+torch = "2.3.1"
+
+[tool.poetry.extras]
+cpu-torch = []
+gpu-torch = []
+
+
+[build-system]
+requires = ["poetry-core>=1.5.0"]
+build-backend = "poetry.core.masonry.api"

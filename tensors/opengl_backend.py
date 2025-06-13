@@ -56,7 +56,7 @@ class OpenGLTensorOperations(AbstractTensor):
         if GL is None:
             raise RuntimeError("PyOpenGL is required for the OpenGL backend")
 
-    def _AbstractTensor__apply_operator_(self, op: str, left: Any, right: Any):
+    def _apply_operator__(self, op: str, left: Any, right: Any):
         raise NotImplementedError("OpenGL operator dispatch not implemented")
 
     def full_(self, size: Tuple[int, ...], fill_value: Any, dtype: Any, device: Any):
@@ -128,6 +128,10 @@ class OpenGLTensorOperations(AbstractTensor):
     def repeat_interleave_(self, repeats: int = 1, dim: int | None = None):
         raise NotImplementedError
 
+    def repeat_(self, repeats: Any = None, dim: int = 0):
+        """Repeat tensor along ``dim`` ``repeats`` times (stub)."""
+        raise NotImplementedError("repeat not implemented for OpenGL backend")
+
     def view_flat_(self):
         raise NotImplementedError
 
@@ -169,6 +173,18 @@ class OpenGLTensorOperations(AbstractTensor):
 
     def argmin_(self, dim: int | None = None):
         raise NotImplementedError
+
+    def save_(self, filepath: str) -> None:
+        """Persist tensor to disk (stub)."""
+        raise NotImplementedError("save not implemented for OpenGL backend")
+
+    def load_(self, filepath: str, dtype: Any, device: Any):
+        """Load tensor from disk (stub)."""
+        raise NotImplementedError("load not implemented for OpenGL backend")
+
+    def to_dtype_(self, dtype: str = "float"):
+        """Convert tensor dtype (stub)."""
+        raise NotImplementedError("to_dtype not implemented for OpenGL backend")
 
     def get_shape(self):
         raise NotImplementedError

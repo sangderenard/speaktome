@@ -1,26 +1,21 @@
 # Windows PowerShell environment setup script for SpeakToMe
-# No Unicode. All pip/python commands run inside venv unless -NoVenv is used.
+# No Unicode. All pip/python commands run inside venv unless -no-venv is used.
 
 param(
     [Parameter(ValueFromRemainingArguments=$true)]
     [string[]]$args
 )
 
+$env:SPEAKTOME_ENV_SETUP_BOX = "`n+----------------------------------------------------------------------+`n| Imports failed. See ENV_SETUP_OPTIONS.md for environment guidance.  |`n| Missing packages usually mean setup was skipped or incomplete.      |`n+----------------------------------------------------------------------+`n"
+
 # Manual flag parsing for all arguments (case-insensitive, -flag=value style)
-$NoVenv = $false
-$UseTorch = $false
-$UseGpuTorch = $false
-$headless = $false
+$UseVenv = $true
 $FromDev = $false
 $Codebases = @()
 $Groups = @()
 foreach ($arg in $args) {
     $arg_lc = $arg.ToLower()
-    if ($arg_lc -eq '-novenv') { $NoVenv = $true }
-    elseif ($arg_lc -eq '-torch') { $UseTorch = $true }
-    elseif ($arg_lc -eq '-gpu' -or $arg_lc -eq '-gpu-torch') { $UseTorch = $true; $UseGpuTorch = $true }
-    elseif ($arg_lc -eq '-notorch') { $UseTorch = $false }
-    elseif ($arg_lc -eq '-headless') { $headless = $true }
+    if ($arg_lc -eq '-no-venv') { $UseVenv = $false }
     elseif ($arg_lc -eq '-fromdev') { $FromDev = $true }
     elseif ($arg_lc -like '-codebases=*') {
         $cbVal = $arg.Substring($arg.IndexOf('=')+1)
@@ -37,8 +32,7 @@ foreach ($arg in $args) {
 }
 
 # All options for this script should be used with single-dash PowerShell-style flags, e.g.:
-#   -Torch -NoVenv -Codebases projectA,projectB -Groups groupX
-# Use -Torch or -Gpu to request torch. If omitted, torch is skipped.
+#   -no-venv -Codebases projectA,projectB -Groups groupX
 # Do not use double-dash flags with this script.
 
 $activeFile = $env:SPEAKTOME_ACTIVE_FILE
@@ -47,25 +41,8 @@ if (-not $activeFile) {
 }
 $env:SPEAKTOME_ACTIVE_FILE = $activeFile
 if (-not $Codebases) {
-    if ($headless) {
-        Write-Host "[DEBUG] No codebases specified - headless mode: auto-loading from codebase_map.json."
-        $mapFile = Join-Path $PSScriptRoot 'AGENTS\codebase_map.json'
-        if (Test-Path $mapFile) {
-            try {
-                $Codebases = (Get-Content $mapFile | ConvertFrom-Json).psobject.Properties.Name
-                # Optionally load all groups for a full install:
-                # $Groups = @( 'groupA','groupB','...' )
-            }
-            catch {
-                Write-Host "[DEBUG] Could not parse codebase_map.json; continuing empty."
-                $Codebases = $null
-            }
-        }
-    }
-    else {
-        Write-Host "[DEBUG] No codebases specified - launching interactive menu."
-        # Let dev_group_menu handle interactive selection
-    }
+    Write-Host "[DEBUG] No codebases specified - launching interactive menu."
+    # Let dev_group_menu handle interactive selection
 }
 $menuArgs = @()
 if ($Codebases) { $menuArgs += '-Codebases'; $menuArgs += ($Codebases -join ',') }
@@ -146,7 +123,7 @@ function Install-Quiet($exePath, [string]$commandArguments) {
     }
 }
 
-if (-not $NoVenv) {
+if ($UseVenv) {
     # 1. Create venv
     Safe-Run { python -m venv .venv }
     
@@ -168,28 +145,14 @@ if (-not $NoVenv) {
     $venvPip = "pip"
 }
 
-# 2. Install core + dev requirements
-Safe-Run { & $venvPython -m pip install --upgrade pip }
-Safe-Run { & $venvPython -m pip install wheel }  # <-- Add this line
 
-# Torch install logic
-if ($UseTorch) {
-    if ($UseGpuTorch) {
-        Write-Host 'Installing torch with GPU support'
-        Install-Quiet $venvPip "install torch==2.3.1"
-    } else {
-        Write-Host 'Installing CPU-only torch'
-        Install-Quiet $venvPip "install torch==2.3.1+cpu -f https://download.pytorch.org/whl/torch_stable.html"
-    }
-} else {
-    Write-Host '[INFO] Torch not requested; skipping installation.'
-}
+# 2. Delegate package installation to dev_group_menu.py
 
 # If not called from a dev script, launch the dev menu for all codebase/group installs
 
 # Always run dev_group_menu.py at the end
 if ($FromDev) {
-    Write-Host "Installing AGENTS/tools in headless mode..."
+    Write-Host "Installing AGENTS/tools..."
     $env:PIP_CMD = $venvPip
     & $venvPython (Join-Path $PSScriptRoot "AGENTS\tools\dev_group_menu.py") --install --codebases 'tools' --record $activeFile
     Write-Host "Launching codebase/group selection tool for editable installs (from-dev)..."

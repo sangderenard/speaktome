@@ -23,13 +23,16 @@ try:
     import threading
     import tempfile
     from pathlib import Path
-    from AGENTS.tools.header_utils import ENV_SETUP_BOX
     import tomllib
 except ModuleNotFoundError:  # Python < 3.11
     import tomli as tomllib
 except Exception:
+    import os
     import sys
-    from AGENTS.tools.header_utils import ENV_SETUP_BOX
+    try:
+        ENV_SETUP_BOX = os.environ["SPEAKTOME_ENV_SETUP_BOX"]
+    except KeyError as exc:
+        raise RuntimeError("environment not initialized") from exc
     print(ENV_SETUP_BOX)
     sys.exit(1)
 
@@ -77,6 +80,12 @@ ROOT = Path(__file__).resolve().parents[2]
 REGISTRY = ROOT / "AGENTS" / "CODEBASE_REGISTRY.md"
 MAP_FILE = ROOT / "AGENTS" / "codebase_map.json"
 ACTIVE_ENV = "SPEAKTOME_ACTIVE_FILE"
+
+if "PYTHONPATH" not in os.environ:
+    os.environ["PYTHONPATH"] = str(ROOT)
+    # Ensure imports find local packages when executed directly
+    if str(ROOT) not in sys.path:
+        sys.path.insert(0, str(ROOT))
 
 
 def discover_codebases(registry_path: Path) -> list[Path]:
@@ -198,25 +207,39 @@ def noninteractive_selection(
 def install_selections(
     selections: dict[str, dict[str, list[str]]], *, pip_cmd: str = "pip"
 ) -> None:
-    """Install selected packages for each codebase using ``pip_cmd``."""
+    """Install selected packages for each codebase using ``poetry`` and ``pip_cmd``."""
 
     env = os.environ.copy()
     env.setdefault("PYTHONPATH", str(ROOT))
     env.setdefault("PIP_NO_BUILD_ISOLATION", "1")
+
+    # Gather all selected group names across codebases
+    selected_groups: set[str] = set()
+    for groups in selections.values():
+        selected_groups.update(groups.keys())
+
+    base_cmd = ["poetry", "install", "--sync", "--no-interaction"]
+    non_torch = [g for g in selected_groups if g not in {"cpu-torch", "gpu-torch"}]
+    if non_torch:
+        base_cmd += ["--with", ",".join(sorted(non_torch))]
+    else:
+        base_cmd += ["--without", "cpu-torch", "--without", "gpu-torch"]
+
+    subprocess.run(base_cmd, check=False, env=env)
+
+    # Install torch groups separately so failures don't stop other packages
+    for grp in (g for g in selected_groups if g in {"cpu-torch", "gpu-torch"}):
+        subprocess.run(["poetry", "install", "--sync", "--no-interaction", "--with", grp], check=False, env=env)
+
+    # Install codebases and extra pip packages
     for cb, groups in selections.items():
         cb_path = CODEBASE_PATHS.get(cb, ROOT / cb)
-        if not cb_path.is_dir():
-            continue
-        subprocess.run([
-            pip_cmd,
-            "install",
-            "--no-build-isolation",
-            "-e",
-            str(cb_path),
-        ], check=False, env=env)
-        for pkgs in groups.values():
-            for pkg in pkgs:
-                subprocess.run([pip_cmd, "install", pkg], check=False, env=env)
+        if cb_path.is_dir():
+            subprocess.run([pip_cmd, "install", "--no-build-isolation", "-e", str(cb_path)], check=False, env=env)
+        for grp, pkgs in groups.items():
+            if grp not in {"cpu-torch", "gpu-torch"}:
+                for pkg in pkgs:
+                    subprocess.run([pip_cmd, "install", pkg], check=False, env=env)
 
 
 def interactive_menu_selection() -> tuple[list[str], dict[str, dict[str, list[str]]]]:

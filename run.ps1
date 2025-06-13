@@ -5,7 +5,7 @@ $ErrorActionPreference = 'Stop'
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Definition
 $venvPython = Join-Path $scriptDir '.venv\Scripts\python.exe'
 if (-not (Test-Path $venvPython)) {
-    Write-Host 'Virtual environment not found. Run setup_env.ps1 first.'
+    Write-Host 'Virtual environment not found. See ENV_SETUP_OPTIONS.md.'
     exit 1
 }
 

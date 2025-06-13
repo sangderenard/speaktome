@@ -11,34 +11,21 @@ set -uo pipefail
 SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 MAP_FILE="$SCRIPT_ROOT/AGENTS/codebase_map.json"
 
+# Provide ENV_SETUP_BOX for modules that fail to import early
+export SPEAKTOME_ENV_SETUP_BOX="\n+-----------------------------------------------------------------------+\n| Imports failed. See ENV_SETUP_OPTIONS.md for environment guidance.  |\n| Missing packages usually mean setup was skipped or incomplete.      |\n+-----------------------------------------------------------------------+\n"
+
 ACTIVE_FILE=${SPEAKTOME_ACTIVE_FILE:-/tmp/speaktome_active.json}
 export SPEAKTOME_ACTIVE_FILE="$ACTIVE_FILE"
 
 USE_VENV=1
-HEADLESS=0
-TORCH_CHOICE=""
 CODEBASES=""
 GROUPS=()
 for arg in "$@"; do
   arg_lc="${arg,,}"
   case $arg_lc in
     -no-venv) USE_VENV=0 ;;
-    -headless) HEADLESS=1 ;;
-    -torch) TORCH_CHOICE="cpu" ;;
-    -gpu|-gpu-torch) TORCH_CHOICE="gpu" ;;
-    -notorch|-no-torch) TORCH_CHOICE="" ;;
   esac
 done
-
-# Auto-load codebases from map file when running headless
-if [ -z "$CODEBASES" ] && [ $HEADLESS -eq 1 ] && [ -f "$MAP_FILE" ]; then
-  CODEBASES="$(python - "$MAP_FILE" <<'PY'
-import json,sys
-d=json.load(open(sys.argv[1]))
-print(",".join(d.keys()))
-PY
-)"
-fi
 
 [ -n "$CODEBASES" ] && MENU_ARGS+=("-codebases" "$CODEBASES")
 for g in "${GROUPS[@]}"; do
@@ -102,8 +89,15 @@ install_quiet() {
 }
 
 if [ $USE_VENV -eq 1 ]; then
-  safe_run python -m venv .venv
-  source .venv/bin/activate
+  poetry config virtualenvs.in-project true
+  INSTALL_ARGS="${SPEAKTOME_POETRY_ARGS:---without cpu-torch --without gpu-torch}"
+  if [[ "$INSTALL_ARGS" == *"--with"* && "$INSTALL_ARGS" != *"--without"* ]]; then
+    echo "[INFO] Torch groups requested; attempting install" >&2
+    install_quiet poetry install --sync --no-interaction $INSTALL_ARGS
+  else
+    echo "[INFO] Skipping torch groups" >&2
+    safe_run poetry install --sync --no-interaction $INSTALL_ARGS
+  fi
   VENV_PYTHON="./.venv/bin/python"
   VENV_PIP="./.venv/bin/pip"
 else
@@ -111,8 +105,6 @@ else
   VENV_PIP="pip"
 fi
 
-safe_run $VENV_PYTHON -m pip install --upgrade pip
-safe_run $VENV_PYTHON -m pip install wheel
 CODEBASES=""
 GROUPS=()
 MENU_ARGS=()
@@ -125,17 +117,6 @@ for arg in "$@"; do
   esac
 done
 
-if [ -n "$TORCH_CHOICE" ]; then
-  if [ "$TORCH_CHOICE" = "gpu" ]; then
-    echo "Installing torch with GPU support"
-    install_quiet "$VENV_PIP" install torch==2.3.1
-  else
-    echo "Installing CPU-only torch"
-    install_quiet "$VENV_PIP" install torch==2.3.1+cpu -f https://download.pytorch.org/whl/torch_stable.html
-  fi
-else
-  echo "[INFO] Torch not requested; skipping installation."
-fi
 
 # If not called from a dev script, launch the dev menu for all codebase/group installs
 CALLED_BY_DEV=0
@@ -147,8 +128,8 @@ done
 
 # Always run dev_group_menu.py at the end
 if [ $CALLED_BY_DEV -eq 1 ]; then
-  # Headless install of AGENTS/tools
-  echo "Installing AGENTS/tools in headless mode..."
+  # Install AGENTS/tools without prompts
+  echo "Installing AGENTS/tools..."
   PIP_CMD="$VENV_PIP" "$VENV_PYTHON" "$SCRIPT_ROOT/AGENTS/tools/dev_group_menu.py" --install --codebases tools --record "$SPEAKTOME_ACTIVE_FILE"
   # Then run again with any arguments passed
   echo "Launching codebase/group selection tool for editable installs (from-dev)..."

@@ -51,7 +51,7 @@ class NumPyTensorOperations(AbstractTensor):
     def __init__(self, track_time: bool = False):
         super().__init__(track_time=track_time)
 
-    def _AbstractTensor__apply_operator_(self, op: str, left: Any, right: Any):
+    def _apply_operator__(self, op: str, left: Any, right: Any):
         """Apply arithmetic operators on NumPy arrays."""
         a = np.array(left) if not isinstance(left, np.ndarray) else left
         b = np.array(right) if not isinstance(right, np.ndarray) else right
@@ -225,6 +225,10 @@ class NumPyTensorOperations(AbstractTensor):
     def repeat_interleave_(self, tensor, repeats, dim=None):
         tensor = self._AbstractTensor__unwrap(tensor)
         return np.repeat(tensor, repeats, axis=dim)
+
+    def repeat_(self, repeats=None, dim: int = 0):
+        """Repeat tensor along ``dim`` ``repeats`` times (stub)."""
+        raise NotImplementedError("repeat not implemented for NumPy backend")
 
     def view_flat_(self, tensor):
         return self._AbstractTensor__unwrap(tensor).reshape(-1)

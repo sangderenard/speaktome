@@ -10,14 +10,8 @@ try:
     from pathlib import Path
     from typing import Iterable, List, Dict
 except Exception:
-    print(
-        "\n"
-        "+-----------------------------------------------------------------------+\n"
-        "| Imports failed. Run setup_env or setup_env_dev and select every    |\n"
-        "| project and module you plan to use. Missing packages mean setup was |\n"
-        "| skipped or incomplete.                                             |\n"
-        "+-----------------------------------------------------------------------+\n"
-    )
+    from AGENTS.tools.header_utils import ENV_SETUP_BOX
+    print(ENV_SETUP_BOX)
     raise
 # --- END HEADER ---
 

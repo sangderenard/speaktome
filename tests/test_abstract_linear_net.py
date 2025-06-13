@@ -20,10 +20,10 @@ def test_sequential_linear_model_forward():
     x = ops.tensor_from_list([[2.0, 3.0, 1.0]], dtype=ops.float_dtype, device=None)
     result = model.forward(x, None)["logits"]
 
-    manual = ops._AbstractTensor__apply_operator("matmul", x, w0)
-    manual = ops._AbstractTensor__apply_operator("add", manual, b0)
-    manual = ops._AbstractTensor__apply_operator("matmul", manual, w1)
-    manual = ops._AbstractTensor__apply_operator("add", manual, b1)
+    manual = ops._apply_operator__("matmul", x, w0)
+    manual = ops._apply_operator__("add", manual, b0)
+    manual = ops._apply_operator__("matmul", manual, w1)
+    manual = ops._apply_operator__("add", manual, b1)
 
     assert ops.tolist(result) == ops.tolist(manual)
 
@@ -39,10 +39,10 @@ def test_sequential_linear_model_with_activation_and_from_weights():
     x = ops.tensor_from_list([[1.0]], dtype=ops.float_dtype, device=None)
     result = model.forward(x, None)["logits"]
 
-    manual = ops._AbstractTensor__apply_operator("matmul", x, w0)
-    manual = ops._AbstractTensor__apply_operator("add", manual, b0)
+    manual = ops._apply_operator__("matmul", x, w0)
+    manual = ops._apply_operator__("add", manual, b0)
     manual = ops.clamp(manual, min_val=0.0)
-    manual = ops._AbstractTensor__apply_operator("matmul", manual, w1)
-    manual = ops._AbstractTensor__apply_operator("add", manual, b1)
+    manual = ops._apply_operator__("matmul", manual, w1)
+    manual = ops._apply_operator__("add", manual, b1)
 
     assert ops.tolist(result) == ops.tolist(manual)

@@ -1,44 +1,65 @@
-[build-system]
-requires = ["setuptools>=61", "wheel"]
-build-backend = "setuptools.build_meta"
-
-[project]
+[tool.poetry]
 name = "fontmapper"
 version = "0.1.0"
 description = "ASCII rendering and font mapping utilities"
+authors = ["FontMapper Authors"]
+license = "MIT"
 readme = "README.md"
-requires-python = ">=3.8"
-license = { text = "MIT" }
-authors = [{ name = "FontMapper Authors" }]
 
-# Baseline dependencies -- no heavy ML stack
-dependencies = [
-    "fonttools",
-    "Pillow",
-    "numpy>=1.26",
-]
+[tool.poetry.dependencies]
+python = ">=3.10"
+fonttools = "*"
+Pillow = "*"
+numpy = ">=1.26,<2.3"
 
-[project.optional-dependencies]
-ml = [
-    "torch",
-    "torchvision",
-    "pynvml",
-]
-ssim = [
-    "scikit-image",
-]
-amqp = [
-    "pika",
-]
-server = [
-    "flask",
-    "flask-cors",
-    "waitress; sys_platform == 'win32'",
-]
-gui = [
-    "PyQt5",
-]
+[tool.poetry.group.torch]
+optional = true
 
-[tool.setuptools.packages.find]
-where = ["."]
-include = ["fontmapper*"]
+[tool.poetry.group.torch.dependencies]
+torch = "*"
+torchvision = "*"
+pynvml = "*"
+
+[tool.poetry.group.ssim]
+optional = true
+
+[tool.poetry.group.ssim.dependencies]
+"scikit-image" = "*"
+
+[tool.poetry.group.amqp]
+optional = true
+
+[tool.poetry.group.amqp.dependencies]
+pika = "*"
+
+[tool.poetry.group.server]
+optional = true
+
+[tool.poetry.group.server.dependencies]
+flask = "*"
+"flask-cors" = "*"
+"waitress" = {version = "*", markers = "sys_platform == 'win32'"}
+
+[tool.poetry.group.gui]
+optional = true
+
+[tool.poetry.group.gui.dependencies]
+PyQt5 = "*"
+
+[tool.poetry.group.dev]
+optional = true
+
+[tool.poetry.group.dev.dependencies]
+tools = {path = "../AGENTS/tools", develop = true}
+
+[tool.poetry.extras]
+ml = []
+ssim = []
+amqp = []
+server = []
+gui = []
+dev = []
+
+[build-system]
+requires = ["poetry-core>=1.5.0"]
+build-backend = "poetry.core.masonry.api"

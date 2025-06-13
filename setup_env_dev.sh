@@ -8,6 +8,7 @@ set -uo pipefail
 # changing directories with pushd. This allows the script to be invoked
 # from anywhere while still locating `.venv`.
 SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+export SPEAKTOME_ENV_SETUP_BOX="\n+----------------------------------------------------------------------+\n| Imports failed. See ENV_SETUP_OPTIONS.md for environment guidance.  |\n| Missing packages usually mean setup was skipped or incomplete.      |\n+----------------------------------------------------------------------+\n"
 ACTIVE_FILE=${SPEAKTOME_ACTIVE_FILE:-/tmp/speaktome_active.json}
 export SPEAKTOME_ACTIVE_FILE="$ACTIVE_FILE"
 MENU_ARGS=()
@@ -23,15 +24,34 @@ safe_run() {
 
 # Run the regular setup script (this creates the venv)
 USE_VENV=1
+TORCH_CHOICE=""
 for arg in "$@"; do
   arg_lc="${arg,,}"
   case $arg_lc in
     -no-venv) USE_VENV=0 ;;
     -codebases=*|-cb=*) MENU_ARGS+=("-codebases" "${arg#*=}") ;;
     -groups=*|-grp=*)   MENU_ARGS+=("-groups" "${arg#*=}") ;;
+    -torch) TORCH_CHOICE="cpu" ;;
+    -gpu|-gpu-torch) TORCH_CHOICE="gpu" ;;
   esac
 done
-safe_run bash "$SCRIPT_ROOT/setup_env.sh" "$@" --from-dev
+POETRY_ARGS="--without cpu-torch --without gpu-torch"
+if [ "$TORCH_CHOICE" = "cpu" ]; then
+  POETRY_ARGS="--with cpu-torch"
+elif [ "$TORCH_CHOICE" = "gpu" ]; then
+  POETRY_ARGS="--with gpu-torch"
+fi
+export SPEAKTOME_POETRY_ARGS="$POETRY_ARGS"
+
+ARGS=()
+for arg in "$@"; do
+  case "${arg,,}" in
+    -torch|-gpu|-gpu-torch) ;;
+    *) ARGS+=("$arg") ;;
+  esac
+done
+
+safe_run bash "$SCRIPT_ROOT/setup_env.sh" "${ARGS[@]}" --from-dev
 
 # Define the venv Python path (assumes setup_env.sh created it at .venv)
 if [ $USE_VENV -eq 1 ]; then
@@ -63,14 +83,8 @@ if [ $USE_VENV -eq 1 ]; then
       exit 1
   fi
 
-  # Install dev requirements
-  REQUIREMENTS_DEV="$SCRIPT_ROOT/requirements-dev.txt"
-  if [ -f "$REQUIREMENTS_DEV" ]; then
-    echo "Installing requirements-dev.txt..."
-    safe_run "$VENV_PIP" install -r "$REQUIREMENTS_DEV"
-  else
-    echo "Warning: requirements-dev.txt not found at $REQUIREMENTS_DEV" >&2
-  fi
+  # Dev dependencies installed via poetry
+
 fi
 
 

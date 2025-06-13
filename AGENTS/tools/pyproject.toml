@@ -1,22 +1,19 @@
-[project]
-name = "speaktome-agent-tools"
+[tool.poetry]
+name = "tools"
 version = "0.1.0"
 description = "Agent tools and repo management utilities for SpeakToMe"
-authors = [ { name = "Your Name", email = "your@email.com" } ]
+authors = ["Your Name <your@email.com>"]
 readme = "README.md"
-requires-python = ">=3.8"
-dependencies = [
-    "tomli; python_version<'3.11'",
-    "importlib-metadata; python_version<'3.8'",
-    "pytz",
-    "ntplib",
-    "pytest>=8.0",
-]
+packages = [{include = "AGENTS", from = ".."}]
 
-[tool.setuptools.packages.find]
-where = ["."]
-include = ["*"]
+[tool.poetry.dependencies]
+python = ">=3.10"
+tomli = {version = "*", python = "<3.11"}
+"importlib-metadata" = {version = "*", python = "<3.8"}
+pytz = "*"
+ntplib = "*"
+pytest = ">=8.0"
 
 [build-system]
-requires = ["setuptools>=61.0"]
-build-backend = "setuptools.build_meta"
+requires = ["poetry-core>=1.5.0"]
+build-backend = "poetry.core.masonry.api"

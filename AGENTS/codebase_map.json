@@ -1,8 +1,16 @@
 {
+  "tensor printing": {
+    "path": "tensor printing",
+    "groups": {
+      "dev": [
+        "tools"
+      ]
+    }
+  },
   "fontmapper": {
     "path": "fontmapper",
     "groups": {
-      "ml": [
+      "torch": [
         "torch",
         "torchvision",
         "pynvml"
@@ -16,24 +24,41 @@
       "server": [
         "flask",
         "flask-cors",
-        "waitress; sys_platform == 'win32'"
+        "waitress"
       ],
       "gui": [
         "PyQt5"
+      ],
+      "dev": [
+        "tools"
+      ]
+    }
+  },
+  "speaktome": {
+    "path": "speaktome",
+    "groups": {
+      "plot": [
+        "matplotlib>=3.7",
+        "networkx>=3.1",
+        "scikit-learn>=1.2"
+      ],
+      "ml": [
+        "transformers>=4.30",
+        "sentence-transformers>=2.2"
+      ],
+      "dev": [
+        "pytest>=8.0",
+        "tools"
       ]
     }
   },
   "laplace": {
     "path": "laplace",
-    "groups": {}
-  },
-  "speaktome": {
-    "path": "speaktome",
-    "groups": {}
-  },
-  "tensor printing": {
-    "path": "tensor printing",
-    "groups": {}
+    "groups": {
+      "dev": [
+        "tools"
+      ]
+    }
   },
   "tensors": {
     "path": "tensors",
@@ -50,10 +75,16 @@
         "torch"
       ],
       "numpy": [
-        "numpy>=1.26"
+        "numpy>=1.26,<2.3"
+      ],
+      "opengl": [
+        "PyOpenGL>=3.1",
+        "glfw",
+        "numpy>=1.26,<2.3"
       ],
       "dev": [
-        "pytest>=8.0"
+        "pytest>=8.0",
+        "tools"
       ]
     }
   },
@@ -62,11 +93,14 @@
     "groups": {
       "gui": [
         "pygame>=2"
+      ],
+      "dev": [
+        "tools"
       ]
     }
   },
   "tools": {
-    "path": "AGENTS\\tools",
+    "path": "AGENTS/tools",
     "groups": {}
   }
 }
