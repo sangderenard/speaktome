@@ -37,6 +37,10 @@ for arg in "$@"; do
   esac
 done
 
+CODEBASES=""
+GROUPS=()
+MENU_ARGS=()
+
 [ -n "$CODEBASES" ] && MENU_ARGS+=("-codebases" "$CODEBASES")
 for g in "${GROUPS[@]}"; do
   MENU_ARGS+=("-groups" "$g")
@@ -114,10 +118,6 @@ else
   VENV_PYTHON="python"
   VENV_PIP="pip"
 fi
-
-CODEBASES=""
-GROUPS=()
-MENU_ARGS=()
 
 for arg in "$@"; do
   arg_lc="${arg,,}"
