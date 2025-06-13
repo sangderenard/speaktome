@@ -1,10 +1,59 @@
-import types
-import sys
+#!/usr/bin/env python3
+# --- BEGIN HEADER ---
+"""Interactive lookahead demo."""
+from __future__ import annotations
+
 try:
-    from AGENTS.tools.header_utils import ENV_SETUP_BOX
-    import numpy as np
-except ModuleNotFoundError:  # pragma: no cover - optional dependency
+    import types
     import sys
+    import numpy as np
+    from speaktome.core.model_abstraction import AbstractModelWrapper
+except Exception:
+    import os
+    import sys
+    from pathlib import Path
+
+    def _find_repo_root(start: Path) -> Path:
+        current = start.resolve()
+        required = {
+            "speaktome",
+            "laplace",
+            "tensor_printing",
+            "time_sync",
+            "AGENTS",
+            "fontmapper",
+            "tensors",
+        }
+        for parent in [current, *current.parents]:
+            if all((parent / name).exists() for name in required):
+                return parent
+        return current
+
+    if "ENV_SETUP_BOX" not in os.environ:
+        root = _find_repo_root(Path(__file__))
+        box = root / "ENV_SETUP_BOX.md"
+        try:
+            os.environ["ENV_SETUP_BOX"] = f"\n{box.read_text()}\n"
+        except Exception:
+            os.environ["ENV_SETUP_BOX"] = "environment not initialized"
+        print(os.environ["ENV_SETUP_BOX"])
+        sys.exit(1)
+    import subprocess
+    try:
+        root = _find_repo_root(Path(__file__))
+        groups = os.environ.get("SPEAKTOME_GROUPS", "")
+        cmd = [sys.executable, "-m", "AGENTS.tools.auto_env_setup", str(root)]
+        if groups:
+            for g in groups.split(","):
+                cmd.append(f"-groups={g}")
+        subprocess.run(cmd, check=False)
+    except Exception:
+        pass
+    try:
+        ENV_SETUP_BOX = os.environ["ENV_SETUP_BOX"]
+    except KeyError as exc:
+        raise RuntimeError("environment not initialized") from exc
+    print(f"[HEADER] import failure in {__file__}")
     print(ENV_SETUP_BOX)
     sys.exit(1)
 # --- END HEADER ---
@@ -18,58 +67,3 @@ class DummyModel(AbstractModelWrapper):
 
     def get_device(self):
         return "cpu"
-
-class DummyTokenizer:
-    pad_token_id = 0
-
-
-def _choose_ops():
-    return get_tensor_operations(DEFAULT_FACULTY)
-
-
-def aggregate(scores):
-    ops = _choose_ops()
-    return ops.mean(scores, dim=-1)
-
-
-def main():
-    ops = _choose_ops()
-    model = DummyModel()
-    tokenizer = DummyTokenizer()
-    cfg = LookaheadConfig(
-        instruction=None,
-        lookahead_top_k=2,
-        lookahead_temp=1.0,
-        aggregate_fn=aggregate,
-    )
-    controller = LookaheadController(
-        lookahead_steps=1,
-        max_len=3,
-        device="cpu",
-        tokenizer=tokenizer,
-        config=cfg,
-        tensor_ops=ops,
-        model_wrapper=model,
-    )
-
-    if isinstance(ops, NumPyTensorOperations) and np is not None:
-        prefix_tokens = np.array([[1]], dtype=np.int64)
-        prefix_scores = np.array([[0.0]], dtype=np.float32)
-        prefix_lengths = np.array([1], dtype=np.int64)
-        parent_idx = np.array([0], dtype=np.int64)
-    else:
-        prefix_tokens = [[1]]
-        prefix_scores = [[0.0]]
-        prefix_lengths = [1]
-        parent_idx = [0]
-
-    out = controller.run(prefix_tokens, prefix_scores, prefix_lengths, parent_idx)
-    tokens, scores, lengths, parents, parent_lens, pruned = out
-    print("Tokens:", tokens)
-    print("Scores:", scores)
-    print("Lengths:", lengths)
-    print("Parents:", parents)
-    print("Pruned:", pruned)
-
-if __name__ == "__main__":
-    main()
