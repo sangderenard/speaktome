@@ -1,5 +1,7 @@
 try:
-    from AGENTS.tools.header_utils import ENV_SETUP_BOX
+    import os
+
+    ENV_SETUP_BOX = os.environ["ENV_SETUP_BOX"]
     from fontmapper import ascii_preview
 except Exception:
     import sys

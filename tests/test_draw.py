@@ -3,13 +3,15 @@
 from __future__ import annotations
 
 try:
-    from AGENTS.tools.header_utils import ENV_SETUP_BOX
+    import os
     import numpy as np
     from time_sync.draw import (
         get_changed_subunits,
         default_subunit_batch_to_chars,
         flexible_subunit_kernel,
     )
+
+    ENV_SETUP_BOX = os.environ["ENV_SETUP_BOX"]
 except Exception:
     import sys
     print(ENV_SETUP_BOX)

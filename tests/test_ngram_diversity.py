@@ -4,10 +4,11 @@
 from __future__ import annotations
 
 try:
-    from AGENTS.tools.header_utils import ENV_SETUP_BOX
+    import os
     import pytest
     pytestmark = pytest.mark.requires_torch
 
+    ENV_SETUP_BOX = os.environ["ENV_SETUP_BOX"]
     torch = pytest.importorskip("torch", reason="requires PyTorch")
     from speaktome.core.scorer import Scorer
 except Exception:

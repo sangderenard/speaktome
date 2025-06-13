@@ -2,14 +2,14 @@
 from __future__ import annotations
 
 try:
-    from AGENTS.tools.header_utils import ENV_SETUP_BOX
     import os
     import shutil
     import logging
     from pathlib import Path
     from importlib import reload
-
     import pytest
+
+    ENV_SETUP_BOX = os.environ["ENV_SETUP_BOX"]
 
     import AGENTS.validate_guestbook as vg
 except Exception:

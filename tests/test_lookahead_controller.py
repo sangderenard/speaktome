@@ -6,8 +6,10 @@ import pytest
 pytest.importorskip('torch', reason='lookahead controller requires torch')
 
 try:
-    from AGENTS.tools.header_utils import ENV_SETUP_BOX
+    import os
     import numpy as np
+
+    ENV_SETUP_BOX = os.environ["ENV_SETUP_BOX"]
 except ModuleNotFoundError:  # pragma: no cover - optional dependency
     import sys
     print(ENV_SETUP_BOX)
