@@ -25,7 +25,7 @@ def available_backends() -> list[tuple[str, type[ta.AbstractTensor]]]:
     if importlib.util.find_spec("torch") is not None:
         backends.append(("PyTorch", ta.PyTorchTensorOperations))
     try:
-        from tensors.c_backend import CTensorOperations
+        from tensors.accelerator_backends.c_backend import CTensorOperations
         backends.append(("CTensor", CTensorOperations))
     except Exception:
         pass

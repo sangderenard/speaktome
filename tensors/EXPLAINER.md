@@ -13,7 +13,8 @@ operate on tensors without binding to a specific backend.
   logic chooses the highest available faculty (Pure Python, NumPy, Torch, JAX,
   etc.).
 - **Backend Modules** – Each backend (`pure_backend.py`, `numpy_backend.py`,
-  `torch_backend.py`, `jax_backend.py`, `c_backend.py`, `opengl_backend.py`)
+  `torch_backend.py`, `jax_backend.py`, `accelerator_backends/c_backend.py`,
+  `accelerator_backends/opengl_backend.py`)
   implements tensor primitives using its library of choice.
 - **Conversion Registry** – Utility functions allow converting tensors between
   backends when possible.
