@@ -2,15 +2,9 @@
 """ASCII art utilities for rendering clock faces."""
 from __future__ import annotations
 
-try:
-    from AGENTS.tools.header_utils import ENV_SETUP_BOX
-    import datetime as _dt
-    import math
-    from typing import List, Tuple, Optional
-except Exception:
-    import sys
-    print(ENV_SETUP_BOX)
-    sys.exit(1)
+import datetime as _dt
+import math
+from typing import List, Tuple, Optional
 # --- END HEADER ---
 
 from colorama import Fore, Style

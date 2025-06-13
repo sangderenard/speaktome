@@ -2,19 +2,13 @@
 """ASCII classifier using tensor backends for parallel evaluation."""
 from __future__ import annotations
 
-try:
-    from AGENTS.tools.header_utils import ENV_SETUP_BOX
-    from typing import Any
-    import numpy as np
-    from PIL import Image, ImageDraw, ImageFont
-    from tensors import (
-        AbstractTensor,
-        Faculty,
-    )
-except Exception as e:
-    import sys
-    print(ENV_SETUP_BOX)
-    sys.exit(1)
+from typing import Any
+import numpy as np
+from PIL import Image, ImageDraw, ImageFont
+from tensors import (
+    AbstractTensor,
+    Faculty,
+)
 # --- END HEADER ---
 
 try:

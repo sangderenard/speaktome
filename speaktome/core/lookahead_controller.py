@@ -1,18 +1,12 @@
 from __future__ import annotations
 
-try:
-    from AGENTS.tools.header_utils import ENV_SETUP_BOX
-    # Standard library imports
-    from typing import List, Tuple, Callable, Any, Set, TYPE_CHECKING
+# Standard library imports
+from typing import List, Tuple, Callable, Any, Set, TYPE_CHECKING
 
-    if TYPE_CHECKING:  # pragma: no cover - type hints only
-        from .beam_search_instruction import BeamSearchInstruction
-    from tensors import AbstractTensor
-    from .model_abstraction import AbstractModelWrapper
-except Exception:
-    import sys
-    print(ENV_SETUP_BOX)
-    sys.exit(1)
+if TYPE_CHECKING:  # pragma: no cover - type hints only
+    from .beam_search_instruction import BeamSearchInstruction
+from tensors import AbstractTensor
+from .model_abstraction import AbstractModelWrapper
 # --- END HEADER ---
 
 

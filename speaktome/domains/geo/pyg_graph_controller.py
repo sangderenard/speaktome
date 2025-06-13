@@ -1,28 +1,21 @@
-try:
-    from AGENTS.tools.header_utils import ENV_SETUP_BOX
-    # Standard library imports
-    from typing import Optional, List, TYPE_CHECKING
+# Standard library imports
+from typing import Optional, List, TYPE_CHECKING
 
-    import torch
+import torch
 
-    from ...util.lazy_loader import lazy_import
-    if TYPE_CHECKING:
-        from torch_geometric.data import Data as PyGData
+from ...util.lazy_loader import lazy_import
+if TYPE_CHECKING:
+    from torch_geometric.data import Data as PyGData
 
-    # Local application/library specific imports
-    from ...core.beam_search import BeamSearch
-    from .pygeo_mind import PyGeoMind
-    # Local application/library specific imports
-    from ...core.human_scorer_policy_manager import HumanScorerPolicyManager
-    from ...core.beam_search_instruction import BeamSearchInstruction
-    # Ensure this import points to the new location of BeamTreeVisualizer
-    # Import both visualizers from beam_tree_visualizer.py
-    from ...core.beam_tree_visualizer import BeamTreeVisualizer
-    from ...config import get_sentence_transformer_model
-except Exception:
-    import sys
-    print(ENV_SETUP_BOX)
-    sys.exit(1)
+# Local application/library specific imports
+from ...core.beam_search import BeamSearch
+from .pygeo_mind import PyGeoMind
+from ...core.human_scorer_policy_manager import HumanScorerPolicyManager
+from ...core.beam_search_instruction import BeamSearchInstruction
+# Ensure this import points to the new location of BeamTreeVisualizer
+# Import both visualizers from beam_tree_visualizer.py
+from ...core.beam_tree_visualizer import BeamTreeVisualizer
+from ...config import get_sentence_transformer_model
 # --- END HEADER ---
 class PyGGraphController:
     def __init__(self, beam_search: BeamSearch, pygeomind_model: Optional[PyGeoMind] = None, human_in_control: bool = False):

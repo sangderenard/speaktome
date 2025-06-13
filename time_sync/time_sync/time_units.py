@@ -2,15 +2,9 @@
 """Defines TimeUnit class and utilities for configurable clock units."""
 from __future__ import annotations
 
-try:
-    from AGENTS.tools.header_utils import ENV_SETUP_BOX
-    import datetime as _dt
-    from dataclasses import dataclass, field
-    from typing import Callable, Any, List, Tuple, Dict
-except Exception:
-    import sys
-    print(ENV_SETUP_BOX)
-    sys.exit(1)
+import datetime as _dt
+from dataclasses import dataclass, field
+from typing import Callable, Any, List, Tuple, Dict
 # --- END HEADER ---
 
 # --- Accessor Functions ---

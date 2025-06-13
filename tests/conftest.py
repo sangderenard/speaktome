@@ -314,7 +314,7 @@ Active Faculty for this Session:
     
     root_logger.info("--------------------------------------------------------------------------------")
     # --- End Enhanced Log Header & Faculty Information ---
-    from AGENTS.tools.dump_headers import dump_headers
+    from AGENTS.tests.headers.dump_headers import dump_headers
     buf = StringIO()
     _stdout = sys.stdout
     sys.stdout = buf

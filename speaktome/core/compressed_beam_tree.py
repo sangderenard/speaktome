@@ -1,27 +1,21 @@
-try:
-    from AGENTS.tools.header_utils import ENV_SETUP_BOX
-    # Standard library imports
-    from typing import Dict, List, Optional, Tuple, Any, TYPE_CHECKING
+# Standard library imports
+from typing import Dict, List, Optional, Tuple, Any, TYPE_CHECKING
 
-    import torch
-    from ..util.lazy_loader import lazy_install
+import torch
+from ..util.lazy_loader import lazy_install
 
-    if TYPE_CHECKING:
-        from transformers import PreTrainedTokenizer  # For type hinting
+if TYPE_CHECKING:
+    from transformers import PreTrainedTokenizer  # For type hinting
 
-    if TYPE_CHECKING:
-        from torch_geometric.data import Data as PyGData  # pragma: no cover
+if TYPE_CHECKING:
+    from torch_geometric.data import Data as PyGData  # pragma: no cover
 
-    # Local application/library specific imports
-    from .beam_tree_node import BeamTreeNode  # Assuming BeamTreeNode is in beam_tree_node.py
-    from tensors import (
-        AbstractTensor,
-        get_tensor_operations,
-    )
-except Exception:
-    import sys
-    print(ENV_SETUP_BOX)
-    sys.exit(1)
+# Local application/library specific imports
+from .beam_tree_node import BeamTreeNode  # Assuming BeamTreeNode is in beam_tree_node.py
+from tensors import (
+    AbstractTensor,
+    get_tensor_operations,
+)
 # --- END HEADER ---
 
 class CompressedBeamTree:

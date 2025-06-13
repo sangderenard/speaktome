@@ -1,15 +1,9 @@
-try:
-    from AGENTS.tools.header_utils import ENV_SETUP_BOX
-    # Standard library imports
-    import queue as py_queue
-    import threading
-    from typing import Dict, List, Optional, Tuple, TYPE_CHECKING
+# Standard library imports
+import queue as py_queue
+import threading
+from typing import Dict, List, Optional, Tuple, TYPE_CHECKING
 
-    import torch
-except Exception:
-    import sys
-    print(ENV_SETUP_BOX)
-    sys.exit(1)
+import torch
 # --- END HEADER ---
 
 if TYPE_CHECKING:

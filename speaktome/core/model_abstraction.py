@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 try:
-    from AGENTS.tools.header_utils import ENV_SETUP_BOX
     from abc import ABC, abstractmethod
     from typing import Any, Dict
     import torch
@@ -11,7 +10,7 @@ except ModuleNotFoundError:  # pragma: no cover - optional dependency
     torch = None  # type: ignore
 except Exception:
     import sys
-    print(ENV_SETUP_BOX)
+    print("Model abstraction failed to import")
     sys.exit(1)
 # --- END HEADER ---
 

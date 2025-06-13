@@ -5,7 +5,6 @@ import argparse
 # Third-party imports
 from tensors.faculty import Faculty, DEFAULT_FACULTY
 try:
-    from AGENTS.tools.header_utils import ENV_SETUP_BOX
     import torch
 except ModuleNotFoundError:  # pragma: no cover - runtime message only
     torch = None
@@ -16,10 +15,6 @@ if not TORCH_AVAILABLE:
 try:
     from transformers import PreTrainedTokenizer
     TRANSFORMERS_AVAILABLE = True
-except ModuleNotFoundError:  # pragma: no cover - runtime message only
-    import sys
-    print(ENV_SETUP_BOX)
-    sys.exit(1)
 # --- END HEADER ---
 
 

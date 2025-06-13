@@ -2,12 +2,6 @@
 """FontMapper FM38 utility functions."""
 from __future__ import annotations
 
-try:
-    from AGENTS.tools.header_utils import ENV_SETUP_BOX
-except Exception:
-    import sys
-    print(ENV_SETUP_BOX)
-    sys.exit(1)
 # --- END HEADER ---
 
 # --- Core Imports (always required) ---
@@ -37,9 +31,7 @@ try:
     from collections import defaultdict
 except Exception:
     import sys
-    from AGENTS.tools.header_utils import ENV_SETUP_BOX
-    print(ENV_SETUP_BOX)
-    sys.exit(1)
+    print(f"Optional dependencies missing in {__file__} -> {sys.exc_info()[1]}")
 # --- END HEADER ---
 
 from .optional_dependencies import (

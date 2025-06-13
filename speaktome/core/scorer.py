@@ -1,34 +1,28 @@
-try:
-    from AGENTS.tools.header_utils import ENV_SETUP_BOX
-    """Scoring utilities for beam search and research experimentation.
+# """Scoring utilities for beam search and research experimentation.
 
-    This module lazily loads GPT‑2 resources and provides a suite of batched
-    scoring functions.  The design favours vectorised tensor operations so models
-    and heuristics can scale gracefully.  Future versions will introduce a queue
-    and mailbox mechanism so that tokenisation, model inference, and scoring can be
-    scheduled in worker threads.  This will allow the scoring pipeline to operate
-    on arbitrary array types while delivering results to dynamic mailboxes for
-    maximum throughput.
-    """
+# This module lazily loads GPT‑2 resources and provides a suite of batched
+# scoring functions.  The design favours vectorised tensor operations so models
+# and heuristics can scale gracefully.  Future versions will introduce a queue
+# and mailbox mechanism so that tokenisation, model inference, and scoring can be
+# scheduled in worker threads.  This will allow the scoring pipeline to operate
+# on arbitrary array types while delivering results to dynamic mailboxes for
+# maximum throughput.
+# """
 
-    from typing import Callable, Dict
+from typing import Callable, Dict
 
-    import os
-    import torch
-    import torch.nn.functional as F
-    import queue
+import os
+import torch
+import torch.nn.functional as F
+import queue
 
-    from tensors import (
-        AbstractTensor,
-        get_tensor_operations,
-    )
+from tensors import (
+    AbstractTensor,
+    get_tensor_operations,
+)
 
-    from ..util.lazy_loader import lazy_import, optional_import
-    from .. import config
-except Exception:
-    import sys
-    print(ENV_SETUP_BOX)
-    sys.exit(1)
+from ..util.lazy_loader import lazy_import, optional_import
+from .. import config
 # --- END HEADER ---
 
 class Scorer:

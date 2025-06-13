@@ -1,17 +1,11 @@
-try:
-    from AGENTS.tools.header_utils import ENV_SETUP_BOX
-    # Standard library imports
-    import collections
-    from typing import Optional, List, TYPE_CHECKING
+# Standard library imports
+import collections
+from typing import Optional, List, TYPE_CHECKING
 
-    if TYPE_CHECKING:
-        from transformers import PreTrainedTokenizer
+if TYPE_CHECKING:
+    from transformers import PreTrainedTokenizer
 
-    from ..util.lazy_loader import lazy_install
-except Exception:
-    import sys
-    print(ENV_SETUP_BOX)
-    sys.exit(1)
+from ..util.lazy_loader import lazy_install
 # --- END HEADER ---
 
 if TYPE_CHECKING:

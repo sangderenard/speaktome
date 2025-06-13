@@ -1,18 +1,12 @@
-try:
-    from AGENTS.tools.header_utils import ENV_SETUP_BOX
-    # Standard library imports
-    from typing import List, Optional
+# Standard library imports
+from typing import List, Optional
 
-    import torch
+import torch
 
-    from tensors import (
-        AbstractTensor,
-        get_tensor_operations,
-    )
-except Exception:
-    import sys
-    print(ENV_SETUP_BOX)
-    sys.exit(1)
+from tensors import (
+    AbstractTensor,
+    get_tensor_operations,
+)
 # --- END HEADER ---
 
 class BeamTreeNode:

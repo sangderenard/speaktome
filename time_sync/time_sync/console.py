@@ -2,13 +2,7 @@
 """Console utilities for screen manipulation and color initialization."""
 from __future__ import annotations
 
-try:
-    from AGENTS.tools.header_utils import ENV_SETUP_BOX
-    from colorama import Cursor, ansi, just_fix_windows_console as _just_fix_windows_console
-except Exception:
-    import sys
-    print(ENV_SETUP_BOX)
-    sys.exit(1)
+from colorama import Cursor, ansi, just_fix_windows_console as _just_fix_windows_console
 # --- END HEADER ---
 
 # Provide no-op fallbacks if colorama is not installed. These stubs ensure the

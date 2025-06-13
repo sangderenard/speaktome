@@ -1,22 +1,16 @@
-try:
-    from AGENTS.tools.header_utils import ENV_SETUP_BOX
-    # Standard library imports
-    import json
-    from typing import List, Set, Optional, Tuple, Dict, Callable, TYPE_CHECKING, Union, Any
+# Standard library imports
+import json
+from typing import List, Set, Optional, Tuple, Dict, Callable, TYPE_CHECKING, Union, Any
 
-    import torch
+import torch
 
-    from tensors import (
-        AbstractTensor,
-        get_tensor_operations,
-    )
+from tensors import (
+    AbstractTensor,
+    get_tensor_operations,
+)
 
-    # Local application/library specific imports
-    from .beam_tree_node import BeamTreeNode  # Assuming BeamTreeNode is in beam_tree_node.py
-except Exception:
-    import sys
-    print(ENV_SETUP_BOX)
-    sys.exit(1)
+# Local application/library specific imports
+from .beam_tree_node import BeamTreeNode  # Assuming BeamTreeNode is in beam_tree_node.py
 # --- END HEADER ---
 if TYPE_CHECKING:
     from .compressed_beam_tree import CompressedBeamTree # For type hinting 'tree'

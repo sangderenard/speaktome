@@ -2,17 +2,11 @@
 """Background thread for producing ASCII frames."""
 from __future__ import annotations
 
-try:
-    from AGENTS.tools.header_utils import ENV_SETUP_BOX
-    import numpy as np
-    import threading
-    import time
-    from typing import Callable
-    from .frame_buffer import PixelFrameBuffer # Changed from AsciiFrameBuffer
-except Exception:
-    import sys
-    print(ENV_SETUP_BOX)
-    sys.exit(1)
+import numpy as np
+import threading
+import time
+from typing import Callable
+from .frame_buffer import PixelFrameBuffer # Changed from AsciiFrameBuffer
 # --- END HEADER ---
 
 

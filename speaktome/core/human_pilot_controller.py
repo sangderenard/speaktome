@@ -1,19 +1,13 @@
-try:
-    from AGENTS.tools.header_utils import ENV_SETUP_BOX
-    # Standard library imports
-    from typing import List, Optional, TYPE_CHECKING
+# Standard library imports
+from typing import List, Optional, TYPE_CHECKING
 
-    # Third-party imports
-    import torch  # type: ignore[import-untyped]
-    from torch_geometric.data import Data as PyGData  # type: ignore[import-untyped] # Moved for runtime availability
+# Third-party imports
+import torch  # type: ignore[import-untyped]
+from torch_geometric.data import Data as PyGData  # type: ignore[import-untyped] # Moved for runtime availability
 
-    # Local application/library specific imports
-    from .beam_search import BeamSearch
-    from .beam_search_instruction import BeamSearchInstruction
-except Exception:
-    import sys
-    print(ENV_SETUP_BOX)
-    sys.exit(1)
+# Local application/library specific imports
+from .beam_search import BeamSearch
+from .beam_search_instruction import BeamSearchInstruction
 # --- END HEADER ---
 
 class HumanPilotController:

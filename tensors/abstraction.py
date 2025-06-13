@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 try:
-    from AGENTS.tools.header_utils import ENV_SETUP_BOX
     from abc import ABC, abstractmethod
     from typing import Any, Tuple, Optional, List, Union, Callable, Dict, Deque
     import math
@@ -23,7 +22,6 @@ except Exception:
     print("Failed to import required modules for tensor operations.")
     import sys
 
-    print(ENV_SETUP_BOX)
     sys.exit(1)
 # --- END HEADER ---
 

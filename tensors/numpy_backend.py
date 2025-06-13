@@ -32,7 +32,6 @@ from typing import Any, Tuple, List, Optional
 from .abstraction import AbstractTensor
 
 try:
-    from AGENTS.tools.header_utils import ENV_SETUP_BOX
     import numpy as np
 except ModuleNotFoundError:  # pragma: no cover - optional dependency
     np = None  # type: ignore
@@ -43,7 +42,7 @@ except ModuleNotFoundError:  # pragma: no cover - optional dependency
     torch = None  # type: ignore
 except Exception:
     import sys
-    print(ENV_SETUP_BOX)
+    print("NumPy backend failed to import")
     sys.exit(1)
 # --- END HEADER ---
 

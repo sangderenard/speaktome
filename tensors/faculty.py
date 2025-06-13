@@ -3,13 +3,11 @@
 from __future__ import annotations
 
 try:
-    from AGENTS.tools.header_utils import ENV_SETUP_BOX
     import os
     from enum import IntEnum
 except Exception:
     import sys
     print("faculty.py: Failed to import required modules.")
-    print(ENV_SETUP_BOX)
     sys.exit(1)
 # --- END HEADER ---
 

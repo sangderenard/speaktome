@@ -2,18 +2,12 @@
 """Model loading and batch evaluation helpers."""
 from __future__ import annotations
 
-try:
-    from AGENTS.tools.header_utils import ENV_SETUP_BOX
-    import torch
-    from torch.utils.data import DataLoader
-    from .char_sorter import CharSorter
-    from .datasets import CustomInputDataset
-    from .model_configs import ModelConfig
-    from .transforms import ToTensorAndToDevice
-except Exception:
-    import sys
-    print(ENV_SETUP_BOX)
-    sys.exit(1)
+import torch
+from torch.utils.data import DataLoader
+from .char_sorter import CharSorter
+from .datasets import CustomInputDataset
+from .model_configs import ModelConfig
+from .transforms import ToTensorAndToDevice
 # --- END HEADER ---
 
 from pathlib import Path

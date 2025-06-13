@@ -3,12 +3,11 @@
 from __future__ import annotations
 
 try:
-    from AGENTS.tools.header_utils import ENV_SETUP_BOX
     from .c_backend import CTensorOperations
     from .opengl_backend import OpenGLTensorOperations
 except Exception:
     import sys
-    print(ENV_SETUP_BOX)
+    print("Accelerator backends failed to import")
     sys.exit(1)
 # --- END HEADER ---
 

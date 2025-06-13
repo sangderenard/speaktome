@@ -2,15 +2,9 @@
 """Image rendering helper for theme effects and post-processing."""
 from __future__ import annotations
 
-try:
-    from AGENTS.tools.header_utils import ENV_SETUP_BOX
-    from PIL import Image, ImageEnhance, ImageFilter
-    from typing import Optional
-    from .theme_manager import ThemeManager
-except Exception:
-    import sys
-    print(ENV_SETUP_BOX)
-    sys.exit(1)
+from PIL import Image, ImageEnhance, ImageFilter
+from typing import Optional
+from .theme_manager import ThemeManager
 # --- END HEADER ---
 
 class RenderingBackend:

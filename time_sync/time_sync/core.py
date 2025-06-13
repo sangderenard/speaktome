@@ -2,16 +2,10 @@
 """Core functions for aligning system time with internet time."""
 from __future__ import annotations
 
-try:
-    from AGENTS.tools.header_utils import ENV_SETUP_BOX
-    import datetime as _dt
-    import os
-    from typing import Optional
-    from . import _internet
-except Exception:
-    import sys
-    print(ENV_SETUP_BOX)
-    sys.exit(1)
+import datetime as _dt
+import os
+from typing import Optional
+from . import _internet
 # --- END HEADER ---
 
 OFFSET_ENV = "SPEAKTOME_TIME_OFFSET"

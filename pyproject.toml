@@ -7,6 +7,11 @@ license = "MIT"
 
 [tool.poetry.dependencies]
 python = ">=3.12"
+
+[tool.poetry.group.tools]
+optional = true
+
+[tool.poetry.group.tools.dependencies]
 tools = {path = "AGENTS/tools", develop = true}
 
 [tool.poetry.group.dev]

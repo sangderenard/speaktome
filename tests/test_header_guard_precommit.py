@@ -4,8 +4,8 @@ from __future__ import annotations
 
 try:
     from pathlib import Path
-    import AGENTS.tools.header_guard_precommit as hg
-    from AGENTS.tools.header_utils import ENV_SETUP_BOX
+    import AGENTS.tests.headers.header_guard_precommit as hg
+    from AGENTS.tests.headers.header_utils import ENV_SETUP_BOX
 except Exception:
     print(ENV_SETUP_BOX)
     raise
