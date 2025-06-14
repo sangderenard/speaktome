@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 # --- BEGIN HEADER ---
-"""Template for SPEAKTOME module headers."""
+"""Header class helpers for managing structured headers."""
 from __future__ import annotations
 
 try:
-    import your_modules
+    from typing import Any, Dict, List, Optional
+    import re
+
 except Exception:
     import os
     import sys
@@ -124,58 +126,55 @@ except Exception:
     print(ENV_SETUP_BOX)
     sys.exit(1)
 # --- END HEADER ---
+class Header:
+    """A class to represent and manipulate headers dynamically."""
 
-ENV_BOX_ENV = "ENV_SETUP_BOX"
+    def __init__(
+        self,
+        description: str,
+        components: Optional[Dict[str, str]] | None = None,
+        error_handling: Optional[Dict[str, str]] | None = None,
+    ) -> None:
+        self.description = description
+        self.components = components or {}
+        self.error_handling = error_handling or {}
 
-
-def get_env_setup_box() -> str:
-    """Return the environment setup message."""
-    try:
-        return os.environ[ENV_BOX_ENV]
-    except KeyError as exc:  # pragma: no cover - env missing
-        raise RuntimeError("environment not initialized") from exc
-
-
-ENV_SETUP_BOX = get_env_setup_box()
-
-HEADER_START = "# --- BEGIN HEADER ---"
-HEADER_END = "# --- END HEADER ---"
-IMPORT_FAILURE_PREFIX = "[HEADER] import failure in"
-
-HEADER_REQUIREMENTS = [
-    "'# --- BEGIN HEADER ---' sentinel after shebang",
-    "shebang line '#!/usr/bin/env python3'",
-    "module docstring",
-    "'from __future__ import annotations' before the try block",
-    "imports wrapped in a try block",
-    (
-        "except block imports os, sys and Path, defines _find_repo_root,"
-        " checks ENV_SETUP_BOX and prints the message when missing,"
-        " then invokes auto_env_setup via subprocess",
-    ),
-    "'# --- END HEADER ---' sentinel after the except block",
-]
-
-
-def extract_header_import_block(lines: list[str]) -> list[str]:
-    """Return lines from the first import to the header end sentinel."""
-    try:
-        start = next(
-            i for i, ln in enumerate(lines) if ln.strip().startswith(("import", "from "))
+    def __str__(self) -> str:
+        """Pretty-print the header as a markdown string."""
+        components_str = "\n".join(
+            [f"  - {key}: \"{value}\"" for key, value in self.components.items()]
         )
-    except StopIteration:
-        return []
-    try:
-        end = next(i for i, ln in enumerate(lines) if ln.strip() == HEADER_END)
-    except StopIteration:
-        end = len(lines)
-    return lines[start:end]
+        error_handling_str = "\n".join(
+            [f"  - {key}: \"{value}\"" for key, value in self.error_handling.items()]
+        )
+        return f"""
+HEADER:
+  - Description: "{self.description}"
+  - Components:
+{components_str}
+  - Error Handling:
+{error_handling_str}
+"""
 
-__all__ = [
-    "get_env_setup_box",
-    "HEADER_START",
-    "HEADER_END",
-    "IMPORT_FAILURE_PREFIX",
-    "HEADER_REQUIREMENTS",
-    "extract_header_import_block",
-]
+    @classmethod
+    def from_markdown(cls, markdown: str) -> "Header":
+        """Parse a markdown template to create a Header object."""
+        description_match = re.search(r"Description: \"(.*?)\"", markdown)
+        components_match = re.findall(
+            r"- (\w+): \"(.*?)\"",
+            markdown.split("Components:")[1].split("Error Handling:")[0],
+        )
+        error_handling_match = re.findall(
+            r"- (\w+): \"(.*?)\"",
+            markdown.split("Error Handling:")[1],
+        )
+
+        description = description_match.group(1) if description_match else ""
+        components = {key: value for key, value in components_match}
+        error_handling = {key: value for key, value in error_handling_match}
+
+        return cls(description, components, error_handling)
+
+    def to_markdown(self) -> str:
+        """Convert the Header object back to a markdown string."""
+        return str(self)

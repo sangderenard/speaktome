@@ -6,10 +6,10 @@ Utility scripts and helper functions for the SpeakToMe project.
   against `tensors/abstraction_functions.md` to highlight documentation gaps.
 * `sort_abstracttensor_methods.py` – reorder `AbstractTensor` methods based on
   `tensors/abstraction_functions.md` and write the result to a new file.
-* `run_header_checks.py` – orchestrate `auto_fix_headers.py`,
-  `validate_headers.py` and `test_all_headers.py` in one step.
+* `headers/run_header_checks.py` – orchestrate `headers/auto_fix_headers.py`,
+  `headers/validate_headers.py` and `headers/test_all_headers.py` in one step.
 * `stats_counter.py` – print friendly line counts across the repository.
 
 > **Note**
-> The legacy helper `header_utils.py` exists only for backwards
+> The legacy helper `headers/header_utils.py` exists only for backwards
 > compatibility. Do **not** import it in new code.

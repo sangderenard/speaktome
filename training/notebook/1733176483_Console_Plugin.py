@@ -15,7 +15,7 @@ try:
     from hotrodprintingpress import GrandPrintingPress
     pygame.font.init()
 except Exception:
-    from AGENTS.tools.header_utils import ENV_SETUP_BOX
+    from AGENTS.tools.headers.header_utils import ENV_SETUP_BOX
     print(ENV_SETUP_BOX)
     raise
 # --- END HEADER ---

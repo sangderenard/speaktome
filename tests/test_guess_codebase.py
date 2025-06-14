@@ -1,5 +1,5 @@
 import pathlib
-from AGENTS.tools.dynamic_header_recognition import guess_codebase
+from AGENTS.tools.headers.dynamic_header_recognition import guess_codebase
 
 
 def test_guess_codebase_speaktome():
