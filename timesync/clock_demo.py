@@ -6,7 +6,7 @@ The demo runs until ``q`` or ``quit`` is received on standard input.
 from __future__ import annotations
 
 
-#from AGENTS.tools.header_utils import ENV_SETUP_BOX
+#from AGENTS.tools.headers.header_utils import ENV_SETUP_BOX
 import datetime as _dt
 import argparse
 import time

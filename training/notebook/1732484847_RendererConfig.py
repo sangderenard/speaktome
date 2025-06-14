@@ -6,7 +6,7 @@ try:
     import pygame
     from OpenGL.GL import *  # noqa: F401,F403
 except Exception:
-    from AGENTS.tools.header_utils import ENV_SETUP_BOX
+    from AGENTS.tools.headers.header_utils import ENV_SETUP_BOX
     print(ENV_SETUP_BOX)
     raise
 # --- END HEADER ---

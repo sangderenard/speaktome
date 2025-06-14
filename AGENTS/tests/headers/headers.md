@@ -17,22 +17,59 @@ except Exception:  # <try:end> <except:start>
     import os  # <import>
     import sys  # <import>
     from pathlib import Path  # <import>
+    import json  # <import>
 
     def _find_repo_root(start: Path) -> Path:  # <find-root:start>
         current = start.resolve()
         required = {
             "speaktome",
             "laplace",
-            "tensor printing",
-            "time_sync",
+            "tensorprinting",
+            "timesync",
             "AGENTS",
             "fontmapper",
             "tensors",
+            "testenv",
         }
         for parent in [current, *current.parents]:
             if all((parent / name).exists() for name in required):
                 return parent
         return current
+
+    ROOT = _find_repo_root(Path(__file__))
+    MAP_FILE = ROOT / "AGENTS" / "codebase_map.json"
+
+    def guess_codebase(path: Path, map_file: Path = MAP_FILE) -> str | None:
+        """Return codebase name owning ``path``."""
+        try:
+            data = json.loads(map_file.read_text())
+        except Exception:
+            data = None
+
+        if data:
+            for name, info in data.items():
+                cb_path = ROOT / info.get("path", name)
+                try:
+                    path.relative_to(cb_path)
+                    return name
+                except ValueError:
+                    continue
+        else:
+            candidates = {
+                "speaktome",
+                "laplace",
+                "tensorprinting",
+                "timesync",
+                "fontmapper",
+                "tensors",
+                "testenv",
+                "tools",
+            }
+            for part in path.parts:
+                if part in candidates:
+                    return part
+
+        return None
 
     if "ENV_SETUP_BOX" not in os.environ:  # <env-check:start>
         root = _find_repo_root(Path(__file__))
@@ -64,7 +101,7 @@ except Exception:  # <try:end> <except:start>
 
 ## Dynamic Header Recognition
 
-The module `AGENTS.tools.dynamic_header_recognition` provides a skeleton
+The module `AGENTS.tools.headers.dynamic_header_recognition` provides a skeleton
 implementation for parsing and comparing headers using a tree structure.
 It exposes :class:`HeaderNode` and helpers like :func:`parse_header` to
 serve as building blocks for future validation logic.
