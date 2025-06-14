@@ -4,7 +4,6 @@ from __future__ import annotations
 
 try:
     import your_modules
-
 except Exception:
     import os
     import sys
@@ -139,10 +138,3 @@ __all__ = [
     "validate_headers",
 ]
 
-from importlib import import_module
-
-
-def __getattr__(name: str):
-    if name in __all__:
-        return import_module(f"{__name__}.{name}")
-    raise AttributeError(name)

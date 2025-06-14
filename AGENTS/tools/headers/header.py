@@ -6,6 +6,7 @@ from __future__ import annotations
 try:
     from typing import Any, Dict, List, Optional
     import re
+
 except Exception:
     import os
     import sys
@@ -125,7 +126,6 @@ except Exception:
     print(ENV_SETUP_BOX)
     sys.exit(1)
 # --- END HEADER ---
-
 class Header:
     """A class to represent and manipulate headers dynamically."""
 
