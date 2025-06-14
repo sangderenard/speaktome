@@ -20,6 +20,7 @@ def _find_repo_root(start: Path) -> Path:
         "AGENTS",
         "fontmapper",
         "tensors",
+        "testenv",
     }
     for parent in [current, *current.parents]:
         if all((parent / name).exists() for name in required):

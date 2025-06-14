@@ -10,7 +10,6 @@ from . import header_audit
 from . import run_header_checks
 from . import test_all_headers
 from . import header
-from . import header_template
 
 __all__ = [
     "header_utils",
@@ -23,5 +22,4 @@ __all__ = [
     "run_header_checks",
     "test_all_headers",
     "header",
-    "header_template",
 ]

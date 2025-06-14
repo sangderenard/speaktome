@@ -21,6 +21,7 @@ except Exception:
             "AGENTS",
             "fontmapper",
             "tensors",
+            "testenv",
         }
         for parent in [current, *current.parents]:
             if all((parent / name).exists() for name in required):
@@ -57,6 +58,7 @@ except Exception:
                 "timesync",
                 "fontmapper",
                 "tensors",
+                "testenv",
                 "tools",
             }
             for part in path.parts:
