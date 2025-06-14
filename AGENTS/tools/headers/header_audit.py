@@ -125,6 +125,7 @@ except Exception:
     sys.exit(1)
 # --- END HEADER ---
 
+
 ROOT = Path(__file__).resolve().parents[2]
 PATTERN = re.compile(r"# --- BEGIN HEADER ---")
 

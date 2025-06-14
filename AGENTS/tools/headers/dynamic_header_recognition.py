@@ -125,6 +125,7 @@ except Exception:
     sys.exit(1)
 # --- END HEADER ---
 
+
 # Regex patterns for atomic units within the standard header
 HEADER_START_REGEX = re.compile(r"^# --- BEGIN HEADER ---$", re.MULTILINE)
 HEADER_END_REGEX = re.compile(r"^# --- END HEADER ---$", re.MULTILINE)

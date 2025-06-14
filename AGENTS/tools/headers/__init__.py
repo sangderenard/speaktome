@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # --- BEGIN HEADER ---
+"""Template for SPEAKTOME module headers."""
 from __future__ import annotations
 
 try:

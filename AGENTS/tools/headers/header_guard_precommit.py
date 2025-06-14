@@ -125,6 +125,7 @@ except Exception:
     sys.exit(1)
 # --- END HEADER ---
 
+
 FRIENDLY_GUIDANCE = """
 # A Gentle Guide to Code Headers
 

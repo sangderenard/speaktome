@@ -125,6 +125,7 @@ except Exception:
     sys.exit(1)
 # --- END HEADER ---
 
+
 END_MARKER = "# --- END HEADER ---"
 
 
