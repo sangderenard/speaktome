@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 # --- BEGIN HEADER ---
-"""Template for SPEAKTOME module headers."""
 from __future__ import annotations
 
 try:
@@ -124,7 +123,6 @@ except Exception:
     print(ENV_SETUP_BOX)
     sys.exit(1)
 # --- END HEADER ---
-"""Header utilities and templates."""
 
 __all__ = [
     "auto_fix_headers",
@@ -140,10 +138,3 @@ __all__ = [
     "validate_headers",
 ]
 
-from importlib import import_module
-
-
-def __getattr__(name: str):
-    if name in __all__:
-        return import_module(f"{__name__}.{name}")
-    raise AttributeError(name)
