@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 # --- BEGIN HEADER ---
-"""Testing environment package bundling tests and utilities."""
+"""Run the header template directly to ensure it is syntactically valid."""
 from __future__ import annotations
 
 try:
-    pass
+    import subprocess
+    import sys
+    from pathlib import Path
 except Exception:
     import os
     import sys
@@ -55,3 +57,18 @@ except Exception:
     print(ENV_SETUP_BOX)
     sys.exit(1)
 # --- END HEADER ---
+
+ROOT = Path(__file__).resolve().parents[3]
+SCRIPT_PATH = ROOT / "AGENTS" / "tools" / "headers" / "header_template.py"
+
+
+def main() -> int:
+    proc = subprocess.run([sys.executable, str(SCRIPT_PATH)], capture_output=True, text=True)
+    print(proc.stdout)
+    if proc.stderr:
+        print(proc.stderr, file=sys.stderr)
+    return proc.returncode
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
