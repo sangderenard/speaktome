@@ -133,7 +133,6 @@ EXCLUDE_DIRS = {
     "laplace",
     "training",
     "tensorprinting",
-    "tensorprinting",
 }
 
 HEADER_START = "# --- BEGIN HEADER ---"
