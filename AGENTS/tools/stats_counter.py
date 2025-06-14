@@ -72,6 +72,22 @@ def gather_files(pattern: str, *, exclude_archives: bool) -> list[Path]:
     for path in root.rglob(pattern):
         if exclude_archives and any(p in {"archive", "BACKUPS"} for p in path.parts):
             continue
+        if any(part in {".git", ".venv"} for part in path.parts):
+            continue
+        files.append(path)
+    return files
+
+
+def gather_repo_files(*, exclude_archives: bool) -> list[Path]:
+    root = find_repo_root(Path(__file__).resolve())
+    files = []
+    for path in root.rglob("*"):
+        if not path.is_file() or path.is_symlink():
+            continue
+        if exclude_archives and any(p in {"archive", "BACKUPS"} for p in path.parts):
+            continue
+        if any(part in {".git", ".venv"} for part in path.parts):
+            continue
         files.append(path)
     return files
 
@@ -118,7 +134,8 @@ def main(argv: list[str] | None = None) -> None:
     all_py_paths = gather_files("*.py", exclude_archives=False)
     py_all_total, py_all_unique = count_lines(all_py_paths)
 
-    curses = count_curses(all_py_paths)
+    all_files = gather_repo_files(exclude_archives=False)
+    curses = count_curses(all_files)
     f_bombs = curses.get("fuck", 0) + curses.get("fucking", 0)
 
     lines = [
@@ -127,8 +144,11 @@ def main(argv: list[str] | None = None) -> None:
         f"  - Markdown guides: {md_total} total / {md_unique} unique",
         f"  - Python with history: {py_all_total} total / {py_all_unique} unique",
     ]
-    if f_bombs > 5:
-        lines.append(f"  - Curses spotted: {sum(curses.values())} (f-bombs: {f_bombs})")
+    if curses:
+        summary = ", ".join(f"{w}:{n}" for w, n in sorted(curses.items()))
+        lines.append(f"  - Curses spotted: {sum(curses.values())} ({summary})")
+        if f_bombs > 5:
+            lines.append("  - Please mind the language in commit messages!")
     print("\n".join(lines))
 
 
