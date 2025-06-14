@@ -26,7 +26,7 @@ def _find_repo_root(start: Path) -> Path:
             return parent
     return current
 
-JOB_DIR = _find_repo_root(Path(__file__)) / "job_descriptions"
+JOB_DIR = _find_repo_root(Path(__file__)) / "AGENTS" / "job_descriptions"
 OUT_FILE = JOB_DIR / "job_priority.json"
 # --- END HEADER ---
 
