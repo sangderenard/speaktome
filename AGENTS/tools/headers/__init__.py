@@ -1,7 +1,5 @@
 """Header utilities and templates."""
 
-"""Header utilities and templates."""
-
 __all__ = [
     "auto_fix_headers",
     "dump_headers",
@@ -23,3 +21,4 @@ def __getattr__(name: str):
     if name in __all__:
         return import_module(f"{__name__}.{name}")
     raise AttributeError(name)
+

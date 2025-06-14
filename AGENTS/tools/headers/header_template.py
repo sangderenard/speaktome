@@ -113,6 +113,7 @@ except Exception:
         subprocess.run(base_cmd, check=False)
         for grp in groups:
             subprocess.run(base_cmd + [f"-groups={grp}"], check=False)
+
     except Exception:
         pass
     try:
