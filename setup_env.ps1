@@ -9,6 +9,28 @@ param(
 $env_box_file = Join-Path $PSScriptRoot "ENV_SETUP_BOX.md"
 $env:ENV_SETUP_BOX = "`n$(Get-Content $env_box_file -Raw)`n"
 
+# Ensure required build backend is available
+try {
+    python - <<'PY' 2>$null
+import importlib.util, sys
+sys.exit(0 if importlib.util.find_spec("poetry.core.masonry.api") else 1)
+PY
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "[INFO] poetry-core missing; installing to enable editable builds"
+        python -m pip install -q --user 'poetry-core>=1.5.0'
+        if ($LASTEXITCODE -ne 0) {
+            Write-Warning "Automatic poetry-core install failed; please install it manually"
+        }
+    }
+} catch {
+    Write-Warning "Unable to check for poetry-core. Please ensure it is installed."
+}
+
+# Warn if poetry itself is unavailable
+if (-not (Get-Command poetry -ErrorAction SilentlyContinue)) {
+    Write-Warning "Poetry executable not found in PATH. Install poetry before continuing."
+}
+
 # Manual flag parsing for all arguments (case-insensitive, -flag=value style)
 $UseVenv = $true
 $FromDev = $false
