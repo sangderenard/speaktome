@@ -21,11 +21,12 @@ TEMPLATES = {
     'template_doc_report.md',
     'template_tticket_report.md',
     'template_audit_report.md',
+    'template_log_report.md',
 }
 ARCHIVE_DIR = os.path.join(REPORTS_DIR, 'archive')
 STICKIES_FILE = os.path.join(REPORTS_DIR, 'stickies.txt')
 PATTERN = re.compile(
-    r'(?:\d{4}-\d{2}-\d{2}|\d{10})_(DOC|TTICKET|AUDIT)_[A-Za-z0-9_]+\.md'
+    r'(?:\d{4}-\d{2}-\d{2}|\d{10})_(DOC|TTICKET|AUDIT|LOG)_[A-Za-z0-9_]+\.md'
 )
 
 

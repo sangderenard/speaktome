@@ -2,11 +2,12 @@
 
 This folder contains all user experience reports and supporting files. Use these guidelines when adding new reports. Treat the experience reports as a centralized log of automated instructions and AI-assisted experiments.
 
-We encourage **three complementary reporting modes**:
+We encourage **four complementary reporting modes**:
 
 1. **DOC** — documentation of repository activity.
 2. **TTICKET** — trouble tickets describing errors or unexpected behaviour.
 3. **AUDIT** — in‑depth auditing of functions and design decisions.
+4. **LOG** — raw logs captured from repeatable commands.
 
 ## Naming Convention
 
@@ -16,13 +17,15 @@ Store reports in `experience_reports/`. Choose a category and name the file as:
 EPOCH_DOC_Descriptive_Title.md
 EPOCH_TTICKET_Descriptive_Title.md
 EPOCH_AUDIT_Descriptive_Title.md
+EPOCH_LOG_Descriptive_Title.md
 ```
 
 * `EPOCH` is the timestamp or date of the entry.
-* `DOC`, `TTICKET`, or `AUDIT` indicate the level of detail:
+* `DOC`, `TTICKET`, `AUDIT`, or `LOG` indicate the level of detail:
   * **DOC** — brief activity notes.
   * **TTICKET** — trouble tickets describing errors.
   * **AUDIT** — in‑depth systematic explorations.
+  * **LOG** — raw log dumps for debugging or reference.
 * `Descriptive_Title` summarizes the scenario using `_` instead of spaces.
 
 Example: `1720123456_DOC_New_User_Experience_Simulation.md`.
@@ -50,4 +53,5 @@ Use the matching template for your report type:
 - `experience_reports/template_doc_report.md`
 - `experience_reports/template_tticket_report.md`
 - `experience_reports/template_audit_report.md`
+- `experience_reports/template_log_report.md`
 

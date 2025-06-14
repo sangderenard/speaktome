@@ -6,6 +6,7 @@ Welcome to the guestbook kiosk of our agent theme park. Here every report is a j
 EPOCH_DOC_Descriptive_Title.md
 EPOCH_TTICKET_Descriptive_Title.md
 EPOCH_AUDIT_Descriptive_Title.md
+EPOCH_LOG_Descriptive_Title.md
 ```
 
 Templates for each category are available:
@@ -13,6 +14,7 @@ Templates for each category are available:
 - `template_doc_report.md`
 - `template_tticket_report.md`
 - `template_audit_report.md`
+- `template_log_report.md`
 
 Include a **Prompt History** section quoting any instructions or conversations that influenced the session verbatim. Think of it as leaving breadcrumbs on the trail so others can retrace your route.
 
