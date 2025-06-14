@@ -19,6 +19,6 @@ and update any relevant documentation.
 Tests should never attempt to import packages that the setup scripts are
 responsible for installing. If a dependency is missing, the header guard will
 print the contents of `ENV_SETUP_BOX.md` and exit. Do not try to import
-`AGENTS.tools.header_utils` or any other helper inside the setup routines as a
+`AGENTS.tools.headers.header_utils` or any other helper inside the setup routines as a
 way to bootstrap installation&mdash;that defeats the purpose of the environment
 check and often fails on clean systems.

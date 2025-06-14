@@ -136,10 +136,10 @@ def main(argv: list[str] | None = None) -> int:
         run(["python", "AGENTS/tools/update_codebase_map.py", "-o", "AGENTS/codebase_map.json"], log, report_lines)
 
     with log.context("Auto fix headers"):
-        run(["python", "AGENTS/tools/auto_fix_headers.py"], log, report_lines)
+        run(["python", "AGENTS/tools/headers/auto_fix_headers.py"], log, report_lines)
 
     with log.context("Validate headers"):
-        run(["python", "AGENTS/tools/validate_headers.py", ".", "--rewrite"], log, report_lines)
+        run(["python", "AGENTS/tools/headers/validate_headers.py", ".", "--rewrite"], log, report_lines)
 
     with log.context("Update pyproject deps"):
         for root in Path(".").glob("*/pyproject.toml"):
