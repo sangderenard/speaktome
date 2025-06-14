@@ -103,7 +103,7 @@ def run_setup_script(project_root: Path | None = None, *, use_venv: bool = True)
         return None
 
     script = script.resolve()
-    base_cmd = [str(script)]
+    base_cmd = [str(script), "-codebases=speaktome"]
     if not use_venv:
         base_cmd.append("-no-venv")
 

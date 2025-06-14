@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 try:
+    import json
     import re
     from pathlib import Path
     from typing import Iterable, Optional
@@ -17,8 +18,8 @@ except Exception:
         required = {
             "speaktome",
             "laplace",
-            "tensor_printing",
-            "time_sync",
+            "tensorprinting",
+            "timesync",
             "AGENTS",
             "fontmapper",
             "tensors",
@@ -82,12 +83,66 @@ class HeaderNode:
         return f"HeaderNode(name={self.name!r}, content={self.content!r}, children={self.children!r})"
 
 
+ROOT = Path(__file__).resolve().parents[3]
+MAP_FILE = ROOT / "AGENTS" / "codebase_map.json"
+
+
+def guess_codebase(path: Path, map_file: Path = MAP_FILE) -> str | None:
+    """Return codebase name owning ``path``.
+
+    This mirrors the implementation used by production headers but keeps tests
+    free from installation requirements. If ``codebase_map.json`` is missing, it
+    falls back to a simple directory name search.
+    """
+
+    try:
+        data = json.loads(map_file.read_text())
+    except Exception:
+        data = None
+
+    if data:
+        for name, info in data.items():
+            cb_path = ROOT / info.get("path", name)
+            try:
+                path.relative_to(cb_path)
+                return name
+            except ValueError:
+                continue
+    else:
+        candidates = {
+            "speaktome",
+            "laplace",
+            "tensorprinting",
+            "timesync",
+            "fontmapper",
+            "tensors",
+            "tools",
+        }
+        for part in path.parts:
+            if part in candidates:
+                return part
+
+    return None
+
+
 def parse_header(text: str) -> HeaderNode:
-    """Parse ``text`` into a :class:`HeaderNode` tree. Stub implementation."""
+    """Parse ``text`` into a :class:`HeaderNode` tree."""
     root = HeaderNode("root")
-    # TODO: implement full parser
-    if HEADER_START_REGEX.search(text) and HEADER_END_REGEX.search(text):
-        root.add_child(HeaderNode("sentinel"))
+    if not (HEADER_START_REGEX.search(text) and HEADER_END_REGEX.search(text)):
+        return root
+
+    doc = DOCSTRING_REGEX.search(text)
+    if doc:
+        root.add_child(HeaderNode("docstring", doc.group(1).strip()))
+
+    for match in IMPORT_REGEX.finditer(text):
+        root.add_child(HeaderNode("import", match.group(1).strip()))
+
+    if TRY_BLOCK_REGEX.search(text):
+        root.add_child(HeaderNode("try"))
+    if EXCEPT_BLOCK_REGEX.search(text):
+        root.add_child(HeaderNode("except"))
+
     return root
 
 
@@ -114,6 +169,7 @@ def pretty_print_tree(node: HeaderNode, level: int = 0) -> str:
 
 __all__ = [
     "HeaderNode",
+    "guess_codebase",
     "parse_header",
     "compare_trees",
     "pretty_print_tree",
