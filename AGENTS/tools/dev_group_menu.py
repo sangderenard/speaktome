@@ -82,8 +82,11 @@ else:
 
     def getch_timeout(timeout: float) -> str | None:
         """Get a single character with timeout on Unix-like systems."""
-        fd = sys.stdin.fileno()
-        old_settings = termios.tcgetattr(fd)
+        try:
+            fd = sys.stdin.fileno()
+            old_settings = termios.tcgetattr(fd)
+        except Exception:
+            return None
         try:
             tty.setraw(fd)
             ready, _, _ = select.select([sys.stdin], [], [], timeout)

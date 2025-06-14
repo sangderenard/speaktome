@@ -7,7 +7,7 @@ set -uo pipefail
 
 # Initialize argument-related variables early so they exist when referenced
 CODEBASES=""
-GROUPS=()
+SEL_GROUPS=()
 MENU_ARGS=()
 
 
@@ -123,16 +123,16 @@ for arg in "$@"; do
   arg_lc="${arg,,}"
   case $arg_lc in
     -codebases=*|-cb=*) CODEBASES="${arg#*=}" ;;
-    -groups=*|-grp=*)   GROUPS+=("${arg#*=}") ;;
+    -groups=*|-grp=*)   SEL_GROUPS+=("${arg#*=}") ;;
   esac
 done
 
 [ -n "$CODEBASES" ] && MENU_ARGS+=("-codebases" "$CODEBASES")
-for g in "${GROUPS[@]}"; do
+for g in "${SEL_GROUPS[@]}"; do
   MENU_ARGS+=("-groups" "$g")
 done
 echo "[DEBUG] Codebases: ${CODEBASES:-}" >&2
-echo "[DEBUG] Groups: ${GROUPS[*]:-}" >&2
+echo "[DEBUG] Groups: ${SEL_GROUPS[*]:-}" >&2
 
 
 # If not called from a dev script, launch the dev menu for all codebase/group installs
@@ -158,17 +158,12 @@ fi
 
 echo "Environment setup complete."
 echo "[OK] Environment ready. Activate with 'source .venv/bin/activate'."
-TORCH_INFO=$($VENV_PYTHON - <<'PY'
-import importlib, sys
-spec = importlib.util.find_spec("torch")
-if spec is None:
-    sys.exit(0)
-import torch
-cuda = torch.version.cuda if torch.cuda.is_available() else "CPU"
-print(f"{torch.__version__} {cuda}")
-PY
-)
-echo "   * Torch = ${TORCH_INFO:-missing}"
+TORCH_INFO=$("$VENV_PIP" show torch 2>/dev/null | awk '/^Version/ {print $2}')
+if [ -n "$TORCH_INFO" ]; then
+  echo "   * Torch = $TORCH_INFO"
+else
+  echo "   * Torch = missing"
+fi
 echo "Selections recorded to $SPEAKTOME_ACTIVE_FILE"
 
 # Create `.venv` symlinks in selected codebases so editors opened
