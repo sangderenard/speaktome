@@ -102,5 +102,13 @@
   "tools": {
     "path": "AGENTS/tools",
     "groups": {}
+  },
+  "wheelhouse": {
+    "path": "wheelhouse",
+    "groups": {
+      "dev": [
+        "tools"
+      ]
+    }
   }
 }
