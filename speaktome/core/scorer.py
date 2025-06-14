@@ -16,10 +16,7 @@ import torch
 import torch.nn.functional as F
 import queue
 
-from tensors import (
-    AbstractTensor,
-    get_tensor_operations,
-)
+from tensors import AbstractTensor
 
 from ..util.lazy_loader import lazy_import, optional_import
 from .. import config
@@ -41,7 +38,7 @@ class Scorer:
             model_path = local_path if os.path.isdir(local_path) else "gpt2"
         self.model_path = model_path
 
-        self.tensor_ops = tensor_ops or get_tensor_operations()
+        self.tensor_ops = tensor_ops or AbstractTensor.get_tensor()
 
         self.default_scorer = Scorer.mean_logprob_score
         self.default_k = 5
@@ -166,9 +163,17 @@ class Scorer:
     @staticmethod
     def next_token_logprob_score(beams=None, scores=None, lengths=None, tokenizer=None, **kwargs):
         """Score using the log probability of the most recent token."""
+        beams_t = AbstractTensor.get_tensor(beams)
+        scores_t = AbstractTensor.get_tensor(scores)
+        lengths_t = AbstractTensor.get_tensor(lengths)
 
-        idx = (lengths - 1).clamp(min=0)
-        return scores[torch.arange(beams.shape[0]), idx]
+        idx = (lengths_t - 1).clamp(min_val=0)
+        rows = AbstractTensor.arange(
+            beams_t.shape[0],
+            device=beams_t.get_device(),
+            dtype=beams_t.long_dtype,
+        )
+        return scores_t.select_by_indices(rows, idx)
 
     @staticmethod
     def mean_logprob_score(beams=None, scores=None, lengths=None, tokenizer=None, **kwargs):
@@ -198,12 +203,14 @@ class Scorer:
     @staticmethod
     def ngram_diversity_score(beams=None, scores=None, lengths=None, tokenizer=None, n: int = 2, penalty: float = -1.0, **kwargs):
         """Penalise repeated n-grams within each beam."""
-        
-        batch, seq_len = beams.shape
-        device = beams.device
+        beams_t = AbstractTensor.get_tensor(beams)
+        lengths_t = AbstractTensor.get_tensor(lengths)
+
+        batch, seq_len = beams_t.shape
+        device = beams_t.get_device()
 
         if seq_len < n:
-            return torch.zeros(batch, device=device)
+            return AbstractTensor.zeros((batch,), dtype=beams_t.float_dtype, device=device)
 
         base = getattr(tokenizer, "vocab_size", None)
         if base is None:
@@ -213,36 +220,38 @@ class Scorer:
         valid_counts = (lengths - n + 1).clamp(min=0)
         max_windows = windows.shape[1]
 
-        mask = torch.arange(max_windows, device=device).unsqueeze(0) < valid_counts.unsqueeze(1)
-        multipliers = (base ** torch.arange(n, device=device)).view(1, 1, -1)
+        mask = AbstractTensor.arange(max_windows, device=device).unsqueeze(0) < valid_counts.unsqueeze(1)
+        multipliers = (base ** AbstractTensor.arange(n, device=device)).view(1, 1, -1)
         hashed = (windows * multipliers).sum(dim=2)
-        rows = torch.arange(batch, device=device).unsqueeze(1).expand(batch, max_windows)[mask]
+        rows = AbstractTensor.arange(batch, device=device).unsqueeze(1).expand(batch, max_windows)[mask]
         hashed_flat = hashed[mask]
 
-        pairs = torch.stack([rows, hashed_flat], dim=1)
+        pairs = beams_t.stack([rows, hashed_flat], dim=1)
         unique_pairs, counts = torch.unique(pairs, return_counts=True, dim=0)
         duplicate_counts = counts - 1
-        penalties = torch.zeros(batch, device=device, dtype=torch.float)
-        penalties.index_add_(0, unique_pairs[:, 0], duplicate_counts.float() * penalty)
+        penalties = AbstractTensor.zeros((batch,), dtype=beams_t.float_dtype, device=device)
+        penalties.data.index_add_(0, unique_pairs[:, 0], duplicate_counts.float() * penalty)
 
         return -penalties
     @staticmethod
     def pairwise_diversity_score(beams=None, lengths=None, tokenizer=None, **kwargs):
         """Discourage token overlap across beams using Jaccard distance."""
-        batch = beams.shape[0]
-        device = beams.device
+        beams_t = AbstractTensor.get_tensor(beams)
+        lengths_t = AbstractTensor.get_tensor(lengths)
+        batch = beams_t.shape[0]
+        device = beams_t.get_device()
         if tokenizer is not None and hasattr(tokenizer, "vocab_size"):
             vocab_size = tokenizer.vocab_size
         else:
-            vocab_size = int(beams.max().item()) + 1
+            vocab_size = int(beams_t.max().item()) + 1
 
         # Build multi-hot representation for each beam without Python loops
-        row_idx = torch.arange(batch, device=device).unsqueeze(1).expand_as(beams)
-        col_mask = torch.arange(beams.shape[1], device=device).unsqueeze(0) < lengths.unsqueeze(1)
+        row_idx = AbstractTensor.arange(batch, device=device).unsqueeze(1).expand_as(beams_t)
+        col_mask = AbstractTensor.arange(beams_t.shape[1], device=device).unsqueeze(0) < lengths_t.unsqueeze(1)
         rows = row_idx[col_mask]
-        cols = beams[col_mask]
-        one_hot = torch.zeros(batch, vocab_size, device=device, dtype=torch.float32)
-        one_hot.index_put_((rows, cols), torch.ones_like(rows, dtype=torch.float32), accumulate=True)
+        cols = beams_t[col_mask]
+        one_hot = AbstractTensor.zeros((batch, vocab_size), dtype=beams_t.float_dtype, device=device)
+        one_hot.data.index_put_((rows, cols), torch.ones_like(rows, dtype=torch.float32), accumulate=True)
         one_hot_bool = one_hot.bool()
 
         inter = torch.matmul(one_hot_bool.float(), one_hot_bool.t().float())
