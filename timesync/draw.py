@@ -197,38 +197,49 @@ def get_changed_subunits(
     frame_height, frame_width = new_frame.shape[0], new_frame.shape[1]
     changed_subunits_list: List[Tuple[int, int, np.ndarray]] = []
 
+    # Vectorized difference computation for regions that align to the subunit
+    # grid. Any leftover edge regions fall back to the original loop logic.
+    h_full = frame_height - (frame_height % subunit_height)
+    w_full = frame_width - (frame_width % subunit_width)
+
+    if h_full > 0 and w_full > 0:
+        diff = np.abs(
+            old_frame[:h_full, :w_full].astype(np.int16)
+            - new_frame[:h_full, :w_full].astype(np.int16)
+        )
+        reshaped = diff.reshape(
+            h_full // subunit_height,
+            subunit_height,
+            w_full // subunit_width,
+            subunit_width,
+            -1,
+        )
+        losses = reshaped.mean(axis=(1, 3, 4))
+        coords = np.argwhere(losses > loss_threshold)
+        for by, bx in coords:
+            y = int(by * subunit_height)
+            x = int(bx * subunit_width)
+            changed_subunits_list.append(
+                (y, x, new_frame[y : y + subunit_height, x : x + subunit_width].copy())
+            )
+
+    # Handle right and bottom edges that may be smaller than the subunit size
     for y in range(0, frame_height, subunit_height):
-        for x in range(0, frame_width, subunit_width):
-            # Determine the actual end coordinates for the current subunit,
-            # handling cases where the subunit might extend beyond frame boundaries.
+        for x in range(w_full, frame_width, subunit_width):
             y_end = min(y + subunit_height, frame_height)
             x_end = min(x + subunit_width, frame_width)
+            changed_subunits_list.append((y, x, new_frame[y:y_end, x:x_end].copy()))
 
-            # Extract the current subunit from both old and new frames.
-            current_subunit_old = old_frame[y:y_end, x:x_end]
-            current_subunit_new = new_frame[y:y_end, x:x_end]
+    for y in range(h_full, frame_height, subunit_height):
+        for x in range(0, w_full, subunit_width):
+            y_end = min(y + subunit_height, frame_height)
+            x_end = min(x + subunit_width, frame_width)
+            changed_subunits_list.append((y, x, new_frame[y:y_end, x:x_end].copy()))
 
-            # Short-circuit: if the slice is smaller than requested, mark it
-            # changed without comparing to ``old_frame``.
-            if (
-                current_subunit_new.shape[0] != subunit_height
-                or current_subunit_new.shape[1] != subunit_width
-            ):
-                changed_subunits_list.append((y, x, current_subunit_new.copy()))
-                continue
-
-            # Compare the subunits using a loss metric. ``loss_threshold``
-            # represents the mean absolute difference required to flag a
-            # change. Multi-channel data is handled by computing the mean
-            # across all channels.
-            loss = np.mean(
-                np.abs(
-                    current_subunit_old.astype(np.int16)
-                    - current_subunit_new.astype(np.int16)
-                )
-            )
-            if loss > loss_threshold:
-                changed_subunits_list.append((y, x, current_subunit_new.copy()))
-
+    for y in range(h_full, frame_height, subunit_height):
+        for x in range(w_full, frame_width, subunit_width):
+            y_end = min(y + subunit_height, frame_height)
+            x_end = min(x + subunit_width, frame_width)
+            changed_subunits_list.append((y, x, new_frame[y:y_end, x:x_end].copy()))
 
     return changed_subunits_list
