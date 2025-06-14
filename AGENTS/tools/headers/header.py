@@ -33,7 +33,11 @@ except Exception:
     MAP_FILE = ROOT / "AGENTS" / "codebase_map.json"
 
     def guess_codebase(path: Path, map_file: Path = MAP_FILE) -> str | None:
-        """Return codebase name owning ``path``."""
+        """Return codebase name owning ``path``.
+
+        Tries ``codebase_map.json`` first, then falls back to scanning path
+        components for known codebase names.
+        """
         try:
             data = json.loads(map_file.read_text())
         except Exception:
@@ -121,7 +125,6 @@ except Exception:
     print(ENV_SETUP_BOX)
     sys.exit(1)
 # --- END HEADER ---
-
 
 class Header:
     """A class to represent and manipulate headers dynamically."""

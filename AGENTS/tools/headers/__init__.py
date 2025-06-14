@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 # --- BEGIN HEADER ---
-"""Header utilities and templates."""
 from __future__ import annotations
 
 try:
-    from importlib import import_module
+    import your_modules
+
 except Exception:
     import os
     import sys
@@ -32,7 +32,11 @@ except Exception:
     MAP_FILE = ROOT / "AGENTS" / "codebase_map.json"
 
     def guess_codebase(path: Path, map_file: Path = MAP_FILE) -> str | None:
-        """Return codebase name owning ``path``."""
+        """Return codebase name owning ``path``.
+
+        Tries ``codebase_map.json`` first, then falls back to scanning path
+        components for known codebase names.
+        """
         try:
             data = json.loads(map_file.read_text())
         except Exception:
