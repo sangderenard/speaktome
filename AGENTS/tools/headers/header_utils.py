@@ -150,7 +150,7 @@ HEADER_REQUIREMENTS = [
     "'from __future__ import annotations' before the try block",
     "imports wrapped in a try block",
     (
-        "except block imports os, sys and Path, defines _find_repo_root,"
+        "except block imports os, sys, Path and json, defines _find_repo_root,"
         " checks ENV_SETUP_BOX and prints the message when missing,"
         " then invokes auto_env_setup via subprocess",
     ),
