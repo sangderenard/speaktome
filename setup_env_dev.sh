@@ -122,7 +122,7 @@ dev_menu
 echo "For advanced codebase/group selection, run: python AGENTS/tools/dev_group_menu.py"
 echo "Selections recorded to $SPEAKTOME_ACTIVE_FILE"
 
-# All options for this script should be used with double-dash GNU-style flags, e.g.:
-#   --torch --no-venv --codebases=projectA,projectB --groups=groupX
-# Use --torch or --gpu to request torch. If omitted, torch is skipped.
-# Do not use single-dash flags with this script.
+# All options for this script should be used with single-dash flags, e.g.:
+#   -torch -no-venv -codebases=projectA,projectB -groups=groupX
+# Use -torch or -gpu to request torch. If omitted, torch is skipped.
+# Do not use double-dash GNU-style flags with this script.

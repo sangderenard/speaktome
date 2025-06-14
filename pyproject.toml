@@ -1,5 +1,6 @@
 [tool.poetry]
-name = "speaktome-hub"
+name = "speaktome-root"
+package-mode = false
 version = "0.1.0"
 description = "Monorepo hub for SpeakToMe projects"
 authors = ["SpeakToMe Authors"]

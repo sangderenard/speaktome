@@ -122,14 +122,14 @@ fi
 for arg in "$@"; do
   arg_lc="${arg,,}"
   case $arg_lc in
-    -codebases=*|-cb=*) CODEBASES="${arg#*=}" ;;
-    -groups=*|-grp=*)   SEL_GROUPS+=("${arg#*=}") ;;
+    -codebases=*|--codebases=*|-cb=*|--cb=*) CODEBASES="${arg#*=}" ;;
+    -groups=*|--groups=*|-grp=*|--grp=*)   SEL_GROUPS+=("${arg#*=}") ;;
   esac
 done
 
-[ -n "$CODEBASES" ] && MENU_ARGS+=("-codebases" "$CODEBASES")
+[ -n "$CODEBASES" ] && MENU_ARGS+=("--codebases" "$CODEBASES")
 for g in "${SEL_GROUPS[@]}"; do
-  MENU_ARGS+=("-groups" "$g")
+  MENU_ARGS+=("--groups" "$g")
 done
 echo "[DEBUG] Codebases: ${CODEBASES:-}" >&2
 echo "[DEBUG] Groups: ${SEL_GROUPS[*]:-}" >&2

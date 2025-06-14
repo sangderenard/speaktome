@@ -43,3 +43,15 @@ def test_show_active(tmp_path) -> None:
     env = {**os.environ, 'SPEAKTOME_ACTIVE_FILE': str(tmp_path / 'active.json')}
     result = run_menu(['--show-active'], env=env)
     assert str(tmp_path / 'active.json') in result.stdout
+
+
+def test_single_dash_flags(tmp_path) -> None:
+    active = tmp_path / 'active.json'
+    result = run_menu([
+        '-codebases', 'speaktome',
+        '-groups', 'speaktome:dev',
+        '-json', '-record', str(active)
+    ])
+    data = json.loads(result.stdout)
+    assert 'speaktome' in data['codebases']
+    assert active.exists()

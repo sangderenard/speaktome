@@ -352,7 +352,35 @@ def interactive_menu_selection() -> tuple[list[str], dict[str, dict[str, list[st
     return final_codebases, final_groups
 
 
+def _normalize_args(args: list[str] | None) -> list[str]:
+    """Translate single-dash flags to double-dash equivalents."""
+    if not args:
+        return []
+    mapping = {
+        "-list": "--list",
+        "-show-active": "--show-active",
+        "-json": "--json",
+        "-install": "--install",
+        "-codebases": "--codebases",
+        "-groups": "--groups",
+        "-record": "--record",
+    }
+    result: list[str] = []
+    for arg in args:
+        if arg.startswith("--"):
+            result.append(arg)
+            continue
+        for short, long in mapping.items():
+            if arg == short or arg.startswith(f"{short}="):
+                result.append(long + arg[len(short):])
+                break
+        else:
+            result.append(arg)
+    return result
+
+
 def main(argv: list[str] | None = None) -> None:  # pragma: no cover - CLI
+    argv = _normalize_args(argv)
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--list",
