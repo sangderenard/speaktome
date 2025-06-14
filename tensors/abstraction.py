@@ -128,21 +128,33 @@ class AbstractTensor(ABC):
         return call()
 
     # --- Tensor creation and manipulation methods ---
+    @classmethod
     def full(
-        self,
+        cls,
         size: Tuple[int, ...],
         fill_value: Any,
         dtype: Any = None,
         device: Any = None,
-    ):
-        result = type(self)(track_time=self.track_time)
-        result.data = self.full_(size, fill_value, dtype, device)
+    ) -> "AbstractTensor":
+        ops = _get_ops_for_class(cls)
+        result = cls(track_time=getattr(ops, "track_time", False))
+        result.data = ops.full_(size, fill_value, dtype, device)
+        return result
+
+    def full(self, size: Tuple[int, ...], fill_value: Any, dtype: Any = None, device: Any = None):
+        return type(self).full(size, fill_value, dtype, device)
+
+    @classmethod
+    def zeros(
+        cls, size: Tuple[int, ...], dtype: Any = None, device: Any = None
+    ) -> "AbstractTensor":
+        ops = _get_ops_for_class(cls)
+        result = cls(track_time=getattr(ops, "track_time", False))
+        result.data = ops.zeros_(size, dtype, device)
         return result
 
     def zeros(self, size: Tuple[int, ...], dtype: Any = None, device: Any = None):
-        result = type(self)(track_time=self.track_time)
-        result.data = self.zeros_(size, dtype, device)
-        return result
+        return type(self).zeros(size, dtype, device)
 
     def clone(self) -> "AbstractTensor":
         result = type(self)(track_time=self.track_time)
@@ -203,6 +215,20 @@ class AbstractTensor(ABC):
         result.data = self.not_equal_(other)
         return result
 
+    @classmethod
+    def arange(
+        cls,
+        start: int,
+        end: Optional[int] = None,
+        step: int = 1,
+        device: Any = None,
+        dtype: Any = None,
+    ) -> "AbstractTensor":
+        ops = _get_ops_for_class(cls)
+        result = cls(track_time=getattr(ops, "track_time", False))
+        result.data = ops.arange_(start, end, step, device, dtype)
+        return result
+
     def arange(
         self,
         start: int,
@@ -211,9 +237,7 @@ class AbstractTensor(ABC):
         device: Any = None,
         dtype: Any = None,
     ) -> "AbstractTensor":
-        result = type(self)(track_time=self.track_time)
-        result.data = self.arange_(start, end, step, device, dtype)
-        return result
+        return type(self).arange(start, end, step, device, dtype)
 
     def select_by_indices(
         self, indices_dim0: Any = None, indices_dim1: Any = None
@@ -303,12 +327,19 @@ class AbstractTensor(ABC):
         result.data = self.sqrt_()
         return result
 
+    @classmethod
+    def tensor_from_list(
+        cls, data: List[Any], dtype: Any = None, device: Any = None
+    ) -> "AbstractTensor":
+        ops = _get_ops_for_class(cls)
+        result = cls(track_time=getattr(ops, "track_time", False))
+        result.data = ops.tensor_from_list_(data, dtype, device)
+        return result
+
     def tensor_from_list(
         self, data: List[Any], dtype: Any = None, device: Any = None
     ) -> "AbstractTensor":
-        result = type(self)(track_time=self.track_time)
-        result.data = self.tensor_from_list_(data, dtype, device)
-        return result
+        return type(self).tensor_from_list(data, dtype, device)
 
     def boolean_mask_select(self, mask: Any = None) -> "AbstractTensor":
         result = type(self)(track_time=self.track_time)
