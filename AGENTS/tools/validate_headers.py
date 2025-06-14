@@ -104,7 +104,7 @@ def check_class(cls: ast.ClassDef) -> tuple[bool, bool, str | None]:
                 if (
                     isinstance(target, ast.Name)
                     and target.id == "HEADER"
-                    and isinstance(stmt.value, (ast.Str, ast.Constant))
+                    and isinstance(stmt.value, ast.Constant)
                 ):
                     header = getattr(
                         stmt.value, "s", getattr(stmt.value, "value", None)
@@ -150,7 +150,7 @@ def validate(root: Path, *, rewrite: bool = False) -> int:
                 if (
                     cls.body
                     and isinstance(cls.body[0], ast.Expr)
-                    and isinstance(cls.body[0].value, (ast.Str, ast.Constant))
+                    and isinstance(cls.body[0].value, ast.Constant)
                 ):
                     insert_at = cls.body[0].end_lineno
                 insert_idx = insert_at - 1

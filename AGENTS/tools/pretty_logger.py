@@ -18,9 +18,16 @@ class LogContext:
 class PrettyLogger:
     HEADER = """A logger that auto-generates aesthetic markdown headers based on context."""
     
-    def __init__(self, name: str):
+    def __init__(self, name: str, enable_color: bool | None = None):
         self.logger = logging.getLogger(name)
         self.contexts: List[LogContext] = []
+        self.color_enabled = enable_color if enable_color is not None else sys.stdout.isatty()
+        if self.color_enabled and sys.platform.startswith("win"):
+            try:
+                import colorama
+                colorama.just_fix_windows_console()
+            except Exception:  # pragma: no cover - optional
+                pass
         self._setup_handlers()
     
     @staticmethod
@@ -38,6 +45,11 @@ class PrettyLogger:
         handler.setFormatter(logging.Formatter('%(message)s'))
         self.logger.addHandler(handler)
         self.logger.setLevel(logging.INFO)
+
+    def _color(self, text: str, code: str) -> str:
+        if not self.color_enabled:
+            return text
+        return f"{code}{text}\x1b[0m"
     
     @contextmanager
     def context(self, title: str, tags: Optional[List[str]] = None):
@@ -48,7 +60,8 @@ class PrettyLogger:
         # Print entry header
         depth_marker = "#" * (ctx.depth + 2)  # Start at h2
         tag_str = " ".join(f"[{t}]" for t in ctx.tags)
-        self.logger.info(f"\n{depth_marker} {ctx.title} {tag_str}\n")
+        header_line = f"\n{depth_marker} {ctx.title} {tag_str}\n"
+        self.logger.info(self._color(header_line, "\x1b[95m"))
         
         try:
             yield
@@ -60,25 +73,22 @@ class PrettyLogger:
     def info(self, msg: str):
         """Log with current context indentation."""
         indent = "  " * len(self.contexts)
-        self.logger.info(f"{indent}{msg}")
+        self.logger.info(self._color(f"{indent}{msg}", "\x1b[92m"))
 
-    # ########## STUB: color_output_enhancements ##########
-    # PURPOSE: Provide optional ANSI color formatting for log messages.
-    # EXPECTED BEHAVIOR: Detect terminal capabilities and apply styling to
-    #   markdown headers and nested messages for improved readability.
-    # INPUTS: Log strings emitted by ``info`` and ``context``.
-    # OUTPUTS: Colored text written to the console.
-    # KEY ASSUMPTIONS/DEPENDENCIES: Terminal supports ANSI escape codes.
-    # TODO:
-    #   - Add feature detection for Windows terminals.
-    #   - Implement color themes configurable via environment variable.
-    #   - Expose simple API for other tools to enable or disable colors.
-    # NOTES: This stub illustrates the planned interface but does not yet
-    #   modify output.  The current implementation is monochrome.
-    # ###########################################################################
+    # Optional color enhancements for console output.
     def enable_color(self) -> None:
-        """Enable colored output (not yet implemented)."""
-        raise NotImplementedError
+        """Enable colored output for subsequent log messages."""
+        self.color_enabled = True
+        if sys.platform.startswith("win"):
+            try:
+                import colorama
+                colorama.just_fix_windows_console()
+            except Exception:  # pragma: no cover - optional
+                pass
+
+    def disable_color(self) -> None:
+        """Disable colored output."""
+        self.color_enabled = False
 
 
 @dataclass
