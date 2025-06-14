@@ -1,0 +1,4 @@
+[submodule "wheelhouse"]
+	path = wheelhouse
+	url = git@github.com:sangderenard/wheelhouse.git
+	branch = nogodsnomasters
