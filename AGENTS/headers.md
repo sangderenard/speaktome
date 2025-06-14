@@ -1,6 +1,6 @@
 # Standard Header
 
-The Python module `AGENTS.tools.header.Header` defines the canonical
+The Python module `AGENTS.tools.headers.header_template` defines the canonical
 header used across this repository.  Each line ends with sentinel comments
 that mark the start or end of major sections.  Tools read these comments to
 generate or validate headers programmatically.
@@ -28,6 +28,7 @@ except Exception:  # <try:end> <except:start>
             "AGENTS",
             "fontmapper",
             "tensors",
+            "testenv",
         }
         for parent in [current, *current.parents]:
             if all((parent / name).exists() for name in required):
@@ -60,6 +61,7 @@ except Exception:  # <try:end> <except:start>
                 "timesync",
                 "fontmapper",
                 "tensors",
+                "testenv",
                 "tools",
             }
             for part in path.parts:
