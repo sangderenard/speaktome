@@ -124,7 +124,7 @@ def _discover_codebases(map_file: Path) -> list[str]:
 CODEBASES = _discover_codebases(ROOT / "AGENTS" / "codebase_map.json")
 
 try:
-    from AGENTS.tools.dynamic_header_recognition import guess_codebase
+    from AGENTS.tools.headers.dynamic_header_recognition import guess_codebase
 except Exception:
     def guess_codebase(path: Path, map_file: Path | None = None) -> str | None:
         return None

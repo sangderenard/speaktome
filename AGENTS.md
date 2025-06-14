@@ -54,4 +54,4 @@ Open the printed file under `AGENTS/job_descriptions/` and follow its steps. Rec
 - **AGENTS/tools** — shared helper scripts for repository management.
 
 See `AGENTS/CODEBASE_REGISTRY.md` for details and future additions.
-Dynamic header recognition utilities live in `AGENTS.tools.dynamic_header_recognition`.
+Dynamic header recognition utilities live in `AGENTS.tools.headers.dynamic_header_recognition`.

@@ -67,6 +67,26 @@ except Exception:
 
         return None
 
+    def parse_pyproject_groups(pyproject: Path) -> list[str]:
+        try:
+            try:
+                import tomllib
+            except ModuleNotFoundError:  # Python < 3.11
+                import tomli as tomllib
+        except Exception:
+            return []
+        try:
+            data = tomllib.loads(pyproject.read_text())
+        except Exception:
+            return []
+
+        groups = set()
+        groups.update(data.get("project", {}).get("optional-dependencies", {}).keys())
+        tool = data.get("tool", {}).get("poetry", {})
+        groups.update(tool.get("group", {}).keys())
+        groups.update(tool.get("extras", {}).keys())
+        return sorted(groups)
+
     if "ENV_SETUP_BOX" not in os.environ:
         root = _find_repo_root(Path(__file__))
         box = root / "ENV_SETUP_BOX.md"
@@ -79,15 +99,21 @@ except Exception:
     import subprocess
     try:
         root = _find_repo_root(Path(__file__))
-        subprocess.run(
-            [
-                sys.executable,
-                "-m",
-                "AGENTS.tools.auto_env_setup",
-                str(root),
-            ],
-            check=False,
-        )
+        pyproject = root / "pyproject.toml"
+        groups = parse_pyproject_groups(pyproject)
+        codebase = guess_codebase(Path(__file__))
+        base_cmd = [
+            sys.executable,
+            "-m",
+            "AGENTS.tools.auto_env_setup",
+            str(root),
+        ]
+        if codebase:
+            base_cmd.append(f"-codebases={codebase}")
+        subprocess.run(base_cmd, check=False)
+        for grp in groups:
+            subprocess.run(base_cmd + [f"-groups={grp}"], check=False)
+
     except Exception:
         pass
     try:

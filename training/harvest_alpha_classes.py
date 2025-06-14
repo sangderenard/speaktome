@@ -10,7 +10,7 @@ try:
     from pathlib import Path
     from typing import Iterable, List, Dict
 except Exception:
-    from AGENTS.tools.header_utils import ENV_SETUP_BOX
+    from AGENTS.tools.headers.header_utils import ENV_SETUP_BOX
     print(ENV_SETUP_BOX)
     raise
 # --- END HEADER ---
