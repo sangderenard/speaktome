@@ -85,6 +85,7 @@ class HeaderNode:
 
 ROOT = Path(__file__).resolve().parents[2]
 MAP_FILE = ROOT / "AGENTS" / "codebase_map.json"
+TEMPLATE_PATH = Path(__file__).with_name("header_template.py")
 
 
 def guess_codebase(path: Path, map_file: Path = MAP_FILE) -> str | None:
@@ -146,6 +147,15 @@ def parse_header(text: str) -> HeaderNode:
     return root
 
 
+def load_template_tree(path: Path = TEMPLATE_PATH) -> HeaderNode:
+    """Return :class:`HeaderNode` tree parsed from the header template."""
+    try:
+        text = path.read_text(encoding="utf-8")
+    except Exception:
+        return HeaderNode("root")
+    return parse_header(text)
+
+
 def compare_trees(parsed_tree: HeaderNode, template_tree: HeaderNode) -> list[str]:
     """Return a list of differences between ``parsed_tree`` and ``template_tree``."""
     differences: list[str] = []
@@ -171,6 +181,7 @@ __all__ = [
     "HeaderNode",
     "guess_codebase",
     "parse_header",
+    "load_template_tree",
     "compare_trees",
     "pretty_print_tree",
 ]

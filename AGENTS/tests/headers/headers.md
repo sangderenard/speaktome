@@ -104,4 +104,6 @@ except Exception:  # <try:end> <except:start>
 The module `AGENTS.tools.headers.dynamic_header_recognition` provides a skeleton
 implementation for parsing and comparing headers using a tree structure.
 It exposes :class:`HeaderNode` and helpers like :func:`parse_header` to
-serve as building blocks for future validation logic.
+serve as building blocks for future validation logic.  The helper
+:func:`load_template_tree` reads ``header_template.py`` and returns a
+parsed tree so other tools can compare against the canonical layout.
