@@ -1,0 +1,42 @@
+# Normalize text files to LF in the repository
+* text=auto eol=lf
+
+# Treat common binary formats as binary to prevent line-ending conversion
+*.whl binary
+*.exe binary
+*.dll binary
+*.so  binary
+*.dylib binary
+*.a   binary
+*.lib binary
+*.bin binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.bmp binary
+*.ico binary
+*.svg binary
+*.pdf binary
+*.zip binary
+*.tar binary
+*.gz  binary
+*.bz2 binary
+*.xz  binary
+*.7z  binary
+*.rar binary
+*.mp3 binary
+*.mp4 binary
+*.mov binary
+*.avi binary
+*.wav binary
+*.flac binary
+*.ogg binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.otf binary
+*.jar binary
+*.class binary
+*.pyc binary
+
