@@ -17,7 +17,7 @@ Provide error messages or log excerpts demonstrating the failure.
 Document any troubleshooting steps taken and their results.
 
 ## Current Status
-Explain whether the issue is resolved or requires follow-up.
+Explain whether the issue is resolved or requires follow-up. Document any remaining tasks in `todo/` as a `.stub.md` file.
 
 ## Prompt History
 Quote all prompts or instructions that shaped this trouble ticket.
