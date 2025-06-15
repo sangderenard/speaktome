@@ -47,8 +47,8 @@ def temp_reports(tmp_path, monkeypatch):
 def test_archives_old_files(temp_reports) -> None:
     """Verify that older reports are moved into ``archive/``."""
     logger.info("test_archives_old_files start")
-    vg.validate_and_fix()
-    vg.archive_old_reports()
+    vg.validate_and_fix(apply=True)
+    vg.archive_old_reports(apply=True)
     archived_files = sorted(os.listdir(temp_reports / 'archive'))
     assert len(archived_files) == 2
     logger.info("test_archives_old_files end")
