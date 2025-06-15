@@ -16,7 +16,7 @@ Describe any notable output or results.
 Key takeaways from this activity.
 
 ## Next Steps
-Follow-up actions or questions.
+Follow-up actions or questions. Record these items in `todo/` as a `.stub.md` file so contributors can easily track outstanding work.
 
 ## Prompt History
 Quote any instructions that guided this report verbatim.
