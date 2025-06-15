@@ -16,3 +16,4 @@ Each Markdown file documents a distinct idea or design direction.
 - `ASCII_Render_Pipeline.md`
 - `FFT_Wavelet_Token_Library.md`
 - `Weight_Drift_Constraint_Functions.md`
+- `Decaying_Graph_Contextual_Data.md`
