@@ -1,6 +1,6 @@
 # Todo Folder
 
-This directory holds open work items and prototypes.
+This directory holds open work items and prototypes. When you write an experience report, translate any "Next Steps" into a `.stub.md` file here so tasks are not lost in the documentation.
 
 ## Stub Tracking
 
