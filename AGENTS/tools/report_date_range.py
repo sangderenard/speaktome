@@ -39,6 +39,7 @@ def gather_epochs() -> list[int]:
     return epochs
 
 
+
 def report_date_range() -> tuple[int, int] | None:
     """Return the earliest and latest epoch timestamps or ``None`` if no reports."""
     epochs = gather_epochs()
@@ -53,6 +54,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     range_pair = report_date_range()
+
     if range_pair is None:
         print("no reports found")
         return 1
