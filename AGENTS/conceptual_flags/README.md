@@ -17,3 +17,4 @@ Each Markdown file documents a distinct idea or design direction.
 - `FFT_Wavelet_Token_Library.md`
 - `Weight_Drift_Constraint_Functions.md`
 - `Decaying_Graph_Contextual_Data.md`
+- `Multi_Rate_Decaying_Graph_Context.md`
