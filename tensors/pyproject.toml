@@ -43,6 +43,12 @@ PyOpenGL = ">=3.1"
 glfw = "*"
 numpy = ">=1.26,<2.3"
 
+[tool.poetry.group.rust]
+optional = true
+
+[tool.poetry.group.rust.dependencies]
+maturin = ">=1.5"
+
 [tool.poetry.group.dev]
 optional = true
 
@@ -56,6 +62,7 @@ ctensor = []
 torch = []
 numpy = []
 opengl = []
+rust = []
 dev = []
 
 [build-system]
