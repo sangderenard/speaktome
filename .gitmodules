@@ -1,7 +1,0 @@
-[submodule "wheelhouse"]
-	path = wheelhouse
-	url = git@github.com:sangderenard/wheelhouse.git
-	branch = nogodsnomasters
-[submodule "asciioscilliscope/eigen"]
-  path = asciioscilliscope/eigen
-  url  = https://gitlab.com/libeigen/eigen.git
