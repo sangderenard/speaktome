@@ -3,6 +3,8 @@
 	url = git@github.com:sangderenard/wheelhouse.git
     branch = nogodsnomasters
 
+
 [submodule "asciioscilliscope/eigen"]
-	path = asciioscilliscope/eigen
-	url = https://github.com/libigl/eigen.git
+    path   = asciioscilliscope/eigen
+    url    = https://github.com/libigl/eigen.git
+    ignore = all
