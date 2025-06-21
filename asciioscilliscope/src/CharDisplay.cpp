@@ -1,28 +1,39 @@
 #include "../include/asciioscilliscope/CharDisplay.h"
-#include <algorithm>
 
 namespace asciioscilliscope {
 
-CharDisplay::CharDisplay(int rows, int cols)
-    : rows_(rows), cols_(cols), curr_(rows*cols), next_(rows*cols) {}
-
-void CharDisplay::set(int y, int x, char ch, uint8_t r, uint8_t g, uint8_t b) {
-    if (x<0||x>=cols_||y<0||y>=rows_) return;
-    next_[y*cols_ + x] = CharCell{ch, r, g, b};
+CharDisplay::CharDisplay(int rows, int cols, bool fullPrintMode)
+    : rows_(rows), cols_(cols), fullPrintMode_(fullPrintMode),
+      sliceQueue_(), activeBuffer_(0) {
+    buffers_[0] = Eigen::Tensor<char,2>(rows, cols);
+    buffers_[1] = Eigen::Tensor<char,2>(rows, cols);
+    buffers_[0].setZero();
+    buffers_[1].setZero();
 }
 
-std::vector<std::tuple<int,int,char,uint8_t,uint8_t,uint8_t>> CharDisplay::diffAndSwap() {
-    std::vector<std::tuple<int,int,char,uint8_t,uint8_t,uint8_t>> diff;
-    for (int i=0; i<rows_*cols_; ++i) {
-        const CharCell &n = next_[i];
-        CharCell &c = curr_[i];
-        if (n.ch!=c.ch || n.r!=c.r || n.g!=c.g || n.b!=c.b) {
-            diff.emplace_back(i/cols_, i%cols_, n.ch, n.r, n.g, n.b);
-            c = n;
-        }
-    }
-    std::fill(next_.begin(), next_.end(), CharCell{' ',0,0,0});
-    return diff;
+// ########## STUB: CharDisplay::stageSlice ##########
+// PURPOSE: enqueue a character slice for future display.
+// EXPECTED BEHAVIOR: thread-safe insertion into the slice queue.
+// ###########################################################################
+void CharDisplay::stageSlice(const Eigen::Tensor<char,2>& slice, double timestamp) {
+    sliceQueue_.emplace_back(timestamp, slice);
+}
+
+// ########## STUB: CharDisplay::getNextDiff ##########
+// PURPOSE: compute diffs between queued slice and current buffer.
+// EXPECTED BEHAVIOR: produce per-cell updates; this stub only swaps buffers.
+// ###########################################################################
+std::vector<std::tuple<int,int,char,uint8_t,uint8_t,uint8_t>>
+CharDisplay::getNextDiff() {
+    if (sliceQueue_.empty()) return {};
+    buffers_[activeBuffer_ ^ 1] = sliceQueue_.front().second;
+    sliceQueue_.pop_front();
+    activeBuffer_ ^= 1;
+    return {};
+}
+
+const Eigen::Tensor<char,2>& CharDisplay::getFullBuffer() const {
+    return buffers_[activeBuffer_];
 }
 
 } // namespace asciioscilliscope
