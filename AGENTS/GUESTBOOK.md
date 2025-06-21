@@ -40,7 +40,7 @@ Review earlier experiences before starting a new test. Identify unresolved quest
 
 ## Continuous Collaboration
 
-User experience reports are part of a dynamic feedback loop between developers and testers. Keep the conversation going by clearly stating next steps and open issues. The goal is incremental refinement of the project.
+User experience reports are part of a dynamic feedback loop between developers and testers. Keep the conversation going by clearly stating next steps and open issues. Whenever you outline follow-up tasks, also create a `.stub.md` file in `todo/` summarizing the action. This makes it easier for future contributors to find and implement outstanding work. The goal is incremental refinement of the project.
 
 ## Prompt History
 

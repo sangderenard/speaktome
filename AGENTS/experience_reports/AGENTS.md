@@ -18,7 +18,7 @@ Templates for each category are available:
 
 Include a **Prompt History** section quoting any instructions or conversations that influenced the session verbatim. Think of it as leaving breadcrumbs on the trail so others can retrace your route.
 
-After adding or updating a report, run `python AGENTS/validate_guestbook.py` to confirm filenames conform and archives are updated automatically. This keeps the park map tidy and easy to read.
+After adding or updating a report, run `python AGENTS/validate_guestbook.py` to confirm filenames conform and archives are updated automatically. Capture any "Next Steps" from your report as a `.stub.md` file in `todo/` so future agents can quickly locate outstanding tasks. This keeps the park map tidy and easy to read.
 
 
 For unusually detailed analyses, create a "long documentation" report. See `1749791541_v1_Long_Documentation_Guidelines.md` for the recommended format and extended instructions.

@@ -14,9 +14,30 @@
 # NOTES: Mirrors the "Log Interpreter" role proposed by GPT-4o.
 # ###########################################################################
 
-def interpret_test_log(log_text: str) -> list[str]:
-    """Return a list of actionable issues found in the log."""
-    raise NotImplementedError("log_interpreter stub")
+import re
+from typing import List
+
+
+def interpret_test_log(log_text: str) -> List[str]:
+    """Return a list of actionable issues found in the log.
+
+    This minimal implementation looks for lines containing ``FAILED`` or ``ERROR``
+    that are not marked as skipped. It ignores lines mentioning ``SKIPPED`` or
+    ``xfailed``. The result is a list of relevant log lines.
+    """
+
+    issues: List[str] = []
+    fail_pattern = re.compile(r"(FAILED|ERROR)", re.IGNORECASE)
+    skip_pattern = re.compile(r"SKIPPED|xfailed", re.IGNORECASE)
+
+    for line in log_text.splitlines():
+        if not fail_pattern.search(line):
+            continue
+        if skip_pattern.search(line):
+            continue
+        issues.append(line.strip())
+
+    return issues
 
 
 if __name__ == "__main__":

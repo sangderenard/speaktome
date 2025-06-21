@@ -14,4 +14,4 @@ Describe the exact command used to generate the log.
 ```
 
 ## Prompt History
-Include the prompts or instructions that requested this log.
+Include the prompts or instructions that requested this log. If the output suggests follow-up actions, record them in `todo/` as a `.stub.md` file.

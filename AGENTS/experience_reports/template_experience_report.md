@@ -21,5 +21,5 @@ Summaries of outputs, errors, or unusual events.
 What did this run teach you? How does it differ from previous attempts?
 
 ## Next Steps
-Planned follow-up actions or unresolved questions.
+Planned follow-up actions or unresolved questions. Record these tasks in `todo/` as a `.stub.md` file for easy tracking.
 
