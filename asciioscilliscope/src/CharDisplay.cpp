@@ -3,26 +3,33 @@
 
 namespace asciioscilliscope {
 
-CharDisplay::CharDisplay(int rows, int cols)
-    : rows_(rows), cols_(cols), curr_(rows*cols), next_(rows*cols) {}
+CharDisplay::CharDisplay(int rows, int cols, bool fullPrint)
+    : rows_(rows), cols_(cols), fullPrintMode_(fullPrint),
+      buffers_{Eigen::Tensor<char,2>(rows, cols), Eigen::Tensor<char,2>(rows, cols)} {}
 
-void CharDisplay::set(int y, int x, char ch, uint8_t r, uint8_t g, uint8_t b) {
-    if (x<0||x>=cols_||y<0||y>=rows_) return;
-    next_[y*cols_ + x] = CharCell{ch, r, g, b};
+// ########## STUB: stageSlice ##########
+// PURPOSE: enqueue next character slice for display
+void CharDisplay::stageSlice(const Eigen::Tensor<char,2>& slice, double timestamp) {
+    (void)timestamp;
+    std::lock_guard<std::mutex> lock(mutex_);
+    sliceQueue_.emplace_back(timestamp, slice);
 }
 
-std::vector<std::tuple<int,int,char,uint8_t,uint8_t,uint8_t>> CharDisplay::diffAndSwap() {
-    std::vector<std::tuple<int,int,char,uint8_t,uint8_t,uint8_t>> diff;
-    for (int i=0; i<rows_*cols_; ++i) {
-        const CharCell &n = next_[i];
-        CharCell &c = curr_[i];
-        if (n.ch!=c.ch || n.r!=c.r || n.g!=c.g || n.b!=c.b) {
-            diff.emplace_back(i/cols_, i%cols_, n.ch, n.r, n.g, n.b);
-            c = n;
-        }
-    }
-    std::fill(next_.begin(), next_.end(), CharCell{' ',0,0,0});
-    return diff;
+// ########## STUB: getNextDiff ##########
+// PURPOSE: compute diffs between queued slice and active buffer
+std::vector<std::tuple<int,int,char,uint8_t,uint8_t,uint8_t>> CharDisplay::getNextDiff() {
+    std::lock_guard<std::mutex> lock(mutex_);
+    std::vector<std::tuple<int,int,char,uint8_t,uint8_t,uint8_t>> result;
+    if (sliceQueue_.empty()) return result;
+    Eigen::Tensor<char,2> slice = sliceQueue_.front().second;
+    sliceQueue_.pop_front();
+    buffers_[activeBuffer_] = slice;
+    activeBuffer_ ^= 1;
+    return result;
+}
+
+const Eigen::Tensor<char,2>& CharDisplay::getFullBuffer() const {
+    return buffers_[activeBuffer_];
 }
 
 } // namespace asciioscilliscope

@@ -2,11 +2,13 @@
 
 namespace asciioscilliscope {
 
+// ########## STUB: classify ##########
+// PURPOSE: Map RGB to ASCII using brightness ramp in future.
+// EXPECTED BEHAVIOR: choose character based on intensity.
+// ########################################################
 char CharClassifier::classify(uint8_t r, uint8_t g, uint8_t b) const {
-    static const std::string ramp = " .'`^\",:;Il!i><~+_-?][}{1)(|\\/*tfjrxnuvczXYUJCLQ0OZmwqpdbkhao*#MW&8%B@$";
-    float brightness = 0.2126f*r + 0.7152f*g + 0.0722f*b;
-    size_t idx = static_cast<size_t>((brightness/255.0f)*(ramp.size()-1));
-    return ramp[idx];
+    (void)r; (void)g; (void)b;
+    return '?';
 }
 
 } // namespace asciioscilliscope
