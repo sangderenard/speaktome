@@ -2,3 +2,6 @@
 	path = wheelhouse
 	url = git@github.com:sangderenard/wheelhouse.git
 	branch = nogodsnomasters
+[submodule "path/to/eigen"]
+	path = path/to/eigen
+	url = https://gitlab.com/libeigen/eigen.git
