@@ -14,6 +14,8 @@
 #include <string>
 #include <cstdio>
 #include <cstring>
+#include <algorithm>
+#include "screen.h"
 #include "stb_image.h"
 #include "signal_input.h"  // Add signal reader header
 
@@ -35,97 +37,86 @@ inline void setup_utf8_console() {
 using Clock = std::chrono::steady_clock;
 using ms = std::chrono::milliseconds;
 
-// Triple-buffered diff manager for RGB pixels
+// Double-buffered diff manager for RGB pixels
 class PixelFrameBuffer {
 public:
     PixelFrameBuffer(int rows, int cols)
         : rows(rows), cols(cols), size(rows*cols*3),
-          buf_render(size), buf_next(size), buf_disp(size) {}
+          curr(size), prev(size) {}
 
     void update_render(const std::vector<uint8_t>& data) {
         if (data.size() != size) return;
         std::lock_guard<std::mutex> lk(m);
-        buf_render = data;
+        curr = data;
     }
 
-    std::vector<std::tuple<int,int,uint8_t,uint8_t,uint8_t>> get_diff_and_promote() {
+    std::vector<std::tuple<int,int,uint8_t,uint8_t,uint8_t>> get_diff_and_swap() {
         std::vector<std::tuple<int,int,uint8_t,uint8_t,uint8_t>> diff;
         std::lock_guard<std::mutex> lk(m);
         for (int i=0, idx=0; i<size; i+=3, ++idx) {
-            uint8_t r=buf_render[i], g=buf_render[i+1], b=buf_render[i+2];
-            uint8_t pr=buf_disp[i], pg=buf_disp[i+1], pb=buf_disp[i+2];
+            uint8_t r=curr[i], g=curr[i+1], b=curr[i+2];
+            uint8_t pr=prev[i], pg=prev[i+1], pb=prev[i+2];
             if (r!=pr || g!=pg || b!=pb) {
                 int y = idx / cols, x = idx % cols;
                 diff.emplace_back(y,x,r,g,b);
             }
-            buf_next[i]=r; buf_next[i+1]=g; buf_next[i+2]=b;
         }
-        buf_disp.swap(buf_next);
+        prev.swap(curr);
         return diff;
     }
 
 private:
     int rows, cols, size;
-    std::vector<uint8_t> buf_render, buf_next, buf_disp;
+    std::vector<uint8_t> curr, prev;
     std::mutex m;
 };
 
-// Color phosphor with independent decay per channel
-class ColorPhosphor {
+// Map RGB values to ASCII characters via brightness
+class CharClassifier {
 public:
-    ColorPhosphor() {
-        intensity.fill(0.0f);
-        auto now = Clock::now();
-        last.fill(now);
+    char classify(uint8_t r, uint8_t g, uint8_t b) const {
+        static const std::string ramp = " .'`^\",:;Il!i><~+_-?][}{1)(|\\/*tfjrxnuvczXYUJCLQ0OZmwqpdbkhao*#MW&8%B@$";
+        float brightness = 0.2126f * r + 0.7152f * g + 0.0722f * b;
+        size_t idx = static_cast<size_t>((brightness / 255.f) * (ramp.size() - 1));
+        return ramp[idx];
     }
-    void excite(uint8_t r, uint8_t g, uint8_t b) {
-        excite_chan(0, r);
-        excite_chan(1, g);
-        excite_chan(2, b);
-    }
-    std::array<uint8_t,3> value() const {
-        std::array<uint8_t,3> out;
-        auto now = Clock::now();
-        for (int c=0; c<3; ++c) {
-            float dt = std::chrono::duration<float>(now - last[c]).count();
-            float decay = std::exp(-dt * decay_rate);
-            float v = intensity[c] * decay;
-            out[c] = static_cast<uint8_t>(std::clamp(v,0.0f,255.0f));
-        }
-        return out;
-    }
-private:
-    void excite_chan(int c, uint8_t level) {
-        intensity[c] = std::min(intensity[c] + level, 255.0f);
-        last[c] = Clock::now();
-    }
-    static constexpr float decay_rate = 0.5f; // per second
-    std::array<float,3> intensity;
-    std::array<Clock::time_point,3> last;
 };
 
-// Screen of phosphors
-class Screen {
+struct CharCell {
+    char ch{ ' ' };
+    uint8_t r{0}, g{0}, b{0};
+};
+
+// Double-buffered character grid for terminal output
+class CharDisplay {
 public:
-    Screen(int w, int h): width(w), height(h), grid(w*h) {}
-    void excite(int x, int y, uint8_t r, uint8_t g, uint8_t b) {
-        if (x<0||x>=width||y<0||y>=height) return;
-        grid[y*width + x].excite(r,g,b);
+    CharDisplay(int rows, int cols) : rows(rows), cols(cols),
+        curr(rows*cols), next(rows*cols) {}
+
+    void set(int y, int x, char ch, uint8_t r, uint8_t g, uint8_t b) {
+        if (x<0||x>=cols||y<0||y>=rows) return;
+        next[y*cols + x] = CharCell{ch, r, g, b};
     }
-    std::vector<uint8_t> render_buffer() const {
-        std::vector<uint8_t> out(width*height*3);
-        for (int y=0,i=0; y<height; ++y) {
-            for (int x=0; x<width; ++x, i+=3) {
-                auto v = grid[y*width + x].value();
-                out[i]=v[0]; out[i+1]=v[1]; out[i+2]=v[2];
+
+    std::vector<std::tuple<int,int,char,uint8_t,uint8_t,uint8_t>> diff_and_swap() {
+        std::vector<std::tuple<int,int,char,uint8_t,uint8_t,uint8_t>> diff;
+        for (int i=0;i<rows*cols;++i) {
+            const CharCell &n = next[i];
+            CharCell &c = curr[i];
+            if (n.ch!=c.ch || n.r!=c.r || n.g!=c.g || n.b!=c.b) {
+                diff.emplace_back(i/cols, i%cols, n.ch, n.r, n.g, n.b);
+                c = n;
             }
         }
-        return out;
+        std::fill(next.begin(), next.end(), CharCell{});
+        return diff;
     }
+
 private:
-    int width, height;
-    std::vector<ColorPhosphor> grid;
+    int rows, cols;
+    std::vector<CharCell> curr, next;
 };
+
 
 // Renderer that diffs and draws to console
 class Renderer {
@@ -134,7 +125,10 @@ public:
       : img_w(img_w), img_h(img_h),
         phosphor_w(img_w/4), phosphor_h(img_h/4),
         char_w(img_w/16), char_h(img_h/16),
-        fb(char_h, char_w), screen(phosphor_w, phosphor_h), running(true) {}
+        fb(char_h, char_w), screen(phosphor_w, phosphor_h),
+        display(char_h, char_w),
+        img_prev(img_w*img_h*3), ph_prev(phosphor_w*phosphor_h*3),
+        running(true) {}
 
     void excite_from_image(const std::vector<uint8_t>& img) {
         // Aggregate image pixels into phosphor grid (4x4 blocks)
@@ -159,7 +153,14 @@ public:
         // hide cursor
         std::cout<<"\x1B[?25l";
         while(running) {
-            auto ph_buf = screen.render_buffer();
+            auto ph_curr = screen.render_buffer();
+            if (ph_prev.empty()) ph_prev.resize(ph_curr.size());
+            for (size_t i=0; i<ph_curr.size(); ++i) {
+                volatile bool changed = ph_curr[i] != ph_prev[i];
+                (void)changed;
+            }
+            std::vector<uint8_t> ph_buf = ph_curr;
+            ph_prev.swap(ph_curr);
             // Downsample phosphor buffer to char grid (4x4 blocks)
             std::vector<uint8_t> char_buf(char_w*char_h*3);
             for (int cy=0; cy<char_h; ++cy) {
@@ -178,8 +179,15 @@ public:
                 }
             }
             fb.update_render(char_buf);
-            auto diffs = fb.get_diff_and_promote();
-            draw(diffs);
+            auto diffs = fb.get_diff_and_swap();
+            for (auto &t: diffs) {
+                int y,x; uint8_t r,g,b;
+                std::tie(y,x,r,g,b) = t;
+                char ch = classifier.classify(r,g,b);
+                display.set(y,x,ch,r,g,b);
+            }
+            auto char_diffs = display.diff_and_swap();
+            draw(char_diffs);
             std::this_thread::sleep_for(ms(33));
         }
         // show cursor
@@ -192,19 +200,23 @@ private:
     int char_w, char_h;
     int fb_rows() const { return char_h; }
     int fb_cols() const { return char_w; }
-    void draw(const std::vector<std::tuple<int,int,uint8_t,uint8_t,uint8_t>>& d) {
+public:
+    void draw(const std::vector<std::tuple<int,int,char,uint8_t,uint8_t,uint8_t>>& d) {
         for (auto &t: d) {
-            int y,x; uint8_t r,g,b;
-            std::tie(y,x,r,g,b) = t;
+            int y,x; char ch; uint8_t r,g,b;
+            std::tie(y,x,ch,r,g,b) = t;
             std::cout << "\x1B["<<(y+1)<<";"<<(x+1)<<"H"
-                      << "\x1B[48;2;"<<(int)r<<";"<<(int)g<<";"<<(int)b<<"m " ;
+                      << "\x1B[38;2;"<<(int)r<<";"<<(int)g<<";"<<(int)b<<"m"<<ch;
         }
         std::cout<<"\x1B[0m"<<std::flush;
     }
     PixelFrameBuffer fb;
     Screen screen;
+    CharDisplay display;
+    std::vector<uint8_t> img_prev;
+    std::vector<uint8_t> ph_prev;
+    CharClassifier classifier;
     std::atomic<bool> running;
-    int screen_width, screen_height;
 };
 
 int main(int argc, char** argv) {
@@ -221,14 +233,20 @@ int main(int argc, char** argv) {
     if (std::string(argv[1]) == "signal") {
         // Oscilloscope mode: no image load
         Screen screen(80, 30);
-        start_signal_reader(screen, 80, running);
+        start_signal_reader(screen, 80, 30, running);
         // draw loop
-        Renderer R(80,30); // reinterpret Renderer as diff/draw on Screen?
+        Renderer R(80,30); // diff/draw on Screen
         while (running) {
             auto buf = screen.render_buffer();
-            R.fb.update_render(buf); // assume fb/public
-            auto diffs = R.fb.get_diff_and_promote();
-            R.draw(diffs);
+            R.fb.update_render(buf);
+            auto diffs = R.fb.get_diff_and_swap();
+            for (auto &t : diffs) {
+                int y,x; uint8_t r,g,b; std::tie(y,x,r,g,b)=t;
+                char ch = R.classifier.classify(r,g,b);
+                R.display.set(y,x,ch,r,g,b);
+            }
+            auto cd = R.display.diff_and_swap();
+            R.draw(cd);
             std::this_thread::sleep_for(ms(33));
         }
     } else {
