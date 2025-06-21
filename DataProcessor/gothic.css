@@ -1,0 +1,75 @@
+body {
+  background-color: #3A3A3A;
+  font-family: "Raleway", sans-serif;
+  color: #FFC0CB;
+}
+
+form {
+  padding: 20px;
+  text-align: center;
+  border: thin solid #FFC0CB;
+  border-radius: 5px;
+}
+
+h1 {
+  font-size: 36px;
+  text-shadow: 1px 1px #000;
+  color: #FFC0CB;
+}
+
+input[type="number"] {
+  padding: 10px;
+  font-size: 18px;
+  border-radius: 5px;
+  border: thin solid #FFC0CB;
+  color: #3A3A3A;
+  background-color: #FFC0CB;
+}
+
+button {
+  padding: 10px 20px;
+  font-size: 18px;
+  border-radius: 5px;
+  border: thin solid #FFC0CB;
+  color: #3A3A3A;
+  background-color: #FFC0CB;
+  cursor: pointer;
+  transition: 0.3s;
+}
+
+button:hover {
+  background-color: #3A3A3A;
+  color: #FFC0CB;
+}
+
+#output {
+  margin: 20px 0;
+  font-size: 24px;
+  text-align: center;
+  border: thin solid #FFC0CB;
+  border-radius: 5px;
+}
+
+#output-value {
+  font-weight: bold;
+  color: #3A3A3A;
+}
+
+#graph {
+  background-color: #FFC0CB;
+  border: thin solid #3A3A3A;
+  border-radius: 5px;
+}
+
+.bar {
+  background-color: #3A3A3A;
+  transition: 0.3s;
+}
+
+#top-panel {
+  padding: 20px;
+  background-color: #3A3A3A;
+  color: #FFC0CB;
+  border: thin solid #FFC0CB;
+  border-radius: 5px;
+}

@@ -1,0 +1,8 @@
+#eggbox {
+  width: 100px;
+  height: 100px;
+background-image: url("bike.png");
+background-size: 100px;
+  position: absolute;
+z-index: 0;
+}

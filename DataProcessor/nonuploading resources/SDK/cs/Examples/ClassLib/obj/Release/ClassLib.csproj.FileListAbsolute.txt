@@ -1,0 +1,7 @@
+C:\Users\alber\eclipse-workspace\DataProcessor\SDK\cs\Examples\ClassLib\obj\Release\ClassLib.csprojResolveAssemblyReference.cache
+C:\Users\alber\eclipse-workspace\DataProcessor\SDK\cs\Examples\ClassLib\obj\Release\Fit.dll
+C:\Users\alber\eclipse-workspace\DataProcessor\SDK\cs\Examples\ClassLib\Fit.xml
+C:\Users\alber\eclipse-workspace\DataProcessor\SDK\cs\Examples\ClassLib\obj\Release\Fit.pdb
+C:\Users\alber\eclipse-workspace\DataProcessor\SDK\cs\Fit.dll
+C:\Users\alber\eclipse-workspace\DataProcessor\SDK\cs\Fit.pdb
+C:\Users\alber\eclipse-workspace\DataProcessor\SDK\cs\Fit.xml

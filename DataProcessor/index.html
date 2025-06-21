@@ -1,0 +1,1525 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Cycling Power Curve Based Workout Calculator</title>
+<link id="style-link" rel="stylesheet" type="text/css" href="newDefault.css">
+
+<link rel="stylesheet" type="text/css" href="necessary.css">
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/numeric/1.2.6/numeric.min.js"></script>
+  <script src="Interpolator.js"></script>
+  <script src="DataSet.js"></script>
+  <script src="Functions.js"></script>
+  <script src="FunctionChain.js"></script>
+  <script src="Graph.js"></script>
+  <script src="ControlBox.js"></script>
+  <script src="FitFile.js"></script>
+  <script src="profile.js"></script>
+  <script src="FitUtils.js"></script>
+  <script src="InputControl.js"></script>
+  <script src="Worker.js"></script>
+  <script src="ServerCommunication4.js"></script>
+  <script src="crc-calculator.js"></script>
+
+  
+<script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/3.1.9-1/crypto-js.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+  <div id="heading-container" class="baseblock"><h1>Customize Your Cycling Workout Plan</h1><br>
+<div id="chatgpt-container">
+Welcome to the Cycling Power Curve Based Workout Calculator! This tool allows you to set your own training goals and receive a personalized workout plan. Simply input the target power and duration values you desire, and receive a plan tailored to help you reach your goals. The calculator provides a visual representation of your target power curve, making it easy to track your progress. Plus, you can choose from a variety of stylish themes to make the experience more enjoyable. So, whether you're a seasoned cyclist or just starting out, this calculator is the perfect tool to help you reach your full potential on the bike.
+<br><br><div style="background-color: #f2f2f2; padding: 20px; text-align: center;">
+  <h3 style="margin: 0;">ChatGPT</h3>
+  <p style="margin: 0; font-size: 14px;">A large language model trained by OpenAI</p>
+</div></div><br></div>
+<select id="style-select">
+  <option value="newDefault.css">Default</option>
+  <option value="default.css">Old West</option>
+  <option value="minimalist.css">Minimalist</option>
+  <option value="gradient.css">Tropical</option>
+  <option value="gothic.css">Gothic</option>
+  <option value="baseball.css">Baseball</option>
+  <option value="scifi.css">Sci-Fi</option>
+  <option value="Bookman.css">Bookman</option>
+
+
+</select>
+<div id="top-panel">
+<div id="left-panel"> 
+<div id="output-container">
+<div id="wave-modifier-container"></div>
+<!-- 
+  <div id="output">
+
+
+  <div id="output-value"></div><br>
+</div></div></div>
+<div id="humanization-controls"></div>
+<div id="interpolation-controlbox">
+</div><br><br>
+
+<div id="graph-container" class="graph-container">
+  <h3>Humanized Workout</h3>
+<div id="graphOne" class="graph"></div>
+  <h3>Basic Workout</h3>
+  <div id="graph" class="graph"></div><br>
+  <h3>Input Power Curve</h3>
+  <div id="graphPowerCurve" class="graph"></div>
+<h3>Output Power Curve</h3>
+<div id="graphFour" class="graph"></div>
+
+</div>
+<br><br>
+-->
+</body>
+
+<script type="text/javascript">
+let userSettings = {};
+
+
+const ids = [
+	  "style-link",
+	  "chatgpt-container",
+	  "heading-container",
+	  "style-select",
+	  "top-panel",
+	  "form-container",
+	  "add-input-pair",
+	  "remove-input-pair",
+	  "calculate-workout-plan",
+	  "input-container",
+	  "duration-1",
+	  "power-1",
+	  "sort-options",
+	  "output-container",
+	  "output",
+	  "output-value",
+	  "graph-container",
+	  "graph",
+	  "clearButton",
+	  "workingClearButton"
+	];
+	
+	
+
+
+
+class ImageLink extends FunctionChainLink {
+	  static paramNames = ['blendType', 'wetdrymix', 'file', 'swapinputs'];
+	  static inputTypes = ['select', 'range', 'file', 'checkbox'];
+	  static labels = ['Blend Type', 'Mix', 'Image File', 'Swap input A and input B'];
+	  static inputParams = [[['add', 'subtract', 'divide', 'multiply','exclusion', 'color', 'brightness', 'invert', 'screen', 'greyscale' ], 'screen'], [0, 1, .01, .5], false];
+
+	  constructor() {
+	    super();
+const fn = (dataset, blendType, wetdrymix, file, swapinputs) => {
+// Load the image file and process it
+const img = new Image();
+img.onload = () => {
+  const canvas = document.createElement('canvas');
+  canvas.width = img.width;
+  canvas.height = img.height;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(img, 0, 0);
+  const imgData = ctx.getImageData(0, 0, img.width, img.height);
+
+  // Convert the pixel information into a Point object array with 6 axes
+  const pointsA = [];
+  const pointsB = [];
+  for (let i = 0; i < imgData.width * imgData.height; i++) {
+    const x = i % imgData.width;
+    const y = Math.floor(i / imgData.width);
+    const index = i * 4;
+    const alpha = imgData.data[index + 3];
+    const red = imgData.data[index];
+    const green = imgData.data[index + 1];
+    const blue = imgData.data[index + 2];
+    const value = (red + green + blue) / 3;
+
+    // Create a point with the pixel information
+    const point = {
+      coordinates: {
+        x: x,
+        y: imgData.height - y - 1,
+        a: alpha / 255,
+        R: red,
+        G: green,
+        B: blue
+      }
+    };
+
+    // Add the point to pointsA or pointsB depending on the swapinputs parameter
+    if (swapinputs) {
+      pointsB.push(point);
+
+    } else {
+      pointsA.push(point);
+    }
+  }
+
+if(swapinputs){
+pointsA = dataset.points;
+}else{
+pointsB = dataset.points;
+}
+
+  // Pad pointsA and pointsB so that every x, y pair in every array is in both arrays, in parallel.
+  const [paddedPointsA, paddedPointsB] = padPoints(pointsA, pointsB, blendType);
+
+  // Blend the pixel values based on the selected blend type
+  const blendedPoints = ImageLink.blend(paddedPointsA, paddedPointsB, blendType);
+
+//TODO: weighted average blend with original padded pointsA, wetdrymix value, 
+
+  // Replace the points in the dataset with the blended points
+  dataset.replacePoints(blendedPoints);
+};
+img.src = URL.createObjectURL(file);
+
+return dataset;
+};
+	    this.setFunction(fn);
+	  }
+	  static blend(pointsOne, pointsTwo, blendType) {
+		  const numPoints = Math.min(pointsOne.length, pointsTwo.length);
+		  for (let i = 0; i < numPoints; i++) {
+		    const pointOne = pointsOne[i];
+		    const pointTwo = pointsTwo[i];
+		    switch (blendType) {
+		      case 'add':
+		        pointOne.coordinates.R += pointTwo.coordinates.R;
+		        pointOne.coordinates.G += pointTwo.coordinates.G;
+		        pointOne.coordinates.B += pointTwo.coordinates.B;
+		        break;
+		      case 'subtract':
+		        pointOne.coordinates.R -= pointTwo.coordinates.R;
+		        pointOne.coordinates.G -= pointTwo.coordinates.G;
+		        pointOne.coordinates.B -= pointTwo.coordinates.B;
+		        break;
+		      case 'multiply':
+		        pointOne.coordinates.R *= pointTwo.coordinates.R / 255;
+		        pointOne.coordinates.G *= pointTwo.coordinates.G / 255;
+		        pointOne.coordinates.B *= pointTwo.coordinates.B / 255;
+		        break;
+		      case 'divide':
+		        pointOne.coordinates.R /= pointTwo.coordinates.R / 255;
+		        pointOne.coordinates.G /= pointTwo.coordinates.G / 255;
+		        pointOne.coordinates.B /= pointTwo.coordinates.B / 255;
+		        break;
+		      case 'grayscale':
+		        const gray = (pointOne.coordinates.R + pointOne.coordinates.G + pointOne.coordinates.B) / 3;
+		        pointOne.coordinates.R = gray;
+		        pointOne.coordinates.G = gray;
+		        pointOne.coordinates.B = gray;
+		        break;
+		      case 'screen':
+		        pointOne.coordinates.R = 255 - (((255 - pointOne.coordinates.R) * (255 - pointTwo.coordinates.R)) / 255);
+		        pointOne.coordinates.G = 255 - (((255 - pointOne.coordinates.G) * (255 - pointTwo.coordinates.G)) / 255);
+		        pointOne.coordinates.B = 255 - (((255 - pointOne.coordinates.B) * (255 - pointTwo.coordinates.B)) / 255);
+		        break;
+		case 'exclusion':
+		  pointOne.coordinates.R = 128 - (2 * ((128 - pointOne.coordinates.R) * (128 - pointTwo.coordinates.R)) / 255);
+		  pointOne.coordinates.G = 128 - (2 * ((128 - pointOne.coordinates.G) * (128 - pointTwo.coordinates.G)) / 255);
+		  pointOne.coordinates.B = 128 - (2 * ((128 - pointOne.coordinates.B) * (128 - pointTwo.coordinates.B)) / 255);
+		  break;
+		case 'color':
+		  pointOne.coordinates.R = pointTwo.coordinates.R;
+		  pointOne.coordinates.G = pointTwo.coordinates.G;
+		  pointOne.coordinates.B = pointTwo.coordinates.B;
+		  break;
+		case 'brightness':
+		  const luminance = (0.2126 * pointTwo.coordinates.R) + (0.7152 * pointTwo.coordinates.G) + (0.0722 * pointTwo.coordinates.B);
+		  pointOne.coordinates.R = pointOne.coordinates.R + ((luminance - pointOne.coordinates.R) * (pointTwo.coordinates.R / 255));
+		  pointOne.coordinates.G = pointOne.coordinates.G + ((luminance - pointOne.coordinates.G) * (pointTwo.coordinates.G / 255));
+		  pointOne.coordinates.B = pointOne.coordinates.B + ((luminance - pointOne.coordinates.B) * (pointTwo.coordinates.B / 255));
+		  break;
+		case 'invert':
+		  pointOne.coordinates.R = 255 - pointOne.coordinates.R + pointTwo.coordinates.R;
+		  pointOne.coordinates.G = 255 - pointOne.coordinates.G + pointTwo.coordinates.G;
+		  pointOne.coordinates.B = 255 - pointOne.coordinates.B + pointTwo.coordinates.B;
+		  break;
+	      default:
+		        throw new Error(`Invalid blend type: ${blendType}`);
+		    }
+		  }
+		  return pointsOne;
+		}
+
+	}
+
+	
+
+
+class ElementAutomator {
+	  constructor(element, rangeStart, rangeEnd, swing = false, speed = 1) {
+	    this.element = element;
+	    this.rangeStart = rangeStart;
+	    this.rangeEnd = rangeEnd;
+	    this.swing = swing;
+	    this.speed = speed;
+	    this.currentValue = parseFloat(this.element.value);
+
+	    this.interval = null;
+	    this.isPaused = true;
+	    this.isReversing = false;
+
+	    this.element.addEventListener('input', () => {
+	      this.currentValue = parseFloat(this.element.value);
+	    });
+
+	    this.startButton = document.createElement('button');
+	    this.startButton.textContent = 'Start';
+	    this.startButton.addEventListener('click', () => {
+	      if (this.isPaused) {
+	        this.isPaused = false;
+	        this.startButton.textContent = 'Pause';
+	        this.start();
+	      } else {
+	        this.isPaused = true;
+	        this.startButton.textContent = 'Resume';
+	        clearInterval(this.interval);
+	      }
+	    });
+
+	    this.resetButton = document.createElement('button');
+	    this.resetButton.textContent = 'Reset';
+	    this.resetButton.addEventListener('click', () => {
+	      this.reset();
+	    });
+
+	    this.rangeStartInput = document.createElement('input');
+	    this.rangeStartInput.type = 'number';
+	    this.rangeStartInput.value = rangeStart;
+	    this.rangeStartInput.addEventListener('input', () => {
+	      this.rangeStart = parseFloat(this.rangeStartInput.value);
+	      this.reset();
+	    });
+
+	    this.rangeEndInput = document.createElement('input');
+	    this.rangeEndInput.type = 'number';
+	    this.rangeEndInput.value = rangeEnd;
+	    this.rangeEndInput.addEventListener('input', () => {
+	      this.rangeEnd = parseFloat(this.rangeEndInput.value);
+	      this.reset();
+	    });
+
+	    this.speedInput = document.createElement('input');
+	    this.speedInput.type = 'range';
+	    this.speedInput.min = '0';
+	    this.speedInput.max = '10';
+	    this.speedInput.step = '0.1';
+	    this.speedInput.value = speed;
+	    this.speedInput.addEventListener('input', () => {
+	      this.speed = parseFloat(this.speedInput.value);
+	    });
+
+	    this.container = document.createElement('div');
+	    this.container.appendChild(document.createTextNode(`${element.id}: `));
+	    this.container.appendChild(this.startButton);
+	    this.container.appendChild(this.resetButton);
+	    this.container.appendChild(document.createTextNode(' Range start: '));
+	    this.container.appendChild(this.rangeStartInput);
+	    this.container.appendChild(document.createTextNode(' Range end: '));
+	    this.container.appendChild(this.rangeEndInput);
+	    this.container.appendChild(document.createTextNode(' Speed: '));
+	    this.container.appendChild(this.speedInput);
+	  }
+
+	  start() {
+	    const range = this.rangeEnd - this.rangeStart;
+	    const step = range / 100;
+	    this.interval = setInterval(() => {
+	      if (!this.isReversing) {
+	        if (this.currentValue + step > this.rangeEnd) {
+	          this.isReversing = true;
+	        } else {
+	          this.currentValue += step;
+	        }
+	      } else {
+	        if (this.currentValue - step < this.rangeStart) {
+	          this.isReversing = false;
+	        } else {
+	          this.currentValue -= step;
+	        }
+	      }
+
+	      if (this.swing) {
+	        const valueRange = this.rangeEnd - this.rangeStart;
+	        const normalizedValue = (this.currentValue - this.rangeStart) / valueRange;
+	        const angle = normalizedValue * Math.PI;
+	        const sinValue = Math.sin(angle);
+	        const swingRange = range / 2;
+	        this.element.value = this.rangeStart + swingRange + sinValue * swingRange;
+	      } else {
+	        this.element.value = this.currentValue;
+	}
+
+	  this.element.dispatchEvent(new Event('input'));
+	}, 1000 / this.speed);
+	}
+
+	reset() {
+	this.currentValue = parseFloat(this.element.value);
+	clearInterval(this.interval);
+	this.isPaused = true;
+	this.isReversing = false;
+	this.startButton.textContent = 'Start';
+	}
+
+	getGui() {
+	return this.container;
+	}
+	}
+
+
+
+
+
+
+// Define the DatasetVisualization class
+class DatasetVisualization {
+  constructor(data) {
+    this.data = data;
+    this.outerDiv = document.createElement('div');
+    this.outerDiv.id = `${id}-outer`;
+    this.vizDiv = document.createElement('div');
+    this.vizDiv.id = `${id}-viz`;
+    this.reportDiv = document.createElement('div');
+    this.reportDiv.id = `${id}-report`;
+    this.outerDiv.appendChild(vizDiv);
+    this.outerDiv.appendChild(reportDiv);
+    // Add any additional class properties or methods here
+  }
+
+  // Add any additional class methods here
+}
+
+
+
+
+
+	  
+		  document.addEventListener("DOMContentLoaded", function() {
+			//  addControlBox(0);
+
+			  });
+	const select = document.getElementById("style-select");
+	const link = document.getElementById("style-link");
+	select.addEventListener("change", () => {
+	link.setAttribute("href", select.value);
+	saveSettings();
+	});
+
+	let inputPairCounter = 1;
+
+	function saveSettings() {
+
+	  if (!userSettings) {
+	    const error = new Error('userSettings is not defined');
+	    ////////////////////////////////////console.error(error.message + '\n' + error.stack);
+	    return;
+	  }
+
+	  const styleSelect = document.getElementById("style-select");
+	  userSettings.styleSelect = styleSelect.value;
+	  const durations = [];
+	  const powers = [];
+	  const inputPairs = document.querySelectorAll(".inputPair");
+	  inputPairs.forEach((inputPair, i) => {
+	    const durationInput = inputPair.querySelector(`#duration-${i + 1}`);
+	    const powerInput = inputPair.querySelector(`#power-${i + 1}`);
+	    durations.push(durationInput.value);
+	    powers.push(powerInput.value);
+	  });
+	  userSettings.durations = durations;
+	  userSettings.powers = powers;
+
+	  setCookie("userSettings", userSettings);
+	}
+
+
+
+
+	const extractWorkoutFromWorkoutPlan = (workoutPlan) => {
+		//////////////////////////////////////console.trace();
+	 // //////////////////////////////////////console.log(`Workout Plan: ${JSON.stringify(workoutPlan)}`);
+	  if (!workoutPlan || workoutPlan.length === 0) {
+	    ////////////////////////////////////console.error(`Empty workout plan provided, Stack trace: ${new Error().stack}`);
+	    return [];
+	  }
+	  let workout = [];
+	  for (let i = 0; i < workoutPlan.length; i++) {
+	    let workoutElement = workoutPlan[i];
+	    ////////////////////////////////////////console.log(`Workout Element: ${JSON.stringify(workoutElement)}`);
+	    
+	    let duration;
+	    let power;
+	    ////////////////////////////////////////console.log(JSON.stringify(workoutPlan));
+	    if(workoutElement.duration){
+	     duration = workoutElement.duration;
+	     power = workoutElement.power;
+	    }else{
+	    //	duration = workoutElement.getDuration();
+	    //	power = workoutElement.getPower();
+	    }
+	//    //////////////////////////////////////console.log(`Duration: ${duration}`);
+	  //  //////////////////////////////////////console.log(`Power: ${power}`);
+	    workout.push({ duration, power });
+	  }
+	  ////////////////////////////////////////console.log(`Extracted Workout: ${JSON.stringify(workout)}`);
+	//////////////////////////////////////console.error(new Error().stack);
+	  return workout;
+	}
+	const reorderWorkoutPlan = (workoutPlan, workout) => {
+	////////////////////////////////////////console.log(`Workout Plan: ${JSON.stringify(workoutPlan)}`);
+	////////////////////////////////////////console.log(`Workout: ${JSON.stringify(workout)}`);
+	if (!workoutPlan || !workoutPlan.length) {
+	////////////////////////////////////console.error('Error: workoutPlan is empty or undefined');
+	////////////////////////////////////console.error(new Error().stack);
+	return workoutPlan;
+	}
+	if (!workout || !workout.length) {
+	////////////////////////////////////console.error('Error: workout is empty or undefined');
+	////////////////////////////////////console.error(new Error().stack);
+	return workoutPlan;
+	}
+
+	for (let i = 0; i < workout.length; i++) {
+	  ////////////////////////////////////////console.log(`Workout Element[${i}]: ${JSON.stringify(workout[i])}`);
+	  if (!workoutPlan[i]) {
+	    workoutPlan[i] = {};
+	  }
+	  workoutPlan[i].duration = workout[i].duration;
+	  workoutPlan[i].power = workout[i].power;
+	  ////////////////////////////////////////console.log(`Workout Plan Element[${i}]: ${JSON.stringify(workoutPlan[i])}`);
+	}
+
+	////////////////////////////////////////console.log(`Reordered Workout Plan: ${JSON.stringify(workoutPlan)}`);
+	return workoutPlan;
+	}
+
+
+
+
+	const distributeEvenly = (workoutPlan, maxDataPoints = 5) => {
+	//////////////////////////////////////console.log("DistributeEvenly:" + JSON.stringify(workoutPlan));
+	maxDataPoints = calculateMaxDataPoints();
+	  const xyVals = getXYFromWorkout(workoutPlan);
+	  const interpolator = new Interpolator(xyVals[0], xyVals[1], "linear");
+//	//////////////////////////////////////console.log("interpolator: " + JSON.stringify(interpolator));
+	  interpolator.createDenseMap("linear");
+//	//////////////////////////////////////console.log("interpolator: " + JSON.stringify(interpolator));
+	  const totalDuration = workoutPlan.reduce((sum, interval) => sum + interval.duration, 0);
+	  const intervalDuration = totalDuration / parseFloat(maxDataPoints);
+	  let cumulativeDuration = 0;
+	  let timeSoFar = 0;
+	  const newWorkoutPlan = [];
+
+	  for (let i = 0; i < maxDataPoints; i++) {
+	    const start = timeSoFar;
+	    const end = start + intervalDuration;
+	    let powerValue = (interpolator.integral(start, end) / (end - start));
+	    if (isNaN(powerValue)) {
+	      powerValue = 0;
+	    }
+	    newWorkoutPlan.push({ duration: parseFloat(intervalDuration), power: Math.round(powerValue) });
+	    timeSoFar = end;
+	  }
+
+	  //////////////////////////////////////console.log("newWorkoutPlan: " + JSON.stringify(newWorkoutPlan));
+	  return newWorkoutPlan;
+	};
+
+
+	const calculateCumulativeData = (workoutPlan) => {
+	  let cumulativeDuration = 0;
+	  let cumulativeWeightedAveragePower = 0;
+	  const result = [];
+	  for (let i = 0; i < workoutPlan.length; i++) {
+	    cumulativeDuration += workoutPlan[i].duration;
+	    cumulativeWeightedAveragePower += workoutPlan[i].power * workoutPlan[i].duration;
+	    result.push({
+	      ...workoutPlan[i],
+	      cumulativeDuration,
+	      cumulativeWeightedAveragePower: cumulativeWeightedAveragePower / cumulativeDuration
+	    });
+		////////////////////////////////////////console.log(`pushing to results: ${JSON.stringify({...workoutPlan[i], cumulativeDuration, cumulativeWeightedAveragePower: cumulativeWeightedAveragePower / cumulativeDuration})}`);
+	  }
+	////////////////////////////////////////console.log(result);
+	  return result;
+	};
+
+
+
+	function getInterpolator(x, y) {
+
+	let firstPassType = firstPassSelect.value;
+	let secondPassType = secondPassSelect.value;
+	let firstPassX = firstPassTimes.value;
+	let secondPassX = secondPassTimes.value;
+
+	  let type;
+	  if (secondPassType === "none" && firstPassX == "1") {
+	return new Interpolator(x, y, firstPassType)
+	  } else if(secondPassType != "none" && firstPassX == "1" && secondPassX == "2"){
+	let returnVal = new Interpolator(x, y, secondPassType);
+	returnVal.createDenseMap(firstPassType);
+	return returnVal;
+	  } else{
+		let returnVal = new Interpolator(x,y, firstPassType);
+		for( let i = 1; i < firstPassX; i++){
+			returnVal.createDenseMap(firstPassType);
+		}
+	if(secondPassType != "none"){
+		returnVal.type = secondPassType;
+		returnVal.createDenseMap(secondPassType);
+		for( let i = 1; i < secondPassX; i++){
+			returnVal.createDenseMap(secondPassType);
+		}
+	}
+	return returnVal;
+	}
+
+	}
+
+
+
+
+	function calculateHumanizedWorkout(workoutPlan, humanizationSettings, subdivide = false) {
+	  let humanizedWorkout = [];
+try{
+	  if (subdivide) {
+	    for (let i = 0; i < workoutPlan.length; i++) {
+	      let singleInterval = [workoutPlan[i]];
+	      let humanizedSingleIntervalWorkout = redistributeTimePoints(singleInterval, humanizationSettings);
+	      let humanizedSingleInterval = reorderWorkoutPlan(singleInterval, humanizedSingleIntervalWorkout);
+	      humanizedWorkout = humanizedWorkout.concat(humanizedSingleInterval);
+	    }
+	  } else {
+	    //humanizedWorkout = redistributeTimePoints(workoutPlan, humanizationSettings);
+	  }
+//let returnVal =  calculateCumulativeData(humanizedWorkout);
+////////////////////////////////////////console.log(returnVal);
+	  return workoutPlan;// returnVal
+} catch (error) {
+    ////////////////////////////////////console.error(`Error in calculateWorkoutPlan(): ${error}`);
+  }
+
+	}
+function getBoxReturn(id){
+	let inputs = getAllBoxInputs(id);
+	let prevID;
+	let isFirst = false;
+	let index = 0;
+	for(let i = 0; i<inputs.length; i++){
+		if( inputs[i]['id]'] == id){
+			index = i;
+			if(i > 0){
+				prevID = inputs[i-1]['id'];
+			}else{
+				isFirst = true;
+			
+			}
+		}
+	}
+	let previousWorkoutPlan = null;
+	if(isFirst != true){
+		previousWorkoutPlan = getBoxReturn(prevID); 
+	}
+	
+	//let returnVal = calculateHumanizedWorkout([inputs['durations'],inputs['powers']],document.getElementById(`intervalRedistribution-${id}).value`);
+	
+	
+	//return returnVal;
+	
+}
+function createGraph(containerElement, workoutPlan, normalizationType) {
+//	//////////////////////////////////////console.log(workoutPlan);
+//	//////////////////////////////////////console.log(normalizationType);
+
+	  containerElement.innerHTML = "";
+	    let containerWidth = containerElement.clientWidth;
+	    let containerHeight = containerElement.clientHeight;
+	    let containerPadding = window.getComputedStyle(containerElement).padding;
+	    let totalPadding = parseFloat(containerPadding)*2;
+	    containerWidth -= totalPadding;
+	    containerHeight -= totalPadding;
+	  let workout = extractWorkoutFromWorkoutPlan(workoutPlan);
+////////////////////////////////////////console.log(workout);
+	  let durations = workout.map(w => w.duration);
+	  let powers = workout.map(w => w.power);
+
+
+	  containerElement.style.padding = "0";
+	 containerElement.style.padding = `${containerPadding} ${containerPadding} 0 ${containerPadding}`
+
+	if (normalizationType === "duration") {
+	let previousLeft = 0;
+
+	for (let i = 0; i < workout.length; i++) {
+	let duration = workout[i].duration;
+	let power = workout[i].power;
+	////////////////////////////////////////console.log("duration: " + duration + " power: " + power);
+	let bar = document.createElement("div");
+	bar.classList.add("bar");
+	bar.style.margin = "0px";
+
+	bar.style.width = (duration / Math.max(...durations) * containerWidth) + "px";
+	//bar.style.bottom = (containerHeight+totalPadding);
+	//bar.style.left = previousLeft + "px";
+	previousLeft += bar.clientWidth;
+	bar.style.height = (power / Math.max(...powers) * containerHeight) + "px";
+	bar.style.backgroundColor = `hsla(${power / Math.max(...powers) * 360}, 100%, 50%, ${power / Math.max(...powers)})`;
+	bar.style.position = "absolute";
+	bar.innerHTML = Math.round(power) + "w<br>" + convertToHHMMSS(duration);
+	containerElement.appendChild(bar);
+	}
+	} else if (normalizationType === "sum") {
+	    const sum = durations.reduce((a, b) => parseFloat(a) + parseFloat(b), 0);
+	////////////////////////////////////////console.log("creating sum graph of total: "+sum);
+	    for (let i = 0; i < workout.length; i++) {
+	      let duration = workout[i].duration;
+	      let power = workout[i].power;
+	      let bar = document.createElement("div");
+	bar.style.margin = "0px";
+	      bar.classList.add("bar");
+	      bar.style.width = (duration / sum * 100) + "%";
+	      bar.style.height = (power / Math.max(...powers) * 100) + "%";
+
+	     bar.innerHTML = Math.floor(power) + "w<br>" + convertToHHMMSS(duration);
+	      containerElement.appendChild(bar);
+	    }
+	  }
+	}
+
+let editingChain = new ControlSystem(null);
+
+			function convertIntervalsToWorkoutPlan(intervals){
+			  return intervals.map(({ duration, power }) => ({ duration: duration, power: power }));
+			}
+
+			//let editingChain = null;
+
+function calculateWorkoutPlan(dataSet) {
+				//////////////////////////////////////console.error(dataSet);
+			  if (!dataSet) return;
+			  ////////////////////////////////////////console.log(dataSet);
+			  if (editingChain == null) editingChain = new ControlSystem(dataSet);
+			  const boxes = editingChain.getControlBoxes();
+			  ////////////////////////////////////////console.log(boxes);
+			  let { durations, powers } = userSettings;
+			   boxes.forEach((currentStep) => {
+			    if (!userSettings) {
+			      //////////////////////////////////////console.error('userSettings is not defined');
+			      return;
+			    }
+			    ////////////////////////////////////////console.log('Calculating workout plan...');
+			    if (dataSet) {
+			      
+			        const inputDataSet = currentStep.inputDataSet;
+			        if (inputDataSet) {
+			          durations = inputDataSet.getAllD();
+			          powers = inputDataSet.getAllP();
+			         //////////////////////////////////////console.log("powers: " + powers);
+			        }
+			      
+			    }
+			    
+			      const sum = durations.reduce((acc, val) => acc + val, 0);
+			      const totalPower = powers.reduce((acc, val) => acc + val, 0);
+			      let intervals;
+			      if(dataSet.intervals){
+			    	  intervals = dataSet.intervals;
+			      }else{
+			       intervals = DataProcessor.getIntervalsFromPoints(dataSet.points);
+			      }
+			      const workoutPlan = convertIntervalsToWorkoutPlan(intervals);
+			      ////////////////////console.log('intervals: ' + JSON.stringify(intervals));
+			      //////////////////////////////////////console.log('Workout plan:', workoutPlan);
+			      const containerElement = document.getElementById('graph');
+			      ////////////////////////////////////////console.log('Output element: ' + JSON.stringify(containerElement));
+			      const workout = extractWorkoutFromWorkoutPlan(workoutPlan);
+			      ////////////////////////////////////////console.log('Workout:', workout);
+			      const reorderedWorkoutPlan = reorderWorkoutPlan(workoutPlan, workout);
+			      ////////////////////////////////////////console.log('Reordered workout plan:', reorderedWorkoutPlan);
+			      createGraph(containerElement, reorderedWorkoutPlan, 'sum');
+			      //////////////////////////////////////console.log(editingChain.getCurrentOutputDataset());
+			      let currentDuration = 0, currentPower = 0;
+			      workoutPlan.forEach((segment) => {
+			        currentDuration += Number(segment.duration);
+			        currentPower = Math.max(currentPower, segment.power);
+			        segment.cumulativeDuration = currentDuration;
+			        segment.cumulativePower = currentPower;
+			      });
+				    const result = {
+						      workoutPlan,
+						      averagePower: totalPower / sum,
+						      normalizedPower: workoutPlan[workoutPlan.length - 1].cumulativePower,
+						      intensityFactor: totalPower / (sum * userSettings.ftp),
+						      trainingStressScore: (totalPower * userSettings.iformula) / (userSettings.ftp * userSettings.ftp * sum / 3600),
+						    };
+
+					//	    //////////////////////////////////////console.log('Workout plan result:', result.workoutPlan);
+
+						    //constructWorkoutPlanOutput(workoutPlan, document.getElementById("output-value"));
+						    //createGrid(document.getElementById("humanization-controls"), workoutPlan);
+						    //let humanizedWorkoutPlan;
+						   // if (document.getElementById('intervalRedistribution-0') !== null) {
+						      //redistroMethod = document.getElementById('intervalRedistribution-0').value;
+						     // humanizedWorkoutPlan = calculateHumanizedWorkout(workoutPlan, redistroMethod);
+						   // }
+
+						//    //////////////////////////////////////console.log('Humanized workout plan:', humanizedWorkoutPlan);
+
+						 //   createGraph(document.getElementById('graph-0'), humanizedWorkoutPlan, 'sum');
+						    ////////////////////////////////////////console.log(intervals);
+						    //////////////////////////////////////console.log(DataProcessor.getDataSetFromIntervals(intervals));
+						    editingChain.setInputDataSet(DataProcessor.getDataSetFromIntervals(intervals));
+						    //////////////////////////////////////console.log(editingChain.inputDataSet);
+						    //////////////////////////////////////console.log(editingChain.getCurrentOutputDataset());
+						    //createGraph(document.getElementById('graphOne'), convertIntervalsToWorkoutPlan(editingChain.getCurrentOutputDataset().intervals), 'sum');
+			    
+			        });
+			  
+			}
+			        
+			        
+			        
+			        
+			        
+			        
+			        
+			        
+	function validateValues(values, direction, minDistance) {
+		  if (values.length === 1) {
+			    return values;
+			  }
+	  let correctedValues = [...values];
+	  let numValues = correctedValues.length;
+	  let distance = minDistance || 1;
+
+	  for (let i = 1; i < numValues; i++) {
+	    if (correctedValues[i] <= 0) {
+	      correctedValues[i] = 1;
+	    }
+	    let prevValue = correctedValues[i - 1];
+	    let currentValue = correctedValues[i];
+	    if ((direction === 'ascending' && currentValue <= prevValue) || (direction === 'descending' && currentValue >= prevValue)) {
+	      let offset = direction === 'ascending' ? prevValue + distance : prevValue - distance;
+	      correctedValues[i] = Math.max(offset, currentValue);
+	      if (direction === 'descending') {
+	        for (let j = i - 1; j >= 0; j--) {
+	          if (correctedValues[j] <= correctedValues[j + 1]) {
+	            correctedValues[j] = correctedValues[j + 1] + distance;
+	          } else {
+	            break;
+	          }
+	        }
+	      }
+	    }
+	  }
+
+	  return correctedValues;
+	}
+
+
+	const addInputPair = () => {
+	  inputPairCounter++;
+	  const inputContainer = document.querySelector('#input-container');
+	  const inputPair = document.createElement('div');
+	inputPair.classList.add("inputPair");
+	inputPair.innerHTML = `
+	  <div style="width: 40%;">
+	    <label for="duration-${inputPairCounter}">Duration ${inputPairCounter}:</label>
+	    <input type="number" id="duration-${inputPairCounter}" value="${isNaN(userSettings.durations[inputPairCounter - 1]) ? 1 : userSettings.durations[inputPairCounter - 1] + 1}">
+	  </div>
+	  <div style="width: 40%;">
+	    <label for="power-${inputPairCounter}">Power ${inputPairCounter}:</label>
+	    <input type="number" id="power-${inputPairCounter}" value="${isNaN(userSettings.powers[inputPairCounter - 1]) ? 1 : userSettings.powers[inputPairCounter - 1] + 1}">
+	  </div>
+	`;
+	  inputPair.style.display = 'flex';
+	  inputPair.style.justifyContent = 'space-between';
+	  inputPair.style.alignItems = 'center';
+	  inputContainer.appendChild(inputPair);
+	  inputPair.querySelectorAll("input[type='number']").forEach(input => {
+	    input.addEventListener("change", verifyInputs);
+	  });
+
+		verifyInputs();
+
+	};
+	function loadSettings() {
+	  const styleSelect = document.getElementById("style-select");
+	  styleSelect.value = userSettings.styleSelect;
+
+	////////////////////////////////////////console.log(styleSelect.value);
+	  const sortOptions = document.getElementById("sort-options");
+	  sortOptions.value = userSettings.sortOptions;
+
+	  const durations = userSettings.durations;
+	////////////////////////////////////////console.log(durations);
+	  const powers = userSettings.powers;
+	  const inputContainer = document.getElementById("input-container");
+	  inputContainer.innerHTML = "";
+	inputPairCounter = 0;
+	  for (let i = 0; i < durations.length; i++) {
+	////////////////////////////////////////console.log("inputLoaded");
+	    const inputPair = document.createElement("div");
+	    inputPair.classList.add("inputPair");
+	    inputPair.setAttribute("style", "display: flex; justify-content: space-between; align-items: center;");
+		////////////////////////////////////////console.log(durations[i]);
+	    inputPair.innerHTML = `
+	      <div style="width: 40%;">
+	        <label for="duration-${i + 1}">Duration ${i + 1}:</label>
+	        <input type="number" id="duration-${i + 1}" value="${durations[i]}">
+	      </div>
+	      <div style="width: 40%;">
+	        <label for="power-${i + 1}">Power ${i + 1}:</label>
+	        <input type="number" id="power-${i + 1}" value="${powers[i]}">
+	      </div>
+	    `;
+	    inputContainer.appendChild(inputPair);
+	inputPairCounter++;
+	document.getElementById(`duration-${i + 1}`).addEventListener("change", verifyInputs);
+	document.getElementById(`power-${i + 1}`).addEventListener("change", verifyInputs);
+	  }
+
+	  styleSelect.dispatchEvent(new Event("change"));
+	}
+
+	//utility functions
+	function calculateMaxDataPoints(){
+	return 10;
+	}
+	function convertToHHMMSS(duration) {
+	let hours = Math.floor(duration / 60);
+	let minutes = Math.floor(duration % 60);
+	let seconds = Math.floor((duration % 1) * 60);
+	let formattedTime = "";
+	if (hours > 0) {
+	formattedTime += hours + ":";
+	}
+	formattedTime += (minutes < 10 ? "0" + minutes : minutes) + ":";
+	formattedTime += (seconds < 10 ? "0" + seconds : seconds);
+	return formattedTime;
+	}
+	function copyStyles(from, to) {
+	  var computedStyle = window.getComputedStyle(from, null);
+	  var toStyle = to.style;
+
+	  for (var i = 0; i < computedStyle.length; i++) {
+	    var property = computedStyle[i];
+	    var value = computedStyle.getPropertyValue(property);
+	    toStyle.setProperty(property, value);
+	  }
+	}
+
+	function copyStylesToId(source, id) {
+	  var targetElement = document.getElementById(id);
+	  copyStyles(source, targetElement);
+	}
+
+	function copyStylesToClass(source, className) {
+	  var targetElements = document.getElementsByClassName(className);
+
+	  for (var i = 0; i < targetElements.length; i++) {
+	    copyStyles( source, targetElements[i]);
+	  }
+	}
+
+	function copyStylesByIdMapping(source, idMapping) {
+	  for (var i = 0; i < idMapping.length; i++) {
+	    var mapping = idMapping[i];
+	    var targetId = mapping.id;
+	    var targetClass = mapping.class;
+
+	    if (targetId) {
+	      copyStylesToId(source, targetId);
+	    } else if (targetClass) {
+	      copyStylesToClass(source, targetClass);
+	    }
+	  }
+	}
+
+
+
+	const getXYFromWorkout = (workoutPlan) => {
+		  if (!Array.isArray(workoutPlan) || workoutPlan.length === 0) {
+		    throw new Error("Invalid workout plan");
+		  }
+
+		  let minIntervalDuration = 0.001666;
+		  let returnVal = [[0, 0], [0, 0]];
+
+		  if (workoutPlan.length === 1) {
+		    returnVal = [[0, workoutPlan[0].duration], [workoutPlan[0].power, workoutPlan[0].power]];
+		  }
+
+		  let xValues = [0];
+		  let yValues = [workoutPlan[0].power];
+		  let durationSum = 0;
+
+
+		  for (let i = 0; i < workoutPlan.length; i++) {
+		    let duration = workoutPlan[i].duration;
+		    let power = workoutPlan[i].power;
+
+		    if (typeof duration !== "number" || isNaN(duration) || duration <= 0) {
+		      ////////////////////////////////////console.warn(`Invalid duration for workoutPlan[${i}]: ${duration}. Skipping this interval.`);
+		      continue;
+		    }
+
+		    if (typeof power !== "number" || isNaN(power) || power < 0) {
+		      ////////////////////////////////////console.warn(`Invalid power for workoutPlan[${i}]: ${power}. Skipping this interval.`);
+		      continue;
+		    }
+
+		    let cumDuration = xValues[i * 3] + minIntervalDuration / 2 || 0;
+		    let intervalStart = cumDuration;
+		    let intervalEnd = cumDuration + duration;
+		    let intervalMid = (intervalStart + intervalEnd) / 2;
+		    let intervalEndBefore = intervalEnd - minIntervalDuration / 2;
+		    let intervalStartAfter = intervalStart + minIntervalDuration / 2;
+
+		    if (isNaN(intervalStart) || isNaN(intervalEnd) || isNaN(intervalMid)) {
+		      ////////////////////////////////////console.warn(`Invalid time for workoutPlan[${i}]: ${duration}. Skipping this interval.`);
+		      continue;
+		    }
+
+		    xValues.push(intervalStartAfter, intervalMid, intervalEndBefore);
+		    yValues.push(power, power, power);
+		    durationSum += duration;
+		  }
+		  if (durationSum !== xValues[xValues.length - 1]) {
+		    xValues.push(durationSum);
+		    yValues.push(workoutPlan[workoutPlan.length - 1].power);
+		  }
+
+		  xValues = xValues.filter((value) => typeof value === "number" && !isNaN(value));
+		  yValues = yValues.filter((value) => typeof value === "number" && !isNaN(value));
+
+		  if (xValues.length !== yValues.length) {
+		    throw new Error("Invalid workout plan");
+		  }
+
+		  return [xValues, yValues];
+		};
+	function interpolateWorkoutPlan(workoutPlan, interpolatorSetting, pass){
+	//////////////////////////////////////console.log(JSON.stringify(workoutPlan));
+	//////////////////////////////////////console.log(JSON.stringify(interpolatorSetting));
+	let minIntervalDuration = interpolatorSetting['intervalSlider'] / parseFloat(5);
+
+	let xyValues = getXYFromWorkout(workoutPlan);
+	//////////////////////////////////////console.log(JSON.stringify(xyValues));
+	  let returnVal = new Interpolator(xyValues[0], xyValues[1], interpolatorSetting['interpolation-selector']);
+	//////////////////////////////////////console.log(JSON.stringify(returnVal));
+	if(interpolatorSetting['second-pass-interpolation-selector'] != "none" && pass==2){
+	for(let i = 0; i< interpolatorSetting['second-pass-multiplier-selector']; i++){
+	returnVal.createDenseMap(interpolatorSetting['second-pass-interpolation-selector']);
+	}
+
+	}else if(pass == 1){
+	for(let i = 0; i< interpolatorSetting['first-pass-multiplier-selector']; i++){
+	returnVal.createDenseMap(interpolatorSetting['interpolation-selector']);
+	}
+	}//////////////////////////////////////console.log(JSON.stringify(returnVal));
+	return returnVal;
+	}
+	 
+	function generateWorkoutFromInterpolator(interpolator, interpolatorSetting) {
+	//  //////////////////////////////////////console.log("interpolator", interpolator);
+	 // //////////////////////////////////////console.log("interpolatorSetting", interpolatorSetting);
+
+	  const intervalDuration = interpolatorSetting['intervalSlider']/parseFloat(100);
+	 // //////////////////////////////////////console.log("intervalDuration", intervalDuration);
+
+	  const xValues = interpolator.x;
+//	  //////////////////////////////////////console.log("xValues", xValues);
+
+	  let currentPower = null;
+	  let currentIntervalStart = null;
+	  let workouts = [];
+
+	  for (let i = 0; i < xValues.length - 1; i++) {
+	    const spanDuration = xValues[i+1] - xValues[i];
+	//    //////////////////////////////////////console.log("spanDuration", spanDuration);
+
+	    // Only consider spans that are at least as long as the interval duration
+	    if (spanDuration >= intervalDuration) {
+	      const spanPower = interpolator.integral(xValues[i], xValues[i+1]) / spanDuration;
+	      //////////////////////////////////////console.log("spanPower:" + spanPower + " x values: " + xValues[i] +","+xValues[i+1] + " interpolator.integral(xValues[i], xValues[i+1]): "+interpolator.integral(xValues[i], xValues[i+1]));
+
+	      if (currentPower === null) {
+	        // Start a new interval
+	        currentPower = spanPower;
+	        currentIntervalStart = xValues[i];
+	        //////////////////////////////////////console.log("Started new interval", "currentPower", currentPower, "currentIntervalStart", currentIntervalStart);
+	      } else if (Math.abs(spanPower - currentPower) > 1) {
+	        // End current interval
+	        const intervalDuration = xValues[i] - currentIntervalStart;
+	        //////////////////////////////////////console.log("Ended current interval", "currentPower", currentPower, "intervalDuration", intervalDuration);
+	        workouts.push({
+	          power: currentPower,
+	          duration: intervalDuration
+	        });
+
+	        // Start a new interval
+	        currentPower = spanPower;
+	        currentIntervalStart = xValues[i];
+	        //////////////////////////////////////console.log("Started new interval", "currentPower", currentPower, "currentIntervalStart", currentIntervalStart);
+	      }
+	    }
+	  }
+
+	  // End any remaining interval
+	  if (currentPower !== null) {
+	    const intervalDuration = xValues[xValues.length-1] - currentIntervalStart;
+	    //////////////////////////////////////console.log("Ended remaining interval", "currentPower", currentPower, "intervalDuration", intervalDuration);
+	    workouts.push({
+	      power: currentPower,
+	      duration: intervalDuration
+	    });
+	  }
+
+	  //////////////////////////////////////console.log("workouts", workouts);
+	  return workouts;
+	}
+	class MathematicalOperation {
+
+		  static createTrapezoidalMap(a, b, evaluateFunc, numIntervals = 100) {
+			    let map = new Map();
+			    let h = (b - a) / numIntervals;
+			    for (let i = 0; i <= numIntervals; i++) {
+			      let x = a + i * h;
+			      let y = evaluateFunc(x);
+			      if (i === 0 || i === numIntervals) {
+			        map.set(x, y);
+			      } else {
+			        map.set(x, 2 * y);
+			      }
+			    }
+			    let area = this.trapezoidalRule(a, b, evaluateFunc, numIntervals);
+			    return { map, area };
+			  }
+		  
+		  static snapToValue(value, targets, threshold) {
+			  return value;
+			  if (!threshold) {
+			    threshold = value * 0.1;
+			  }
+
+			  if (threshold > targets[0]) {
+			    threshold = targets[0];
+			  }
+
+			  const magnetism = targets.reduce((map, target) => {
+			    map[target] = 1; // set initial coefficient to 1
+			    return map;
+			  }, {});
+
+			  const inverseSquare = (x) => 1 / (x ** 2); // inverse square rule
+			  const sigmoid = x => 1 / (1 + Math.exp(-x));
+			  
+			  let bestTarget = null;
+			  let bestScore = 0;
+
+			  for (let i = 0; i < targets.length; i++) {
+			    const target = targets[i];
+			    const closestMultiple = Math.round(value / target);
+			    const lowerBound = Math.max(closestMultiple - threshold, 0);
+			    const upperBound = closestMultiple + threshold;
+
+			    let targetScore = 0;
+
+			    for (let j = lowerBound; j <= upperBound; j++) {
+			      const currentTarget = target * j;
+			      const distance = Math.abs(value - currentTarget);
+//////////////////////////////////////console.log(distance);
+			      
+			      if (distance <= threshold) {
+			    	if(value < 10000000){  
+			              targetScore += magnetism[currentTarget] * inverseSquare(distance);
+			    	}else{
+			    		targetScore += magnetism[currentTarget] * sigmoid(distance);
+			    	
+			    		}
+			    	}
+			      
+			      }
+			    
+
+			    if (targetScore > bestScore) {
+			      bestTarget = target * Math.round(value / target);
+			      bestScore = targetScore;
+			    }
+			    
+			    //////////////////////////////////////console.log(bestScore);
+			  }
+
+			  const matchingTargets = targets.filter((target) => bestTarget % target === 0);
+
+			  if (matchingTargets.length > 1) {
+			    const totalMultiplier = matchingTargets.reduce((multiplier, target) => {
+			      return multiplier * Math.floor(bestTarget / target);
+			    }, 1);
+
+			    const increaseFactor = Math.exp(matchingTargets.length);
+			    magnetism[bestTarget] *= increaseFactor * totalMultiplier;
+			  } else {
+			    const matchingCount = targets.reduce((count, target) => {
+			      return count + (bestTarget % target === 0 ? 1 : 0);
+			    }, 0);
+
+			    const increaseFactor = Math.exp(matchingCount);
+			    magnetism[bestTarget] *= increaseFactor;
+			  }
+
+			  return bestTarget !== null ? bestTarget : value;
+			}
+		static createEvaluateFunction(dataset, evaluateFunc = null) {
+			  if (dataset.interpolator && dataset.interpolator.evaluate) {
+			    return dataset.interpolator.evaluate;
+			  } else {
+			    const x = dataset.points.map(point => point[0]);
+			    const y = dataset.points.map(point => point[1]);
+			    const type = dataset.interpolator ? dataset.interpolator.type : 'linear';
+			    const interp = new Interpolator(x, y, type);
+
+			    if (evaluateFunc) {
+			      return (x) => evaluateFunc(x, interp);
+			    } else {
+			      return (x) => interp.evaluate(x);
+			    }
+			  }
+			}	
+		
+		  static forwardTransform(wavelet, dataset) {
+			    const transformedCoefficients = wavelet.forwardTransform(dataset.data);
+			    return new Dataset(transformedCoefficients);
+			  }
+
+			  static inverseTransform(wavelet, dataset) {
+			    const transformedCoefficients = wavelet.inverseTransform(dataset.data);
+			    return new Dataset(transformedCoefficients);
+			  }
+			  static discreteFourierTransform(dataset) {
+				    let N = dataset.length;
+				    let X = new Array(N);
+
+				    for (let k = 0; k < N; k++) {
+				      let sum = new ComplexNumber(0, 0);
+				      for (let n = 0; n < N; n++) {
+				        let phi = (TWO_PI * k * n) / N;
+				        let c = new ComplexNumber(Math.cos(phi), -Math.sin(phi));
+				        sum = sum.add(dataset[n].multiply(c));
+				      }
+				      X[k] = sum;
+				    }
+
+				    return X;
+				  }
+			  
+			  static interpolate(start, end, x) {
+				    const slope = (end.y - start.y) / (end.x - start.x);
+				    const yIntercept = start.y - (slope * start.x);
+				    return slope * x + yIntercept;
+				  }
+		  static trapezoidalRule(a, b, evaluateFunc, numIntervals = 100) {
+			    let h = (b - a) / numIntervals;
+			    let sum = evaluateFunc(a) + evaluateFunc(b);
+			    
+			    for (let i = 1; i < numIntervals; i++) {
+			      let x = a + i * h;
+			      sum += 2 * evaluateFunc(x);
+			    }
+			    return (h / 2) * sum;
+			  }
+			  
+			  static zip(arrays) {
+				  //////////////////////////////////////console.log(arrays);
+			    const result = [];
+			    const length = arrays.length > 0 ? arrays[0].length : 0;
+			    for (let i = 0; i < length; i++) {
+			      result[i] = arrays.map((array) => array[i]);
+			    }
+			    return result;
+			  }
+
+			  static centralDifference(x, evaluateFunc, h = 0.01) {
+			    return (evaluateFunc(x + h)[0] - evaluateFunc(x - h)) / (2 * h);
+			  }
+
+			  static integral(a, b, n, evaluateFunc) {
+			    const integrand = (x) => evaluateFunc(x);
+			    
+			    const integralValue = this.trapezoidalRule(a, b, integrand, n);
+			  //  //////////////////////////////////////console.log("interpolator values: "+integrand(a) +":"+integrand(b));
+			   // //////////////////////////////////////console.log("trapezoidalRule from a to b: "+integralValue+":"+a+":"+b);
+			    return integralValue;
+			  }
+
+			  static derivative(dataSet, evaluateFunc, x, h) {
+			    const func = (x) => evaluateFunc(x);
+			    const derivativeValue = this.centralDifference(x, func, h);
+			    return derivativeValue;
+			  }
+
+			  static createDenseMap(points, type='linear', step=0.1, evaluateValues = null, interpolator = null) {
+				    const xValues = points.map(point => point.x);
+				    const yValues = points.map(point => point.y);
+
+				    if (interpolator == null) {
+				      interpolator = new Interpolator(xValues, yValues, type);
+				    }
+
+				    return interpolator.createDenseMap(null, type, step, evaluateValues);
+				  }
+
+			  static movingAverage(dataSet, duration) {
+			    const intervals = dataSet.getIntervals();
+			    const points = dataSet.getPoints();
+			    let cumulativeDuration = new Interval(0, 0);
+			    let cumulativePower = 0;
+			    const result = [];
+			    points.forEach((point, index) => {
+			      const interval = intervals[index];
+			      cumulativeDuration = cumulativeDuration.plus(interval);
+			      cumulativePower += point.y;
+			      while (cumulativeDuration.length() > duration) {
+			        const excessDuration = cumulativeDuration.length() - duration;
+			        const excessFraction = excessDuration / cumulativeDuration.length();
+			        const movingAverage = cumulativePower / duration;
+			        result.push({
+			          duration: new Interval(cumulativeDuration.start, cumulativeDuration.start + duration),
+			          movingAveragePower: movingAverage
+			        });
+			        cumulativePower -= cumulativePower * excessFraction;
+			        cumulativeDuration = new Interval(
+			          cumulativeDuration.start + duration * (1 - excessFraction),
+			          cumulativeDuration.end
+			        );
+			      }
+			    });
+			    return result;
+			  }
+			  static findMaxMovingAveragePower(dataSet, windowSize) {
+				  const x = dataSet.points.map(point => point[0]);
+				  const y = dataSet.points.map(point => point[1]);
+				  const n = x.length;
+
+				  if (windowSize < 2) {
+				    throw new Error('Window size must be at least 2.');
+				  } else if (windowSize > n) {
+				    throw new Error('Window size must be less than the length of the input data.');
+				  }
+
+				  const evaluateFunc = this.createEvaluateFunction(dataSet);
+
+				  let maxPower = -Infinity;
+				  for (let i = 0; i <= n - windowSize; i++) {
+				    const xWindow = x.slice(i, i + windowSize);
+				    const yWindow = y.slice(i, i + windowSize);
+				    const interpWindow = new Interpolator(xWindow, yWindow, dataSet.interpolator.type);
+				    const denseMap = this.createDenseMap(dataSet, evaluateFunc, xWindow);
+				    const yMean = yWindow.reduce((a, b) => a + b, 0) / windowSize;
+				    let power = 0;
+				    for (let j = 0; j < windowSize; j++) {
+				      const error = denseMap[xWindow[j]] - yMean;
+				      power += error * error;
+				    }
+				    power /= windowSize;
+				    if (power > maxPower) {
+				      maxPower = power;
+				    }
+				  }
+				  return maxPower;
+				}
+
+	
+			  static totalRms(dataset) {
+				  const evaluateFunc = (x) => {
+				    const i = this.binarySearch(dataset.points, x);
+				    if (i === -1) {
+				      return null;
+				    } else {
+				      return dataset.points[i].value;
+				    }
+				  };
+				  const n = dataset.points.length;
+				  let sum = 0;
+				  for (let i = 0; i < n; i++) {
+				    const error = dataset.points[i].value - evaluateFunc(dataset.points[i].x);
+				    sum += error * error;
+				  }
+				  const rms = Math.sqrt(sum / n);
+				  const rmsPoints = [{ x: dataset.intervals[0].min, value: rms }, { x: dataset.intervals[0].max, value: rms }];
+				  return new DataSet(rmsPoints, dataset.intervals);
+				}
+
+				static movingWindowRms(dataset, windowSize) {
+				  const points = dataset.points;
+				  const n = points.length;
+
+				  if (windowSize < 2) {
+				    throw new Error('Window size must be at least 2.');
+				  } else if (windowSize > n) {
+				    throw new Error('Window size must be less than the length of the input data.');
+				  }
+
+				  const evaluateFunc = (x) => {
+				    const i = this.binarySearch(points, x);
+				    if (i === -1) {
+				      return null;
+				    } else {
+				      return points[i].value;
+				    }
+				  };
+
+				  const rmsValues = [];
+				  for (let i = 0; i <= n - windowSize; i++) {
+				    const windowPoints = points.slice(i, i + windowSize);
+				    const windowDataset = new DataSet(windowPoints, dataset.intervals);
+				    rmsValues.push(this.totalRms(windowDataset).points[0].value);
+				  }
+
+				  const rmsPoints = rmsValues.map((value, index) => ({ x: points[index + Math.floor(windowSize / 2)].x, value }));
+				  return new DataSet(rmsPoints, dataset.intervals);
+				}
+				
+		
+					  
+				static lowPassFilter(dataset, k) {
+					  const x = dataset.points.map(point => point.coordinates.x);
+					  const y = dataset.points.map(point => point.coordinates.y);
+					  const dt = x[1] - x[0];
+					  let prevY = y[0];
+					  const smoothed = [prevY];
+					  for (let i = 1; i < y.length; i++) {
+					    const dfdx = (y[i] - prevY) / dt;
+					    const alpha = 1 - Math.exp(-k * Math.abs(dfdx));
+					    const currY = alpha * y[i] + (1 - alpha) * prevY;
+					    smoothed.push(currY);
+					    prevY = currY;
+					  }
+					  const smoothedPoints = x.map((xValue, i) => ({ coordinates: { x: xValue, y: smoothed[i] } }));
+					  return new DataSet(smoothedPoints);
+					}
+
+					static highPassFilter(dataset, k) {
+					  const x = dataset.points.map(point => point.coordinates.x);
+					  const y = dataset.points.map(point => point.coordinates.y);
+					  const dt = x[1] - x[0];
+					  let prevY = y[0];
+					  const smoothed = [prevY];
+					  for (let i = 1; i < y.length; i++) {
+					    const dfdx = (y[i] - prevY) / dt;
+					    const alpha = 1 - Math.exp(-k * Math.abs(dfdx));
+					    const currY = y[i] - alpha * y[i] + (1 - alpha) * prevY;
+					    smoothed.push(currY);
+					    prevY = currY;
+					  }
+					  const smoothedPoints = x.map((xValue, i) => ({ coordinates: { x: xValue, y: smoothed[i] } }));
+					  return new DataSet(smoothedPoints);
+					}
+
+					  static gaussianFilter(dataset, sigma) {
+					    // Implementation of Gaussian filter
+					  }
+
+					  static epanechnikovFilter(dataset, k) {
+					    // Implementation of Epanechnikov filter
+					  }
+					}
+		
+
+//copyStyles(document.getElementById("output"), document.getElementById("chatgpt-container"));
+//copyStylesToClass(document.getElementById("chatgpt-container"), "baseblock" );
+
+
+
+// Function to store the array in a cookie
+function setCookie(cname, cvalue) {
+ // //////////////////////////////////////console.log(`userSettings before encoding and storing:`, cvalue);
+  ////////////////////////////////////////console.log(`typeof cvalue:`, typeof cvalue);
+
+  var d = new Date();
+  d.setTime(d.getTime() + (365 * 24 * 60 * 60 * 1000)); // 365 days
+  var expires = "expires=" + d.toUTCString();
+  var cookieString = cname + "=" + encodeURIComponent(JSON.stringify(cvalue)) + ";" + expires + ";path=/";
+  document.cookie = cookieString;
+
+ // //////////////////////////////////////console.log(`Encoded cookie: ${document.cookie}`);
+}
+
+function getCookie(cname) {
+	  const cookieArray = document.cookie.split(";");
+	  const cookieMap = new Map();
+	  
+	 // //////////////////////////////////////console.log("Found cookies:", cookieArray);
+	  
+	  cookieArray.forEach(cookie => {
+	    const [key, value] = cookie.trim().split("=");
+	    cookieMap.set(key, value);
+	  });
+	  
+	  //////////////////////////////////////console.log("Cookie map:", cookieMap);
+	  
+	  if (cookieMap.has(cname)) {
+	    const cookieValue = decodeURIComponent(cookieMap.get(cname));
+	   // //////////////////////////////////////console.log(`Retrieved cookie "${cname}" with value: ${cookieValue}`);
+	    try {
+	      return JSON.parse(cookieValue);
+	    } catch (error) {
+	//      ////////////////////////////////////console.error(`Error parsing cookie "${cname}": ${error.message}`);
+//	      ////////////////////////////////////console.trace();
+	      return null;
+	    }
+	  }
+	  
+	  //////////////////////////////////////console.log(`Could not find cookie with name "${cname}"`);
+	  return null;
+	}
+
+
+
+
+
+// Load the array from the cookie when the page loads
+document.addEventListener("DOMContentLoaded", function() {
+try {
+var loadedUserSettings = getCookie("userSettings");
+if (loadedUserSettings) {
+userSettings = loadedUserSettings; // Set the global variable
+if (typeof userSettings === 'object' && userSettings !== null && !Array.isArray(userSettings) && Object.values(userSettings).every(value => value && typeof value !== 'string' || value.toLowerCase() !== 'null')) {
+	  loadSettings();
+	}
+//////////////////////////////////////console.log("Load called: " + userSettings.styleSelect);
+} else {
+userSettings = {
+styleSelect: "newDefault.css",
+sortOptions: "1",
+durations: [1],
+powers: [1]
+};
+
+}
+//verifyInputs();
+} catch (error) {
+////////////////////////////////////console.error("Error loading user settings: " + error.message);
+userSettings = {
+styleSelect: "newDefault.css",
+sortOptions: "1",
+durations: [1],
+powers: [1]
+};
+}
+});
+
+// Get the file input element from the DOM
+
+// Add an event listener to the file input element to handle file selection
+
+</script>
+</html>

@@ -1,0 +1,116 @@
+body {
+  font-family: "Arial", sans-serif;
+  background-color: #F7DC6F;
+  margin: 0;
+  padding: 0;
+}
+
+h1 {
+  text-align: center;
+  font-size: 2em;
+  margin-top: 1em;
+  color: #333;
+}
+
+#style-select {
+  text-align: center;
+  margin-top: 1em;
+}
+
+#top-panel {
+  background-color: #fff;
+  padding: 1em;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  margin-bottom: 1em;
+  border: 2px solid #34495E;
+  border-radius: 10px;
+}
+
+#form-container {
+  display: flex;
+  justify-content: center;
+}
+
+form {
+  width: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+button {
+  background-color: #34495E;
+  color: #fff;
+  border: none;
+  border-radius: 5px;
+  padding: 0.5em 1em;
+  cursor: pointer;
+  margin-top: 1em;
+}
+
+#input-container {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  margin-bottom: 1em;
+}
+
+#output-container {
+  display: flex;
+  justify-content: center;
+}
+
+#output {
+  background-color: #fff;
+  padding: 1em;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  margin-bottom: 1em;
+  text-align: center;
+  border: 2px solid #34495E;
+  border-radius: 10px;
+}
+
+#sort-options {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 1em;
+}
+
+#output-value {
+  font-size: 1.5em;
+  margin-bottom: 1em;
+  color: #34495E;
+}
+
+#graph-container {
+  display: flex;
+  justify-content: center;
+}
+
+#graph {
+  background-color: #fff;
+  padding: 1em;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  border: 2px solid #34495E;
+  border-radius: 10px;
+}
+
+label {
+  font-size: 1.2em;
+  margin-right: 0.5em;
+  color: #34495E;
+}
+
+.bar {
+  background-color: #E74C3C;
+  margin: 1em 0;
+}
+
+input[type='number'] {
+  width: 5em;
+  padding: 0.5em;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+  text-align: center;
+margin-right: 0.5em;
+}
