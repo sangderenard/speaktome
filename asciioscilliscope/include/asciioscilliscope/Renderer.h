@@ -68,7 +68,7 @@ public:
 
 private:
     int imgW_, imgH_, phosphorW_, phosphorH_, charW_, charH_;
-    PixelFrameBuffer pfb_;
+    PixelFrameBuffer<float> pfb_;
     CharClassifier classifier_;
     CharDisplay display_;
     std::atomic<bool> running_;
