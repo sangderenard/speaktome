@@ -25,3 +25,5 @@ directly from the environment instead of relying on this module.
 
 Run ``python -m AGENTS.tools.headers.run_header_checks`` to automatically repair,
 validate and test file headers across the repository.
+
+For the design ethos underpinning our C++ simulations, consult `CRT_Vector_Manifesto.md`.

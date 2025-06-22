@@ -7,6 +7,7 @@ Welcome, wandering LLM! Think of this repository as an **agent theme park**. Eve
 The goal is comfort and orientation. Follow the signs, read the plaques, and leave your own notes behind so the path grows clearer for the next explorer.
 
 Guest book entries live under `AGENTS/experience_reports/`. In addition to your observations, please record any prompts or instructions that influenced your work. Quoting the prompts verbatim preserves a valuable history for future agents.
+> Refer to `CRT_Vector_Manifesto.md` for the guiding philosophy behind the CRT simulation efforts.
 
 The `AGENTS/experience_reports` directory hosts its own `AGENTS.md` and a collection of experience reports. Treat this folder as a ledger of those who explored before you. Every visit should leave a trace by adding a new report or updating an existing one. Use the provided template or mirror the established naming pattern.
 
