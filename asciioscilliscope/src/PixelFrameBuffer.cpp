@@ -37,9 +37,24 @@ void PixelFrameBuffer<DataType>::updateRender(const Eigen::Tensor<DataType,5>& d
 template<typename DataType>
 std::vector<std::tuple<int,int,int,int,int,DataType>>
 PixelFrameBuffer<DataType>::getDiffAndSwap(DataType threshold) {
-    (void)threshold;
-    prev_ = curr_;
-    return {};
+    Eigen::Tensor<DataType,5> diff = (curr_ - prev_).abs();
+    std::vector<std::tuple<int,int,int,int,int,DataType>> events;
+    for (int b = 0; b < batch_; ++b) {
+        for (int t = 0; t < timeSteps_; ++t) {
+            for (int c = 0; c < channels_; ++c) {
+                for (int r = 0; r < rows_; ++r) {
+                    for (int col = 0; col < cols_; ++col) {
+                        DataType delta = diff(b,t,c,r,col);
+                        if (delta > threshold) {
+                            events.emplace_back(b,t,c,r,col,curr_(b,t,c,r,col));
+                        }
+                    }
+                }
+            }
+        }
+    }
+    prev_.swap(curr_);
+    return events;
 }
 
 template class PixelFrameBuffer<float>;

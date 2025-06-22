@@ -50,8 +50,4 @@ const Eigen::Tensor<char,2>& CharDisplay::getFullBuffer() const {
     return buffers_[activeBuffer_];
 }
 
-const Eigen::Tensor<char,2>& CharDisplay::getFullBuffer() const {
-    return buffers_[activeBuffer_];
-}
-
 } // namespace asciioscilliscope
