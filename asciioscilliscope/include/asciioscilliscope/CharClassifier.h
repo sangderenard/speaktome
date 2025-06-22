@@ -9,7 +9,9 @@ namespace asciioscilliscope {
 /**
  * CharClassifier
  * --------------
- * Converts RGB color values into ASCII characters using a brightness ramp.
+ * Converts aggregated color values into ASCII characters using a brightness
+ * ramp. A single call to `classify` represents an averaged measurement from a
+ * console-character sized region rather than a one-to-one pixel mapping.
  * Supports future extensions for per-channel phosphor timing offsets and
  * batched tensor classifications.
  *
@@ -18,8 +20,15 @@ namespace asciioscilliscope {
  *   - Map normalized or raw color values to ASCII symbols
  *   - Optionally apply per-channel delays for realistic phosphor simulation
  *
+ * Note: a console character represents many HD pixels. Classification never
+ * maps a single HD sample directly to ASCII. Inputs should be averaged or
+ * otherwise reduced to a representative brightness value. The number of color
+ * channels is not fixed; the classifier works with any channel count as long as
+ * the data is aggregated into a brightness value per console site. Use the
+ * vector-based API for fully general input.
+ *
  * API:
- *   - classify(r, g, b): maps one pixel to a char
+ *   - classify(r, g, b): maps an aggregated RGB sample to a char
  *   - classifyBatch(tensor): maps entire color tensor to char tensor
  *
  * TODO:
@@ -30,16 +39,45 @@ namespace asciioscilliscope {
 class CharClassifier {
 public:
     /**
+     * Constructor
+     * -----------
+     * Optionally supply a custom ramp string used for brightness mapping.
+     * If not provided, a default 70-character ramp is used.
+     */
+    explicit CharClassifier(const std::string& ramp = "");
+    /**
      * classify
      * --------
-     * Maps a single RGB triplet to an ASCII character.
+     * Maps an RGB brightness sample to an ASCII character. The RGB values may
+     * represent the average over many pixels. Extra color channels, if present,
+     * should be blended before calling this method. This is strictly a
+     * convenience wrapper around the generic vector-based `classify` method.
      *
-     * @param r  Red component [0,255]
-     * @param g  Green component [0,255]
-     * @param b  Blue component [0,255]
+     * @param r  Aggregated red component [0,255]
+     * @param g  Aggregated green component [0,255]
+     * @param b  Aggregated blue component [0,255]
      * @return ASCII symbol representing brightness
      */
     char classify(uint8_t r, uint8_t g, uint8_t b) const;
+
+    /**
+     * classify
+     * --------
+     * Variant that accepts an arbitrary number of channel intensities.
+     * The brightness is computed by averaging all provided values.
+     *
+     * @param channels Vector of intensity samples [0,255]
+     * @return ASCII symbol representing brightness
+     */
+    char classify(const std::vector<uint8_t>& channels) const;
+
+    /**
+     * setRamp
+     * -------
+     * Replace the brightness ramp used for classification.
+     * The string should be ordered from darkest to brightest.
+     */
+    void setRamp(const std::string& ramp);
 
     /**
      * classifyBatch
@@ -106,6 +144,9 @@ public:
     // classifySampleSites(const Eigen::Tensor<float,2>& sampleTensor,
     //                     const std::vector<SiteMetadata>& sites,
     //                     ChannelMode mode = ChannelMode::Blend) const;
+
+private:
+    std::string ramp_;
 };
 
 } // namespace asciioscilliscope
