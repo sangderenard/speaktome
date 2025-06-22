@@ -13,12 +13,14 @@ find_package(Eigen3)
 set(SRC_FILES
     src/ConicProjector3D.cpp
     src/Projection2D.cpp
+    src/PixelFrameBuffer.cpp
 )
 
 # Build library
 add_library(asciioscilliscope STATIC ${SRC_FILES})
 # Expose public headers (project and Eigen header-only library)
 target_include_directories(asciioscilliscope PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/asciioscilliscope>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/asciioscilliscope/kernels>

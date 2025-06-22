@@ -1,4 +1,5 @@
 #include "../include/asciioscilliscope/PixelFrameBuffer.h"
+#include <algorithm>
 
 namespace asciioscilliscope {
 
@@ -27,6 +28,16 @@ PixelFrameBuffer<DataType>::PixelFrameBuffer(int batch,
 // ###########################################################################
 template<typename DataType>
 void PixelFrameBuffer<DataType>::updateRender(const Eigen::Tensor<DataType,5>& data) {
+    // Basic shape verification. Eigen::Tensor::dimensions() returns an array
+    // of fixed size. Only perform checks in debug builds to avoid runtime
+    // overhead.
+#ifndef NDEBUG
+    assert(data.dimension(0) == batch_);
+    assert(data.dimension(1) == timeSteps_);
+    assert(data.dimension(2) == channels_);
+    assert(data.dimension(3) == rows_);
+    assert(data.dimension(4) == cols_);
+#endif
     curr_ = data;
 }
 
@@ -37,23 +48,26 @@ void PixelFrameBuffer<DataType>::updateRender(const Eigen::Tensor<DataType,5>& d
 template<typename DataType>
 std::vector<std::tuple<int,int,int,int,int,DataType>>
 PixelFrameBuffer<DataType>::getDiffAndSwap(DataType threshold) {
-    Eigen::Tensor<DataType,5> diff = (curr_ - prev_).abs();
+    Eigen::Tensor<DataType,5> diff = curr_ - prev_;
+    Eigen::Tensor<DataType,5> absDiff = diff.abs();
     std::vector<std::tuple<int,int,int,int,int,DataType>> events;
     for (int b = 0; b < batch_; ++b) {
         for (int t = 0; t < timeSteps_; ++t) {
             for (int c = 0; c < channels_; ++c) {
                 for (int r = 0; r < rows_; ++r) {
                     for (int col = 0; col < cols_; ++col) {
-                        DataType delta = diff(b,t,c,r,col);
+                        DataType delta = absDiff(b,t,c,r,col);
                         if (delta > threshold) {
-                            events.emplace_back(b,t,c,r,col,curr_(b,t,c,r,col));
+                            events.emplace_back(
+                                b, t, c, r, col,
+                                curr_(b,t,c,r,col) - prev_(b,t,c,r,col));
                         }
                     }
                 }
             }
         }
     }
-    prev_.swap(curr_);
+    std::swap(prev_, curr_);
     return events;
 }
 

@@ -1,5 +1,5 @@
 #pragma once
-#include <Eigen/CXX11/Tensor>
+#include "eigen/unsupported/Eigen/CXX11/Tensor"
 #include <memory>
 
 namespace asciioscilliscope {
