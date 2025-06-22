@@ -3,36 +3,29 @@
 
 namespace asciioscilliscope {
 
-template<typename DataType>
-Eigen::Tensor<bool,2> Projection2D<DataType>::projectTrapezoid(
-    int rows,
-    int cols,
-    DataType nearWidth,
-    DataType farWidth
-) {
+// Project trapezoidal pyramid interior to a binary mask
+template<typename T>
+Eigen::Tensor<bool,2> Projection2D<T>::projectTrapezoid(
+    int rows, int cols, const TrapezoidalPyramid& geom) {
     Eigen::Tensor<bool,2> mask(rows, cols);
-    mask.setConstant(false);
-    if (rows < 1 || cols < 1) return mask;
-    for (int i = 0; i < rows; ++i) {
-        DataType t = (rows == 1) ? DataType(0) : static_cast<DataType>(i) / static_cast<DataType>(rows - 1);
-        DataType width = nearWidth + (farWidth - nearWidth) * t;
-        DataType leftDouble = (static_cast<DataType>(cols) - width) / DataType(2);
-        int left = static_cast<int>(std::round(leftDouble));
-        int w = static_cast<int>(std::round(width));
-        int right = left + w;
-        for (int j = 0; j < cols; ++j) {
-            if (j >= left && j < right) {
-                mask(i, j) = true;
-            }
+    // Compute scale factors per row for trapezoid interpolation
+    for(int r=0; r<rows; ++r) {
+        // Linear interpolate width/height at this depth
+        T t = T(r) / T(rows - 1);
+        T halfW = (1 - t) * (geom.nearWidth/2) + t * (geom.farWidth/2);
+        T halfH = (1 - t) * (geom.nearHeight/2) + t * (geom.farHeight/2);
+        for(int c=0; c<cols; ++c) {
+            // Center coordinates
+            T x = (T(c) - cols/2);
+            T y = (T(r) - rows/2);
+            // Inside trapezoid if within halfW and halfH
+            mask(r, c) = (std::abs(x) <= halfW && std::abs(y) <= halfH);
         }
     }
     return mask;
 }
 
-// Explicit template instantiation
-template Eigen::Tensor<bool,2> Projection2D<float>::projectTrapezoid(
-    int, int, float, float);
-template Eigen::Tensor<bool,2> Projection2D<double>::projectTrapezoid(
-    int, int, double, double);
+template class Projection2D<float>;
+template class Projection2D<double>;
 
 } // namespace asciioscilliscope
