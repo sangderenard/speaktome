@@ -1,0 +1,3 @@
+- Implement a hashed beam scatter pass integrating base-n intersection refinement.
+- Evaluate batch kernel aggregation for energy diffusion across the aperture grid.
+- Document misfire leakage handling in the nano-layer simulator.
