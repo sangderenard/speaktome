@@ -12,7 +12,7 @@ find_package(Eigen3)
 # Enumerate source files explicitly to allow partial builds
 set(SRC_FILES
     src/ConicProjector3D.cpp
-    src/Projection2D.cpp
+    src/asciioscilliscope/Projection2D.cpp
     src/PixelFrameBuffer.cpp
 )
 
