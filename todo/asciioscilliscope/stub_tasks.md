@@ -30,8 +30,10 @@ The C++ oscilliscope experiment contains several stub blocks. The list below bre
 - implement Eigen-based resampling
 
 ## SampleSiteGrid
-- aggregate HD tensors into sample sites
-- compute exact centers for each site in `initMetadata`
+- integrate IsoShell sampling when reducing HD tensors
+- apply CharClassifier kernels during reduction
+- follow the design principles spelled out in `../CRT_Vector_Manifesto.md`
+- compute IsoShell intersection centers in `initMetadata`
 
 ## PhosphorScreen
 - allocate event queues and buffers
