@@ -6,6 +6,8 @@ __pycache__/
 dist/
 build/
 .venv/
+.vs/
+.vscode/
 node_modules/
 todo/*.stub.md
 

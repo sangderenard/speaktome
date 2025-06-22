@@ -8,5 +8,6 @@
         "xlocnum": "cpp",
         "xtr1common": "cpp",
         "charconv": "cpp"
-    }
+    },
+    "cmake.cmakePath": "C:/Program Files/CMake/bin/cmake.exe"
 }

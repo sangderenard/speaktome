@@ -11,3 +11,6 @@
 [submodule "codex"]
 	path = codex
 	url = git@github.com:sangderenard/codex-personal.git
+[submodule "asciioscilliscope/googletest"]
+	path = asciioscilliscope/googletest
+	url = https://github.com/google/googletest.git

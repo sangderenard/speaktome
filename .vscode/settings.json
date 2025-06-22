@@ -2,5 +2,17 @@
     "files.associations": {
         "alignedvector3": "cpp",
         "fft": "cpp"
-    }
+    },
+    // VS Code CMake Tools configuration
+    "cmake.sourceDirectory": "${workspaceFolder}/asciioscilliscope",
+    "cmake.buildDirectory": "${workspaceFolder}/asciioscilliscope/build",
+    "cmake.generator": "Ninja",
+    "cmake.cmakePath": "cmake",
+    "cmake.configureOnOpen": true,
+    "cmake.configureSettings": {
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
+    },
+    "cmake.defaultBuildTarget": "asciioscilliscope",
+    "cmake.defaultLaunchTarget": "ascii_demo",
+    "cmake.buildBeforeRun": true
 }
