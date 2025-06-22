@@ -10,7 +10,7 @@ build/
 .vscode/
 node_modules/
 todo/*.stub.md
-
+nonuploading-resources/
 # Agent toolkit binaries
 AGENTS/tools/bin/busybox
 AGENTS/tools/bin/nano

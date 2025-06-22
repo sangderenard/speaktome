@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("ActivityEncode")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Release")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+18cdac0cfe968779703f6c3758d67c901b7c1684")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+812805ad1d53032b67cf18f5f670eb98c3d411ef")]
 [assembly: System.Reflection.AssemblyProductAttribute("ActivityEncode")]
 [assembly: System.Reflection.AssemblyTitleAttribute("ActivityEncode")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

@@ -3,3 +3,6 @@ build_property.RootNamespace = WorkoutEncode
 build_property.ProjectDir = C:\dev\Powershell\speaktome\DataProcessor\nonuploading resources\SDK\cs\Cookbook\WorkoutEncode\
 build_property.EnableComHosting = 
 build_property.EnableGeneratedComInterfaceComImportInterop = 
+build_property.CsWinRTUseWindowsUIXamlProjections = false
+build_property.EffectiveAnalysisLevelStyle = 
+build_property.EnableCodeStyleSeverity = 
