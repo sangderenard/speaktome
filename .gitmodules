@@ -8,3 +8,6 @@
     path   = asciioscilliscope/eigen
     url    = https://github.com/libigl/eigen.git
     ignore = all
+[submodule "codex"]
+	path = codex
+	url = git@github.com:sangderenard/codex-personal.git
