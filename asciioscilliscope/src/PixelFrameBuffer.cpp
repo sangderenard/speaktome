@@ -12,6 +12,11 @@ PixelFrameBuffer<DataType>::PixelFrameBuffer(int batch,
       rows_(rows), cols_(cols),
       curr_(batch, timeSteps, channels, rows, cols),
       prev_(batch, timeSteps, channels, rows, cols) {
+    // ########## STUB: PixelFrameBuffer Constructor ##########
+    // PURPOSE: allocate and zero-initialize buffers.
+    // EXPECTED BEHAVIOR: prepare double-buffered tensors for diffs.
+    // TODO: handle memory initialization and threading primitives.
+    // ########################################################
     curr_.setZero();
     prev_.setZero();
 }

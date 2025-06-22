@@ -4,6 +4,7 @@ namespace asciioscilliscope {
 
 template<typename DataType>
 DiffusionKernel<DataType>::DiffusionKernel(int radius, DataType strength)
+
     : radius_(radius), strength_(strength) {}
 
 // ########## STUB: DiffusionKernel::apply ##########
@@ -12,6 +13,7 @@ void DiffusionKernel<DataType>::apply(const Eigen::Tensor<DataType,2>& input,
                                       Eigen::Tensor<DataType,2>& output) const {
     output = input;
 }
+
 
 template class DiffusionKernel<float>;
 
