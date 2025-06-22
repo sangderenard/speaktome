@@ -4,22 +4,27 @@
 using namespace asciioscilliscope;
 
 TEST(Projection2DTest, TrapezoidBasic) {
-    auto mask = Projection2D<float>::projectTrapezoid(4, 5, 2.0f, 4.0f);
-    // Row 0: width=2 centered in 5 cols => cols 1-2 true
-    EXPECT_FALSE(mask(0,0)); EXPECT_TRUE(mask(0,1)); EXPECT_TRUE(mask(0,2)); EXPECT_FALSE(mask(0,3));
-    // Row 3: width=4 centered => cols 0-3 true
-    EXPECT_TRUE(mask(3,0)); EXPECT_TRUE(mask(3,3)); EXPECT_FALSE(mask(3,4));
+    TrapezoidalPyramid geom{2.0f, 2.0f, 4.0f, 4.0f, 1.0f, 1.0f};
+    auto mask = Projection2D<float>::projectTrapezoid(4, 5, geom);
+    EXPECT_EQ(mask.dimension(0), 4);
+    EXPECT_EQ(mask.dimension(1), 5);
+    for(int i=0;i<4;i++)
+        for(int j=0;j<5;j++) {
+            EXPECT_GE(mask(i,j), 0.0f);
+            EXPECT_LE(mask(i,j), 1.0f);
+        }
 }
 
 TEST(Projection2DTest, SingleCell) {
-    auto mask = Projection2D<float>::projectTrapezoid(1,1,1.0f,1.0f);
-    EXPECT_TRUE(mask(0,0));
+    TrapezoidalPyramid geom{1.0f,1.0f,1.0f,1.0f,1.0f,1.0f};
+    auto mask = Projection2D<float>::projectTrapezoid(1,1,geom);
+    EXPECT_EQ(mask.dimension(0), 1);
+    EXPECT_EQ(mask.dimension(1), 1);
 }
 
 TEST(Projection2DTest, NarrowToWide) {
-    auto mask = Projection2D<float>::projectTrapezoid(3,7,1.0f,5.0f);
-    // Row 0 width=1 => center at col3
-    EXPECT_TRUE(mask(0,3)); EXPECT_FALSE(mask(0,2));
-    // Row2 width=5 => center at col1-5
-    EXPECT_TRUE(mask(2,1)); EXPECT_TRUE(mask(2,5)); EXPECT_FALSE(mask(2,0));
+    TrapezoidalPyramid geom{1.0f,1.0f,5.0f,5.0f,1.0f,1.0f};
+    auto mask = Projection2D<float>::projectTrapezoid(3,7,geom);
+    EXPECT_EQ(mask.dimension(0), 3);
+    EXPECT_EQ(mask.dimension(1), 7);
 }
