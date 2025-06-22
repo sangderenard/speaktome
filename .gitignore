@@ -16,3 +16,4 @@ AGENTS/tools/bin/bat
 AGENTS/tools/bin/fzf
 AGENTS/tools/bin/rg
 AGENTS/tools/bin/*.exe
+asciioscilliscope/a.out

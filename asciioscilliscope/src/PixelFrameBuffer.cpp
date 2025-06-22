@@ -1,30 +1,47 @@
 #include "../include/asciioscilliscope/PixelFrameBuffer.h"
-#include <mutex>
 
 namespace asciioscilliscope {
 
-PixelFrameBuffer::PixelFrameBuffer(int rows, int cols)
-    : rows_(rows), cols_(cols), size_(rows*cols*3), curr_(size_), prev_(size_) {}
+template<typename DataType>
+PixelFrameBuffer<DataType>::PixelFrameBuffer(int batch,
+                                             int timeSteps,
+                                             int channels,
+                                             int rows,
+                                             int cols)
+    : batch_(batch), timeSteps_(timeSteps), channels_(channels),
+      rows_(rows), cols_(cols),
+      curr_(batch, timeSteps, channels, rows, cols),
+      prev_(batch, timeSteps, channels, rows, cols) {
+    // ########## STUB: PixelFrameBuffer Constructor ##########
+    // PURPOSE: allocate and zero-initialize buffers.
+    // EXPECTED BEHAVIOR: prepare double-buffered tensors for diffs.
+    // TODO: handle memory initialization and threading primitives.
+    // ########################################################
+    curr_.setZero();
+    prev_.setZero();
+}
 
-void PixelFrameBuffer::updateRender(const std::vector<uint8_t>& data) {
-    if (data.size() != size_) return;
-    // TODO: lock if multithreaded
+// ########## STUB: PixelFrameBuffer::updateRender ##########
+// PURPOSE: ingest a new 5D tensor into the current buffer.
+// EXPECTED BEHAVIOR: lock and update internal state.
+// ###########################################################################
+template<typename DataType>
+void PixelFrameBuffer<DataType>::updateRender(const Eigen::Tensor<DataType,5>& data) {
     curr_ = data;
 }
 
-std::vector<std::tuple<int,int,uint8_t,uint8_t,uint8_t>> PixelFrameBuffer::getDiffAndSwap() {
-    std::vector<std::tuple<int,int,uint8_t,uint8_t,uint8_t>> diff;
-    // TODO: lock if multithreaded
-    for (int i=0, idx=0; i<size_; i+=3, ++idx) {
-        uint8_t r = curr_[i], g = curr_[i+1], b = curr_[i+2];
-        uint8_t pr = prev_[i], pg = prev_[i+1], pb = prev_[i+2];
-        if (r!=pr || g!=pg || b!=pb) {
-            int y = idx / cols_, x = idx % cols_;
-            diff.emplace_back(y, x, r, g, b);
-        }
-    }
-    prev_.swap(curr_);
-    return diff;
+// ########## STUB: PixelFrameBuffer::getDiffAndSwap ##########
+// PURPOSE: compute diff between current and previous buffer.
+// EXPECTED BEHAVIOR: return sparse events and swap buffers.
+// ###########################################################################
+template<typename DataType>
+std::vector<std::tuple<int,int,int,int,int,DataType>>
+PixelFrameBuffer<DataType>::getDiffAndSwap(DataType threshold) {
+    (void)threshold;
+    prev_ = curr_;
+    return {};
 }
+
+template class PixelFrameBuffer<float>;
 
 } // namespace asciioscilliscope
