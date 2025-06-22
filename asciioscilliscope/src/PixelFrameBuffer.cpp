@@ -4,10 +4,10 @@ namespace asciioscilliscope {
 
 template<typename DataType>
 PixelFrameBuffer<DataType>::PixelFrameBuffer(int batch,
-                                            int timeSteps,
-                                            int channels,
-                                            int rows,
-                                            int cols)
+                                             int timeSteps,
+                                             int channels,
+                                             int rows,
+                                             int cols)
     : batch_(batch), timeSteps_(timeSteps), channels_(channels),
       rows_(rows), cols_(cols),
       curr_(batch, timeSteps, channels, rows, cols),
@@ -21,30 +21,27 @@ PixelFrameBuffer<DataType>::PixelFrameBuffer(int batch,
     prev_.setZero();
 }
 
+// ########## STUB: PixelFrameBuffer::updateRender ##########
+// PURPOSE: ingest a new 5D tensor into the current buffer.
+// EXPECTED BEHAVIOR: lock and update internal state.
+// ###########################################################################
 template<typename DataType>
 void PixelFrameBuffer<DataType>::updateRender(const Eigen::Tensor<DataType,5>& data) {
-    // ########## STUB: updateRender ##########
-    // PURPOSE: ingest next time-slice tensor.
-    // TODO: enforce size checks and thread safety.
-    // ########################################
     curr_ = data;
 }
 
+// ########## STUB: PixelFrameBuffer::getDiffAndSwap ##########
+// PURPOSE: compute diff between current and previous buffer.
+// EXPECTED BEHAVIOR: return sparse events and swap buffers.
+// ###########################################################################
 template<typename DataType>
 std::vector<std::tuple<int,int,int,int,int,DataType>>
 PixelFrameBuffer<DataType>::getDiffAndSwap(DataType threshold) {
-    // ########## STUB: getDiffAndSwap ##########
-    // PURPOSE: compute diff between curr_ and prev_.
-    // EXPECTED BEHAVIOR: return sparse events above threshold.
-    // TODO: implement diff computation using Eigen operations.
-    // ########################################
     (void)threshold;
-    std::vector<std::tuple<int,int,int,int,int,DataType>> diff;
     prev_ = curr_;
-    return diff;
+    return {};
 }
 
-// explicit instantiation
 template class PixelFrameBuffer<float>;
 
 } // namespace asciioscilliscope

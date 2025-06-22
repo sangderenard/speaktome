@@ -2,6 +2,11 @@
 
 namespace asciioscilliscope {
 
+// ########## STUB: CharClassifier::classify ##########
+// PURPOSE: Map RGB values to an ASCII symbol using a brightness ramp.
+// EXPECTED BEHAVIOR: Select a character corresponding to the computed
+// brightness. This stub uses a fixed ramp and ignores advanced options.
+// ###########################################################################
 char CharClassifier::classify(uint8_t r, uint8_t g, uint8_t b) const {
     // ########## STUB: classify ##########
     // PURPOSE: map RGB triplet to ASCII character.

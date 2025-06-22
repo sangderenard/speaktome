@@ -30,6 +30,7 @@ void PhosphorScreen<DataType>::excite(int x,
                                       int channel,
                                       DataType value,
                                       double timestamp) {
+
     // ########## STUB: excite ##########
     // PURPOSE: queue an excitation event with timestamp.
     // EXPECTED BEHAVIOR: adjust by channel offset and envelope.
@@ -61,6 +62,7 @@ void PhosphorScreen<DataType>::applyDiffusion(Eigen::Tensor<DataType,3>& buffer)
 }
 
 // explicit instantiation
+
 template class PhosphorScreen<float>;
 
 } // namespace asciioscilliscope

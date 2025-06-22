@@ -20,6 +20,7 @@ void BeamFocus<DataType>::setGridParameters(bool useCircularKernel, int kernelRa
     // EXPECTED BEHAVIOR: store settings for later focus operations.
     // TODO: apply validation and precompute kernels.
     // ###############################################
+
     useCircularKernel_ = useCircularKernel;
     kernelRadius_ = kernelRadius;
 }

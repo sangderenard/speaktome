@@ -5,6 +5,7 @@ namespace asciioscilliscope {
 template<typename DataType>
 ElectronGun<DataType>::ElectronGun(int hdRows, int hdCols, int channels)
     : hdRows_(hdRows), hdCols_(hdCols), channels_(channels),
+
       confinementRadius_(0), fieldCurvature_(0), beamAngle_(0), gain_(1),
       currentStep_(0) {
     // ########## STUB: ElectronGun Constructor ##########

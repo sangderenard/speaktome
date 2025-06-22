@@ -3,6 +3,7 @@
 namespace asciioscilliscope {
 
 template<typename DataType>
+
 Interpolator<DataType>::Interpolator(Mode mode)
     : mode_(mode) {
     // ########## STUB: Interpolator Constructor ##########

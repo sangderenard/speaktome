@@ -8,6 +8,7 @@ SampleSiteGrid<DataType>::SampleSiteGrid(int hdRows,
                                          int siteRows,
                                          int siteCols,
                                          int radius)
+
     : hdRows_(hdRows), hdCols_(hdCols), siteRows_(siteRows), siteCols_(siteCols), radius_(radius) {
     initMetadata();
 }
@@ -26,11 +27,13 @@ Eigen::Tensor<DataType,2> SampleSiteGrid<DataType>::reduceHdTensor(const Eigen::
 
 template<typename DataType>
 std::vector<std::tuple<int,int,int,int,int>> SampleSiteGrid<DataType>::getSiteMetadata() const {
+
     return siteMetadata_;
 }
 
 template<typename DataType>
 void SampleSiteGrid<DataType>::initMetadata() {
+
     // ########## STUB: initMetadata ##########
     // PURPOSE: populate site metadata mapping HD regions to sites.
     // TODO: compute exact hdRowCenter/hdColCenter per site.
@@ -43,7 +46,6 @@ void SampleSiteGrid<DataType>::initMetadata() {
     }
 }
 
-// explicit instantiation
 template class SampleSiteGrid<float>;
 
 } // namespace asciioscilliscope
