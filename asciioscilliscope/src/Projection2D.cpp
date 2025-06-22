@@ -3,11 +3,11 @@
 
 namespace asciioscilliscope {
 
-// Project trapezoidal pyramid interior to a binary mask
+// Project trapezoidal pyramid interior to an attenuation map
 template<typename T>
-Eigen::Tensor<bool,2> Projection2D<T>::projectTrapezoid(
+Eigen::Tensor<T,2> Projection2D<T>::projectTrapezoid(
     int rows, int cols, const TrapezoidalPyramid& geom) {
-    Eigen::Tensor<bool,2> mask(rows, cols);
+    Eigen::Tensor<T,2> mask(rows, cols);
     // Compute scale factors per row for trapezoid interpolation
     for(int r=0; r<rows; ++r) {
         // Linear interpolate width/height at this depth
@@ -19,7 +19,7 @@ Eigen::Tensor<bool,2> Projection2D<T>::projectTrapezoid(
             T x = (T(c) - cols/2);
             T y = (T(r) - rows/2);
             // Inside trapezoid if within halfW and halfH
-            mask(r, c) = (std::abs(x) <= halfW && std::abs(y) <= halfH);
+            mask(r, c) = (std::abs(x) <= halfW && std::abs(y) <= halfH) ? T(1) : T(0);
         }
     }
     return mask;
