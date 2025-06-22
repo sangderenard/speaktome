@@ -1,5 +1,6 @@
 #include "../include/asciioscilliscope/Renderer.h"
 #include <iostream>
+#include <algorithm>
 
 namespace asciioscilliscope {
 
@@ -42,15 +43,29 @@ void Renderer::start() {
 
 void Renderer::stop() {
     running_.store(false);
-
-
+}
 
 void Renderer::processDiffs(float threshold) {
     // ########## STUB: processDiffs ##########
     // PURPOSE: convert PixelFrameBuffer diffs into CharDisplay updates.
-    // TODO: implement diff handling and classification.
+    // EXPECTED BEHAVIOR: translate PFB diff events to classifier output and
+    //                    stage slices in CharDisplay.
     // #########################################
-    (void)threshold;
+
+    auto events = pfb_.getDiffAndSwap(threshold);
+    Eigen::Tensor<char,2> slice(charH_, charW_);
+    slice.setConstant(' ');
+
+    for (const auto& ev : events) {
+        int row = std::get<3>(ev);
+        int col = std::get<4>(ev);
+        float value = std::get<5>(ev);
+        uint8_t intensity = static_cast<uint8_t>(std::min(255.f, value * 255.f));
+        char ch = classifier_.classify(intensity, intensity, intensity);
+        slice(row, col) = ch;
+    }
+
+    display_.stageSlice(slice, 0.0);
 }
 
 void Renderer::flushDisplay() {
@@ -61,9 +76,6 @@ void Renderer::flushDisplay() {
     auto& buf = display_.getFullBuffer();
     (void)buf;
     std::cout << "Renderer flushDisplay stub" << std::endl;
-
 }
-
-void Renderer::flushDisplay() {}
 
 } // namespace asciioscilliscope
