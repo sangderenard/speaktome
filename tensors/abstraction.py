@@ -876,6 +876,14 @@ class AbstractTensor:
         if cls is None:
             if like is not None:
                 cls = like.__class__
+            elif isinstance(data, AbstractTensor):
+                # Respect data's own backend rather than falling through to
+                # the global default -- callers throughout this codebase
+                # (stack, topk, scorer.py's score functions, ...) pass an
+                # already-wrapped AbstractTensor as bare `data` expecting
+                # its backend to be preserved, not silently swapped for
+                # whatever backend happens to be first in the registry.
+                cls = data.__class__
             else:
                 cls = AbstractTensor.check_or_build_registry()
 

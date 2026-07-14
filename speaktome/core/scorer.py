@@ -38,7 +38,7 @@ class Scorer:
             model_path = local_path if os.path.isdir(local_path) else "gpt2"
         self.model_path = model_path
 
-        self.tensor_ops = tensor_ops or AbstractTensor.get_tensor()
+        self.tensor_ops = tensor_ops if tensor_ops is not None else AbstractTensor.get_tensor()
 
         self.default_scorer = Scorer.mean_logprob_score
         self.default_k = 5
@@ -167,11 +167,12 @@ class Scorer:
         scores_t = AbstractTensor.get_tensor(scores)
         lengths_t = AbstractTensor.get_tensor(lengths)
 
-        idx = (lengths_t - 1).clamp(min_val=0)
+        idx = (lengths_t - 1).clamp(min=0)
         rows = AbstractTensor.arange(
             beams_t.shape[0],
             device=beams_t.get_device(),
             dtype=beams_t.long_dtype,
+            cls=type(beams_t),
         )
         return scores_t.select_by_indices(rows, idx)
 
@@ -207,37 +208,43 @@ class Scorer:
         lengths_t = AbstractTensor.get_tensor(lengths)
 
         batch, seq_len = beams_t.shape
+        backend_cls = type(beams_t)
         device = beams_t.get_device()
 
         if seq_len < n:
-            return AbstractTensor.zeros((batch,), dtype=beams_t.float_dtype, device=device)
+            return AbstractTensor.zeros((batch,), dtype=beams_t.float_dtype, device=device, cls=backend_cls)
 
         base = getattr(tokenizer, "vocab_size", None)
         if base is None:
-            base = int(beams.max().item()) + 1
+            base = int(beams_t.max().item()) + 1
 
-        windows = beams.unfold(1, n, 1)
-        valid_counts = (lengths - n + 1).clamp(min=0)
+        # torch.unfold/torch.unique/index_add_ have no AbstractTensor
+        # equivalent; this heuristic is inherently torch-specific from
+        # here on. Drop to raw torch explicitly, then rewrap the result.
+        beams_raw = beams_t.data
+        windows = beams_raw.unfold(1, n, 1)
+        valid_counts = (lengths_t.data - n + 1).clamp(min=0)
         max_windows = windows.shape[1]
 
-        mask = AbstractTensor.arange(max_windows, device=device).unsqueeze(0) < valid_counts.unsqueeze(1)
-        multipliers = (base ** AbstractTensor.arange(n, device=device)).view(1, 1, -1)
+        mask = torch.arange(max_windows, device=device).unsqueeze(0) < valid_counts.unsqueeze(1)
+        multipliers = (base ** torch.arange(n, device=device)).view(1, 1, -1)
         hashed = (windows * multipliers).sum(dim=2)
-        rows = AbstractTensor.arange(batch, device=device).unsqueeze(1).expand(batch, max_windows)[mask]
+        rows = torch.arange(batch, device=device).unsqueeze(1).expand(batch, max_windows)[mask]
         hashed_flat = hashed[mask]
 
-        pairs = beams_t.stack([rows, hashed_flat], dim=1)
+        pairs = torch.stack([rows, hashed_flat], dim=1)
         unique_pairs, counts = torch.unique(pairs, return_counts=True, dim=0)
         duplicate_counts = counts - 1
-        penalties = AbstractTensor.zeros((batch,), dtype=beams_t.float_dtype, device=device)
-        penalties.data.index_add_(0, unique_pairs[:, 0], duplicate_counts.float() * penalty)
+        penalties = torch.zeros((batch,), dtype=torch.float32, device=device)
+        penalties.index_add_(0, unique_pairs[:, 0], duplicate_counts.float() * penalty)
 
-        return -penalties
+        return AbstractTensor.get_tensor(-penalties, like=beams_t)
     @staticmethod
     def pairwise_diversity_score(beams=None, lengths=None, tokenizer=None, **kwargs):
         """Discourage token overlap across beams using Jaccard distance."""
         beams_t = AbstractTensor.get_tensor(beams)
         lengths_t = AbstractTensor.get_tensor(lengths)
+        backend_cls = type(beams_t)
         batch = beams_t.shape[0]
         device = beams_t.get_device()
         if tokenizer is not None and hasattr(tokenizer, "vocab_size"):
@@ -246,13 +253,16 @@ class Scorer:
             vocab_size = int(beams_t.max().item()) + 1
 
         # Build multi-hot representation for each beam without Python loops
-        row_idx = AbstractTensor.arange(batch, device=device).unsqueeze(1).expand_as(beams_t)
-        col_mask = AbstractTensor.arange(beams_t.shape[1], device=device).unsqueeze(0) < lengths_t.unsqueeze(1)
+        row_idx = AbstractTensor.arange(batch, device=device, cls=backend_cls).unsqueeze(1).expand_as(beams_t)
+        col_mask = AbstractTensor.arange(beams_t.shape[1], device=device, cls=backend_cls).unsqueeze(0) < lengths_t.unsqueeze(1)
         rows = row_idx[col_mask]
         cols = beams_t[col_mask]
-        one_hot = AbstractTensor.zeros((batch, vocab_size), dtype=beams_t.float_dtype, device=device)
-        one_hot.data.index_put_((rows, cols), torch.ones_like(rows, dtype=torch.float32), accumulate=True)
-        one_hot_bool = one_hot.bool()
+        one_hot = AbstractTensor.zeros((batch, vocab_size), dtype=beams_t.float_dtype, device=device, cls=backend_cls)
+
+        # index_put_/matmul/fill_diagonal_ have no AbstractTensor
+        # equivalent; drop to raw torch explicitly for this section.
+        one_hot.data.index_put_((rows.data, cols.data), torch.ones_like(rows.data, dtype=torch.float32), accumulate=True)
+        one_hot_bool = one_hot.data.bool()
 
         inter = torch.matmul(one_hot_bool.float(), one_hot_bool.t().float())
         union = (
@@ -265,7 +275,7 @@ class Scorer:
         sim_matrix.fill_diagonal_(0)
 
         diversity_scores = -sim_matrix.sum(dim=1) / (batch - 1)
-        return diversity_scores
+        return AbstractTensor.get_tensor(diversity_scores, like=beams_t)
 
 
 
@@ -282,31 +292,43 @@ class Scorer:
         self.delivery_queue = queue.Queue(maxsize=8)
         self.bins = {}
         self.survival_age = {}
+        backend_cls = type(self.tensor_ops)
+        long_dtype = self.tensor_ops.long_dtype
+        float_dtype = self.tensor_ops.float_dtype
         for name, cfg in bins_config.items():
             N = cfg['width']
             self.bins[name] = {
                 'fn': cfg['fn'],
                 'params': cfg.get('params', {}),
-                'beams': self.tensor_ops.full((N, max_len), -1, dtype=torch.long, device=self.device),
-                'scores': self.tensor_ops.full((N,), float('-inf'), dtype=torch.float32, device=self.device),
-                'lengths': self.tensor_ops.zeros((N,), dtype=torch.long, device=self.device),
-                'age': self.tensor_ops.zeros((N,), dtype=torch.long, device=self.device),
+                'beams': self.tensor_ops.full((N, max_len), -1, dtype=long_dtype, device=self.device, cls=backend_cls),
+                'scores': self.tensor_ops.full((N,), float('-inf'), dtype=float_dtype, device=self.device, cls=backend_cls),
+                'lengths': self.tensor_ops.zeros((N,), dtype=long_dtype, device=self.device, cls=backend_cls),
+                'age': self.tensor_ops.zeros((N,), dtype=long_dtype, device=self.device, cls=backend_cls),
                 'width': N
             }
 
     def update_bins(self, beams, scores, lengths, tokenizer, round_idx=0):
         """Update all bins with new candidate beams."""
+        backend_cls = type(self.tensor_ops)
+        long_dtype = self.tensor_ops.long_dtype
+        float_dtype = self.tensor_ops.float_dtype
+        beams_t = self.tensor_ops.ensure_tensor(beams)
+        scores_t = self.tensor_ops.ensure_tensor(scores)
+        lengths_t = self.tensor_ops.ensure_tensor(lengths)
         for name, bin in self.bins.items():
             N = bin['beams'].shape[0]
-            bin_scores = self.call_score_fn(bin['fn'], beams, scores, lengths, tokenizer, **bin['params'])
-            pad_n = bin['beams'].shape[1] - beams.shape[1]
-            padded_beams = self.tensor_ops.pad(beams, (0, pad_n)) if pad_n > 0 else beams
-            all_scores = self.tensor_ops.cat([bin['scores'], bin_scores], dim=0)
-            all_beams = self.tensor_ops.cat([bin['beams'], padded_beams], dim=0)
-            all_lengths = self.tensor_ops.cat([bin['lengths'], lengths], dim=0)
-            all_age = self.tensor_ops.cat([bin['age'] + 1, self.tensor_ops.zeros(bin_scores.shape, dtype=torch.long, device=self.device)], dim=0)
+            bin_scores = self.call_score_fn(bin['fn'], beams_t, scores_t, lengths_t, tokenizer, **bin['params'])
+            pad_n = bin['beams'].shape[1] - beams_t.shape[1]
+            padded_beams = beams_t.pad((0, pad_n)) if pad_n > 0 else beams_t
+            all_scores = AbstractTensor.cat([bin['scores'], bin_scores], dim=0)
+            all_beams = AbstractTensor.cat([bin['beams'], padded_beams], dim=0)
+            all_lengths = AbstractTensor.cat([bin['lengths'], lengths_t], dim=0)
+            all_age = AbstractTensor.cat(
+                [bin['age'] + 1, self.tensor_ops.zeros(bin_scores.shape, dtype=long_dtype, device=self.device, cls=backend_cls)],
+                dim=0,
+            )
 
-            _, top_idx = self.tensor_ops.topk(all_scores, k=N, dim=0)
+            _, top_idx = AbstractTensor.topk(all_scores, k=N, dim=0)
             bin['scores'] = all_scores[top_idx]
             bin['beams'] = all_beams[top_idx]
             bin['lengths'] = all_lengths[top_idx]
@@ -318,21 +340,21 @@ class Scorer:
                     bin[k] = bin[k][keep]
                 pad_n = N - bin['scores'].shape[0]
                 if pad_n > 0:
-                    bin['scores'] = self.tensor_ops.cat([
+                    bin['scores'] = AbstractTensor.cat([
                         bin['scores'],
-                        self.tensor_ops.full((pad_n,), float('-inf'), dtype=torch.float32, device=self.device)
+                        self.tensor_ops.full((pad_n,), float('-inf'), dtype=float_dtype, device=self.device, cls=backend_cls),
                     ], dim=0)
-                    bin['beams'] = self.tensor_ops.cat([
+                    bin['beams'] = AbstractTensor.cat([
                         bin['beams'],
-                        self.tensor_ops.full((pad_n, self.max_len), -1, dtype=torch.long, device=self.device)
+                        self.tensor_ops.full((pad_n, self.max_len), -1, dtype=long_dtype, device=self.device, cls=backend_cls),
                     ], dim=0)
-                    bin['lengths'] = self.tensor_ops.cat([
+                    bin['lengths'] = AbstractTensor.cat([
                         bin['lengths'],
-                        self.tensor_ops.zeros((pad_n,), dtype=torch.long, device=self.device)
+                        self.tensor_ops.zeros((pad_n,), dtype=long_dtype, device=self.device, cls=backend_cls),
                     ], dim=0)
-                    bin['age'] = self.tensor_ops.cat([
+                    bin['age'] = AbstractTensor.cat([
                         bin['age'],
-                        self.tensor_ops.zeros((pad_n,), dtype=torch.long, device=self.device)
+                        self.tensor_ops.zeros((pad_n,), dtype=long_dtype, device=self.device, cls=backend_cls),
                     ], dim=0)
 
     def print_bins(self, tokenizer, max_chars=100):

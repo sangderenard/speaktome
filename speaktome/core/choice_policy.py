@@ -116,12 +116,12 @@ class AlphaBetaPolicy(ChoicePolicy):
             chosen_indices.append(picked)
             chosen_scores.append([row[i] for i in picked])
 
-        cls = type(log_probs)
+        backend_cls = type(log_probs)
         device = log_probs.get_device()
-        scores_t = cls.tensor_from_list(
+        scores_t = backend_cls.tensor(
             chosen_scores, dtype=log_probs.float_dtype, device=device
         )
-        indices_t = cls.tensor_from_list(
+        indices_t = backend_cls.tensor(
             chosen_indices, dtype=log_probs.long_dtype, device=device
         )
         return scores_t, indices_t

@@ -16,7 +16,7 @@ def _ops():
 
 def test_topk_policy_matches_manual_log_softmax_topk():
     ops = _ops()
-    logits = ops.tensor_from_list(
+    logits = ops.tensor(
         [[0.0, 5.0, 1.0, -3.0]], dtype=ops.float_dtype, device="cpu"
     )
     policy = TopKPolicy()
@@ -35,7 +35,7 @@ def test_topk_policy_matches_manual_log_softmax_topk():
 
 def test_topk_policy_respects_batch_dimension():
     ops = _ops()
-    logits = ops.tensor_from_list(
+    logits = ops.tensor(
         [[0.0, 5.0, 1.0], [9.0, 0.0, 0.0]], dtype=ops.float_dtype, device="cpu"
     )
     policy = TopKPolicy()
@@ -55,7 +55,7 @@ def test_alpha_beta_policy_rejects_bad_parameters():
 def test_alpha_beta_policy_alpha_one_is_near_deterministic_for_sharp_distribution():
     ops = _ops()
     # One logit towers over the rest; softmax puts ~all mass on index 1.
-    logits = ops.tensor_from_list(
+    logits = ops.tensor(
         [[0.0, 20.0, 0.0]], dtype=ops.float_dtype, device="cpu"
     )
     policy = AlphaBetaPolicy(alpha=1.0, beta=1.0, seed=0)
@@ -72,7 +72,7 @@ def test_alpha_beta_policy_alpha_zero_is_roughly_uniform():
     # One dominant logit per row -- if alpha weighting leaked through, index 1
     # would be picked far more than its 1/vocab share.
     row = [0.0, 20.0, 0.0, 0.0]
-    logits = ops.tensor_from_list(
+    logits = ops.tensor(
         [row for _ in range(trials)], dtype=ops.float_dtype, device="cpu"
     )
     policy = AlphaBetaPolicy(alpha=0.0, beta=1.0, seed=1234)
@@ -90,7 +90,7 @@ def test_alpha_beta_policy_alpha_zero_is_roughly_uniform():
 
 def test_alpha_beta_policy_scores_are_true_model_logprob_not_sampling_weight():
     ops = _ops()
-    logits = ops.tensor_from_list(
+    logits = ops.tensor(
         [[0.0, 20.0, 0.0]], dtype=ops.float_dtype, device="cpu"
     )
     row = logits.tolist()[0]

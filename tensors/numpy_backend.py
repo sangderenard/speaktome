@@ -810,6 +810,12 @@ class NumPyTensorOperations(AbstractTensor):
             return tensor.astype(np.uint8)
         elif dtype in ("bool",):
             return tensor.astype(np.bool_)
+        elif not isinstance(dtype, str):
+            # Accept a real numpy dtype/type object (e.g. np.int64, the
+            # value returned by AbstractTensor.long_dtype on this backend)
+            # rather than silently mis-defaulting to float32 for anything
+            # that isn't one of the recognized string names above.
+            return tensor.astype(dtype)
         else:
             # Default to float32
             return tensor.astype(np.float32)
