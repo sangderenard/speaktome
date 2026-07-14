@@ -1,0 +1,218 @@
+from __future__ import annotations
+
+"""High level processing utilities for :mod:`autograd`.
+
+This module provides :class:`AutogradProcess`, a companion to the lightweight
+``autograd`` implementation.  It aggregates optional post processing stages
+such as forward/backward graph extraction, caching requirements, execution
+schedules and a tiny training loop.  The intent is to retain the most detailed
+representation of an abstract tensor computation so that higher level tooling
+can introspect or render it.
+"""
+
+from dataclasses import dataclass, field
+from typing import Any, Callable, Dict, Iterable, List
+
+import networkx as nx
+import pandas as pd
+
+from .autograd import GradTape
+from .abstraction import AbstractTensor
+from .graph_translator import GraphTranslator
+
+
+@dataclass
+class AutogradProcess:
+    """Coordinate post processing for a :class:`GradTape`.
+
+    Parameters
+    ----------
+    tape:
+        The tape whose recorded operations will be analysed.
+    """
+
+    tape: GradTape
+    forward_graph: nx.DiGraph | None = None
+    backward_graph: nx.DiGraph | None = None
+    combined_graph: nx.DiGraph | None = None
+    forward_schedule: List[int] = field(default_factory=list)
+    backward_schedule: List[int] = field(default_factory=list)
+    stages: Dict[str, List[int]] = field(default_factory=dict)
+    cache: set[int] = field(default_factory=set)
+    cache_levels: Dict[int, int] = field(default_factory=dict)
+    loss_level: int | None = None
+    training_log: List[Dict[str, Any]] = field(default_factory=list)
+
+    # ------------------------------------------------------------------
+    # Graph and schedule construction
+    # ------------------------------------------------------------------
+    def build(self, result: Any) -> None:
+        """Populate forward/backward graphs and schedules for ``result``."""
+
+        self.forward_graph = self.tape.export_forward_graph()
+        self.backward_graph = self.tape.export_backward_graph(result)
+        self.cache = self.tape.required_cache(result)
+
+        combined = nx.DiGraph()
+        # forward nodes and edges
+        for tid, data in self.forward_graph.nodes(data=True):
+            combined.add_node(("f", tid), **data)
+        for u, v in self.forward_graph.edges():
+            combined.add_edge(("f", u), ("f", v))
+        # cache and loss nodes
+        for tid in self.cache:
+            combined.add_node(("c", tid))
+            combined.add_edge(("f", tid), ("c", tid))
+        for tid, data in self.forward_graph.nodes(data=True):
+            if data.get("loss"):
+                combined.add_node("loss")
+                combined.add_edge(("f", tid), "loss")
+
+        # backward nodes and edges
+        for tid, data in self.backward_graph.nodes(data=True):
+            combined.add_node(("b", tid), **data)
+        for u, v in self.backward_graph.edges():
+            combined.add_edge(("b", u), ("b", v))
+        for tid in self.backward_graph.nodes:
+            if self.forward_graph.has_node(tid):
+                combined.add_edge(("f", tid), ("b", tid))
+            if tid in self.cache:
+                combined.add_edge(("c", tid), ("b", tid))
+        if combined.has_node("loss"):
+            roots = [nid for nid in self.backward_graph.nodes if self.backward_graph.in_degree(nid) == 0]
+            for r in roots:
+                combined.add_edge("loss", ("b", r))
+
+        self.combined_graph = combined
+
+        # Schedule combined graph once
+        sched = GraphTranslator(combined)
+        order = sched.schedule()
+        levels = sched.levels()
+
+        # Populate levels back to individual graphs
+        for nid, lvl in levels.items():
+            if isinstance(nid, tuple):
+                kind, tid = nid
+                if kind == "f" and self.forward_graph.has_node(tid):
+                    self.forward_graph.nodes[tid]["level"] = lvl
+                elif kind == "b" and self.backward_graph.has_node(tid):
+                    self.backward_graph.nodes[tid]["level"] = lvl
+                elif kind == "c":
+                    self.cache_levels[tid] = lvl
+            elif nid == "loss":
+                self.loss_level = lvl
+
+        # Derive forward/backward schedules from combined order
+        self.forward_schedule = [tid for nid in order if isinstance(nid, tuple) and nid[0] == "f" for tid in [nid[1]]]
+        self.backward_schedule = [tid for nid in order if isinstance(nid, tuple) and nid[0] == "b" for tid in [nid[1]]]
+
+        self.stages["forward"] = self.forward_schedule
+        self.stages["backward"] = self.backward_schedule
+
+    # ------------------------------------------------------------------
+    # Staging utilities
+    # ------------------------------------------------------------------
+    def stage(self, label: str, nodes: Iterable[int]) -> None:
+        """Associate ``nodes`` with the stage ``label``."""
+
+        self.stages[label] = list(nodes)
+
+    # ------------------------------------------------------------------
+    # Training loop
+    # ------------------------------------------------------------------
+    def training_loop(
+        self,
+        forward_fn: Callable[[], Any],
+        params: Iterable[Any],
+        *,
+        steps: int = 1,
+        lr: float = 0.01,
+    ) -> None:
+        """Run a simple gradient-descent training loop.
+
+        ``forward_fn`` is expected to build a computation using ``params`` and
+        return a scalar loss tensor.  After each iteration the tape is cleared
+        and rebuilt to keep the recorded graph compact.
+        """
+
+        params = list(params)
+        for step in range(steps):
+            self.tape._nodes.clear()
+            self.tape.graph.clear()
+            for p in params:
+                self.tape.create_tensor_node(p)
+            result = forward_fn()
+            if isinstance(result, tuple):
+                loss, meta_loss = result
+                if not isinstance(meta_loss, (int, float)):
+                    meta_loss = meta_loss.detach()
+            else:
+                loss, meta_loss = result, result.detach()
+            self.tape.mark_loss(loss)
+            grads = AbstractTensor.autograd.grad(loss, params, retain_graph=True)
+            with AbstractTensor.autograd.no_grad():
+                for p, g in zip(params, grads):
+                    AbstractTensor.copyto(p, p - lr * g)
+            log_val = meta_loss if isinstance(meta_loss, (int, float)) else meta_loss.item()
+            self.training_log.append({"step": step, "loss": float(log_val)})
+
+        # Use the final iteration to populate graphs and schedules
+        self.build(loss)
+        self.tape._nodes.clear()
+        self.tape.graph.clear()
+
+    # ------------------------------------------------------------------
+    # Tabulation helpers
+    # ------------------------------------------------------------------
+    def _stage_of(self, nid: int) -> str | None:
+        for label, nodes in self.stages.items():
+            if nid in nodes:
+                return label
+        return None
+
+    def summary_table(self) -> Dict[str, pd.DataFrame]:
+        """Return tables for graph nodes and training metadata."""
+
+        if self.forward_graph is None or self.backward_graph is None:
+            raise RuntimeError("build() must be called before requesting a table")
+
+        f_index = {tid: i for i, tid in enumerate(self.forward_schedule)}
+        b_index = {tid: i for i, tid in enumerate(self.backward_schedule)}
+        rows: List[Dict[str, Any]] = []
+        for tid, data in self.forward_graph.nodes(data=True):
+            rows.append(
+                {
+                    "id": tid,
+                    "op": data.get("op"),
+                    "forward_order": f_index.get(tid),
+                    "backward_order": b_index.get(tid),
+                    "cached": tid in self.cache or bool(data.get("cached")),
+                    "stage": self._stage_of(tid),
+                    "param_id": data.get("param_id"),
+                    "loss": bool(data.get("loss")),
+                }
+            )
+        graph_df = pd.DataFrame(rows).sort_values("forward_order").reset_index(drop=True)
+        train_df = pd.DataFrame(self.training_log)
+        return {"graph": graph_df, "training": train_df}
+
+    # ------------------------------------------------------------------
+    # Process tree
+    # ------------------------------------------------------------------
+    def process_tree(self) -> nx.DiGraph:
+        """Return a tree organised by stage labels."""
+
+        if self.forward_graph is None:
+            raise RuntimeError("build() must be called before requesting a tree")
+
+        tree = nx.DiGraph()
+        tree.add_node("training")
+        for label, nodes in self.stages.items():
+            tree.add_node(label)
+            tree.add_edge("training", label)
+            for nid in nodes:
+                op = self.forward_graph.nodes[nid].get("op") if nid in self.forward_graph else None
+                tree.add_node(nid, op=op)
+                tree.add_edge(label, nid)
+        return tree

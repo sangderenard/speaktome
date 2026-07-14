@@ -36,9 +36,8 @@ from cffi import FFI
 
 # The tensor abstraction module was renamed to ``abstraction``. Update imports
 # accordingly so the C backend stays in sync with the other backends.
-from .abstraction import AbstractTensor, _get_shape, _flatten
+from ..abstraction import AbstractTensor, _get_shape, _flatten
 
-# --- END HEADER ---
 
 ffi = FFI()
 ffi.cdef("""
@@ -49,6 +48,7 @@ ffi.cdef("""
     void pow_double(const double* a, const double* b, double* out, int n);
     void mod_double(const double* a, const double* b, double* out, int n);
     void floordiv_double(const double* a, const double* b, double* out, int n);
+    void matmul_double(const double* a, const double* b, double* out, int m, int n, int p);
     // Scalar ops
     void add_scalar(const double* a, double b, double* out, int n);
     void subtract_const(const double* a, double b, double* out, int n);
@@ -96,6 +96,8 @@ ffi.cdef("""
 
     void cast_double_to_int(const double* a, int* out, int n);
     void cast_double_to_float(const double* a, float* out, int n);
+    void stack_double(const double** tensors, int num_tensors, const int* shape, int ndim, int dim, double* out);
+    void cat_double(const double** tensors, const int* dim_sizes, int num_tensors, const int* shape, int ndim, int dim, double* out);
 """)
 
 from pathlib import Path
@@ -110,7 +112,7 @@ if not SOURCE_PATH.exists():
     raise FileNotFoundError(f"Missing C source: {SOURCE_PATH}")
 C_SOURCE = SOURCE_PATH.read_text()
 
-_prebuilt = os.environ.get("SPEAKTOME_CTENSOR_LIB")
+_prebuilt = os.environ.get("TENSOR_CTENSOR_LIB")
 if _prebuilt and os.path.exists(_prebuilt):
     C = ffi.dlopen(_prebuilt)
 else:
@@ -128,7 +130,7 @@ else:
 # OUTPUTS: Path to the compiled library.
 # KEY ASSUMPTIONS/DEPENDENCIES: Requires the ``ziglang`` package which
 #         bundles the Zig binary. Compilation occurs only if no prebuilt
-#         library is supplied via ``SPEAKTOME_CTENSOR_LIB``.
+#         library is supplied via ``TENSOR_CTENSOR_LIB``.
 # TODO:
 #   - Implement the Zig command invocation.
 #   - Add caching logic to avoid recompilation.
@@ -220,6 +222,22 @@ class CTensorOperations(AbstractTensor):
     def _apply_operator__(self, op: str, left: CTensor, right: Any):
         """Operate on ``CTensor`` objects or scalars."""
         if isinstance(right, CTensor) and isinstance(left, CTensor):
+            if op in ('matmul', 'rmatmul', 'imatmul'):
+                a, b = (left, right) if op != 'rmatmul' else (right, left)
+                if len(a.shape) != 2 or len(b.shape) != 2:
+                    raise ValueError("matmul expects 2D tensors")
+                m, n = a.shape
+                n2, p = b.shape
+                if n != n2:
+                    raise ValueError("Shape mismatch for matmul")
+                out = CTensor((m, p))
+                C.matmul_double(a.as_c_ptr(), b.as_c_ptr(), out.as_c_ptr(), m, n, p)
+                if op == 'imatmul':
+                    left.buffer = out.buffer
+                    left.shape = out.shape
+                    left.size = out.size
+                    return left
+                return out
             if left.shape != right.shape:
                 raise ValueError("Shape mismatch")
             out = CTensor(left.shape)
@@ -302,8 +320,9 @@ class CTensorOperations(AbstractTensor):
         start: int,
         end: Optional[int] = None,
         step: int = 1,
-        device: Any = None,
+        *,
         dtype: Any = None,
+        device: Any = None,
     ) -> CTensor:
         if end is None:
             n = start
@@ -331,6 +350,21 @@ class CTensorOperations(AbstractTensor):
         C.sqrt_double(tensor.as_c_ptr(), out.as_c_ptr(), tensor.size)
         return out
 
+    def matmul_(self, tensor: Any, other: Any) -> CTensor:
+        if not isinstance(tensor, CTensor):
+            tensor = CTensor.from_list(tensor, _get_shape(tensor))
+        if not isinstance(other, CTensor):
+            other = CTensor.from_list(other, _get_shape(other))
+        if len(tensor.shape) != 2 or len(other.shape) != 2:
+            raise ValueError("matmul expects 2D tensors")
+        m, n = tensor.shape
+        n2, p = other.shape
+        if n != n2:
+            raise ValueError("Shape mismatch for matmul")
+        out = CTensor((m, p))
+        C.matmul_double(tensor.as_c_ptr(), other.as_c_ptr(), out.as_c_ptr(), m, n, p)
+        return out
+
     def tensor_from_list_(self, data: List[Any], dtype: Any, device: Any) -> CTensor:
         shape = _get_shape(data)
         return CTensor.from_list(data, shape)
@@ -340,6 +374,13 @@ class CTensorOperations(AbstractTensor):
 
     def numel_(self, tensor: CTensor) -> int:
         return tensor.size
+
+    def __trunc__(self):
+        import math
+        tensor = self.data
+        if tensor.size != 1:
+            raise TypeError("Only scalar tensors can be converted to int")
+        return int(math.trunc(tensor.buffer[0]))
 
     def mean_(self, tensor: Any, dim: Optional[int] = None) -> Any:
         if not isinstance(tensor, CTensor):
@@ -621,32 +662,63 @@ class CTensorOperations(AbstractTensor):
         raise NotImplementedError("interpolate not implemented for C backend")
 
     def stack_(self, tensors: list, dim: int = 0) -> Any:
-        # ########## STUB: CTensorOperations.stack ##########
-        # PURPOSE: Concatenate a sequence of CTensors along a new dimension.
-        # EXPECTED BEHAVIOR: Should return a CTensor representing ``tensors``
-        #     stacked along ``dim``.
-        # INPUTS: list of CTensors, dimension index.
-        # OUTPUTS: New CTensor with increased rank.
-        # KEY ASSUMPTIONS/DEPENDENCIES: Requires advanced shape handling.
-        # TODO:
-        #   - Implement shape validation and memory allocation logic.
-        # NOTES: Current C backend lacks generic tensor helpers.
-        # ############################################################
-        raise NotImplementedError("stack not implemented for C backend")
+        if not tensors:
+            raise ValueError("tensors list cannot be empty")
+        c_tensors = [
+            t if isinstance(t, CTensor) else CTensor.from_list(t, _get_shape(t))
+            for t in tensors
+        ]
+        base_shape = c_tensors[0].shape
+        for t in c_tensors:
+            if t.shape != base_shape:
+                raise ValueError("All tensors must have the same shape")
+        ndim = len(base_shape)
+        if dim < 0:
+            dim += ndim + 1
+        if dim < 0 or dim > ndim:
+            raise ValueError("dim out of range")
+        new_shape = base_shape[:dim] + (len(c_tensors),) + base_shape[dim:]
+        out = CTensor(new_shape)
+        shape_c = ffi.new("int[]", list(base_shape))
+        tensor_ptrs = ffi.new("double*[]", [t.as_c_ptr() for t in c_tensors])
+        C.stack_double(tensor_ptrs, len(c_tensors), shape_c, ndim, dim, out.as_c_ptr())
+        return out
 
     def cat_(self, tensors: list, dim: int = 0) -> Any:
-        # ########## STUB: CTensorOperations.cat ##########
-        # PURPOSE: Concatenate CTensors along an existing dimension.
-        # EXPECTED BEHAVIOR: Should join ``tensors`` on ``dim`` similar to
-        #     numpy.concatenate.
-        # INPUTS: list of CTensors, dimension index.
-        # OUTPUTS: New CTensor with combined size.
-        # KEY ASSUMPTIONS/DEPENDENCIES: Requires complex stride math.
-        # TODO:
-        #   - Implement concatenation across arbitrary dimensions.
-        # NOTES: Placeholder until a more complete C tensor API exists.
-        # ############################################################
-        raise NotImplementedError("cat not implemented for C backend")
+        if not tensors:
+            raise ValueError("tensors list cannot be empty")
+        c_tensors = [
+            t if isinstance(t, CTensor) else CTensor.from_list(t, _get_shape(t))
+            for t in tensors
+        ]
+        first_shape = list(c_tensors[0].shape)
+        ndim = len(first_shape)
+        if dim < 0:
+            dim += ndim
+        if dim < 0 or dim >= ndim:
+            raise ValueError("dim out of range")
+        for t in c_tensors:
+            if len(t.shape) != ndim:
+                raise ValueError("All tensors must have the same rank")
+            for d in range(ndim):
+                if d == dim:
+                    continue
+                if t.shape[d] != first_shape[d]:
+                    raise ValueError("Non-concat dimensions must match")
+        dim_sizes = [t.shape[dim] for t in c_tensors]
+        out_shape = first_shape[:]
+        out_shape[dim] = sum(dim_sizes)
+        out = CTensor(tuple(out_shape))
+        tensor_ptrs = ffi.new("double*[]", [t.as_c_ptr() for t in c_tensors])
+        dim_sizes_c = ffi.new("int[]", dim_sizes)
+        shape_c = ffi.new("int[]", first_shape)
+        C.cat_double(tensor_ptrs, dim_sizes_c, len(c_tensors), shape_c, ndim, dim, out.as_c_ptr())
+        return out
+
+    def unravel_index_(self, shape):
+        raise NotImplementedError(
+            "unravel_index not implemented for C backend"
+        )
 
     def get_device_(self, tensor: CTensor) -> str:
         return "cpu_cffi"

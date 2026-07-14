@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Backend-agnostic buffer coordinator for accelerator operations."""
 from __future__ import annotations
 
@@ -11,11 +10,8 @@ try:
 
     from .c_backend import CTensorOperations
     from .opengl_backend import OpenGLTensorOperations
-except Exception:
-    import sys
-    print("Accelerator coordinator imports failed")
-    sys.exit(1)
-# --- END HEADER ---
+except Exception:  # pragma: no cover - optional native backends
+    print("Accelerator coordinator imports failed; continuing without it")
 
 
 @dataclass

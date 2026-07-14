@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Prototype classes for OpenGL shader orchestration."""
 from __future__ import annotations
 
@@ -6,11 +5,8 @@ try:
     from typing import Any, Dict, Tuple
     from pathlib import Path
     from OpenGL import GL  # type: ignore
-except Exception:
-    import sys
-    print("OpenGL pipeline failed to import")
-    sys.exit(1)
-# --- END HEADER ---
+except Exception:  # pragma: no cover - optional native backend
+    print("OpenGL pipeline failed to import; continuing without it")
 
 
 # ########## STUB: OpenGL Shader Pipeline ##########

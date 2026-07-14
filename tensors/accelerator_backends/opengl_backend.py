@@ -1,21 +1,17 @@
-#!/usr/bin/env python3
 """OpenGL backend skeleton using buffer objects and compute shaders."""
 from __future__ import annotations
 
 try:
     from typing import Any, Tuple
-    from .abstraction import AbstractTensor
+    from ..abstraction import AbstractTensor
     import numpy as np
     # PyOpenGL imports are optional at this stage
     from OpenGL import GL  # type: ignore
 except ModuleNotFoundError:
     np = None  # type: ignore
     GL = None  # type: ignore
-except Exception:
-    import sys
-    print("OpenGL backend failed to import")
-    sys.exit(1)
-# --- END HEADER ---
+except Exception:  # pragma: no cover - optional native backend
+    print("OpenGL backend failed to import; continuing without it")
 
 
 class GLBuffer:
@@ -50,8 +46,8 @@ class GLBuffer:
 class OpenGLTensorOperations(AbstractTensor):
     """Stub OpenGL backend using buffers and compute shaders."""
 
-    def __init__(self, track_time: bool = False) -> None:
-        super().__init__(track_time=track_time)
+    def __init__(self, track_time: bool = False, tape=None) -> None:
+        super().__init__(track_time=track_time, tape=tape)
         if GL is None:
             raise RuntimeError("PyOpenGL is required for the OpenGL backend")
 
@@ -123,6 +119,14 @@ class OpenGLTensorOperations(AbstractTensor):
 
     def stack_(self, tensors: list[Any], dim: int = 0):
         raise NotImplementedError
+
+    def unravel_index_(self, shape):
+        raise NotImplementedError(
+            "unravel_index not implemented for OpenGL backend"
+        )
+
+    def __trunc__(self):
+        raise NotImplementedError("trunc not implemented for OpenGL backend")
 
     def repeat_interleave_(self, repeats: int = 1, dim: int | None = None):
         raise NotImplementedError

@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Prototype pipeline for dynamically compiling C tensor operations."""
 from __future__ import annotations
 
@@ -6,11 +5,8 @@ try:
     from typing import Any, Dict, Tuple
     from pathlib import Path
     import ctypes
-except Exception:
-    import sys
-    print("C pipeline failed to import")
-    sys.exit(1)
-# --- END HEADER ---
+except Exception:  # pragma: no cover - optional native backend
+    print("C pipeline failed to import; continuing without it")
 
 
 # ########## STUB: CTensor Compilation Pipeline ##########

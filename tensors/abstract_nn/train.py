@@ -1,0 +1,358 @@
+from __future__ import annotations
+from typing import Tuple, List, Optional
+from ..abstraction import AbstractTensor
+from ..autograd import autograd
+from ..autoautograd.residual_store import ResidualStore, Space
+from ..autoautograd.whiteboard_runtime import run_batched_vjp
+from .core import Model
+from .losses import Loss
+from .optimizer import Adam
+from .utils import as_list
+from .hooks import hook_panel
+
+# -------- Gradient control ---------------------------------------------------
+class GradControl:
+    """
+    Configure gradient-norm control.
+    - per_param_max_norm: clip each param's grad to this L2 norm (optional)
+    - max_global_norm: clip the *global* grad L2 norm across all params (optional)
+    - target_global_norm: after clipping, rescale grads to this global norm (optional)
+    """
+    def __init__(
+        self,
+        per_param_max_norm: Optional[float] = None,
+        max_global_norm: Optional[float] = None,
+        target_global_norm: Optional[float] = None,
+    ):
+        self.per_param_max_norm = per_param_max_norm
+        self.max_global_norm = max_global_norm
+        self.target_global_norm = target_global_norm
+
+
+def _l2(g) -> float:
+    # scalar float L2 for any AbstractTensor
+    s = (g * g).sum()
+    # Some backends return a tensor with sqrt(), others a numeric value
+    if hasattr(s, "sqrt"):
+        return float(s.sqrt().item())
+    return float(s) ** 0.5
+
+
+def _global_l2(grads: List) -> float:
+    s = 0.0
+    for g in grads:
+        s += float((g * g).sum().item())
+    return s ** 0.5
+
+
+def _clip_per_param_norm(grads: List, max_norm: float):
+    """Return (scaled_grads, norms_before, scales)."""
+    norms = [_l2(g) for g in grads]
+    eps = 1e-9
+    scales = [1.0 if n == 0.0 else min(1.0, max_norm / (n + eps)) for n in norms]
+    clipped = [g * s for g, s in zip(grads, scales)]
+    return clipped, norms, scales
+
+
+def _clip_global_norm(grads: List, max_norm: float):
+    """Return (scaled_grads, global_norm_before, scale)."""
+    gnorm = _global_l2(grads)
+    eps = 1e-9
+    scale = 1.0 if gnorm == 0.0 else min(1.0, max_norm / (gnorm + eps))
+    if scale < 1.0:
+        grads = [g * scale for g in grads]
+    return grads, gnorm, scale
+
+def _to_scalar(x):
+    # AbstractTensor / torch / numpy all expose .item() for 0-D
+    if hasattr(x, "item"):
+        try:
+            return float(x.item())
+        except Exception:
+            pass
+    # Handle things that only have tolist()
+    if hasattr(x, "tolist"):
+        t = x.tolist()
+        # collapse 1-element nests
+        while isinstance(t, (list, tuple)) and len(t) == 1:
+            t = t[0]
+        if isinstance(t, (int, float, bool)):
+            return float(t)
+    # Already a Python number?
+    if isinstance(x, (int, float, bool)):
+        return float(x)
+    raise TypeError(f"Can't convert {type(x)} to scalar float")
+
+
+def rebind(label: str, new_tensor: AbstractTensor) -> AbstractTensor:
+    """Detach ``new_tensor`` and register it on the active tape with ``label``."""
+    t = new_tensor.detach()
+    t.requires_grad_(True)
+    try:
+        autograd.tape.annotate(t, label=label)
+    except Exception:
+        pass
+    return t
+
+
+def train_step(
+    model: Model,
+    loss_fn: Loss,
+    optimizer: Adam,
+    x: AbstractTensor,
+    y: AbstractTensor,
+    debug: bool = False,
+    grad_control: Optional[GradControl] = None,
+    grad_log: Optional[dict] = None,
+    accumulate: bool = False,
+    zero_grad: bool = True,
+) -> Tuple[float, float, float]:
+    hook_panel.run('step_start', model=model, x=x, y=y)
+    pred = model.forward(x)
+    hook_panel.run('forward', model=model, x=x, pred=pred)
+    loss = loss_fn.forward(pred, y)
+    hook_panel.run('loss', model=model, pred=pred, y=y, loss=loss)
+
+    # Residual seeding instead of direct backward
+    grad_pred = loss_fn.backward(pred, y)
+    residuals = ResidualStore()
+    width = grad_pred.shape[-1] if getattr(grad_pred, "ndim", 0) > 0 else 1
+    residuals.add(0, grad_pred, space=Space.F, width=width)
+    hook_panel.run('backward', model=model, grad_pred=grad_pred)
+
+    # Attempt a real batched VJP once residuals and windows are prepared
+    try:  # best-effort; fall back silently if runtime lacks whiteboard support
+        import types
+
+        node0 = types.SimpleNamespace(sphere=pred, p=None, version=0)
+        sys_obj = types.SimpleNamespace(nodes={0: node0})
+        job0 = types.SimpleNamespace(
+            job_id="pred", op="__mul__", src_ids=(0,), residual=grad_pred
+        )
+        run_batched_vjp(sys=sys_obj, jobs=(job0,), op_args=(1,))
+    except Exception:
+        pass
+
+    L = (pred * grad_pred).sum() if getattr(pred, "ndim", 0) > 0 else pred * grad_pred
+    params_all = [p for layer in model.layers for p in layer.parameters()]
+    grads_all = autograd.grad(L, params_all, retain_graph=False, allow_unused=True)
+    for p, g in zip(params_all, grads_all):
+        try:
+            p._grad = g
+        except Exception:
+            pass
+    if debug:
+        def norms(t: AbstractTensor) -> float:
+            return float(((t * t).sum()).sqrt().item())
+
+        idx = 0
+        for i, l in enumerate(model.layers):
+            gW = grads_all[idx] if idx < len(grads_all) else None
+            idx += 1
+            gB = grads_all[idx] if l.b is not None and idx < len(grads_all) else None
+            if l.b is not None:
+                idx += 1
+            b0 = float(l.b[0, 0].item()) if l.b is not None else None
+            hook_panel.run('debug', layer=l, i=i, W=l.W, gW=gW, b0=b0)
+
+    # Collect params/grads in a stable order
+    params: List[AbstractTensor] = params_all
+    grads: List[AbstractTensor] = list(grads_all)
+    per_layer_norms_before = []
+    idx = 0
+    for layer in model.layers:
+        layer_params = list(layer.parameters())
+        g_list = grads[idx : idx + len(layer_params)]
+        idx += len(layer_params)
+        w_n = _l2(g_list[0]) if g_list else 0.0
+        b_n = _l2(g_list[1]) if len(g_list) > 1 and g_list[1] is not None else None
+        per_layer_norms_before.append({"W": w_n, "b": b_n})
+
+    global_grad_norm_preclip = _global_l2(grads)
+    global_grad_norm_postclip = global_grad_norm_preclip
+    global_grad_norm_requested = global_grad_norm_preclip
+    global_grad_norm_preclip_actual = None
+    did_clip = False
+    grads_preclip = [g for g in grads]
+
+    hook_panel.run(
+        'grad_stats_before',
+        per_layer=per_layer_norms_before,
+        global_norm=global_grad_norm_preclip,
+    )
+
+    # --- Gradient norm control ---
+    if grad_control is not None:
+        if grad_control.per_param_max_norm is not None:
+            grads, norms_before, scales = _clip_per_param_norm(
+                grads, grad_control.per_param_max_norm
+            )
+            if any(s < 1.0 for s in scales):
+                did_clip = True
+                global_grad_norm_preclip_actual = global_grad_norm_preclip
+            hook_panel.run(
+                'grad_clipped_per_param',
+                norms_before=norms_before,
+                scales=scales,
+            )
+        if grad_control.max_global_norm is not None:
+            grads, g_before, g_scale = _clip_global_norm(
+                grads, grad_control.max_global_norm
+            )
+            if g_scale < 1.0:
+                did_clip = True
+                global_grad_norm_preclip_actual = global_grad_norm_preclip
+            hook_panel.run(
+                'grad_clipped_global',
+                global_norm_before=g_before,
+                scale=g_scale,
+            )
+        if grad_control.target_global_norm is not None:
+            g_now = _global_l2(grads)
+            if g_now > 0.0:
+                s = grad_control.target_global_norm / g_now
+                grads = [g * s for g in grads]
+                hook_panel.run(
+                    'grad_rescaled_to_target',
+                    global_norm_before=g_now,
+                    scale=s,
+                    target=grad_control.target_global_norm,
+                )
+
+    global_grad_norm_postclip = _global_l2(grads)
+
+    # Per-layer/global norms after control (for visibility)
+    per_layer_norms_after = []
+    idx = 0
+    for layer in model.layers:
+        gW = grads[idx]
+        idx += 1
+        gB = grads[idx] if layer.b is not None else None
+        if layer.b is not None:
+            idx += 1
+        per_layer_norms_after.append({
+            "W": _l2(gW),
+            "b": _l2(gB) if gB is not None else None,
+        })
+
+    hook_panel.run(
+        'grad_stats_after',
+        per_layer=per_layer_norms_after,
+        global_norm=global_grad_norm_postclip,
+    )
+
+    if grad_log is not None:
+        grad_log.setdefault('requested', []).append(global_grad_norm_requested)
+        grad_log.setdefault('capped', []).append(global_grad_norm_postclip)
+        if did_clip:
+            grad_log.setdefault('preclip', []).append(global_grad_norm_preclip_actual)
+        else:
+            grad_log.setdefault('preclip', []).append(None)
+
+    if not accumulate:
+        new_params = optimizer.step(params, grads)
+        i = 0
+        for layer in model.layers:
+            layer.W = rebind(f"{layer.__class__.__name__}.W", new_params[i])
+            i += 1
+            if layer.b is not None:
+                layer.b = rebind(f"{layer.__class__.__name__}.b", new_params[i])
+                i += 1
+        if zero_grad:
+            model.zero_grad()
+        hook_panel.run('step_end', model=model, x=x, y=y, loss=loss)
+    else:
+        hook_panel.run('accumulation_step', model=model, x=x, y=y, loss=loss)
+    return _to_scalar(loss), global_grad_norm_requested, global_grad_norm_postclip
+
+def train_loop(
+    model: Model,
+    loss_fn: Loss,
+    optimizer: Adam,
+    X: AbstractTensor,
+    Y: AbstractTensor,
+    epochs: int = 2000,
+    log_every: int = 1,
+    provenance_tracker=None,
+    grad_control: Optional[GradControl] = None,
+    grad_accum_steps: int = 1,
+    subbatch_size: Optional[int] = None,
+):
+    """
+    grad_accum_steps: accumulate gradients over this many steps before optimizer update
+    subbatch_size: if set, split X/Y into subbatches of this size
+    """
+    losses = []
+    grad_log = {'requested': [], 'capped': [], 'preclip': []}
+    N = len(X) if hasattr(X, '__len__') else None
+    for e in range(1, epochs + 1):
+        if subbatch_size is not None and N is not None:
+            num_subbatches = (N + subbatch_size - 1) // subbatch_size
+            subbatch_losses = []
+            for sb in range(num_subbatches):
+                start = sb * subbatch_size
+                end = min((sb + 1) * subbatch_size, N)
+                x_sb = X[start:end]
+                y_sb = Y[start:end]
+                hook_panel.run('subbatch_start', epoch=e, subbatch=sb, x=x_sb, y=y_sb)
+                l, g_req, g_cap = train_step(
+                    model,
+                    loss_fn,
+                    optimizer,
+                    x_sb,
+                    y_sb,
+                    debug=(e == 1 and sb == 0),
+                    grad_control=grad_control,
+                    grad_log=grad_log,
+                    accumulate=(grad_accum_steps > 1),
+                    zero_grad=(sb == 0),
+                )
+                subbatch_losses.append(l)
+                hook_panel.run('subbatch_end', epoch=e, subbatch=sb, loss=l)
+            # After all subbatches, do optimizer step if accumulating
+            if grad_accum_steps > 1:
+                params: List[AbstractTensor] = []
+                for layer in model.layers:
+                    params.extend(list(layer.parameters()))
+                grads = [p.grad for p in params]
+                new_params = optimizer.step(params, grads)
+                for idx, (p, new_p) in enumerate(zip(params, new_params)):
+                    label = getattr(p, "_label", f"param[{idx}]")
+                    AbstractTensor.copyto(p, rebind(label, new_p))
+                model.zero_grad()
+                hook_panel.run('optimizer_step', epoch=e)
+            l = sum(subbatch_losses) / len(subbatch_losses)
+            g_cap = grad_log['capped'][-1] if grad_log['capped'] else None
+        else:
+            l, g_req, g_cap = train_step(
+                model,
+                loss_fn,
+                optimizer,
+                X,
+                Y,
+                debug=(e == 1),
+                grad_control=grad_control,
+                grad_log=grad_log,
+                accumulate=(grad_accum_steps > 1),
+                zero_grad=True,
+            )
+            # After grad_accum_steps, do optimizer step
+            if grad_accum_steps > 1:
+                params: List[AbstractTensor] = []
+                for layer in model.layers:
+                    params.extend(list(layer.parameters()))
+                grads = [p.grad for p in params]
+                new_params = optimizer.step(params, grads)
+                for idx, (p, new_p) in enumerate(zip(params, new_params)):
+                    label = getattr(p, "_label", f"param[{idx}]")
+                    AbstractTensor.copyto(p, rebind(label, new_p))
+                model.zero_grad()
+                hook_panel.run('optimizer_step', epoch=e)
+        losses.append(l)
+        hook_panel.run('epoch_end', epoch=e, loss=l)
+        if provenance_tracker is not None:
+            provenance_tracker.record(e, l, model)
+        if (e % log_every) == 0:
+            hook_panel.run('log', epoch=e, loss=l, grad_global=g_cap)
+            print(f"[{e}] loss={l:.6f}  || grad||={g_cap:.6f}")
+    return losses, grad_log

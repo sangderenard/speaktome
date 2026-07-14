@@ -31,7 +31,7 @@ from __future__ import annotations
 
 from typing import Any, Tuple, List, Optional
 
-from .abstraction import AbstractTensor
+
 
 try:
     import jax
@@ -45,13 +45,181 @@ except Exception:
     import sys
     print("JAX backend failed to import")
     sys.exit(1)
-# --- END HEADER ---
+
+from .abstraction import AbstractTensor
 
 class JAXTensorOperations(AbstractTensor):
+    def argwhere_(self):
+        import jax.numpy as jnp
+        return jnp.argwhere(self.data)
+    def swapaxes_(self, axis1, axis2):
+        return jnp.swapaxes(self.data, axis1, axis2)
+    def empty_(self, size, dtype=None, device=None):
+        import jax.numpy as jnp
+        import jax
+        arr = jnp.empty(size, dtype=dtype)
+        return jax.device_put(arr, device or self.default_device)
+    def allclose_(self, other, rtol=1e-5, atol=1e-8, equal_nan=False):
+        import jax.numpy as jnp
+        if not isinstance(other, type(self)):
+            other = type(self)(other)
+        return jnp.allclose(self.data, other.data, rtol=rtol, atol=atol, equal_nan=equal_nan)
+    def isfinite_(self):
+        import jax.numpy as jnp
+        return jnp.isfinite(self.data)
+    def all_(self, dim=None):
+        import jax.numpy as jnp
+        return jnp.all(self.data, axis=dim)
+    def isnan_(self):
+        import jax.numpy as jnp
+        return jnp.isnan(self.data)
+
+    def isinf_(self):
+        import jax.numpy as jnp
+        return jnp.isinf(self.data)
+    def nonzero_(self, as_tuple: bool = False):
+        import jax.numpy as jnp
+        result = jnp.nonzero(self.data)
+        if as_tuple:
+            return result
+        return jnp.stack(result, axis=1)
+    def any_(self, dim=None):
+        import jax.numpy as jnp
+        return jnp.any(self.data, axis=dim)
+    def where_(self, x, y):
+        import jax.numpy as jnp
+        x = x.data if hasattr(x, 'data') else x
+        y = y.data if hasattr(y, 'data') else y
+        return jnp.where(self.data, x, y)
+
+    def maximum_(self, other):
+        import jax.numpy as jnp
+        other = other.data if hasattr(other, 'data') else other
+        return jnp.maximum(self.data, other)
+
+    def minimum_(self, other):
+        import jax.numpy as jnp
+        other = other.data if hasattr(other, 'data') else other
+        return jnp.minimum(self.data, other)
+
+    def clamp_(self, min_val=None, max_val=None):
+        import jax.numpy as jnp
+        return jnp.clip(self.data, a_min=min_val, a_max=max_val)
+
+    def clamp_min_(self, min_val):
+        import jax.numpy as jnp
+        return jnp.maximum(self.data, min_val)
+
+    def clamp_max_(self, max_val):
+        import jax.numpy as jnp
+        return jnp.minimum(self.data, max_val)
+
+    def prod_(self, dim=None, keepdim: bool = False):
+        import jax.numpy as jnp
+        return jnp.prod(self.data, axis=dim, keepdims=keepdim)
+
+    def greater_(self, value):
+        value = value.data if hasattr(value, 'data') else value
+        return self.data > value
+
+    def greater_equal_(self, value):
+        value = value.data if hasattr(value, 'data') else value
+        return self.data >= value
+
+    def less_equal_(self, value):
+        value = value.data if hasattr(value, 'data') else value
+        return self.data <= value
+
+    def equal_(self, value):
+        value = value.data if hasattr(value, 'data') else value
+        return self.data == value
+
+    def logical_not_(self):
+        import jax.numpy as jnp
+        return jnp.logical_not(self.data)
+
+    def sqrt_(self):
+        import jax.numpy as jnp
+        return jnp.sqrt(self.data)
+
+    def exp_(self):
+        import jax.numpy as jnp
+        return jnp.exp(self.data)
+
+    def log_(self):
+        import jax.numpy as jnp
+        return jnp.log(self.data)
+
+    def neg_(self):
+        return -self.data
+
+    def abs_(self):
+        import jax.numpy as jnp
+        return jnp.abs(self.data)
+
+    def invert_(self):
+        import jax.numpy as jnp
+        return jnp.invert(self.data)
+
+    def round_(self, n=None):
+        import jax.numpy as jnp
+        return jnp.round(self.data, n or 0)
+
+    def trunc_(self):
+        import jax.numpy as jnp
+        return jnp.trunc(self.data)
+
+    def floor_(self):
+        import jax.numpy as jnp
+        return jnp.floor(self.data)
+
+    def ceil_(self):
+        import jax.numpy as jnp
+        return jnp.ceil(self.data)
+
+    def __trunc__(self):
+        import jax.numpy as jnp
+        if self.data.size != 1:
+            raise TypeError("Only scalar tensors can be converted to int")
+        return int(jnp.trunc(self.data).item())
+
+    def softmax_(self, dim):
+        import jax.numpy as jnp
+        x = self.data
+        x_max = jnp.max(x, axis=dim, keepdims=True)
+        e_x = jnp.exp(x - x_max)
+        return e_x / jnp.sum(e_x, axis=dim, keepdims=True)
+
+    def log_softmax_(self, dim):
+        import jax.numpy as jnp
+        x = self.data
+        x_max = jnp.max(x, axis=dim, keepdims=True)
+        e_x = jnp.exp(x - x_max)
+        softmax = e_x / jnp.sum(e_x, axis=dim, keepdims=True)
+        return jnp.log(softmax)
+
+    def transpose_(self, dim0, dim1):
+        import jax.numpy as jnp
+        axes = list(range(self.data.ndim))
+        axes[dim0], axes[dim1] = axes[dim1], axes[dim0]
+        return jnp.transpose(self.data, axes)
+    def reshape_(self, shape):
+        import jax.numpy as jnp
+        return jnp.reshape(self.data, shape)
+    def squeeze_(self, dim: int | None = None):
+        import jax.numpy as jnp
+        return jnp.squeeze(self.data, axis=dim) if dim is not None else jnp.squeeze(self.data)
+
+    def unravel_index_(self, shape):
+        import jax.numpy as jnp
+        result = jnp.unravel_index(self.data, shape)
+        if hasattr(self.data, "shape") and self.data.shape == ():
+            return tuple(int(x) for x in result)
+        return result
     """Tensor operations powered by `jax.numpy`."""
 
-    def __init__(self, default_device: Optional[Any] = None, track_time: bool = False) -> None:
-        super().__init__(track_time=track_time)
+    def __init__(self, default_device: Optional[Any] = None, track_time: bool = False, tape=None, requires_grad: bool = False) -> None:
+        super().__init__(track_time=track_time, tape=tape, requires_grad=requires_grad)
         self.default_device = default_device
         self._validate_jax_setup()
 
@@ -72,54 +240,88 @@ class JAXTensorOperations(AbstractTensor):
             return tensor
         return jnp.array(tensor)
 
-    def to_device_(self, tensor: Any, device: Any) -> Any:
+    def to_device_(self, device: Any) -> Any:
         """Move tensor to specified device with validation."""
         target_device = device or self.default_device
         if target_device is not None:
             device_str = str(target_device).lower()
-            if ('gpu' in device_str and not self.has_gpu) or \
-               ('tpu' in device_str and not self.has_tpu):
-                print(f"Warning: Requested device {device_str} not available. Using CPU.")
+            if ('gpu' in device_str and not self.has_gpu) or (
+                'tpu' in device_str and not self.has_tpu
+            ):
+                print(
+                    f"Warning: Requested device {device_str} not available. Using CPU."
+                )
                 target_device = jax.devices('cpu')[0]
-        
-        return jax.device_put(self._to_jnp(tensor), target_device)
+
+        return jax.device_put(self.data, target_device)
 
     def _apply_operator__(self, op: str, left: Any, right: Any):
         """Apply arithmetic ops using JAX arrays."""
-        a = self._to_jnp(left)
-        b = self._to_jnp(right)
+        from .abstraction import AbstractTensor
+        a = self._to_jnp(left._AbstractTensor__unwrap() if isinstance(left, AbstractTensor) else left)
+        b = self._to_jnp(right._AbstractTensor__unwrap() if isinstance(right, AbstractTensor) else right)
+        if op == "neg":
+            return -a
+        if op == "abs":
+            return jnp.abs(a)
+        if op == "invert":
+            return jnp.invert(a)
+        if op == "sin":
+            return jnp.sin(a)
+        if op == "cos":
+            return jnp.cos(a)
+        if op == "tan":
+            return jnp.tan(a)
+        if op == "asin":
+            return jnp.arcsin(a)
+        if op == "acos":
+            return jnp.arccos(a)
+        if op == "atan":
+            return jnp.arctan(a)
+        if op == "sinh":
+            return jnp.sinh(a)
+        if op == "cosh":
+            return jnp.cosh(a)
+        if op == "tanh":
+            return jnp.tanh(a)
+        if op == "asinh":
+            return jnp.arcsinh(a)
+        if op == "acosh":
+            return jnp.arccosh(a)
+        if op == "atanh":
+            return jnp.arctanh(a)
         if op in ("add", "iadd"):
             return a + b
         if op == "radd":
-            return b + a
+            return a + b
         if op in ("sub", "isub"):
             return a - b
         if op == "rsub":
-            return b - a
+            return a - b
         if op in ("mul", "imul"):
             return a * b
         if op == "rmul":
-            return b * a
+            return a * b
         if op in ("truediv", "itruediv"):
             return a / b
         if op == "rtruediv":
-            return b / a
+            return a / b
         if op in ("floordiv", "ifloordiv"):
             return jnp.floor(a / b)
         if op == "rfloordiv":
-            return jnp.floor(b / a)
+            return jnp.floor(a / b)
         if op in ("mod", "imod"):
             return jnp.mod(a, b)
         if op == "rmod":
-            return jnp.mod(b, a)
+            return jnp.mod(a, b)
         if op in ("pow", "ipow"):
             return jnp.power(a, b)
         if op == "rpow":
-            return jnp.power(b, a)
+            return jnp.power(a, b)
         if op in ("matmul", "imatmul"):
             return a @ b
         if op == "rmatmul":
-            return b @ a
+            return a @ b
         raise NotImplementedError(f"Operator {op} not implemented for JAX backend.")
 
     # ------------------------------------------------------------------
@@ -165,17 +367,18 @@ class JAXTensorOperations(AbstractTensor):
     def bool_(self, tensor: Any) -> Any:
         return self.to_dtype_(tensor, "bool")
 
-    def not_equal_(self, tensor1: Any, tensor2: Any) -> Any:
-        return jnp.not_equal(self._to_jnp(tensor1), self._to_jnp(tensor2))
+    def not_equal_(self, value: Any) -> Any:
+        value = value.data if isinstance(value, AbstractTensor) else value
+        return jnp.not_equal(self.data, value)
 
-    def arange_(self, start: int, end: Optional[int] = None, step: int = 1, device: Any = None, dtype: Any = None) -> Any:
-        arr = jnp.arange(start, end, step, dtype=dtype) if end is not None else jnp.arange(start, dtype=dtype)
+    def arange_(self, start: int, end: int, step: int = 1, *, dtype: Any = None, device: Any = None) -> Any:
+        arr = jnp.arange(start, end, step, dtype=dtype)
         return jax.device_put(arr, device or self.default_device)
 
     def select_by_indices_(self, tensor: Any, indices_dim0: Any, indices_dim1: Any) -> Any:
         return self._to_jnp(tensor)[indices_dim0, indices_dim1]
 
-    def log_softmax_(self, tensor: Any, dim: int) -> Any:
+    def log_softmax_tensor_(self, tensor: Any, dim: int) -> Any:
         from jax.nn import log_softmax
         return log_softmax(self._to_jnp(tensor), axis=dim)
 
@@ -218,12 +421,46 @@ class JAXTensorOperations(AbstractTensor):
         tensors = [self._to_jnp(t) for t in tensors]
         return jnp.stack(tensors, axis=dim).tolist()
 
-    def repeat_interleave_(self, tensor: Any, repeats: int, dim: Optional[int] = None) -> Any:
-        return jnp.repeat(self._to_jnp(tensor), repeats, axis=dim).tolist()
+    def repeat_interleave_(self, repeats: int = 1, dim: Optional[int] = None) -> Any:
+        return jnp.repeat(self._to_jnp(self.data), repeats, axis=dim).tolist()
+
+    def copyto_(self, src, *, where=None, casting="same_kind"):
+        import jax.numpy as jnp
+        import numpy as np
+        dst = self._to_jnp(self.data)
+        s = self._to_jnp(src)
+        if not np.can_cast(s.dtype, dst.dtype, casting=casting):
+            raise TypeError(
+                f"Cannot cast from {s.dtype} to {dst.dtype} with casting='{casting}'"
+            )
+        if s.dtype != dst.dtype:
+            s = s.astype(dst.dtype)
+        s = jnp.broadcast_to(s, dst.shape)
+        if where is None:
+            updated = s
+        else:
+            m = self._to_jnp(where)
+            m = jnp.broadcast_to(m, dst.shape)
+            updated = jnp.where(m, s, dst)
+        return updated
+
+    def cumsum_(self, dim: int = 0) -> Any:
+        import jax.numpy as jnp
+        return jnp.cumsum(self.data, axis=dim)
 
     def repeat_(self, repeats: Any = None, dim: int = 0) -> Any:
-        """Repeat tensor along ``dim`` ``repeats`` times (stub)."""
-        raise NotImplementedError("repeat not implemented for JAX backend")
+        """Repeat tensor along ``dim`` ``repeats`` times using JAX."""
+        if repeats is None:
+            raise ValueError("repeats must be specified for JAX backend")
+        arr = self._to_jnp(self.data)
+        if isinstance(repeats, int):
+            reps = [1] * arr.ndim
+            reps[dim] = repeats
+            return jnp.tile(arr, reps).tolist()
+        elif isinstance(repeats, (tuple, list)):
+            return jnp.tile(arr, repeats).tolist()
+        else:
+            raise TypeError("repeats must be int or tuple for JAX backend")
 
     def view_flat_(self, tensor: Any) -> Any:
         return jnp.ravel(self._to_jnp(tensor)).tolist()
@@ -256,18 +493,29 @@ class JAXTensorOperations(AbstractTensor):
     def sqrt_(self, tensor: Any) -> Any:
         return jnp.sqrt(self._to_jnp(tensor))
 
-    def tensor_from_list_(self, data: List[Any], dtype: Any, device: Any) -> Any:
+    def tensor_from_list_(self, data: list, dtype: Any, device: Any) -> Any:
+        if not isinstance(data, (list, tuple)):
+            try:
+                data = data.tolist()
+                auto_converted = True
+            except Exception:
+                auto_converted = False
+        else:
+            auto_converted = False
+        if auto_converted:
+            print("[TensorBackend:jax] Auto-converted input to list for tensor_from_list_()")
         arr = jnp.array(data, dtype=dtype)
         return jax.device_put(arr, device or self.default_device)
 
     def boolean_mask_select_(self, tensor: Any, mask: Any) -> Any:
         return self._to_jnp(tensor)[mask]
 
-    def tolist_(self, tensor: Any) -> List[Any]:
-        return list(self._to_jnp(tensor).tolist())
+    def tolist_(self) -> list:
+        return list(self._to_jnp(self.data).tolist())
 
-    def less_(self, tensor: Any, value: Any) -> Any:
-        return jnp.less(self._to_jnp(tensor), value)
+    def less_(self, value: Any) -> Any:
+        value = value.data if isinstance(value, AbstractTensor) else value
+        return jnp.less(self.data, value)
 
     def index_select_(self, tensor: Any, dim: int, indices: Any) -> Any:
         return jnp.take(self._to_jnp(tensor), indices, axis=dim)
@@ -325,9 +573,7 @@ class JAXTensorOperations(AbstractTensor):
     def float_dtype_(self) -> Any:
         return float
 
-    @property
-    def tensor_type_(self) -> type:
-        return jnp.ndarray
+    tensor_type_ = jnp.ndarray
 
     @staticmethod
     def test() -> None:
@@ -402,3 +648,8 @@ class JAXTensorOperations(AbstractTensor):
 
     def get_ndims(self) -> int:
         return self.data.ndim
+
+    # _tensor_from_list is provided centrally by AbstractTensor; do not duplicate here.
+
+from .abstraction import register_backend
+register_backend("jax", JAXTensorOperations)

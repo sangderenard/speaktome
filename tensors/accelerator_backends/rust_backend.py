@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Rust backend stub for accelerated tensor operations."""
 from __future__ import annotations
 
@@ -6,11 +5,8 @@ try:
     import ctypes
     from pathlib import Path
     from typing import Any
-except Exception:
-    import sys
-    print("Rust backend failed to import")
-    sys.exit(1)
-# --- END HEADER ---
+except Exception:  # pragma: no cover - optional native backend
+    print("Rust backend failed to import; continuing without it")
 
 # ########## STUB: Rust Async Backend ##########
 # PURPOSE: Provide a high-performance backend implemented in Rust.
@@ -55,4 +51,12 @@ class RustTensorOperations:
 
     def full_(self, size: tuple[int, ...], fill_value: Any, dtype: Any, device: Any):
         raise NotImplementedError
+
+    def unravel_index_(self, shape):
+        raise NotImplementedError(
+            "unravel_index not implemented for Rust backend"
+        )
+
+    def __trunc__(self):
+        raise NotImplementedError("trunc not implemented for Rust backend")
 

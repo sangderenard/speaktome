@@ -49,8 +49,7 @@ class LookaheadController:
         self.device = device
         self.tokenizer = tokenizer
         if tensor_ops is None:
-            from tensors import get_tensor_operations
-            tensor_ops = get_tensor_operations()
+            tensor_ops = AbstractTensor.get_tensor()
         self.tensor_ops = tensor_ops
         self.model_wrapper = model_wrapper
 
@@ -77,109 +76,107 @@ class LookaheadController:
         Any,   # final_parent_prefix_lengths: [K]
         List[int]           # pruned_original_parent_beam_idxs
     ]:
-        B_initial = prefix_tokens.shape()[0]
-        initial_prefix_width = prefix_tokens.shape()[1]
+        backend_cls = type(self.tensor_ops)
+
+        B_initial = prefix_tokens.shape[0]
+        initial_prefix_width = prefix_tokens.shape[1]
         final_width = min(self.max_len, initial_prefix_width + self.lookahead_steps)
 
         # 1) Initialize current_* tensors by copying prefix into padded buffers
         current_tokens = self.tensor_ops.full(
             (B_initial, final_width),
             self.pad_id,
-            dtype=self.tensor_ops.get_dtype(prefix_tokens),
-            device=self.device
+            dtype=prefix_tokens.get_dtype(),
+            device=self.device,
+            cls=backend_cls,
         )
         current_scores = self.tensor_ops.zeros(
             (B_initial, final_width),
-            dtype=self.tensor_ops.get_dtype(prefix_scores),
-            device=self.device
+            dtype=prefix_scores.get_dtype(),
+            device=self.device,
+            cls=backend_cls,
         )
         for i in range(B_initial):
-            l = self.tensor_ops.item(prefix_lengths[i])
+            l = prefix_lengths[i].item()
             if l > 0:
-                self.tensor_ops.assign_at_indices(current_tokens, i, slice(0, l), prefix_tokens[i, :l])
-                self.tensor_ops.assign_at_indices(current_scores, i, slice(0, l), prefix_scores[i, :l])
+                current_tokens.assign_at_indices(i, slice(0, l), prefix_tokens[i, :l])
+                current_scores.assign_at_indices(i, slice(0, l), prefix_scores[i, :l])
 
-        current_lengths = self.tensor_ops.to_device(self.tensor_ops.clone(prefix_lengths), self.device)
-        current_parent_beam_idxs = self.tensor_ops.to_device(self.tensor_ops.clone(original_parent_beam_idxs), self.device)
-        current_parent_prefix_lengths = self.tensor_ops.to_device(self.tensor_ops.clone(prefix_lengths), self.device)
+        current_lengths = prefix_lengths.clone().to_device(self.device)
+        current_parent_beam_idxs = original_parent_beam_idxs.clone().to_device(self.device)
+        current_parent_prefix_lengths = prefix_lengths.clone().to_device(self.device)
 
         original_parents_set: Set[int] = set(original_parent_beam_idxs.tolist())
 
         for step in range(self.lookahead_steps):
-            B_cur = current_tokens.shape()[0]
+            B_cur = current_tokens.shape[0]
             if B_cur == 0:
                 break
 
-            effective_input_width = int(self.tensor_ops.item(self.tensor_ops.max(current_lengths))) if B_cur > 0 else 0
+            effective_input_width = int(current_lengths.max().item()) if B_cur > 0 else 0
             if effective_input_width == 0 and step == 0 and B_initial > 0:
                 effective_input_width = 1
             if B_cur > 0:
                 effective_input_width = max(1, effective_input_width)
 
             tokens_for_lm = current_tokens[:, :effective_input_width]
-            attention_mask = self.tensor_ops.long_cast(
-                self.tensor_ops.not_equal(tokens_for_lm, self.pad_id)
-            )
+            attention_mask = tokens_for_lm.not_equal(self.pad_id).long_cast()
 
+            # AbstractModelWrapper.forward operates on raw backend tensors
+            # (e.g. PyTorchModelWrapper type-hints torch.Tensor), not
+            # AbstractTensor wrappers -- unwrap going in, rewrap coming out.
             outputs_dict = self.model_wrapper.forward(
-                input_ids=tokens_for_lm, attention_mask=attention_mask
+                input_ids=tokens_for_lm.data, attention_mask=attention_mask.data
             )
-            logits = outputs_dict['logits']
+            logits = self.tensor_ops.ensure_tensor(outputs_dict['logits'])
 
-            last_indices = self.tensor_ops.clamp(
-                current_lengths - 1, min_val=0
-            )
-            last_logits = self.tensor_ops.select_by_indices(
-                logits,
-                self.tensor_ops.arange(0, B_cur, device=self.device),
+            last_indices = (current_lengths - 1).clamp(min=0)
+            last_logits = logits.select_by_indices(
+                AbstractTensor.arange(0, B_cur, device=self.device, cls=backend_cls),
                 last_indices,
             )
 
-            logprobs = self.tensor_ops.log_softmax(
-                last_logits / self.temp, dim=-1
-            )
-            topk_scores, topk_indices = self.tensor_ops.topk(logprobs, k=self.top_k, dim=-1)
+            logprobs = (last_logits / self.temp).log_softmax(dim=-1)
+            topk_scores, topk_indices = AbstractTensor.topk(logprobs, k=self.top_k, dim=-1)
 
             num_parents = B_cur
             num_children = self.top_k
             N_total = num_parents * num_children
 
-            expanded_parent_idxs = self.tensor_ops.repeat_interleave(current_parent_beam_idxs, num_children)
-            expanded_parent_prefix_lens = self.tensor_ops.repeat_interleave(current_parent_prefix_lengths, num_children)
+            expanded_parent_idxs = current_parent_beam_idxs.repeat_interleave(num_children)
+            expanded_parent_prefix_lens = current_parent_prefix_lengths.repeat_interleave(num_children)
 
-            next_tokens = self.tensor_ops.repeat_interleave(current_tokens, num_children, dim=0)
-            next_scores = self.tensor_ops.repeat_interleave(current_scores, num_children, dim=0)
-            next_lengths = self.tensor_ops.repeat_interleave(current_lengths, num_children)
+            next_tokens = current_tokens.repeat_interleave(num_children, dim=0)
+            next_scores = current_scores.repeat_interleave(num_children, dim=0)
+            next_lengths = current_lengths.repeat_interleave(num_children)
 
-            row_idx = self.tensor_ops.arange(0, N_total, device=self.device)
-            col_idx = self.tensor_ops.clone(next_lengths)
+            row_idx = AbstractTensor.arange(0, N_total, device=self.device, cls=backend_cls)
+            col_idx = next_lengths.clone()
 
-            flat_new_ids = self.tensor_ops.view_flat(topk_indices)
-            flat_new_scores = self.tensor_ops.view_flat(topk_scores)
+            flat_new_ids = topk_indices.view_flat()
+            flat_new_scores = topk_scores.view_flat()
 
-            can_append = self.tensor_ops.less(col_idx, final_width)
+            can_append = col_idx.less(final_width)
 
-            self.tensor_ops.assign_at_indices(
-                next_tokens,
-                self.tensor_ops.boolean_mask_select(row_idx, can_append),
-                self.tensor_ops.boolean_mask_select(col_idx, can_append),
-                self.tensor_ops.boolean_mask_select(flat_new_ids, can_append),
+            next_tokens.assign_at_indices(
+                row_idx.boolean_mask_select(can_append),
+                col_idx.boolean_mask_select(can_append),
+                flat_new_ids.boolean_mask_select(can_append),
             )
-            self.tensor_ops.assign_at_indices(
-                next_scores,
-                self.tensor_ops.boolean_mask_select(row_idx, can_append),
-                self.tensor_ops.boolean_mask_select(col_idx, can_append),
-                self.tensor_ops.boolean_mask_select(flat_new_scores, can_append),
+            next_scores.assign_at_indices(
+                row_idx.boolean_mask_select(can_append),
+                col_idx.boolean_mask_select(can_append),
+                flat_new_scores.boolean_mask_select(can_append),
             )
-            self.tensor_ops.increment_at_indices(next_lengths, can_append)
-            next_lengths = self.tensor_ops.clamp(next_lengths, max_val=final_width)
+            next_lengths.increment_at_indices(can_append)
+            next_lengths = next_lengths.clamp(max=final_width)
 
             candidate_aggregate_scores = self.aggregate_fn(next_scores)
 
             if N_total > self.top_k:
-                _, keep_indices = self.tensor_ops.topk(candidate_aggregate_scores, k=self.top_k, dim=0)
+                _, keep_indices = AbstractTensor.topk(candidate_aggregate_scores, k=self.top_k, dim=0)
             else:
-                keep_indices = self.tensor_ops.arange(0, N_total, device=self.device)
+                keep_indices = AbstractTensor.arange(0, N_total, device=self.device, cls=backend_cls)
 
             current_tokens = next_tokens[keep_indices]
             current_scores = next_scores[keep_indices]

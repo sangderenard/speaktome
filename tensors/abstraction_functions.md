@@ -3,18 +3,11 @@
 This document groups available methods by theme for quick reference.
 
 ## Shape Accessors
-- ShapeAccessor.__init__()
-- ShapeAccessor.__call__()
-- ShapeAccessor.__iter__()
-- ShapeAccessor.__len__()
-- ShapeAccessor.__getitem__()
-- ShapeAccessor.__repr__()
 
 ## Creation & Initialization
 - AbstractTensor.full()
 - AbstractTensor.zeros()
 - AbstractTensor.arange()
-- AbstractTensor.tensor_from_list()
 - AbstractTensor.clone()
 
 ## Device & Dtype Management
@@ -52,9 +45,11 @@ This document groups available methods by theme for quick reference.
 - AbstractTensor.boolean_mask_select()
 - AbstractTensor.argmin()
 - AbstractTensor.assign_at_indices()
+- AbstractTensor.copyto()
 - AbstractTensor.increment_at_indices()
 - AbstractTensor.__getitem__()
 - AbstractTensor.__setitem__()
+- AbstractTensor.unravel_index()
 
 ## Reshaping & Manipulation
 - AbstractTensor.view_flat()
@@ -62,6 +57,7 @@ This document groups available methods by theme for quick reference.
 - AbstractTensor.repeat_interleave()
 - AbstractTensor.stack()
 - AbstractTensor.cat()
+- AbstractTensor.pad_cat()
 - AbstractTensor.pad()
 - AbstractTensor.clamp()
 - AbstractTensor.topk()
@@ -98,8 +94,34 @@ This document groups available methods by theme for quick reference.
 - AbstractTensor.pow()
 - AbstractTensor.sqrt()
 - AbstractTensor.mean()
+- AbstractTensor.cumsum()
 - AbstractTensor.max()
 - AbstractTensor.log_softmax()
+
+## Trigonometric & Hyperbolic
+- AbstractTensor.sin()
+- AbstractTensor.cos()
+- AbstractTensor.tan()
+- AbstractTensor.asin()
+- AbstractTensor.acos()
+- AbstractTensor.atan()
+- AbstractTensor.sinh()
+- AbstractTensor.cosh()
+- AbstractTensor.tanh()
+- AbstractTensor.asinh()
+- AbstractTensor.acosh()
+- AbstractTensor.atanh()
+- AbstractTensor.sec()
+- AbstractTensor.csc()
+- AbstractTensor.cot()
+- AbstractTensor.sech()
+- AbstractTensor.csch()
+- AbstractTensor.coth()
+- AbstractTensor.sinc()
+
+## Spectral Transforms
+- AbstractTensor.fft()
+- AbstractTensor.ifft()
 
 ## Persistence
 - AbstractTensor.save()
@@ -114,6 +136,7 @@ This document groups available methods by theme for quick reference.
 
 ## Functional Interface
 - AbstractF.interpolate()
+- AbstractF.filtered_poisson()
 
 ## Module-Level Helpers
 - register_conversion()
@@ -135,12 +158,15 @@ This document groups available methods by theme for quick reference.
 - c_backend.interpolate_
 - c_backend.stack_
 - c_backend.cat_
+- c_backend.pad_cat_
 - jax_backend._apply_operator__
+- jax_backend.pad_cat_
 - torch_backend._apply_operator__
+- torch_backend.pad_cat_
 - numpy_backend._apply_operator__
 - pure_backend._apply_scalar_op
 - pure_backend._matmul
-- pure_backend.cat_
 - pure_backend.repeat_interleave_
 - pure_backend.mean_
+- pure_backend.index_select_
 - pure_backend.index_select_

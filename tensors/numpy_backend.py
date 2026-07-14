@@ -1,3 +1,4 @@
+
 """NumPy implementation of :class:`AbstractTensor`."""
 
 # TENSOR BACKEND IMPLEMENTATION GUIDELINES:
@@ -29,10 +30,14 @@
 
 from typing import Any, Tuple, List, Optional
 
-from .abstraction import AbstractTensor
+
+from .abstraction import AbstractTensor, register_backend
+
+
 
 try:
     import numpy as np
+    from numpy.lib.stride_tricks import sliding_window_view
 except ModuleNotFoundError:  # pragma: no cover - optional dependency
     np = None  # type: ignore
 
@@ -44,48 +49,330 @@ except Exception:
     import sys
     print("NumPy backend failed to import")
     sys.exit(1)
-# --- END HEADER ---
+
+def _to_tuple2(x):
+    """Normalize an int or 2-tuple to a 2-tuple."""
+    return (x, x) if isinstance(x, (int, np.integer)) else x
 
 class NumPyTensorOperations(AbstractTensor):
-    def __init__(self, track_time: bool = False):
-        super().__init__(track_time=track_time)
+    # Division mode constant: 'normal', 'zero', 'max', 'limit'
+    DIVIDE_MODE = 'zero'  # Change as needed or make configurable
+
+    def _safe_divide(self, a, b, mode=None):
+        import numpy as np
+        if mode is None:
+            mode = self.DIVIDE_MODE
+        # Always use at least float32 for division output
+        dtype = np.result_type(a, b, np.float32)
+        a = np.asarray(a, dtype=dtype)
+        b = np.asarray(b, dtype=dtype)
+        out = np.empty(np.broadcast(a, b).shape, dtype=dtype)
+        mask = b != 0
+        mask = np.broadcast_to(mask, out.shape)
+        if mode == 'normal':
+            # Standard numpy divide (will produce inf/nan for invalid denominators)
+            np.divide(a, b, out=out, where=mask)
+            out[~mask] = np.nan if np.issubdtype(dtype, np.floating) else 0
+        elif mode == 'zero':
+            np.divide(a, b, out=out, where=mask)
+            out[~mask] = 0
+        elif mode == 'max':
+            np.divide(a, b, out=out, where=mask)
+            if np.issubdtype(dtype, np.integer):
+                maxval = np.iinfo(dtype).max
+            else:
+                maxval = np.finfo(dtype).max
+            out[~mask] = maxval
+        elif mode == 'limit':
+            # Future-proof: return a tuple (value, is_limit)
+            np.divide(a, b, out=out, where=mask)
+            import collections
+            LimitResult = collections.namedtuple('LimitResult', ['value', 'is_limit'])
+            is_limit = ~mask
+            return LimitResult(out, is_limit)
+        else:
+            raise ValueError(f"Unknown divide mode: {mode}")
+        return out
+    def argwhere_(self):
+        import numpy as np
+        return np.argwhere(self.data)
+    def swapaxes_(self, axis1, axis2):
+        return self.data.swapaxes(axis1, axis2)
+    def empty_(self, size, dtype=None, device=None):
+        import numpy as np
+        return np.empty(size, dtype=self._torch_dtype_to_numpy(dtype) if dtype is not None else None)
+    def allclose_(self, other, rtol=1e-5, atol=1e-8, equal_nan=False):
+        import numpy as np
+        if not isinstance(other, type(self)):
+            other = type(self)(other)
+        return np.allclose(self.data, other.data, rtol=rtol, atol=atol, equal_nan=equal_nan)
+    def isfinite_(self):
+        import numpy as np
+        return np.isfinite(self.data)
+    def all_(self, dim=None):
+        import numpy as np
+        return np.all(self.data, axis=dim)
+    def isnan_(self):
+        import numpy as np
+        return np.isnan(self.data)
+
+    def isinf_(self):
+        import numpy as np
+        return np.isinf(self.data)
+    def nonzero_(self, as_tuple: bool = False):
+        import numpy as np
+        result = np.nonzero(self.data)
+        if as_tuple:
+            return result
+        # Stack indices for non-tuple output (like torch)
+        return np.stack(result, axis=1)
+    def any_(self, dim=None):
+        import numpy as np
+        return np.any(self.data, axis=dim)
+
+    def argmax_(self, dim=None, keepdim=False):
+        arr = self.data
+        if dim is None:
+            return np.asarray(np.argmax(arr))
+        idx = np.argmax(arr, axis=dim)
+        if keepdim:
+            idx = np.expand_dims(idx, axis=dim)
+        return np.asarray(idx)
+    def where_(self, x, y):
+        import numpy as np
+        x = x.data if isinstance(x, AbstractTensor) else x
+        y = y.data if isinstance(y, AbstractTensor) else y
+        return np.where(self.data, x, y)
+
+    def maximum_(self, other):
+        import numpy as np
+        other = other.data if isinstance(other, AbstractTensor) else other
+        return np.maximum(self.data, other)
+
+    def minimum_(self, other):
+        import numpy as np
+        other = other.data if isinstance(other, AbstractTensor) else other
+        return np.minimum(self.data, other)
+
+    def clamp_(self, min_val=None, max_val=None):
+        import numpy as np
+        return np.clip(self.data, a_min=min_val, a_max=max_val)
+
+    def clamp_min_(self, min_val):
+        import numpy as np
+        return np.maximum(self.data, min_val)
+
+    def clamp_min(self, min_val):
+        return super().clamp_min(min_val)
+
+    def clamp_max_(self, max_val):
+        import numpy as np
+        return np.minimum(self.data, max_val)
+
+    def greater_(self, value):
+        value = value.data if isinstance(value, AbstractTensor) else value
+        return self.data > value
+
+    def greater_equal_(self, value):
+        value = value.data if isinstance(value, AbstractTensor) else value
+        return self.data >= value
+
+    def less_equal_(self, value):
+        value = value.data if isinstance(value, AbstractTensor) else value
+        return self.data <= value
+
+    def less_(self, value):
+        value = value.data if isinstance(value, AbstractTensor) else value
+        return self.data < value
+
+    def equal_(self, value):
+        value = value.data if isinstance(value, AbstractTensor) else value
+        return self.data == value
+
+    def logical_not_(self):
+        import numpy as np
+        return np.logical_not(self.data)
+
+    def sqrt_(self):
+        import numpy as np
+        return np.sqrt(self.data)
+
+    def exp_(self):
+        import numpy as np
+        return np.exp(self.data)
+
+    def log_(self):
+        import numpy as np
+        return np.log(self.data)
+
+    def real_(self):
+        import numpy as np
+        return np.real(self.data)
+
+    def imag_(self):
+        import numpy as np
+        return np.imag(self.data)
+
+    def neg_(self):
+        return -self.data
+
+    def abs_(self):
+        import numpy as np
+        return np.abs(self.data)
+
+    def invert_(self):
+        import numpy as np
+        return np.invert(self.data)
+
+    def round_(self, n=None):
+        import numpy as np
+        return np.round(self.data, n)
+
+    def trunc_(self):
+        import numpy as np
+        return np.trunc(self.data)
+
+    def floor_(self):
+        import numpy as np
+        return np.floor(self.data)
+
+    def ceil_(self):
+        import numpy as np
+        return np.ceil(self.data)
+
+    def __trunc__(self):
+        import numpy as np
+        if self.data.size != 1:
+            raise TypeError("Only scalar tensors can be converted to int")
+        return int(np.trunc(self.data).item())
+
+    def softmax_(self, dim):
+        import numpy as np
+        x = self.data
+        x_max = np.max(x, axis=dim, keepdims=True)
+        e_x = np.exp(x - x_max)
+        return e_x / np.sum(e_x, axis=dim, keepdims=True)
+
+    def log_softmax_(self, dim):
+        import numpy as np
+        x = self.data
+        x_max = np.max(x, axis=dim, keepdims=True)
+        e_x = np.exp(x - x_max)
+        softmax = e_x / np.sum(e_x, axis=dim, keepdims=True)
+        return np.log(softmax)
+
+    def permute_(self, dims):
+        import numpy as np
+        return np.transpose(self.data, axes=dims)
+
+    def transpose_(self, dim0, dim1):
+        import numpy as np
+        axes = list(range(self.data.ndim))
+        axes[dim0], axes[dim1] = axes[dim1], axes[dim0]
+        return np.transpose(self.data, axes)
+    def reshape_(self, shape):
+        import numpy as np
+        return np.reshape(self.data, shape)
+    def flatten_(self, start_dim=0, end_dim=-1):
+        import numpy as np
+        arr = self.data
+        ndim = arr.ndim
+        if start_dim < 0:
+            start_dim += ndim
+        if end_dim < 0:
+            end_dim += ndim
+        flat_dim = int(np.prod(arr.shape[start_dim:end_dim + 1]))
+        new_shape = arr.shape[:start_dim] + (flat_dim,) + arr.shape[end_dim + 1 :]
+        return arr.reshape(new_shape)
+    def unsqueeze_(self, dim: int):
+        import numpy as np
+        return np.expand_dims(self.data, axis=dim)
+    def squeeze_(self, dim: int | None = None):
+        import numpy as np
+        return np.squeeze(self.data, axis=dim) if dim is not None else np.squeeze(self.data)
+
+    def unravel_index_(self, shape):
+        import numpy as np
+        result = np.unravel_index(self.data, shape)
+        if np.isscalar(self.data) or (isinstance(self.data, np.ndarray) and self.data.ndim == 0):
+            return tuple(int(x) for x in result)
+        return result
+
+    def noop(self, *_, **__):
+        """Identity operator used for boundary stubs.
+
+        Returning ``self + 0`` preserves autograd tracking while leaving the
+        tensor value unchanged.
+        """
+        return self + 0
+    def __init__(self, track_time: bool = False, tape=None, requires_grad: bool = False):
+        super().__init__(track_time=track_time, tape=tape, requires_grad=requires_grad)
 
     def _apply_operator__(self, op: str, left: Any, right: Any):
         """Apply arithmetic operators on NumPy arrays."""
-        a = np.array(left) if not isinstance(left, np.ndarray) else left
-        b = np.array(right) if not isinstance(right, np.ndarray) else right
+        from .abstraction import AbstractTensor
+        a = left._AbstractTensor__unwrap() if isinstance(left, AbstractTensor) else left
+        b = right._AbstractTensor__unwrap() if isinstance(right, AbstractTensor) else right
+        if op == "neg":
+            return -a
+        if op == "abs":
+            return np.abs(a)
+        if op == "invert":
+            return np.invert(a)
+        if op == "sin":
+            return np.sin(a)
+        if op == "cos":
+            return np.cos(a)
+        if op == "tan":
+            return np.tan(a)
+        if op == "asin":
+            return np.arcsin(a)
+        if op == "acos":
+            return np.arccos(a)
+        if op == "atan":
+            return np.arctan(a)
+        if op == "sinh":
+            return np.sinh(a)
+        if op == "cosh":
+            return np.cosh(a)
+        if op == "tanh":
+            return np.tanh(a)
+        if op == "asinh":
+            return np.arcsinh(a)
+        if op == "acosh":
+            return np.arccosh(a)
+        if op == "atanh":
+            return np.arctanh(a)
         if op in ("add", "iadd"):
             return a + b
         if op == "radd":
-            return b + a
+            return a + b
         if op in ("sub", "isub"):
             return a - b
         if op == "rsub":
-            return b - a
+            return a - b
         if op in ("mul", "imul"):
             return a * b
         if op == "rmul":
-            return b * a
-        if op in ("truediv", "itruediv"):
-            return a / b
-        if op == "rtruediv":
-            return b / a
+            return a * b
+        if op in ("truediv", "itruediv", "rtruediv"):
+            return self._safe_divide(a, b)
         if op in ("floordiv", "ifloordiv"):
             return np.floor_divide(a, b)
         if op == "rfloordiv":
-            return np.floor_divide(b, a)
+            return np.floor_divide(a, b)
         if op in ("mod", "imod"):
             return np.mod(a, b)
         if op == "rmod":
-            return np.mod(b, a)
+            return np.mod(a, b)
         if op in ("pow", "ipow"):
             return np.power(a, b)
         if op == "rpow":
-            return np.power(b, a)
+            return np.power(a, b)
         if op in ("matmul", "imatmul"):
             return a @ b
         if op == "rmatmul":
-            return b @ a
+            return a @ b
         raise NotImplementedError(f"Operator {op} not implemented for NumPy backend.")
 
     def _torch_dtype_to_numpy(self, dtype):
@@ -124,53 +411,53 @@ class NumPyTensorOperations(AbstractTensor):
     def zeros_(self, size, dtype, device):
         return np.zeros(size, dtype=self._torch_dtype_to_numpy(dtype))
 
-    def clone_(self, tensor):
-        tensor = self._AbstractTensor__unwrap(tensor)
+    def clone_(self, tensor=None):
+        tensor = self._AbstractTensor__unwrap(tensor if tensor is not None else self.data)
         return np.array(tensor, copy=True)
 
-    def to_device_(self, tensor, device):
-        return self._AbstractTensor__unwrap(tensor)
+    def to_device_(self, device):
+        return self.data
 
-    def get_device_(self, tensor):
-        return 'cpu'
+    def get_device_(self):
+        return "cpu"
 
-    def get_dtype_(self, tensor):
-        tensor = self._AbstractTensor__unwrap(tensor)
+    def get_dtype_(self):
+        tensor = self.data
         if isinstance(tensor, np.ndarray):
             return self._numpy_dtype_to_torch(tensor.dtype)
         return tensor.dtype
 
-    def item_(self, tensor):
-        return self._AbstractTensor__unwrap(tensor).item()
+    def item_(self):
+        return self.data.item()
 
-    def max_(self, tensor):
-        return np.max(self._AbstractTensor__unwrap(tensor))
+    def max_(self, dim=None, keepdim=False):
+        data = self._AbstractTensor__unwrap(self.data)
+        return np.asarray(np.max(data, axis=dim, keepdims=keepdim))
 
-    def long_cast_(self, tensor):
-        return self._AbstractTensor__unwrap(tensor).astype(np.int64)
+    def long_cast_(self):
+        return self._AbstractTensor__unwrap(self.data).astype(np.int64)
 
-    def float_(self, tensor):
-        return self.to_dtype_(tensor, "float")
+    def float_(self):
+        return self.to_dtype_("float")
 
-    def double_(self, tensor):
-        return self.to_dtype_(tensor, "double")
+    def double_(self):
+        return self.to_dtype_("double")
 
-    def int_(self, tensor):
-        return self.to_dtype_(tensor, "int")
+    def int_(self):
+        return self.to_dtype_("int")
 
-    def long_(self, tensor):
-        return self.to_dtype_(tensor, "long")
+    def long_(self):
+        return self.to_dtype_("long")
 
-    def bool_(self, tensor):
-        return self.to_dtype_(tensor, "bool")
+    def bool_(self):
+        return self.to_dtype_("bool")
 
-    def not_equal_(self, tensor1, tensor2):
-        return self._AbstractTensor__unwrap(tensor1) != self._AbstractTensor__unwrap(tensor2)
+    def not_equal_(self, value):
+        value = value.data if isinstance(value, AbstractTensor) else value
+        return self.data != value
 
-    def arange_(self, start, end=None, step=1, device=None, dtype=None):
+    def arange_(self, start, end, step=1, *, dtype=None, device=None):
         np_dtype = self._torch_dtype_to_numpy(dtype) if dtype is not None else None
-        if end is None:
-            return np.arange(start, dtype=np_dtype)
         return np.arange(start, end, step, dtype=np_dtype)
 
     def select_by_indices_(self, tensor, indices_dim0, indices_dim1):
@@ -179,14 +466,14 @@ class NumPyTensorOperations(AbstractTensor):
         i1 = self._AbstractTensor__unwrap(indices_dim1)
         return tensor[i0, i1]
 
-    def log_softmax_(self, tensor, dim):
+    def log_softmax_tensor_(self, tensor, dim):
         tensor = self._AbstractTensor__unwrap(tensor)
         e_x = np.exp(tensor - np.max(tensor, axis=dim, keepdims=True))
         softmax = e_x / np.sum(e_x, axis=dim, keepdims=True)
         return np.log(softmax)
 
-    def topk_(self, tensor, k, dim):
-        tensor = self._AbstractTensor__unwrap(tensor)
+    def topk_(self, k, dim):
+        tensor = self.data
         if dim < 0:
             dim = tensor.ndim + dim
         sorted_indices = np.argsort(tensor, axis=dim)
@@ -201,11 +488,11 @@ class NumPyTensorOperations(AbstractTensor):
         tensors = [self._AbstractTensor__unwrap(t) for t in tensors]
         return np.stack(tensors, axis=dim)
 
-    def pad_(self, tensor, pad, value=0.0):
+    def pad_(self, pad, value=0.0):
         if len(pad) % 2 != 0:
             raise ValueError("Padding length must be even.")
         num_dims_to_pad = len(pad) // 2
-        tensor = self._AbstractTensor__unwrap(tensor)
+        tensor = self.data
         if num_dims_to_pad > tensor.ndim:
             raise ValueError("Padding tuple length implies padding more dimensions than tensor has.")
         np_pad_width = []
@@ -217,77 +504,269 @@ class NumPyTensorOperations(AbstractTensor):
             np_pad_width.append((left, right))
         return np.pad(tensor, pad_width=np_pad_width, constant_values=value)
 
+    def pad2d_(self, pad, value=0.0):
+        pl, pr, pt, pb = pad
+        return np.pad(
+            self.data,
+            ((0, 0), (0, 0), (pt, pb), (pl, pr)),
+            mode="constant",
+            constant_values=float(value),
+        )
+
+    def unfold2d_(self, kernel_size, stride=1, padding=0, dilation=1):
+        kH, kW = _to_tuple2(kernel_size)
+        sH, sW = _to_tuple2(stride)
+        pH, pW = _to_tuple2(padding)
+        dH, dW = _to_tuple2(dilation)
+        x = np.pad(
+            self.data,
+            ((0, 0), (0, 0), (pH, pH), (pW, pW)),
+            mode="constant",
+        )
+        N, C, H, W = x.shape
+        eKH, eKW = (kH - 1) * dH + 1, (kW - 1) * dW + 1
+        win = sliding_window_view(x, window_shape=(eKH, eKW), axis=(2, 3))
+        win = win[:, :, ::sH, ::sW, ::dH, ::dW]
+        N, C, Hout, Wout, KH, KW = win.shape
+        patches = win.transpose(0, 1, 4, 5, 2, 3).reshape(N, C * KH * KW, Hout * Wout)
+        return patches
+
+    def fold2d_(
+        self,
+        output_size,
+        kernel_size,
+        stride=1,
+        padding=0,
+        dilation=1,
+    ):
+        N, C, H, W = output_size
+        kH, kW = _to_tuple2(kernel_size)
+        sH, sW = _to_tuple2(stride)
+        pH, pW = _to_tuple2(padding)
+        dH, dW = _to_tuple2(dilation)
+        Hpad, Wpad = H + 2 * pH, W + 2 * pW
+        eKH, eKW = (kH - 1) * dH + 1, (kW - 1) * dW + 1
+        Hout = (Hpad - eKH) // sH + 1
+        Wout = (Wpad - eKW) // sW + 1
+        cols6 = self.data.reshape(N, C, kH, kW, Hout, Wout)
+        ypad = np.zeros((N, C, Hpad, Wpad), dtype=self.data.dtype)
+        for i in range(kH):
+            hi = i * dH
+            hi_end = hi + sH * Hout
+            for j in range(kW):
+                wj = j * dW
+                wj_end = wj + sW * Wout
+                np.add.at(
+                    ypad,
+                    (slice(None), slice(None), slice(hi, hi_end, sH), slice(wj, wj_end, sW)),
+                    cols6[:, :, i, j, :, :],
+                )
+        return ypad[:, :, pH : Hpad - pH or None, pW : Wpad - pW or None]
+
     def cat_(self, tensors, dim=0):
         tensors = [self._AbstractTensor__unwrap(t) for t in tensors]
         return np.concatenate(tensors, axis=dim)
 
-    def repeat_interleave_(self, tensor, repeats, dim=None):
-        tensor = self._AbstractTensor__unwrap(tensor)
-        return np.repeat(tensor, repeats, axis=dim)
+    def pad_cat_(self, tensors, dim=0, pad_value=0):
+        import numpy as np
+
+        arrays = [self._AbstractTensor__unwrap(t) for t in tensors]
+        if not arrays:
+            return np.array([])
+
+        ndim = arrays[0].ndim
+        for arr in arrays:
+            if arr.ndim != ndim:
+                raise ValueError("all tensors must have the same number of dimensions")
+
+        max_shape = list(arrays[0].shape)
+        for arr in arrays[1:]:
+            for i, size in enumerate(arr.shape):
+                if i == dim:
+                    continue
+                if size > max_shape[i]:
+                    max_shape[i] = size
+
+        padded = []
+        for arr in arrays:
+            pad_width = []
+            for i, size in enumerate(arr.shape):
+                if i == dim:
+                    pad_width.append((0, 0))
+                else:
+                    pad_width.append((0, max_shape[i] - size))
+            padded.append(np.pad(arr, pad_width, mode="constant", constant_values=pad_value))
+
+        return np.concatenate(padded, axis=dim)
+
+    def expand_(self, shape):
+        import numpy as np
+
+        target_shape = tuple(shape)
+        orig_ndim = self.data.ndim
+        if len(target_shape) < orig_ndim:
+            raise ValueError(
+                f"expand_ requires shape with at least {orig_ndim} dimensions, got {len(target_shape)}"
+            )
+
+        arr = self.data
+        if len(target_shape) > orig_ndim:
+            arr = arr.reshape((1,) * (len(target_shape) - orig_ndim) + arr.shape)
+
+        new_shape: List[int] = []
+        for i, (current, desired) in enumerate(zip(arr.shape, target_shape)):
+            if desired == -1:
+                new_shape.append(current)
+            elif current == desired or current == 1:
+                if desired < 0:
+                    raise ValueError(
+                        f"dimension {i} must be -1 or >= 0, got {desired}"
+                    )
+                new_shape.append(desired)
+            else:
+                raise ValueError(
+                    f"cannot expand dimension {i} from {current} to {desired}"
+                )
+
+        return np.broadcast_to(arr, tuple(new_shape))
+    def repeat_interleave_(self, repeats=1, dim=None):
+        if dim is None:
+            dim = 0
+        return np.repeat(self.data, repeats, axis=dim)
+
+    def copyto_(self, src, *, where=None, casting="same_kind"):
+        import numpy as np
+        s = self._AbstractTensor__unwrap(src)
+        w = True if where is None else self._AbstractTensor__unwrap(where)
+        np.copyto(self.data, s, casting=casting, where=w)
+        return self.data
+
+    def cumsum_(self, dim=0):
+        import numpy as np
+        return np.cumsum(self.data, axis=dim)
 
     def repeat_(self, repeats=None, dim: int = 0):
-        """Repeat tensor along ``dim`` ``repeats`` times (stub)."""
-        raise NotImplementedError("repeat not implemented for NumPy backend")
+        """Repeat tensor along ``dim`` ``repeats`` times using NumPy."""
+        if repeats is None:
+            raise ValueError("repeats must be specified for NumPy backend")
+        if isinstance(repeats, int):
+            reps = [1] * self.data.ndim
+            reps[dim] = repeats
+            return np.tile(self.data, reps)
+        elif isinstance(repeats, (tuple, list)):
+            return np.tile(self.data, repeats)
+        else:
+            raise TypeError("repeats must be int or tuple for NumPy backend")
 
-    def view_flat_(self, tensor):
-        return self._AbstractTensor__unwrap(tensor).reshape(-1)
+    def view_flat_(self):
+        return self.data.reshape(-1)
 
-    def assign_at_indices_(self, tensor_to_modify, indices_dim0, indices_dim1, values_to_assign):
-        t = self._AbstractTensor__unwrap(tensor_to_modify)
+    def coalesce(self):
+        return self
+
+    @staticmethod
+    def einsum_(equation, *operands):
+        import numpy as np
+        return np.einsum(equation, *operands)
+
+    def assign_at_indices_(self, indices_dim0, indices_dim1, values_to_assign):
+        t = self.data
         v = self._AbstractTensor__unwrap(values_to_assign)
         i0 = self._AbstractTensor__unwrap(indices_dim0)
         i1 = self._AbstractTensor__unwrap(indices_dim1)
         t[i0, i1] = v
         return t
 
-    def increment_at_indices_(self, tensor_to_modify, mask):
-        t = self._AbstractTensor__unwrap(tensor_to_modify)
+    def increment_at_indices_(self, mask):
+        t = self.data
         m = self._AbstractTensor__unwrap(mask)
         t[m] += 1
         return t
 
-    def clamp_(self, tensor, min_val=None, max_val=None):
-        return np.clip(self._AbstractTensor__unwrap(tensor), a_min=min_val, a_max=max_val)
+    def clamp_(self, min_val=None, max_val=None):
+        return np.clip(self.data, a_min=min_val, a_max=max_val)
 
-    def shape_(self, tensor):
-        return tuple(self._AbstractTensor__unwrap(tensor).shape)
+    def shape_(self):
+        v = self.data
+        try:
+            return tuple(v.shape)
+        except Exception:
+            return ()
 
-    def numel_(self, tensor):
-        return self._AbstractTensor__unwrap(tensor).size
+    def numel_(self):
+        return self.data.size
 
-    def mean_(self, tensor, dim=None):
-        return np.mean(self._AbstractTensor__unwrap(tensor), axis=dim)
+    def mean_(self, dim=None, keepdim=False):
+        return np.asarray(np.mean(self.data, axis=dim, keepdims=keepdim))
 
-    def pow_(self, tensor, exponent: float):
-        return np.power(self._AbstractTensor__unwrap(tensor), exponent)
+    def sum_(self, dim=None, keepdim=False):
+        return np.asarray(np.sum(self.data, axis=dim, keepdims=keepdim))
 
-    def sqrt_(self, tensor):
-        return np.sqrt(self._AbstractTensor__unwrap(tensor))
+    def prod_(self, dim=None, keepdim=False):
+        """Return the product of tensor elements along a dimension."""
+        import numpy as np
+        return np.asarray(np.prod(self.data, axis=dim, keepdims=keepdim))
+
+    def min_(self, dim=None, keepdim=False):
+        return np.asarray(np.min(self.data, axis=dim, keepdims=keepdim))
+
+    def pow_(self, exponent: float):
+        return np.power(self.data, exponent)
+
+    def sqrt_(self):
+        return np.sqrt(self.data)
 
     def tensor_from_list_(self, data, dtype, device):
+        if not isinstance(data, (list, tuple)):
+            try:
+                data = data.tolist()
+                auto_converted = True
+            except Exception:
+                auto_converted = False
+        else:
+            auto_converted = False
+        if auto_converted:
+            print("[TensorBackend:numpy] Auto-converted input to list for tensor_from_list_()")
         return np.array(data, dtype=self._torch_dtype_to_numpy(dtype))
 
-    def boolean_mask_select_(self, tensor, mask):
-        tensor = self._AbstractTensor__unwrap(tensor)
+    def boolean_mask_select_(self, mask):
+        tensor = self.data
         m = self._AbstractTensor__unwrap(mask)
         return tensor[m]
 
-    def tolist_(self, tensor):
-        return self._AbstractTensor__unwrap(tensor).tolist()
+    @property
+    def _pi(self):
+        return np.pi
 
-    def less_(self, tensor, value):
-        return self._AbstractTensor__unwrap(tensor) < value
+    def tolist_(self):
+        return self._AbstractTensor__unwrap(self.data).tolist()
 
-    def index_select_(self, tensor, dim, indices):
-        tensor = self._AbstractTensor__unwrap(tensor)
+    def less_(self, value):
+        return self.data < value
+
+    def index_select_(self, dim, indices):
+        tensor = self.data
         idx = self._AbstractTensor__unwrap(indices)
         return np.take(tensor, idx, axis=dim)
 
-    def argmin_(self, tensor, dim=None):
-        return np.argmin(self._AbstractTensor__unwrap(tensor), axis=dim)
+    def argmin_(self, dim=None, keepdim=False):
+        arr = self.data
+        if dim is None:
+            return np.asarray(np.argmin(arr))
+        idx = np.argmin(arr, axis=dim)
+        if keepdim:
+            idx = np.expand_dims(idx, axis=dim)
+        return np.asarray(idx)
 
-    def interpolate_(self, tensor, size):
-        arr = np.array(self._AbstractTensor__unwrap(tensor))
+    def nbytes_(self) -> int:
+        return int(self.data.nbytes)
+
+    def diag_(self, offset: int = 0):
+        import numpy as np
+        return np.diag(self.data, k=offset)
+
+    def interpolate_(self, size):
+        arr = np.array(self.data)
         if len(size) != arr.ndim:
             raise ValueError("size must match tensor dimensions")
         def interp_axis(a, new_len, axis):
@@ -307,8 +786,8 @@ class NumPyTensorOperations(AbstractTensor):
             result = interp_axis(result, size[d], d)
         return result
 
-    def save_(self, tensor, filepath: str) -> None:
-        np.save(filepath, tensor)
+    def save_(self, filepath: str) -> None:
+        np.save(filepath, self.data)
 
     def load_(self, filepath: str, dtype, device):
         arr = np.load(f"{filepath}.npy") if not filepath.endswith('.npy') else np.load(filepath)
@@ -316,8 +795,9 @@ class NumPyTensorOperations(AbstractTensor):
             arr = arr.astype(self._torch_dtype_to_numpy(dtype))
         return arr
 
-    def to_dtype_(self, tensor, dtype: str = "float"):
+    def to_dtype_(self, dtype: str = "float"):
         import numpy as np
+        tensor = self.data
         if dtype in ("float", "float32", "f32"):
             return tensor.astype(np.float32)
         elif dtype in ("float64", "double", "f64"):
@@ -346,9 +826,7 @@ class NumPyTensorOperations(AbstractTensor):
     def float_dtype_(self):
         return np.float32
 
-    @property
-    def tensor_type_(self) -> type:
-        return np.ndarray
+    tensor_type_ = np.ndarray
 
     @staticmethod
     def from_numpy(source_ops, tensor, target_ops):
@@ -392,3 +870,32 @@ class NumPyTensorOperations(AbstractTensor):
 
     def get_ndims(self) -> int:
         return self.data.ndim
+
+    # ---------------- FFT family -----------------
+    def fft_(self, n: int | None = None, axis: int = -1, norm: str | None = None):
+        import numpy as np
+        return np.fft.fft(self.data, n=n, axis=axis, norm=norm)
+
+    def ifft_(self, n: int | None = None, axis: int = -1, norm: str | None = None):
+        import numpy as np
+        return np.fft.ifft(self.data, n=n, axis=axis, norm=norm)
+
+    def rfft_(self, n: int | None = None, axis: int = -1, norm: str | None = None):
+        import numpy as np
+        return np.fft.rfft(self.data, n=n, axis=axis, norm=norm)
+
+    def irfft_(self, n: int | None = None, axis: int = -1, norm: str | None = None):
+        import numpy as np
+        return np.fft.irfft(self.data, n=n, axis=axis, norm=norm)
+
+    def rfftfreq_(self, n: int, d: float = 1.0):
+        import numpy as np
+        return np.fft.rfftfreq(n, d=d)
+
+    def fftfreq_(self, n: int, d: float = 1.0):
+        import numpy as np
+        return np.fft.fftfreq(n, d=d)
+
+    # _tensor_from_list is provided centrally by AbstractTensor; do not duplicate here.
+
+register_backend("numpy", NumPyTensorOperations)

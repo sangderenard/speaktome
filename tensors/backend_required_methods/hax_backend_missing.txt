@@ -1,0 +1,11 @@
+argmax_
+diag_
+einsum_
+expand_
+flatten_
+fold2d_
+min_
+pad2d_
+sum_
+unfold2d_
+unsqueeze_

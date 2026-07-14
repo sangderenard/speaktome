@@ -3,31 +3,31 @@ from __future__ import annotations
 from typing import List, Optional, Tuple, Callable, Dict, Any, TYPE_CHECKING
 import math
 
-    # Third-party imports
-    if TYPE_CHECKING:  # pragma: no cover - type hints only
-        import torch
+# Third-party imports
+if TYPE_CHECKING:  # pragma: no cover - type hints only
+    import torch
 
-    from tensors.faculty import Faculty
+from tensors.faculty import Faculty
 
-    FACULTY_REQUIREMENT = Faculty.TORCH
+FACULTY_REQUIREMENT = Faculty.TORCH
 
-    # Local application/library specific imports
-    # Please adjust these import paths based on your actual project structure.
-    from .. import config
-    from ..config import GPU_LIMIT, LENGTH_LIMIT
-    from .beam_graph_operator import BeamGraphOperator
-    from .beam_search_instruction import BeamSearchInstruction
-    from .scorer import Scorer
-    from .beam_retirement_manager import BeamRetirementManager
-    from .compressed_beam_tree import CompressedBeamTree
-    from tensors import (
-        AbstractTensor,
-    )
-    from .model_abstraction import (
-        AbstractModelWrapper,
-        PyTorchModelWrapper,
-    )
-    from .lookahead_controller import LookaheadConfig, LookaheadController
+# Local application/library specific imports
+# Please adjust these import paths based on your actual project structure.
+from .. import config
+from ..config import GPU_LIMIT, LENGTH_LIMIT
+from .beam_graph_operator import BeamGraphOperator
+from .beam_search_instruction import BeamSearchInstruction
+from .scorer import Scorer
+from .beam_retirement_manager import BeamRetirementManager
+from .compressed_beam_tree import CompressedBeamTree
+from tensors import (
+    AbstractTensor,
+)
+from .model_abstraction import (
+    AbstractModelWrapper,
+    PyTorchModelWrapper,
+)
+from .lookahead_controller import LookaheadConfig, LookaheadController
 # --- END HEADER ---
 
 class BeamSearch:

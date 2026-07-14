@@ -27,11 +27,9 @@
 # AbstractTensor. Backend implementations provide only the raw
 # tensor operations.
 
+
 try:
     from typing import Any, Tuple, List, Optional, Union
-
-    from .abstraction import AbstractTensor
-
     import torch
     import torch.nn.functional as F
 except ModuleNotFoundError:
@@ -41,20 +39,218 @@ except Exception:
     import sys
     print("PyTorch backend failed to import")
     sys.exit(1)
-# --- END HEADER ---
+
+from .abstraction import AbstractTensor
 
 class PyTorchTensorOperations(AbstractTensor):
-    def __init__(self, default_device: Union[str, "torch.device"] = "cpu", track_time: bool = False):
-        super().__init__(track_time=track_time)
-        if torch is None:
+    def argwhere_(self):
+        import torch
+        return torch.nonzero(self.data, as_tuple=False)
+    def swapaxes_(self, axis1, axis2):
+        return self.data.swapaxes(axis1, axis2)
+    def empty_(self, size, dtype=None, device=None):
+        import torch
+        return torch.empty(size, dtype=dtype, device=device or self.default_device)
+    def diag_(self, offset: int = 0):
+        import torch
+        return torch.diag(self.data, diagonal=offset)
+    def allclose_(self, other, rtol=1e-5, atol=1e-8, equal_nan=False):
+        import torch
+        if not isinstance(other, type(self)):
+            other = type(self)(other)
+        return torch.allclose(self.data, other.data, rtol=rtol, atol=atol, equal_nan=equal_nan)
+    def isfinite_(self):
+        import torch
+        return torch.isfinite(self.data)
+    def all_(self, dim=None):
+        import torch
+        return torch.all(self.data, dim=dim)
+    def isnan_(self):
+        import torch
+        return torch.isnan(self.data)
+
+    def isinf_(self):
+        import torch
+        return torch.isinf(self.data)
+    def nonzero_(self, as_tuple: bool = False):
+        import torch
+        return torch.nonzero(self.data, as_tuple=as_tuple)
+    def any_(self, dim=None):
+        import torch
+        return torch.any(self.data, dim=dim)
+    def max_(self, dim=None, keepdim=False):
+        x = self.data
+        if dim is None:
+            out = x.max()
+            return out if not keepdim else out.view(*([1] * x.dim()))
+        vals, _ = x.max(dim=dim, keepdim=keepdim)
+        return vals
+
+    def argmax_(self, dim=None, keepdim=False):
+        x = self.data
+        if dim is None:
+            return x.argmax()
+        return x.argmax(dim=dim, keepdim=keepdim)
+    def where_(self, x, y):
+        import torch
+        x = x.data if isinstance(x, AbstractTensor) else x
+        y = y.data if isinstance(y, AbstractTensor) else y
+        return torch.where(self.data, x, y)
+
+    def maximum_(self, other):
+        import torch
+        other = other.data if isinstance(other, AbstractTensor) else other
+        return torch.maximum(self.data, other)
+
+    def minimum_(self, other):
+        import torch
+        other = other.data if isinstance(other, AbstractTensor) else other
+        return torch.minimum(self.data, other)
+
+    def clamp_(self, min_val=None, max_val=None):
+        import torch
+        return torch.clamp(self.data, min=min_val, max=max_val)
+
+    def clamp_min_(self, min_val):
+        import torch
+        return torch.clamp_min(self.data, min_val)
+
+    def clamp_max_(self, max_val):
+        import torch
+        return torch.clamp_max(self.data, max_val)
+
+    def greater_(self, value):
+        value = value.data if isinstance(value, AbstractTensor) else value
+        return self.data > value
+
+    def greater_equal_(self, value):
+        value = value.data if isinstance(value, AbstractTensor) else value
+        return self.data >= value
+
+    def less_equal_(self, value):
+        value = value.data if isinstance(value, AbstractTensor) else value
+        return self.data <= value
+
+    def equal_(self, value):
+        value = value.data if isinstance(value, AbstractTensor) else value
+        return self.data == value
+
+    def logical_not_(self):
+        import torch
+        return torch.logical_not(self.data)
+
+    def sqrt_(self):
+        import torch
+        return torch.sqrt(self.data)
+
+    def exp_(self):
+        import torch
+        return torch.exp(self.data)
+
+    def log_(self):
+        import torch
+        return torch.log(self.data)
+
+    def neg_(self):
+        return -self.data
+
+    def abs_(self):
+        import torch
+        return torch.abs(self.data)
+
+    def invert_(self):
+        import torch
+        return torch.bitwise_not(self.data)
+
+    def round_(self, n=None):
+        import torch
+        return torch.round(self.data, decimals=n) if n is not None else torch.round(self.data)
+
+    def trunc_(self):
+        import torch
+        return torch.trunc(self.data)
+
+    def floor_(self):
+        import torch
+        return torch.floor(self.data)
+
+    def ceil_(self):
+        import torch
+        return torch.ceil(self.data)
+    
+    @property
+    def _pi(self):
+        return torch.pi
+
+    def __trunc__(self):
+        import torch
+        if self.data.numel() != 1:
+            raise TypeError("Only scalar tensors can be converted to int")
+        return int(torch.trunc(self.data).item())
+
+    def softmax_(self, dim):
+        import torch
+        return torch.softmax(self.data, dim=dim)
+
+    def reshape_(self, shape):
+        return self.data.reshape(shape)
+
+    def transpose_(self, dim0, dim1):
+        return self.data.transpose(dim0, dim1)
+
+    def squeeze_(self, dim: int | None = None):
+        return self.data.squeeze() if dim is None else self.data.squeeze(dim)
+
+    def unravel_index_(self, shape):
+        import torch
+        result = torch.unravel_index(self.data, shape)
+        if self.data.dim() == 0:
+            return tuple(int(x) for x in result)
+        return result
+    def __init__(self, default_device="cpu", track_time: bool = False, requires_grad: bool = False, tape=None):
+        super().__init__(track_time=track_time, requires_grad=requires_grad, tape=tape)
+        try:
+            import torch
+        except ImportError:
             raise RuntimeError("PyTorch is required for this backend")
         self.default_device = torch.device(default_device)
 
-    def _apply_operator__(self, op: str, left: Any, right: Any):
+    def _apply_operator__(self, op, left, right):
         """Delegate arithmetic ops to PyTorch tensors. Always unwrap to raw tensors."""
+        # torch is imported in __init__ and assigned to self._torch
         a = left._AbstractTensor__unwrap() if isinstance(left, AbstractTensor) else left
         b = right._AbstractTensor__unwrap() if isinstance(right, AbstractTensor) else right
-        
+
+        if op == "neg":
+            return -a
+        if op == "abs":
+            return torch.abs(a)
+        if op == "invert":
+            return torch.bitwise_not(a)
+        if op == "sin":
+            return torch.sin(a)
+        if op == "cos":
+            return torch.cos(a)
+        if op == "tan":
+            return torch.tan(a)
+        if op == "asin":
+            return torch.asin(a)
+        if op == "acos":
+            return torch.acos(a)
+        if op == "atan":
+            return torch.atan(a)
+        if op == "sinh":
+            return torch.sinh(a)
+        if op == "cosh":
+            return torch.cosh(a)
+        if op == "tanh":
+            return torch.tanh(a)
+        if op == "asinh":
+            return torch.asinh(a)
+        if op == "acosh":
+            return torch.acosh(a)
+        if op == "atanh":
+            return torch.atanh(a)
         if op in ("add", "iadd"):
             return a + b
         if op == "radd":
@@ -62,31 +258,31 @@ class PyTorchTensorOperations(AbstractTensor):
         if op in ("sub", "isub"):
             return a - b
         if op == "rsub":
-            return b - a
+            return a - b
         if op in ("mul", "imul"):
             return a * b
         if op == "rmul":
-            return b * a
+            return a * b
         if op in ("truediv", "itruediv"):
             return a / b
         if op == "rtruediv":
-            return b / a
+            return a / b
         if op in ("floordiv", "ifloordiv"):
             return torch.floor_divide(a, b)
         if op == "rfloordiv":
-            return torch.floor_divide(b, a)
+            return torch.floor_divide(a, b)
         if op in ("mod", "imod"):
             return a % b
         if op == "rmod":
-            return b % a
+            return a % b
         if op in ("pow", "ipow"):
             return a ** b
         if op == "rpow":
-            return b ** a
+            return a ** b
         if op in ("matmul", "imatmul"):
             return a @ b
         if op == "rmatmul":
-            return b @ a
+            return a @ b
         raise NotImplementedError(f"Operator {op} not implemented for PyTorch backend.")
 
     def full_(self, size, fill_value, dtype, device):
@@ -110,8 +306,66 @@ class PyTorchTensorOperations(AbstractTensor):
     def item_(self):
         return self.data.item()
 
-    def max_(self):
-        return torch.max(self.data)
+    def get_item_(self, data, index):
+        """
+        Backend-aware indexing that supports negative-step slices by translating
+        them to index_select with an appropriate reversed arange. Falls back to
+        native indexing when no negative steps are present.
+        """
+        # Normalize index to a tuple
+        if not isinstance(index, tuple):
+            index = (index,)
+
+        # Expand Ellipsis to full set of slices
+        index = self._expand_ellipsis(index, data.dim())
+
+        # Quick path: no negative steps -> let PyTorch handle it
+        has_neg = any(isinstance(s, slice) and s.step is not None and s.step < 0 for s in index)
+        if not has_neg:
+            return data[index]
+
+        # We need to process dims with negative step manually using index_select.
+        out = data
+        # We apply components one-by-one so we can turn negative slices into
+        # explicit index tensors while preserving other components.
+        for dim, comp in enumerate(index):
+            if isinstance(comp, slice) and comp.step is not None and comp.step < 0:
+                # Python slice semantics
+                n = out.size(dim)
+                start = comp.start
+                stop  = comp.stop
+                step  = comp.step  # negative
+
+                # Translate None/negative to concrete indices
+                start = n - 1 if start is None else (start if start >= 0 else n + start)
+                stop  = -1   if stop  is None else (stop  if stop  >= 0 else n + stop)
+
+                idx = torch.arange(start, stop, step, device=out.device)
+                out = out.index_select(dim, idx)
+            else:
+                # For non-negative slices / ints / tensors, apply directly along this dim
+                # Build a selection tuple that is all ":" except this dim.
+                sel = (slice(None),) * dim + (comp,)
+                out = out[sel]
+        return out
+
+    @staticmethod
+    def _expand_ellipsis(index, nd):
+        """Expand a single Ellipsis into the correct number of full slices."""
+        # ``in`` on a tuple containing NumPy arrays can trigger ambiguous
+        # truth-value errors because equality is applied elementwise.  Use
+        # identity checks instead so arrays in the index do not break
+        # Ellipsis detection.
+        if not any(comp is Ellipsis for comp in index):
+            return index
+        i = next(i for i, comp in enumerate(index) if comp is Ellipsis)
+        # everything except the ellipsis occupies k entries
+        k = len(index) - 1
+        fill = nd - k
+        if fill < 0:
+            # Too many explicit components; let PyTorch raise later for consistency
+            return index
+        return index[:i] + (slice(None),) * fill + index[i+1:]
 
     def long_cast_(self):
         return self.data.long()
@@ -131,15 +385,18 @@ class PyTorchTensorOperations(AbstractTensor):
     def bool_(self):
         return self.data.bool()
 
-    def not_equal_(self, other):
-        return self.data != (other.data if isinstance(other, AbstractTensor) else other)
+    def not_equal_(self, value):
+        value = value.data if isinstance(value, AbstractTensor) else value
+        return self.data != value
 
-    def arange_(self, start, end=None, step=1, device=None, dtype=None):
-        if end is None:
-            return torch.arange(start, device=device or self.default_device, dtype=dtype)
+    def arange_(self, start, end, step=1, *, dtype=None, device=None):
         return torch.arange(start, end, step, device=device or self.default_device, dtype=dtype)
 
     def select_by_indices_(self, indices_dim0, indices_dim1):
+        if isinstance(indices_dim0, AbstractTensor):
+            indices_dim0 = indices_dim0.data
+        if isinstance(indices_dim1, AbstractTensor):
+            indices_dim1 = indices_dim1.data
         return self.data[indices_dim0, indices_dim1]
 
     def log_softmax_(self, dim):
@@ -148,7 +405,39 @@ class PyTorchTensorOperations(AbstractTensor):
     def pad_(self, pad, value=0.0):
         return F.pad(self.data, pad, value=value)
 
+    def pad2d_(self, pad, value=0.0):
+        return F.pad(self.data, pad, mode="constant", value=float(value))
+
+    def unfold2d_(self, kernel_size, stride=1, padding=0, dilation=1):
+        return F.unfold(
+            self.data,
+            kernel_size=kernel_size,
+            dilation=dilation,
+            padding=padding,
+            stride=stride,
+        )
+
+    def fold2d_(
+        self,
+        output_size,
+        kernel_size,
+        stride=1,
+        padding=0,
+        dilation=1,
+    ):
+        # ``output_size`` is (N, C, H, W); F.fold expects (H, W)
+        return F.fold(
+            self.data,
+            output_size=output_size[2:],
+            kernel_size=kernel_size,
+            dilation=dilation,
+            padding=padding,
+            stride=stride,
+        )
+
     def cat_(self, tensors, dim=0):
+        from .abstraction import AbstractTensor
+        # torch is imported in __init__ and assigned to self._torch
         tensors = [t.data if isinstance(t, AbstractTensor) else t for t in tensors]
         return torch.cat(tensors, dim=dim)
 
@@ -156,23 +445,78 @@ class PyTorchTensorOperations(AbstractTensor):
         return torch.topk(self.data, k=k, dim=dim)
 
     def stack_(self, tensors, dim=0):
+        from .abstraction import AbstractTensor
+        # torch is imported in __init__ and assigned to self._torch
         tensors = [t.data if isinstance(t, AbstractTensor) else t for t in tensors]
         return torch.stack(tensors, dim=dim)
+
+    def expand_(self, shape):
+        return self.data.expand(*shape)
 
     def repeat_interleave_(self, repeats=1, dim=None):
         if dim is None:
             dim = 0
         return self.data.repeat_interleave(repeats, dim=dim)
+
+    def copyto_(self, src, *, where=None, casting="same_kind"):
+        import torch
+        import numpy as np
+        from .abstraction import AbstractTensor
+        s = src.data if isinstance(src, AbstractTensor) else src
+        dtype_map = {
+            torch.float32: np.float32,
+            torch.float64: np.float64,
+            torch.float16: np.float16,
+            torch.int64: np.int64,
+            torch.int32: np.int32,
+            torch.int16: np.int16,
+            torch.int8: np.int8,
+            torch.uint8: np.uint8,
+            torch.bool: np.bool_,
+        }
+        dst_np_dtype = dtype_map.get(self.data.dtype)
+        src_np_dtype = dtype_map.get(s.dtype)
+        if dst_np_dtype is not None and src_np_dtype is not None:
+            if not np.can_cast(src_np_dtype, dst_np_dtype, casting=casting):
+                raise TypeError(
+                    f"Cannot cast from {s.dtype} to {self.data.dtype} with casting='{casting}'"
+                )
+        s = s.to(self.data.dtype)
+        if s.shape != self.data.shape:
+            s = s.expand_as(self.data)
+        if where is None:
+            self.data.copy_(s)
+        else:
+            m = where.data if isinstance(where, AbstractTensor) else where
+            if m.shape != self.data.shape:
+                m = m.expand_as(self.data)
+            self.data = torch.where(m, s, self.data)
+        return self.data
+
+    def cumsum_(self, dim=0):
+        import torch
+        return torch.cumsum(self.data, dim=dim)
         
 
     def view_flat_(self):
-        return self.data.view(-1)
+        return self.data.reshape(-1)
+
+    def flatten_(self):
+        return self.data.flatten()
 
     def assign_at_indices_(self, indices_dim0, indices_dim1, values_to_assign):
+        if isinstance(indices_dim0, AbstractTensor):
+            indices_dim0 = indices_dim0.data
+        if isinstance(indices_dim1, AbstractTensor):
+            indices_dim1 = indices_dim1.data
+        if isinstance(values_to_assign, AbstractTensor):
+            values_to_assign = values_to_assign.data
         self.data[indices_dim0, indices_dim1] = values_to_assign
         return self.data
 
     def increment_at_indices_(self, mask):
+        if isinstance(mask, AbstractTensor):
+            mask = mask.data
         self.data[mask] += 1
         return self.data
 
@@ -182,8 +526,31 @@ class PyTorchTensorOperations(AbstractTensor):
     def numel_(self):
         return self.data.numel()
 
-    def mean_(self, dim=None):
-        return torch.mean(self.data, dim=dim)
+    def mean_(self, dim=None, keepdim=False):
+        x = self.data
+        if dim is None:
+            out = x.mean()
+            return out if not keepdim else out.view(*([1] * x.dim()))
+        return x.mean(dim=dim, keepdim=keepdim)
+    def sum_(self, dim=None, keepdim=False):
+        x = self.data
+        if dim is None:
+            out = x.sum()
+            return out if not keepdim else out.view(*([1] * x.dim()))
+        return x.sum(dim=dim, keepdim=keepdim)
+    def prod_(self, dim=None, keepdim=False):
+        x = self.data
+        if dim is None:
+            out = x.prod()
+            return out if not keepdim else out.view(*([1] * x.dim()))
+        return x.prod(dim=dim, keepdim=keepdim)
+    def min_(self, dim=None, keepdim=False):
+        x = self.data
+        if dim is None:
+            out = x.min()
+            return out if not keepdim else out.view(*([1] * x.dim()))
+        vals, _ = x.min(dim=dim, keepdim=keepdim)
+        return vals
 
     def pow_(self, exponent: float):
         return torch.pow(self.data, exponent)
@@ -192,28 +559,56 @@ class PyTorchTensorOperations(AbstractTensor):
         return torch.sqrt(self.data)
 
     def tensor_from_list_(self, data, dtype, device):
+        if not isinstance(data, (list, tuple)):
+            # If not a list/tuple, try to convert to list (e.g., numpy array)
+            try:
+                data = data.tolist()
+                auto_converted = True
+            except Exception:
+                auto_converted = False
+        else:
+            auto_converted = False
+        if auto_converted:
+            print("[TensorBackend:torch] Auto-converted input to list for tensor_from_list_()")
         return torch.tensor(data, dtype=dtype, device=device or self.default_device)
 
     def boolean_mask_select_(self, mask):
+        if isinstance(mask, AbstractTensor):
+            mask = mask.data
         return self.data[mask]
 
     def tolist_(self):
         return self.data.tolist()
 
     def less_(self, value):
+        value = value.data if isinstance(value, AbstractTensor) else value
         return self.data < value
 
     def index_select_(self, dim, indices):
         return torch.index_select(self.data, dim, indices)
 
-    def argmin_(self, dim=None):
-        return torch.argmin(self.data) if dim is None else torch.argmin(self.data, dim=dim)
+    def argmin_(self, dim=None, keepdim=False):
+        x = self.data
+        if dim is None:
+            return x.argmin()  # flattened index; keepdim not meaningful here
+        return x.argmin(dim=dim, keepdim=keepdim)
+
+    def nbytes_(self) -> int:
+        try:
+            return int(self.data.element_size() * self.data.numel())
+        except Exception:
+            return int(self.data.nelement() * self.data.element_size())
 
     def get_shape(self):
         return tuple(self.data.shape)
+    def get_ndims(self, data=None):
+        t = data if data is not None else self.data
+        try:
+            return int(t.dim())
+        except AttributeError:
+            # fallback for array-likes if you ever pass them through here
+            return len(getattr(t, "shape", ()))
 
-    def get_ndims(self):
-        return self.data.dim()
 
     def interpolate_(self, size):
         t = self.data
@@ -258,15 +653,14 @@ class PyTorchTensorOperations(AbstractTensor):
     def float_dtype_(self):
         return torch.float32
 
-    @property
-    def tensor_type_(self) -> type:
-        return torch.Tensor
+    
+    tensor_type_ = torch.Tensor
 
     @staticmethod
     def from_numpy(source_ops, tensor, target_ops):
         if tensor is None:
             raise ValueError("from_numpy called with tensor=None")
-        import torch
+        # torch is imported in __init__ and assigned to self._torch
         arr = tensor.data if hasattr(tensor, "data") else tensor
         result = type(target_ops)(default_device=target_ops.default_device)
         result.data = torch.from_numpy(arr).to(target_ops.default_device)
@@ -284,7 +678,7 @@ class PyTorchTensorOperations(AbstractTensor):
 
     @staticmethod
     def from_pure(source_ops, tensor, target_ops):
-        import torch
+        # torch is imported in __init__ and assigned to self._torch
         data = tensor.data if hasattr(tensor, "data") else tensor
         result = type(target_ops)(default_device=target_ops.default_device)
         result.data = torch.tensor(data, device=target_ops.default_device)
@@ -292,7 +686,7 @@ class PyTorchTensorOperations(AbstractTensor):
 
     @staticmethod
     def from_jax(source_ops, tensor, target_ops):
-        import torch
+        # torch is imported in __init__ and assigned to self._torch
         import numpy as np
         arr = tensor.data if hasattr(tensor, "data") else tensor
         np_array = np.array(arr)
@@ -301,6 +695,8 @@ class PyTorchTensorOperations(AbstractTensor):
         return result
 
     def to_dtype_(self, dtype: str = "float"):
+        if isinstance(dtype, torch.dtype):
+            return self.data.to(dtype)
         if dtype in ("float", "float32", "f32"):
             return self.data.float()
         elif dtype in ("float64", "double", "f64"):
@@ -316,10 +712,41 @@ class PyTorchTensorOperations(AbstractTensor):
         else:
             return self.data.float()
 
-    def repeat_(self, repeats: Any = None, dim: int = 0) -> "AbstractTensor":
+    def repeat_(self, repeats: Any = None, dim: int = 0):
+        """Repeat tensor data along ``dim`` ``repeats`` times.
+
+        ``repeats`` may be:
+        - ``None`` or an empty sequence to simply clone ``self``.
+        - an ``int`` specifying how many copies to make along a single
+          dimension ``dim``.
+        - a sequence providing the repeat count for each dimension.
+        """
         t = self.data
-        repeated = t.repeat(*repeats) if isinstance(repeats, (list, tuple)) else t.repeat(repeats)
+        if repeats is None or (isinstance(repeats, (list, tuple)) and len(repeats) == 0):
+            repeated = t.clone()
+        elif isinstance(repeats, int):
+            if t.dim() == 0:
+                repeated = t.repeat(repeats)
+            else:
+                if dim < 0:
+                    dim += t.dim()
+                if dim < 0 or dim >= t.dim():
+                    raise IndexError("dim out of range for repeat_")
+                sizes = [1] * t.dim()
+                sizes[dim] = repeats
+                repeated = t.repeat(*sizes)
+        elif isinstance(repeats, (list, tuple)):
+            repeated = t.repeat(*repeats)
+        else:
+            repeated = t.repeat(repeats)
         result = type(self)(default_device=self.default_device)
         result.data = repeated
         return result
+    def unsqueeze_(self, dim: int):
+        return self.data.unsqueeze(dim)
+
+    # _tensor_from_list is provided centrally by AbstractTensor; do not duplicate here.
+
+from .abstraction import register_backend
+register_backend("torch", PyTorchTensorOperations)
 
