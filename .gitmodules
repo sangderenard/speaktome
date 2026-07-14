@@ -3,14 +3,38 @@
 	url = git@github.com:sangderenard/wheelhouse.git
     branch = nogodsnomasters
 
-
-[submodule "asciioscilliscope/eigen"]
-    path   = asciioscilliscope/eigen
-    url    = https://github.com/libigl/eigen.git
-    ignore = all
 [submodule "codex"]
 	path = codex
 	url = git@github.com:sangderenard/codex-personal.git
-[submodule "asciioscilliscope/googletest"]
-	path = asciioscilliscope/googletest
-	url = https://github.com/google/googletest.git
+[submodule "asciioscilloscope/asciioscilloscope/third_party/eigen"]
+	path = asciioscilloscope/asciioscilloscope/third_party/eigen
+	url = https://gitlab.com/libeigen/eigen.git
+	branch = master
+[submodule "asciioscilloscope/asciioscilloscope/third_party/libigl"]
+	path = asciioscilloscope/asciioscilloscope/third_party/libigl
+	url = https://github.com/libigl/libigl.git
+	branch = main
+[submodule "asciioscilloscope/asciioscilloscope/third_party/imgui"]
+	path = asciioscilloscope/asciioscilloscope/third_party/imgui
+	url = https://github.com/ocornut/imgui.git
+	branch = master
+[submodule "asciioscilloscope/asciioscilloscope/third_party/glfw"]
+	path = asciioscilloscope/asciioscilloscope/third_party/glfw
+	url = https://github.com/glfw/glfw.git
+	branch = master
+[submodule "asciioscilloscope/asciioscilloscope/third_party/glad"]
+	path = asciioscilloscope/asciioscilloscope/third_party/glad
+	url = https://github.com/Dav1dde/glad.git
+	branch = glad2
+[submodule "asciioscilloscope/asciioscilloscope/third_party/stb"]
+	path = asciioscilloscope/asciioscilloscope/third_party/stb
+	url = https://github.com/nothings/stb.git
+	branch = master
+[submodule "asciioscilloscope/asciioscilloscope/third_party/tinydnn"]
+	path = asciioscilloscope/asciioscilloscope/third_party/tinydnn
+	url = https://github.com/tiny-dnn/tiny-dnn.git
+	branch = master
+[submodule "asciioscilloscope/asciioscilloscope/third_party/onnxruntime"]
+	path = asciioscilloscope/asciioscilloscope/third_party/onnxruntime
+	url = https://github.com/microsoft/onnxruntime.git
+	branch = main
