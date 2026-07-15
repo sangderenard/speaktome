@@ -84,6 +84,22 @@ def test_score_candidates_sums_log_probs_over_a_longer_suffix():
     assert got[0] > got[1]
 
 
+def test_score_candidates_chunking_matches_unchunked():
+    ops = AbstractTensor.get_tensor()
+    model = BigramDummyModel(CYCLE_TABLE)
+    scorer = ImplicitBackpathScorer(model, tokenizer=None)
+
+    suffix = ops.tensor([1, 2], dtype=ops.long_dtype)
+    candidates = ops.tensor([0, 1, 2, 0, 1, 2, 0], dtype=ops.long_dtype)
+
+    unchunked = scorer.score_candidates(suffix, candidates, max_batch_size=None)
+    chunked = scorer.score_candidates(suffix, candidates, max_batch_size=3)
+
+    assert unchunked.shape[0] == chunked.shape[0] == 7
+    for a, b in zip(unchunked.tolist(), chunked.tolist()):
+        assert math.isclose(a, b, rel_tol=1e-5, abs_tol=1e-5)
+
+
 def test_score_candidates_handles_empty_pool():
     ops = AbstractTensor.get_tensor()
     model = BigramDummyModel(CYCLE_TABLE)

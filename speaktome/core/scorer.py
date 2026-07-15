@@ -72,8 +72,9 @@ class Scorer:
         """Load the GPT-2 model and tokenizer on first use."""
 
         if self._model is None or self._tokenizer is None:
-            GPT2LMHeadModel = optional_import("transformers.GPT2LMHeadModel")
-            GPT2Tokenizer = optional_import("transformers.GPT2Tokenizer")
+            transformers_mod = optional_import("transformers")
+            GPT2LMHeadModel = getattr(transformers_mod, "GPT2LMHeadModel", None)
+            GPT2Tokenizer = getattr(transformers_mod, "GPT2Tokenizer", None)
             if GPT2LMHeadModel is None or GPT2Tokenizer is None:
                 raise RuntimeError(
                     "Transformers is required for the full beam search demo."

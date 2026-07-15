@@ -52,17 +52,26 @@ class ImplicitBackpathScorer:
         return all_ids[mask]
 
     def score_candidates(
-        self, suffix_tokens: AbstractTensor, candidate_ids: AbstractTensor
+        self,
+        suffix_tokens: AbstractTensor,
+        candidate_ids: AbstractTensor,
+        max_batch_size: Optional[int] = 2048,
     ) -> AbstractTensor:
         """Return one score per candidate: teacher-forced log-likelihood of ``suffix_tokens``
         under the forward model when that candidate is prepended.
 
         ``suffix_tokens`` is a 1-D tensor ``[L]``, ``candidate_ids`` a 1-D tensor ``[N]``.
         Returns a 1-D tensor ``[N]``.
+
+        A full (filtered) vocabulary is tens of thousands of candidates, and
+        each one expands into its own ``[1+L]`` row -- large enough to blow
+        past GPU memory in a single forward pass. ``max_batch_size`` chunks
+        the candidate pool and concatenates the per-chunk scores; pass
+        ``None`` to force a single unchunked pass (mainly useful for tests
+        with tiny candidate pools).
         """
         backend_cls = type(suffix_tokens)
         device = suffix_tokens.get_device()
-        long_dtype = suffix_tokens.long_dtype
         float_dtype = suffix_tokens.float_dtype
 
         N = candidate_ids.shape[0]
@@ -72,6 +81,27 @@ class ImplicitBackpathScorer:
             return backend_cls.tensor([], dtype=float_dtype, device=device)
         if L == 0:
             return backend_cls.tensor([0.0] * N, dtype=float_dtype, device=device)
+
+        if max_batch_size is None or N <= max_batch_size:
+            return self._score_batch(suffix_tokens, candidate_ids)
+
+        chunks = []
+        for start in range(0, N, max_batch_size):
+            chunk_ids = candidate_ids[start : start + max_batch_size]
+            chunks.append(self._score_batch(suffix_tokens, chunk_ids))
+        return AbstractTensor.cat(chunks, dim=0)
+
+    def _score_batch(
+        self, suffix_tokens: AbstractTensor, candidate_ids: AbstractTensor
+    ) -> AbstractTensor:
+        """Score one batch of candidates in a single forward pass (see score_candidates)."""
+        backend_cls = type(suffix_tokens)
+        device = suffix_tokens.get_device()
+        long_dtype = suffix_tokens.long_dtype
+        float_dtype = suffix_tokens.float_dtype
+
+        N = candidate_ids.shape[0]
+        L = suffix_tokens.shape[0]
 
         suffix_list = suffix_tokens.tolist()
         candidate_list = candidate_ids.tolist()

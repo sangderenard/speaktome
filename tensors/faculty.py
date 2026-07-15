@@ -38,13 +38,17 @@ def detect_faculty() -> Faculty:
         except KeyError as exc:  # pragma: no cover - env misuse
             raise ValueError(f"Unknown faculty override: {forced}") from exc
 
+    # Check from highest tier to lowest -- this should return the highest
+    # available tier, and torch_geometric/torch both imply numpy is
+    # installed anyway, so checking numpy first here was returning NUMPY
+    # even when a higher tier (TORCH, PYGEO) was also available.
     spec = importlib.util.find_spec
-    if spec("numpy") is not None:
-        return Faculty.NUMPY
     if spec("torch_geometric") is not None:
         return Faculty.PYGEO
     if spec("torch") is not None:
         return Faculty.TORCH
+    if spec("numpy") is not None:
+        return Faculty.NUMPY
     return Faculty.PURE_PYTHON
 
 
