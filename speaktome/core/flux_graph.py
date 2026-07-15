@@ -78,6 +78,15 @@ class FluxGraphConfig:
     branch_factor: int = 3
     max_context_tokens: int = 64
     verbose: bool = False
+    # Real GPT-2's own document-boundary token (<|endoftext|>), or whatever
+    # else the model wrapper's tokenizer uses for "start of something new".
+    # Every backward candidate is, by construction, being scored with
+    # nothing to its own left -- without this, that means literally zero
+    # context, a regime the model rarely saw cleanly during training (most
+    # training windows are mid-document, not document starts). Left as
+    # None by default since it's model-specific, not a graph-algorithm
+    # parameter; callers building a real GPT-2 graph should set it.
+    backward_left_context: Optional[List[int]] = None
 
 
 class FluxGraph:
@@ -326,7 +335,9 @@ class FluxGraph:
         )
         if self.config.verbose:
             print(f"  [expand-backward] node {node_id}: scoring {pool.shape[0]} candidates ...")
-        raw_scores = self.backward_scorer.score_candidates(suffix_t, pool)
+        raw_scores = self.backward_scorer.score_candidates(
+            suffix_t, pool, left_context=self.config.backward_left_context
+        )
         top_scores, top_idx = AbstractTensor.topk(raw_scores, k=self.config.branch_factor, dim=0)
         candidate_ids = [int(pool[i].item()) for i in top_idx.tolist()]
         self._attach_children(node_id, Direction.BACKWARD, top_scores.tolist(), candidate_ids)

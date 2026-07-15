@@ -17,7 +17,7 @@ assigns to the suffix. No new model, no training.
 """
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any, List, Optional
 
 from tensors import AbstractTensor
 from .model_abstraction import AbstractModelWrapper
@@ -56,6 +56,7 @@ class ImplicitBackpathScorer:
         suffix_tokens: AbstractTensor,
         candidate_ids: AbstractTensor,
         max_batch_size: Optional[int] = 2048,
+        left_context: Optional[List[int]] = None,
     ) -> AbstractTensor:
         """Return one score per candidate: teacher-forced log-likelihood of ``suffix_tokens``
         under the forward model when that candidate is prepended.
@@ -69,6 +70,18 @@ class ImplicitBackpathScorer:
         the candidate pool and concatenates the per-chunk scores; pass
         ``None`` to force a single unchunked pass (mainly useful for tests
         with tiny candidate pools).
+
+        ``left_context`` prepends fixed tokens before the candidate (e.g. a
+        real GPT-2's own ``<|endoftext|>`` document-boundary token). Without
+        it, every candidate is scored as the literal first token the model
+        has ever seen -- a regime the model rarely saw cleanly during
+        training, since training windows are usually mid-document, not
+        document starts. This shifts every score but does not by itself
+        make rare/specific candidates outscore common/generic ones -- that
+        is a real property of single-token marginal scoring (it averages
+        over every way a document could continue with the suffix, and
+        frequent generic words accumulate more of that marginal mass than a
+        word that's only right in one specific completion), not a bug.
         """
         backend_cls = type(suffix_tokens)
         device = suffix_tokens.get_device()
@@ -83,16 +96,19 @@ class ImplicitBackpathScorer:
             return backend_cls.tensor([0.0] * N, dtype=float_dtype, device=device)
 
         if max_batch_size is None or N <= max_batch_size:
-            return self._score_batch(suffix_tokens, candidate_ids)
+            return self._score_batch(suffix_tokens, candidate_ids, left_context)
 
         chunks = []
         for start in range(0, N, max_batch_size):
             chunk_ids = candidate_ids[start : start + max_batch_size]
-            chunks.append(self._score_batch(suffix_tokens, chunk_ids))
+            chunks.append(self._score_batch(suffix_tokens, chunk_ids, left_context))
         return AbstractTensor.cat(chunks, dim=0)
 
     def _score_batch(
-        self, suffix_tokens: AbstractTensor, candidate_ids: AbstractTensor
+        self,
+        suffix_tokens: AbstractTensor,
+        candidate_ids: AbstractTensor,
+        left_context: Optional[List[int]] = None,
     ) -> AbstractTensor:
         """Score one batch of candidates in a single forward pass (see score_candidates)."""
         backend_cls = type(suffix_tokens)
@@ -102,14 +118,17 @@ class ImplicitBackpathScorer:
 
         N = candidate_ids.shape[0]
         L = suffix_tokens.shape[0]
+        prefix = list(left_context) if left_context else []
+        offset = len(prefix)
 
         suffix_list = suffix_tokens.tolist()
         candidate_list = candidate_ids.tolist()
-        batch_rows = [[c] + suffix_list for c in candidate_list]
+        batch_rows = [prefix + [c] + suffix_list for c in candidate_list]
+        row_len = offset + 1 + L
 
         batch_tokens = backend_cls.tensor(batch_rows, dtype=long_dtype, device=device)
         attention_mask = backend_cls.tensor(
-            [[1] * (1 + L)] * N, dtype=long_dtype, device=device
+            [[1] * row_len] * N, dtype=long_dtype, device=device
         )
 
         # AbstractModelWrapper.forward operates on raw backend tensors, not
@@ -117,12 +136,12 @@ class ImplicitBackpathScorer:
         outputs = self.model_wrapper.forward(
             input_ids=batch_tokens.data, attention_mask=attention_mask.data
         )
-        logits = batch_tokens.ensure_tensor(outputs["logits"])  # [N, 1+L, vocab]
+        logits = batch_tokens.ensure_tensor(outputs["logits"])  # [N, row_len, vocab]
 
         total = backend_cls.tensor([0.0] * N, dtype=float_dtype, device=device)
         for position in range(L):
             target_id = int(suffix_tokens[position].item())
-            log_probs = logits[:, position, :].log_softmax(dim=-1)
+            log_probs = logits[:, offset + position, :].log_softmax(dim=-1)
             total = total + log_probs[:, target_id]
 
         return total

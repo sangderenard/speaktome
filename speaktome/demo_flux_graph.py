@@ -58,6 +58,7 @@ def run_demo(seed_text: str, ticks: int, budget: int, branch_factor: int) -> Non
         compute_budget_per_tick=budget,
         branch_factor=branch_factor,
         verbose=True,
+        backward_left_context=[tokenizer.eos_token_id],
     )
     graph = FluxGraph(wrapper, backpath, TopKPolicy(), ops, config=config, device=device)
 

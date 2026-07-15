@@ -84,6 +84,28 @@ def test_score_candidates_sums_log_probs_over_a_longer_suffix():
     assert got[0] > got[1]
 
 
+def test_score_candidates_with_left_context_offsets_positions_correctly():
+    ops = AbstractTensor.get_tensor()
+    model = BigramDummyModel(CYCLE_TABLE)
+    scorer = ImplicitBackpathScorer(model, tokenizer=None)
+
+    suffix = ops.tensor([1], dtype=ops.long_dtype)
+    candidates = ops.tensor([0, 1, 2], dtype=ops.long_dtype)
+
+    # left_context doesn't change anything under this Markov-order-1 dummy
+    # model (logits depend only on the token at that exact row position),
+    # so this exercises that the row/attention-mask/position offsetting is
+    # correct, not that context semantically matters (verified separately
+    # against real GPT-2).
+    plain = scorer.score_candidates(suffix, candidates, max_batch_size=None)
+    with_ctx = scorer.score_candidates(
+        suffix, candidates, max_batch_size=None, left_context=[0, 1]
+    )
+
+    for a, b in zip(plain.tolist(), with_ctx.tolist()):
+        assert math.isclose(a, b, rel_tol=1e-5, abs_tol=1e-5)
+
+
 def test_score_candidates_chunking_matches_unchunked():
     ops = AbstractTensor.get_tensor()
     model = BigramDummyModel(CYCLE_TABLE)
