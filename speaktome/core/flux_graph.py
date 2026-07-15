@@ -61,11 +61,26 @@ class FluxNode:
     created_tick: int = 0
     burned: bool = False
     expanded: bool = False
+    # Sum of local_evidence from the anchor to this node, inclusive -- set
+    # once at creation (cheap: parent's cumulative + this node's own
+    # evidence), not recomputed by walking the tree each tick.
+    cumulative_evidence: float = 0.0
+    # Best path_mean reachable through this node's own subtree, backed up
+    # from leaves toward the anchor each tick by _digest(). Starts equal
+    # to the node's own path_mean before any digestion has run.
+    rollup_mean: float = 0.0
 
     @property
     def local_value(self) -> float:
         """exp(local_evidence): 1.0 for the anchor, in (0, 1] for real tokens."""
         return math.exp(self.local_evidence)
+
+    @property
+    def path_mean(self) -> float:
+        """Length-normalized quality: mean local_evidence from anchor to here."""
+        if self.depth <= 0:
+            return 0.0
+        return self.cumulative_evidence / self.depth
 
 
 @dataclass
@@ -78,6 +93,20 @@ class FluxGraphConfig:
     branch_factor: int = 3
     max_context_tokens: int = 64
     verbose: bool = False
+    # Circuit: how many relaxation sweeps to run per tick before trusting
+    # pressure for decisions, and how small a max-change counts as settled.
+    max_relaxation_iterations: int = 25
+    relaxation_tolerance: float = 1e-4
+    # Digestion: how much a node's expansion priority is boosted by its
+    # parent's rollup_mean (the best mean-quality path known anywhere in
+    # that neighborhood) -- gives siblings of a good discovery a reason to
+    # get attention even if their own instantaneous pressure is ordinary.
+    rollup_weight: float = 0.3
+    # Exploitation game: how much expansion priority grows per tick a node
+    # has sat eligible without being expanded, so a merely-mediocre-looking
+    # node isn't ignored forever just because something else looked better
+    # first.
+    exploration_constant: float = 0.05
     # Real GPT-2's own document-boundary token (<|endoftext|>), or whatever
     # else the model wrapper's tokenizer uses for "start of something new".
     # Every backward candidate is, by construction, being scored with
@@ -176,9 +205,18 @@ class FluxGraph:
         return back_tokens + self.anchor_tokens + fwd_tokens
 
     def best_leaf(self, direction: Optional[Direction]) -> Optional[int]:
-        """The live leaf with the highest pressure on the given side (None = either side, incl. anchor)."""
+        """The live leaf with the best length-normalized path quality on the given side.
+
+        Selected by path_mean (mean local_evidence from the anchor to this
+        leaf), not raw pressure -- pressure is the exploit/explore signal
+        that drives *where compute goes*, a different question from "what's
+        actually the best thing found so far". Using pressure here made a
+        long-but-mediocre chain look like it kept improving as best_path()
+        just because pressure doesn't decay with depth; path_mean answers
+        the quality question directly, independent of how long the path is.
+        """
         best_id = None
-        best_pressure = -math.inf
+        best_mean = -math.inf
         for node_id, node in self.nodes.items():
             if node.burned:
                 continue
@@ -188,31 +226,43 @@ class FluxGraph:
                 continue
             if self._live_children(node_id):
                 continue  # only consider leaves
-            if node.pressure > best_pressure:
-                best_pressure = node.pressure
+            if node.path_mean > best_mean:
+                best_mean = node.path_mean
                 best_id = node_id
         return best_id
 
     def best_path(self) -> Tuple[List[int], float]:
-        """Live snapshot: the current best complete path and its total local-evidence score."""
+        """Live snapshot: the current best complete path and its mean per-token quality.
+
+        The score is a length-normalized mean (average local_evidence per
+        token across whichever side(s) currently exist), not a raw sum --
+        a raw sum mechanically gets worse as a path gets longer regardless
+        of whether the *quality* per token is improving, which made a
+        growing path look like it was failing even when each new token was
+        individually reasonable.
+        """
         fwd_leaf = self.best_leaf(Direction.FORWARD)
         bwd_leaf = self.best_leaf(Direction.BACKWARD)
         tokens = self.full_sequence(fwd_leaf, bwd_leaf)
 
         total = 0.0
+        count = 0
         for leaf in (fwd_leaf, bwd_leaf):
             cur = leaf
             while cur is not None and cur != self.anchor_id:
                 total += self.nodes[cur].local_evidence
+                count += 1
                 cur = self.nodes[cur].parent_id
-        return tokens, total
+        mean_score = total / count if count > 0 else 0.0
+        return tokens, mean_score
 
     # ------------------------------------------------------------------
     # Tick: pressure update, expansion, starvation
     # ------------------------------------------------------------------
     def tick(self) -> None:
         self.tick_count += 1
-        self._update_pressures()
+        self._settle_circuit()
+        self._digest()
         self._expand_top_pressure_nodes()
         self._starve_and_burn()
 
@@ -231,9 +281,11 @@ class FluxGraph:
             return node.local_value
         return self.nodes[neighbor_id].local_value
 
-    def _update_pressures(self) -> None:
+    def _update_pressures(self) -> float:
+        """One relaxation sweep. Returns the largest pressure change seen."""
         cfg = self.config
         previous = {nid: n.pressure for nid, n in self.nodes.items() if not n.burned}
+        max_delta = 0.0
         for node_id, node in self.nodes.items():
             if node.burned or node_id == self.anchor_id:
                 continue
@@ -245,16 +297,79 @@ class FluxGraph:
             else:
                 inflow = 0.0
             intrinsic = node.local_value + cfg.found_bonus
-            node.pressure = intrinsic + cfg.damping * inflow
+            new_pressure = intrinsic + cfg.damping * inflow
+            max_delta = max(max_delta, abs(new_pressure - node.pressure))
+            node.pressure = new_pressure
+        return max_delta
+
+    def _settle_circuit(self) -> int:
+        """Iterate relaxation until pressure stops moving (or the iteration cap).
+
+        A single sweep is a half-propagated transient, not a solved
+        circuit -- multi-hop support hasn't had a chance to arrive yet.
+        This is pure local arithmetic (no model calls), so iterating it
+        many times per tick is cheap; only the *decisions* made off of it
+        (expansion, starvation) are expensive, and those should see a
+        settled state, not a snapshot mid-flight.
+        """
+        cfg = self.config
+        for i in range(cfg.max_relaxation_iterations):
+            delta = self._update_pressures()
+            if delta < cfg.relaxation_tolerance:
+                return i + 1
+        return cfg.max_relaxation_iterations
+
+    def _digest(self) -> None:
+        """Back up the best reachable path quality from leaves toward the anchor.
+
+        Pressure alone never lets a distant discovery make its ancestors
+        look better -- it only propagates gradually, hop by hop, and can
+        get out-competed for compute along the way. Digestion is a direct,
+        explicit rollup: every node learns the best mean-quality (length-
+        normalized) path found anywhere in its own subtree, in one pass,
+        so that information can inform expansion priority immediately
+        rather than waiting on the circuit to carry it there.
+        """
+        live_nodes = [n for n in self.nodes.values() if not n.burned and n.id != self.anchor_id]
+        for node in sorted(live_nodes, key=lambda n: n.depth, reverse=True):
+            child_rollups = [self.nodes[c].rollup_mean for c in self._live_children(node.id)]
+            node.rollup_mean = max([node.path_mean] + child_rollups)
+
+        anchor = self.nodes[self.anchor_id]
+        child_rollups = [self.nodes[c].rollup_mean for c in self._live_children(self.anchor_id)]
+        anchor.rollup_mean = max(child_rollups) if child_rollups else 0.0
+
+    def _expansion_priority(self, node: FluxNode) -> float:
+        """Pressure (exploit) + neighborhood rollup (digested value) + wait-time bonus (explore).
+
+        Pure top-pressure selection is greedy exploitation: whatever looks
+        best right now always wins, forever. The neighborhood term uses
+        the *parent's* rollup (not the candidate's own -- a fresh leaf's
+        own rollup is trivially just itself) so siblings of a known-good
+        discovery get a boost. The wait-time term grows with ticks spent
+        eligible-but-unpicked, so a merely-ordinary node isn't starved of
+        its turn forever just because something else looked better first.
+        """
+        cfg = self.config
+        parent = self.nodes[node.parent_id] if node.parent_id is not None else None
+        neighborhood_bonus = cfg.rollup_weight * math.exp(parent.rollup_mean) if parent is not None else 0.0
+        wait = max(0, self.tick_count - node.created_tick)
+        exploration_bonus = cfg.exploration_constant * math.sqrt(wait)
+        return node.pressure + neighborhood_bonus + exploration_bonus
 
     def _expandable_nodes(self) -> List[FluxNode]:
+        # Eligibility is "currently a leaf" (no live children right now),
+        # not "has never been expanded" -- a node whose children all
+        # burned off must be able to try again, or it becomes a permanent
+        # dead end that can win best_path() forever without ever being
+        # able to grow past it.
         return [
             n for n in self.nodes.values()
-            if not n.burned and not n.expanded and n.id != self.anchor_id
+            if not n.burned and n.id != self.anchor_id and not self._live_children(n.id)
         ]
 
     def _expand_top_pressure_nodes(self) -> None:
-        candidates = sorted(self._expandable_nodes(), key=lambda n: n.pressure, reverse=True)
+        candidates = sorted(self._expandable_nodes(), key=self._expansion_priority, reverse=True)
         for node in candidates[: self.config.compute_budget_per_tick]:
             self._expand_node(node.id)
             node.expanded = True
@@ -348,14 +463,18 @@ class FluxGraph:
         parent = self.nodes[parent_id]
         for score, token_id in zip(scores, token_ids):
             child_id = self._alloc_id()
+            cumulative = parent.cumulative_evidence + float(score)
+            new_depth = parent.depth + 1
             self.nodes[child_id] = FluxNode(
                 id=child_id,
                 token=int(token_id),
                 direction=direction,
                 parent_id=parent_id,
-                depth=parent.depth + 1,
+                depth=new_depth,
                 local_evidence=float(score),
                 pressure=self.config.found_bonus + math.exp(float(score)),
                 created_tick=self.tick_count,
+                cumulative_evidence=cumulative,
+                rollup_mean=cumulative / new_depth,
             )
             parent.children_ids.append(child_id)

@@ -22,6 +22,11 @@ from typing import Any, List, Optional
 from tensors import AbstractTensor
 from .model_abstraction import AbstractModelWrapper
 from .writing_token_filter import WritingTokenFilter
+
+try:
+    import torch
+except ModuleNotFoundError:  # pragma: no cover - optional dependency
+    torch = None  # type: ignore
 # --- END HEADER ---
 
 
@@ -143,5 +148,17 @@ class ImplicitBackpathScorer:
             target_id = int(suffix_tokens[position].item())
             log_probs = logits[:, offset + position, :].log_softmax(dim=-1)
             total = total + log_probs[:, target_id]
+
+        # Each call allocates a [N, row_len, vocab] logits tensor whose
+        # shape varies from call to call (row_len grows as the graph
+        # grows) -- repeated varying-size allocate/free cycles fragment
+        # CUDA's caching allocator until a later, larger request fails
+        # even with nominally enough total free memory. Drop the large
+        # intermediates and hand cached-but-unallocated blocks back before
+        # returning, rather than letting fragmentation accumulate across
+        # many FluxGraph ticks.
+        del logits, outputs, batch_tokens, attention_mask
+        if torch is not None and torch.cuda.is_available():
+            torch.cuda.empty_cache()
 
         return total

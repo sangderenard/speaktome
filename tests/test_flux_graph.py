@@ -172,3 +172,152 @@ def test_internal_nodes_are_never_burned_even_with_low_pressure():
     # once the child is gone... but we check mid-run behavior: at no point
     # was weak_parent_id burned while it still had a live child.
     assert graph.nodes[weak_parent_id].burned is False
+
+
+def test_a_node_whose_children_all_burn_becomes_expandable_again():
+    # Eligibility must be based on current leaf status, not "has this node
+    # ever been expanded" -- otherwise a node whose children all burn off
+    # becomes a permanent dead end that can win best_path() forever
+    # without ever being able to grow past it.
+    graph = _build_graph()
+    anchor_id = graph.seed([0])
+
+    parent_id = graph._alloc_id()
+    graph.nodes[parent_id] = FluxNode(
+        id=parent_id, token=1, direction=Direction.FORWARD, parent_id=anchor_id,
+        depth=1, local_evidence=0.0, pressure=1.0, expanded=True,
+    )
+    graph.nodes[anchor_id].children_ids.append(parent_id)
+
+    child_id = graph._alloc_id()
+    graph.nodes[child_id] = FluxNode(
+        id=child_id, token=2, direction=Direction.FORWARD, parent_id=parent_id,
+        depth=2, local_evidence=-50.0, pressure=0.01, expanded=True,
+    )
+    graph.nodes[parent_id].children_ids.append(child_id)
+
+    assert parent_id not in [n.id for n in graph._expandable_nodes()]
+
+    for _ in range(graph.config.burn_after_ticks + 2):
+        graph._update_pressures()
+        graph._starve_and_burn()
+
+    assert graph.nodes[child_id].burned is True
+    assert parent_id in [n.id for n in graph._expandable_nodes()]
+
+
+def _build_chain(graph, length, local_evidence, direction=Direction.FORWARD):
+    """Hand-build a straight chain of ``length`` nodes off the anchor."""
+    prev = graph.anchor_id
+    chain = []
+    for depth in range(1, length + 1):
+        nid = graph._alloc_id()
+        cumulative = graph.nodes[prev].cumulative_evidence + local_evidence
+        graph.nodes[nid] = FluxNode(
+            id=nid, token=depth, direction=direction, parent_id=prev,
+            depth=depth, local_evidence=local_evidence, pressure=1.0, expanded=True,
+            cumulative_evidence=cumulative, rollup_mean=cumulative / depth,
+        )
+        graph.nodes[prev].children_ids.append(nid)
+        chain.append(nid)
+        prev = nid
+    return chain
+
+
+def test_settle_circuit_does_more_than_one_relaxation_step():
+    graph = _build_graph()
+    graph.seed([0])
+    _build_chain(graph, length=10, local_evidence=-1.0)
+
+    graph._update_pressures()
+    single_step = {nid: n.pressure for nid, n in graph.nodes.items()}
+
+    graph2 = _build_graph()
+    graph2.seed([0])
+    _build_chain(graph2, length=10, local_evidence=-1.0)
+    iterations = graph2._settle_circuit()
+
+    assert iterations > 1
+    settled = {nid: n.pressure for nid, n in graph2.nodes.items()}
+    # Settling changes the far end of the chain relative to a single sweep --
+    # multi-hop support hasn't had time to arrive after just one update.
+    assert any(
+        abs(settled[nid] - single_step[nid]) > 1e-6
+        for nid in settled if nid != graph.anchor_id
+    )
+
+
+def test_settle_circuit_is_a_no_op_once_already_converged():
+    graph = _build_graph()
+    graph.seed([0])
+    _build_chain(graph, length=6, local_evidence=-1.0)
+    graph._settle_circuit()
+    # Already settled -- a second call should converge almost immediately.
+    iterations = graph._settle_circuit()
+    assert iterations <= 2
+
+
+def test_digest_propagates_a_deep_strong_discovery_to_shallow_ancestors():
+    graph = _build_graph()
+    graph.seed([0])
+
+    # A weak first hop, then a much stronger run deeper in -- an ancestor's
+    # own path_mean alone looks worse than what's reachable through it.
+    weak_id = _build_chain(graph, length=1, local_evidence=-4.0)[0]
+    prev = weak_id
+    strong_chain = []
+    for depth in range(2, 6):
+        nid = graph._alloc_id()
+        cumulative = graph.nodes[prev].cumulative_evidence + 0.0
+        graph.nodes[nid] = FluxNode(
+            id=nid, token=depth, direction=Direction.FORWARD, parent_id=prev,
+            depth=depth, local_evidence=0.0, pressure=1.0, expanded=True,
+            cumulative_evidence=cumulative, rollup_mean=cumulative / depth,
+        )
+        graph.nodes[prev].children_ids.append(nid)
+        strong_chain.append(nid)
+        prev = nid
+
+    graph._digest()
+
+    deepest = graph.nodes[strong_chain[-1]]
+    ancestor = graph.nodes[weak_id]
+    # The deepest node's own path_mean is much better than the weak
+    # ancestor's own path_mean...
+    assert deepest.path_mean > ancestor.path_mean
+    # ...and digestion should have carried that back: the ancestor's
+    # rollup_mean reflects the best thing reachable through it, not just
+    # its own (worse) local path_mean.
+    assert ancestor.rollup_mean > ancestor.path_mean
+    assert math.isclose(ancestor.rollup_mean, deepest.rollup_mean, rel_tol=1e-6)
+
+
+def test_expansion_priority_gives_a_long_waiting_node_a_boost():
+    graph = _build_graph()
+    graph.seed([0])
+
+    # Two candidate leaves with nearly the same pressure, but one has been
+    # sitting eligible for many ticks while the other just appeared.
+    old_id = graph._alloc_id()
+    graph.nodes[old_id] = FluxNode(
+        id=old_id, token=1, direction=Direction.FORWARD, parent_id=graph.anchor_id,
+        depth=1, local_evidence=-1.0, pressure=0.5, created_tick=0,
+    )
+    graph.nodes[graph.anchor_id].children_ids.append(old_id)
+
+    new_id = graph._alloc_id()
+    graph.nodes[new_id] = FluxNode(
+        id=new_id, token=2, direction=Direction.FORWARD, parent_id=graph.anchor_id,
+        depth=1, local_evidence=-1.0, pressure=0.51, created_tick=0,
+    )
+    graph.nodes[graph.anchor_id].children_ids.append(new_id)
+
+    graph.tick_count = 0
+    # At tick 0, both have waited 0 ticks -- the tiny pressure edge wins.
+    assert graph._expansion_priority(graph.nodes[new_id]) > graph._expansion_priority(graph.nodes[old_id])
+
+    # Advance time without ever expanding old_id -- its wait-time bonus
+    # should eventually overcome new_id's tiny pressure edge.
+    graph.nodes[new_id].created_tick = 20  # new_id "arrives" much later
+    graph.tick_count = 20
+    assert graph._expansion_priority(graph.nodes[old_id]) > graph._expansion_priority(graph.nodes[new_id])
