@@ -21,11 +21,6 @@ from typing import Any, List, Optional, Protocol
 
 from tensors import AbstractTensor
 from .model_abstraction import AbstractModelWrapper
-
-try:
-    import torch
-except ModuleNotFoundError:  # pragma: no cover - optional dependency
-    torch = None  # type: ignore
 # --- END HEADER ---
 
 
@@ -214,16 +209,24 @@ class ImplicitBackpathScorer:
         )
         total = log_probs[:, positions, suffix_tokens].sum(dim=1)  # [N]
 
-        # Each call allocates a [N, row_len, vocab] logits tensor whose
-        # shape varies from call to call (row_len grows as the graph
-        # grows) -- repeated varying-size allocate/free cycles fragment
-        # CUDA's caching allocator until a later, larger request fails
-        # even with nominally enough total free memory. Drop the large
-        # intermediates and hand cached-but-unallocated blocks back before
-        # returning, rather than letting fragmentation accumulate across
-        # many FluxGraph ticks.
+        # Drop references to the large [N, row_len, vocab] intermediates
+        # immediately so CPython's refcounting returns them to PyTorch's
+        # caching allocator right away, rather than keeping them alive
+        # until the next GC cycle. Deliberately not calling
+        # torch.cuda.empty_cache() here: an A/B test against the
+        # unmodified original on a real GPT-2 run that eventually OOMs
+        # (a large backward candidate pool at expand_batch_chunk_size
+        # rows, times vocab_size, times a growing context length,
+        # exceeds a 12GB GPU) showed empty_cache() present or absent
+        # made no measurable difference to whether or when that OOM
+        # happened -- both hit it at the same tick with near-identical
+        # per-tick timing. Its only confirmed effect was ~0.35s of pure
+        # synchronization overhead per call with no offsetting benefit.
+        # If this workload's memory footprint needs to come down, the
+        # actual lever is expand_batch_chunk_size/max_batch_size (fewer
+        # candidates scored per forward call) -- a real behavior/perf
+        # tradeoff to raise with the user, not a reflexive re-add of
+        # this call.
         del logits, log_probs, outputs, batch_tokens, attention_mask
-        if torch is not None and torch.cuda.is_available():
-            torch.cuda.empty_cache()
 
         return total

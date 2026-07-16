@@ -98,6 +98,34 @@ def test_tick_keeps_pressures_finite():
         assert math.isfinite(node.pressure)
 
 
+def test_plan_expand_chunks_matches_flat_chunking_when_no_budget_set():
+    graph = _build_graph()
+    graph.config.expand_batch_chunk_size = 5
+    row_lens = [3] * 13
+    chunks = graph._plan_expand_chunks(row_lens, vocab_size=100)
+    assert chunks == [(0, 5), (5, 10), (10, 13)]
+
+
+def test_plan_expand_chunks_shrinks_rows_as_row_len_grows_under_a_budget():
+    graph = _build_graph()
+    graph.config.expand_batch_chunk_size = 100
+    graph.config.max_expand_elements = 1000
+    row_lens = [10] * 5 + [50] * 5  # vocab=10: budget/row_len/vocab = 10 rows, then 2 rows
+    chunks = graph._plan_expand_chunks(row_lens, vocab_size=10)
+    for start, end in chunks:
+        segment = row_lens[start:end]
+        count = end - start
+        assert count == 1 or count * max(segment) * 10 <= 1000
+
+
+def test_plan_expand_chunks_still_serves_a_single_row_that_alone_exceeds_budget():
+    graph = _build_graph()
+    graph.config.expand_batch_chunk_size = 100
+    graph.config.max_expand_elements = 10
+    chunks = graph._plan_expand_chunks([1000], vocab_size=10)
+    assert chunks == [(0, 1)]  # served, not dropped or raising
+
+
 def test_best_path_includes_anchor_and_grows_with_ticks():
     graph = _build_graph()
     graph.seed([2])
@@ -693,14 +721,18 @@ class WordGrowthBigramModel(AbstractModelWrapper):
         return "cpu"
 
 
-def _word_growth_graph(word_trie, branch_factor=2, max_subword_steps=6, anchor_tokens=None):
+def _word_growth_graph(
+    word_trie, branch_factor=2, max_subword_steps=6, anchor_tokens=None,
+    backward_word_trie=None,
+):
     model = WordGrowthBigramModel()
     tok = WordGrowthTokenizer()
     backpath = ImplicitBackpathScorer(model, tok, writing_filter=None)
     ops = PyTorchTensorOperations(track_time=False)
     config = FluxGraphConfig(
         branch_factor=branch_factor, compute_budget_per_tick=1, no_repeat_ngram_size=None,
-        word_trie=word_trie, max_subword_steps=max_subword_steps,
+        word_trie=word_trie, backward_word_trie=backward_word_trie,
+        max_subword_steps=max_subword_steps,
     )
     graph = FluxGraph(model, backpath, TopKPolicy(), ops, config=config)
     graph.seed(anchor_tokens if anchor_tokens is not None else [])
@@ -802,6 +834,66 @@ def test_grow_backward_word_finalizes_immediately_on_a_fresh_word_round0_candida
     # Seed with " cat" (already starts fresh) -- must finalize as a single-token word.
     result = graph._grow_backward_word(graph.nodes[graph.anchor_id], [(2, -0.05)])
     assert result == [([2], -0.05)]
+
+
+def test_grow_backward_word_with_reversed_trie_produces_running():
+    fwd = WordTrie(["running", "cat", "dog"])
+    bwd = WordTrie(["running", "cat", "dog"], reverse=True)
+    graph = _word_growth_graph(fwd, backward_word_trie=bwd)
+    result = graph._grow_backward_word(graph.nodes[graph.anchor_id], [(1, -0.1)])
+    spans = [tuple(tokens) for tokens, _ in result]
+    assert (0, 1) in spans
+
+
+def test_grow_backward_word_never_loops_on_a_repeated_dictionary_fragment():
+    """Regression: a real GPT-2 run produced garbage like "AbAbAballah"
+    because each individually-dictionary-valid token ("Ab" alone passes a
+    flat per-token filter) got prepended repeatedly with no check that the
+    *accumulating* span still headed toward a real word. The reversed
+    trie's stateful walk must reject this even when the model itself
+    strongly prefers repeating the fragment.
+    """
+    words = [" run", "ning", "ab"]  # "ab" is a short, tempting, real-looking fragment
+
+    class RepeatBaitTokenizer:
+        vocab_size = len(words)
+
+        def decode(self, ids):
+            return "".join(words[i] for i in ids)
+
+    # After "ning", the model strongly prefers repeating "ab" forever
+    # rather than ever producing " run".
+    table = [
+        [0.0, 10.0, 0.0],   # after " run" -> "ning"
+        [0.0, 0.0, 10.0],   # after "ning" -> "ab" (repeat bait, model's real favorite)
+        [0.0, 0.0, 10.0],   # after "ab" -> "ab" again
+    ]
+
+    class RepeatBaitModel(AbstractModelWrapper):
+        def forward(self, input_ids, attention_mask, **kwargs):
+            t = torch.tensor(table, dtype=torch.float32)
+            return {"logits": t[input_ids]}
+
+        def get_device(self):
+            return "cpu"
+
+    model = RepeatBaitModel()
+    tok = RepeatBaitTokenizer()
+    backpath = ImplicitBackpathScorer(model, tok, writing_filter=None)
+    ops = PyTorchTensorOperations(track_time=False)
+    fwd = WordTrie(["running"])
+    bwd = WordTrie(["running"], reverse=True)
+    config = FluxGraphConfig(
+        branch_factor=2, compute_budget_per_tick=1, no_repeat_ngram_size=None,
+        word_trie=fwd, backward_word_trie=bwd, max_subword_steps=6,
+    )
+    graph = FluxGraph(model, backpath, TopKPolicy(), ops, config=config)
+    graph.seed([])
+
+    result = graph._grow_backward_word(graph.nodes[graph.anchor_id], [(1, -0.1)])
+    spans = [tuple(tokens) for tokens, _ in result]
+    assert (0, 1) in spans, f"expected running (0,1) among {spans}"
+    assert not any(2 in span for span in spans), f"'ab' (token 2) leaked into a span: {spans}"
 
 
 def test_expand_batch_with_word_trie_produces_multi_token_nodes():
@@ -978,3 +1070,211 @@ def test_head_pressure_never_drives_pressure_negative():
     graph.nodes[node_id].direction = Direction.FORWARD
     graph._settle_circuit()
     assert graph.nodes[node_id].pressure >= 0.0
+
+
+# ---------------------------------------------------------------------------
+# Root displacement / re-rooting
+# ---------------------------------------------------------------------------
+
+def _add_node(graph, parent_id, tok_id, evidence, depth, direction=Direction.FORWARD, pressure=1.0):
+    nid = graph._alloc_id()
+    parent = graph.nodes[parent_id]
+    cum = parent.cumulative_evidence + evidence
+    graph.nodes[nid] = FluxNode(
+        id=nid, tokens=[tok_id], direction=direction, parent_id=parent_id,
+        depth=depth, local_evidence=evidence, pressure=pressure,
+        cumulative_evidence=cum, rollup_mean=cum / depth if depth else 0.0,
+    )
+    parent.children_ids.append(nid)
+    return nid
+
+
+def test_reroot_simple_one_hop_flips_pointers_and_direction():
+    graph = _build_graph()
+    anchor_id = graph.seed([99])
+    f1_id = _add_node(graph, anchor_id, 1, -0.1, 1, direction=Direction.FORWARD, pressure=2.0)
+
+    graph._reroot(f1_id)
+
+    assert graph.anchor_id == f1_id
+    f1 = graph.nodes[f1_id]
+    assert f1.direction is None
+    assert f1.parent_id is None
+    assert f1.depth == 0
+    assert f1.local_evidence == 0.0
+    assert f1.tokens == []
+    assert graph.anchor_tokens == [1]
+
+    old_anchor = graph.nodes[anchor_id]
+    assert old_anchor.parent_id == f1_id
+    assert old_anchor.direction is Direction.BACKWARD
+    assert old_anchor.depth == 1
+    assert old_anchor.tokens == [99]
+    assert anchor_id in f1.children_ids
+    assert f1_id not in old_anchor.children_ids
+
+
+def test_reroot_multi_hop_flips_the_whole_path():
+    graph = _build_graph()
+    anchor_id = graph.seed([99])
+    f1_id = _add_node(graph, anchor_id, 1, -0.1, 1, direction=Direction.FORWARD, pressure=1.0)
+    f2_id = _add_node(graph, f1_id, 2, -0.1, 2, direction=Direction.FORWARD, pressure=1.0)
+    f3_id = _add_node(graph, f2_id, 3, -0.1, 3, direction=Direction.FORWARD, pressure=3.0)
+
+    graph._reroot(f3_id)
+
+    assert graph.anchor_id == f3_id
+    f3 = graph.nodes[f3_id]
+    assert f3.parent_id is None and f3.direction is None and f3.depth == 0
+
+    f2 = graph.nodes[f2_id]
+    assert f2.parent_id == f3_id and f2.direction is Direction.BACKWARD and f2.depth == 1
+
+    f1 = graph.nodes[f1_id]
+    assert f1.parent_id == f2_id and f1.direction is Direction.BACKWARD and f1.depth == 2
+
+    old_anchor = graph.nodes[anchor_id]
+    assert old_anchor.parent_id == f1_id and old_anchor.direction is Direction.BACKWARD
+    assert old_anchor.depth == 3
+    assert old_anchor.tokens == [99]
+
+    assert f2_id in f3.children_ids
+    assert f1_id in f2.children_ids
+    assert anchor_id in f1.children_ids
+
+
+def test_reroot_keeps_orthogonal_sibling_at_intermediate_ancestor_fully_live():
+    graph = _build_graph()
+    anchor_id = graph.seed([99])
+    f1_id = _add_node(graph, anchor_id, 1, -0.1, 1, direction=Direction.FORWARD, pressure=1.0)
+    f2_id = _add_node(graph, f1_id, 2, -0.1, 2, direction=Direction.FORWARD, pressure=3.0)
+    f2b_id = _add_node(graph, f1_id, 20, -0.1, 2, direction=Direction.FORWARD, pressure=0.5)
+
+    graph._reroot(f2_id)
+
+    # f2b is untouched: still attached under f1, still its own original
+    # tokens/direction, still a normal live node -- nothing is detached,
+    # reset, or removed from the graph by re-rooting.
+    assert f2b_id in graph.nodes[f1_id].children_ids
+    f2b = graph.nodes[f2b_id]
+    assert f2b.parent_id == f1_id
+    assert f2b.direction is Direction.FORWARD
+    assert f2b.tokens == [20]
+    assert f2b_id in graph.nodes
+
+    assert f2b_id in graph.orthogonal_node_ids()
+
+
+def test_reroot_old_anchor_opposite_direction_children_stay_attached_not_orthogonal():
+    graph = _build_graph()
+    anchor_id = graph.seed([99])
+    f1_id = _add_node(graph, anchor_id, 1, -0.1, 1, direction=Direction.FORWARD, pressure=3.0)
+    f2_id = _add_node(graph, anchor_id, 2, -0.1, 1, direction=Direction.FORWARD, pressure=0.5)
+    b1_id = _add_node(graph, anchor_id, 3, -0.1, 1, direction=Direction.BACKWARD, pressure=0.5)
+
+    graph._reroot(f1_id)
+
+    orthogonal = graph.orthogonal_node_ids()
+    assert f2_id in orthogonal
+    assert b1_id not in orthogonal
+
+    b1 = graph.nodes[b1_id]
+    assert b1.parent_id == anchor_id
+    assert b1.direction is Direction.BACKWARD
+    assert b1.depth == 2  # anchor shifted to depth 1, b1 one further
+    old_anchor = graph.nodes[anchor_id]
+    assert b1_id in old_anchor.children_ids
+    assert f2_id in old_anchor.children_ids  # still attached, just orthogonal now
+
+
+def test_reroot_demoted_anchor_becomes_vulnerable_to_starvation():
+    graph = _build_graph()
+    graph.config.starvation_floor = 0.5
+    graph.config.burn_after_ticks = 2
+    anchor_id = graph.seed([99])
+    f1_id = _add_node(graph, anchor_id, 1, -0.1, 1, direction=Direction.FORWARD, pressure=3.0)
+    graph._reroot(f1_id)
+
+    old_anchor = graph.nodes[anchor_id]
+    old_anchor.pressure = 0.0
+    graph._starve_and_burn()
+    assert old_anchor.low_pressure_ticks == 1
+    graph._starve_and_burn()
+    assert old_anchor.burned is True
+
+
+def test_demoted_anchor_pressure_is_now_recomputed_not_frozen():
+    graph = _build_graph()
+    anchor_id = graph.seed([99])
+    f1_id = _add_node(graph, anchor_id, 1, -0.1, 1, direction=Direction.FORWARD, pressure=3.0)
+    graph._reroot(f1_id)
+
+    old_anchor = graph.nodes[anchor_id]
+    old_anchor.pressure = 999.0
+    graph._update_pressures()
+    assert old_anchor.pressure != 999.0
+
+
+def test_maybe_reroot_triggers_when_a_node_exceeds_anchor_pressure():
+    graph = _build_graph()
+    anchor_id = graph.seed([99])
+    weak_id = _add_node(graph, anchor_id, 1, -5.0, 1, direction=Direction.FORWARD, pressure=0.5)
+    strong_id = _add_node(graph, anchor_id, 2, -0.01, 1, direction=Direction.FORWARD, pressure=5.0)
+
+    assert graph.anchor_id == anchor_id
+    graph._maybe_reroot()
+
+    assert graph.anchor_id == strong_id
+    # weak_id is orthogonal now (its direction no longer matches its
+    # parent's post-flip direction) but it's still a fully live node in
+    # the same graph -- nothing was removed, and it remains eligible to
+    # become anchor itself if its own pressure ever earns it.
+    assert weak_id in graph.nodes
+    assert weak_id in graph.orthogonal_node_ids()
+
+
+def test_maybe_reroot_does_nothing_when_anchor_pressure_is_highest():
+    graph = _build_graph()
+    anchor_id = graph.seed([99])
+    _add_node(graph, anchor_id, 1, -0.1, 1, direction=Direction.FORWARD, pressure=0.5)
+    graph._maybe_reroot()
+    assert graph.anchor_id == anchor_id
+
+
+def test_previously_orthogonal_node_can_itself_become_the_next_anchor():
+    """Displacing the root doesn't remove anything from the graph -- an
+    orthogonal node is still fully live and can be re-rooted to again."""
+    graph = _build_graph()
+    anchor_id = graph.seed([99])
+    weak_id = _add_node(graph, anchor_id, 1, -5.0, 1, direction=Direction.FORWARD, pressure=0.5)
+    _add_node(graph, anchor_id, 2, -0.01, 1, direction=Direction.FORWARD, pressure=5.0)
+
+    graph._maybe_reroot()
+    assert weak_id in graph.orthogonal_node_ids()
+
+    graph.nodes[weak_id].pressure = 100.0
+    graph._maybe_reroot()
+
+    assert graph.anchor_id == weak_id
+    assert weak_id not in graph.orthogonal_node_ids()  # it's the anchor now
+
+
+def test_path_tokens_correct_after_reroot_includes_demoted_anchor_seed():
+    graph = _build_graph()
+    anchor_id = graph.seed([99])
+    f1_id = _add_node(graph, anchor_id, 1, -0.1, 1, direction=Direction.FORWARD, pressure=3.0)
+    f2_id = _add_node(graph, f1_id, 2, -0.1, 2, direction=Direction.FORWARD, pressure=1.0)
+
+    graph._reroot(f1_id)
+
+    tokens, direction = graph.path_tokens(f2_id)
+    assert tokens == [2]
+    assert direction is Direction.FORWARD
+
+    old_tokens, old_direction = graph.path_tokens(anchor_id)
+    assert old_tokens == [99]
+    assert old_direction is Direction.BACKWARD
+
+    seq = graph.full_sequence(forward_leaf=f2_id, backward_leaf=anchor_id)
+    assert seq == [99, 1, 2]
+

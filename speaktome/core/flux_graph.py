@@ -30,6 +30,23 @@ the best currently-known context on the other side, and correctness
 diffuses through the graph via the tick update as both sides keep
 growing, rather than needing to be exactly right at the moment a node is
 created.
+
+Even the anchor isn't permanent. If a non-anchor node's live pressure
+ever exceeds the current anchor's, that node displaces it: the tree is
+re-rooted there (see FluxGraph._reroot), forward/backward are
+reinterpreted relative to the new root -- what was "toward the old
+anchor" becomes the new root's opposite direction, and the old anchor
+folds into that reinterpreted lineage, now a perfectly ordinary node,
+newly subject to the same starvation/burning as anything else. This is
+still one graph, one topology, one continuous line of real compute --
+re-rooting only changes which node is treated as root. Nothing is ever
+detached, extracted, or stopped: any subtree that branched off *between*
+the new root and the old anchor, on the side not carrying the new root,
+keeps its old direction and just sits there, still fully live, still
+eligible to become anchor itself later if its own pressure ever earns
+it. Such a subtree no longer reads as a clean two-hemisphere
+forward/backward layout (see FluxGraph.orthogonal_node_ids) -- that's a
+pure display question, not a reason to remove it from the graph.
 """
 from __future__ import annotations
 
@@ -43,13 +60,8 @@ from .implicit_backpath import ImplicitBackpathScorer
 from .model_abstraction import AbstractModelWrapper
 from .noodle_explorer import Direction
 from .poetic_attractor import PoeticAttractor
-from .word_trie import WordTrie
+from .word_trie import WordTrie, TrieGate
 from .word_boundary import starts_new_word
-
-try:
-    import torch
-except ModuleNotFoundError:  # pragma: no cover - optional dependency
-    torch = None  # type: ignore
 # --- END HEADER ---
 
 
@@ -132,6 +144,15 @@ class FluxGraphConfig:
     damping: float = 0.5
     starvation_floor: float = 0.08
     burn_after_ticks: int = 3
+    # Off by default: the anchor's own pressure is frozen (never
+    # recomputed, never starves) the way every other node's is. Turning
+    # this on makes the anchor a normal citizen of the pressure network --
+    # if it goes without support for burn_after_ticks ticks (same floor,
+    # same patience as an ordinary node), it can't just sit there forever;
+    # _maybe_reroot force-picks the current highest-pressure live node as
+    # the next anchor from whatever's actually in the graph right now,
+    # rather than waiting for a challenger to out-score it fairly.
+    anchor_can_decay: bool = False
     compute_budget_per_tick: int = 4
     branch_factor: int = 3
     max_context_tokens: int = 64
@@ -175,6 +196,25 @@ class FluxGraphConfig:
     # call within that shared batch (a backward node alone can contribute
     # tens of thousands of candidate rows), not a count of nodes.
     expand_batch_chunk_size: int = 2048
+    # expand_batch_chunk_size alone is a *flat* row-count cap -- real GPU
+    # memory for one forward call scales with rows x row_len x vocab_size,
+    # and row_len grows over a run as context accumulates, so a flat row
+    # cap that's safe early in a run can silently become a multi-GB
+    # request later without expand_batch_chunk_size ever changing. This
+    # bounds the *product* directly: the effective row cap for a given
+    # chunk shrinks as that chunk's own row_len grows, so no single
+    # forward call this triggers can exceed roughly this many
+    # (row x vocab-position) elements, regardless of how long the graph's
+    # context has grown. None (default) preserves the original flat-cap
+    # behavior exactly -- this is opt-in, not a change to existing
+    # configs. Also applied to backward word growth's per-step scoring
+    # calls (see _grow_backward_word), which share the same underlying
+    # concern at a smaller scale. A real GPT-2 run that OOM'd here even
+    # with expand_batch_chunk_size respected (2048 rows x ~20 growing
+    # row_len x 50257 vocab in float32 is already multi-GB) is what this
+    # exists to prevent; tune to your GPU's actual headroom, not a
+    # one-size-fits-all constant.
+    max_expand_elements: Optional[int] = None
     # Optional rhyme/alliteration bias over candidate selection. None
     # disables it entirely (default -- this is a bias on top of the real
     # model, not a replacement for it). When set, it never touches
@@ -200,6 +240,15 @@ class FluxGraphConfig:
     # None (default) disables all of this: every edge stays exactly one
     # token, identical to pre-word-growth behavior.
     word_trie: Optional[WordTrie] = None
+    # Backward growth discovers a word from its end toward its start (each
+    # new token gets *prepended*), so validating against word_trie (built
+    # prefix-wise) would ask a prefix question about what's actually a
+    # suffix-in-progress -- it needs a second trie built over reversed
+    # word strings (WordTrie(..., reverse=True)) to ask the right
+    # question. None (default) means backward growth falls back to
+    # scoring its whole candidate pool every step with no trie narrowing
+    # or validation at all, matching pre-trie-gating behavior.
+    backward_word_trie: Optional[WordTrie] = None
     # Hard cap on how many subtokens one word's growth can consume before
     # being force-finalized as-is, regardless of whether a boundary was
     # found -- safety against a pathological run of continuation pieces
@@ -269,6 +318,26 @@ class FluxGraph:
         # reader for the whole run. Publishing removes the race instead of
         # tuning around it.
         self.published_snapshot: Optional[Dict[int, Tuple[Optional[int], bool, Optional[Direction], float]]] = None
+        # One TrieGate per distinct WordTrie (forward vs backward-reversed),
+        # built lazily on first use and reused for the graph's whole
+        # lifetime -- the underlying candidate pool (which vocab ids are
+        # dictionary/writing-clean at all) never changes tick to tick, so
+        # there's no reason to redo that decode-and-classify pass more than
+        # once. Keyed by id(trie) rather than the trie object itself since
+        # WordTrie isn't hashable.
+        self._trie_gates: Dict[int, TrieGate] = {}
+
+    def _get_word_trie_gate(self, trie: WordTrie) -> TrieGate:
+        key = id(trie)
+        gate = self._trie_gates.get(key)
+        if gate is None:
+            ops = self.tensor_ops
+            pool = self.backward_scorer.candidate_pool(
+                ops, vocab_size=self.backward_scorer.tokenizer.vocab_size, device=self.device
+            )
+            gate = TrieGate(trie, self.backward_scorer.tokenizer, pool.tolist())
+            self._trie_gates[key] = gate
+        return gate
 
     # ------------------------------------------------------------------
     # Construction
@@ -407,13 +476,217 @@ class FluxGraph:
     # Tick: pressure update, expansion, starvation
     # ------------------------------------------------------------------
     def tick(self) -> None:
+        """Advance one discrete step."""
         self.tick_count += 1
         self._settle_circuit()
+        self._maybe_reroot()
         self._digest()
         self._diffuse_auxin()
         self._expand_top_pressure_nodes()
         self._starve_and_burn()
         self._publish_snapshot()
+
+    # ------------------------------------------------------------------
+    # Re-rooting: the anchor itself can be displaced by a higher-pressure node
+    # ------------------------------------------------------------------
+    def _maybe_reroot(self) -> None:
+        """Displace the anchor if some live node's pressure now exceeds it.
+
+        Checked once per tick, right after pressure settles (so the
+        comparison uses converged values, not a mid-relaxation snapshot)
+        and before digestion/auxin/expansion/starvation (so those all see
+        the post-rerooting tree -- correct anchor_id, correct depths --
+        rather than operating on stale structure for one tick). If several
+        live nodes exceed the anchor, the single highest-pressure one wins;
+        ties are broken by whichever this dict iteration reaches first,
+        which is insertion order (oldest node id) in practice -- not a
+        documented guarantee, just a note for anyone tracing a specific run.
+
+        If ``config.anchor_can_decay`` is on, the anchor itself is also
+        tracked for starvation exactly like any other node (same
+        starvation_floor/burn_after_ticks patience -- see _update_pressures'
+        matching exemption toggle). Once it's gone that long without
+        support, it can't just sit there forever the way an unsupported
+        leaf can't: this force-picks the current highest-pressure live node
+        as the next anchor from whatever's actually in the graph right now,
+        rather than waiting for a challenger to fairly out-score it.
+        """
+        anchor = self.nodes[self.anchor_id]
+
+        if self.config.anchor_can_decay:
+            if anchor.pressure < self.config.starvation_floor:
+                anchor.low_pressure_ticks += 1
+            else:
+                anchor.low_pressure_ticks = 0
+            if anchor.low_pressure_ticks >= self.config.burn_after_ticks:
+                replacement_id = self._best_replacement_anchor()
+                if replacement_id is not None:
+                    self._reroot(replacement_id)
+                return
+
+        challenger_id = None
+        challenger_pressure = anchor.pressure
+        for node_id, node in self.nodes.items():
+            if node.burned or node_id == self.anchor_id:
+                continue
+            if node.pressure > challenger_pressure:
+                challenger_pressure = node.pressure
+                challenger_id = node_id
+        if challenger_id is None:
+            return
+        self._reroot(challenger_id)
+
+    def _best_replacement_anchor(self) -> Optional[int]:
+        """The current highest-pressure live non-anchor node, or None if there isn't one.
+
+        The forced pick used when the anchor itself has decayed away (see
+        anchor_can_decay) -- unlike the normal challenger scan in
+        _maybe_reroot, this doesn't require beating anything, just being
+        the best of whatever the current node landscape actually has.
+        """
+        best_id = None
+        best_pressure = -math.inf
+        for node_id, node in self.nodes.items():
+            if node.burned or node_id == self.anchor_id:
+                continue
+            if node.pressure > best_pressure:
+                best_pressure = node.pressure
+                best_id = node_id
+        return best_id
+
+    def _reroot(self, new_root_id: int) -> None:
+        """Re-root the tree at ``new_root_id``.
+
+        Walks from ``new_root_id`` up to the current anchor, reversing
+        parent/child pointers and flipping direction along that path --
+        what was "toward the old anchor" from the new root's own original
+        side is now the new root's *opposite* direction. Every other node
+        in the graph -- including branches whose direction no longer
+        lines up with this new orientation -- is left exactly where it
+        is: nothing is detached, extracted, or reset except the two nodes
+        actually changing anchor status (new_root promoted, old anchor
+        demoted). The graph stays one connected tree, and every node
+        stays fully live and eligible to become anchor itself later (see
+        _maybe_reroot's scan over all of self.nodes). Which nodes no
+        longer read as a clean two-hemisphere forward/backward layout is
+        a pure display question -- see orthogonal_node_ids -- not
+        something this method needs to compute or care about.
+        """
+        old_anchor_id = self.anchor_id
+        if new_root_id == old_anchor_id:
+            return
+        old_anchor_tokens = self.anchor_tokens
+
+        new_root = self.nodes[new_root_id]
+        original_direction = new_root.direction
+        flipped_direction = (
+            Direction.BACKWARD if original_direction is Direction.FORWARD else Direction.FORWARD
+        )
+
+        # Walk the path from new_root up to the old anchor, before any
+        # pointer gets mutated.
+        path: List[int] = [new_root_id]
+        cur = new_root_id
+        while cur != old_anchor_id:
+            cur = self.nodes[cur].parent_id
+            path.append(cur)
+
+        # Reverse parent/child pointers along path[0..-1] -> path[-1].
+        for i in range(len(path) - 1):
+            cur_id, next_id = path[i], path[i + 1]
+            cur_node, next_node = self.nodes[cur_id], self.nodes[next_id]
+            if cur_id in next_node.children_ids:
+                next_node.children_ids.remove(cur_id)
+            cur_node.children_ids.append(next_id)
+            next_node.parent_id = cur_id
+
+        # Flip direction for every reversed-path node (all but the new
+        # root itself, which becomes direction=None as the anchor).
+        for node_id in path[1:]:
+            self.nodes[node_id].direction = flipped_direction
+
+        # Promote new_root to anchor. The demoted old anchor never had its
+        # own single-edge token span (it *was* the fixed seed, not
+        # something grown) -- without this, the entire original seed text
+        # would silently vanish from any path that walks through it now
+        # that it's an ordinary node. Its captured former anchor_tokens
+        # becomes that node's own (multi-token, same as any word-growth
+        # span) edge content.
+        self.nodes[old_anchor_id].tokens = old_anchor_tokens
+        self.anchor_tokens = self._reset_to_anchor_invariants(new_root)
+        self.anchor_id = new_root_id
+        self._recompute_depths_from(new_root_id)
+
+    def _reset_to_anchor_invariants(self, node: FluxNode) -> List[int]:
+        """Match seed()'s anchor construction, in place, for a node that's becoming the anchor.
+
+        Returns the node's own tokens as they were just before this reset
+        -- the caller uses that as the new anchor_tokens. Deliberately
+        leaves pressure, children_ids, and created_tick alone -- pressure
+        is why this node was promoted in the first place (no reason to
+        discard that live signal), children_ids/created_tick are real
+        facts about this node's own history that promotion doesn't change.
+        """
+        captured_tokens = node.tokens
+        node.tokens = []
+        node.direction = None
+        node.parent_id = None
+        node.depth = 0
+        node.local_evidence = 0.0
+        node.cumulative_evidence = 0.0
+        node.low_pressure_ticks = 0
+        node.expanded = True
+        return captured_tokens
+
+    def _recompute_depths_from(self, root_id: int) -> None:
+        """BFS from ``root_id``, fixing depth/cumulative_evidence for the whole tree.
+
+        Needed after re-rooting: both quantities are defined relative to
+        whichever node is being treated as the anchor, and re-rooting
+        shifts that anchor. The graph is always one connected tree (see
+        _reroot), so a single BFS from the new anchor reaches every node,
+        including branches now orthogonal to the new orientation.
+        """
+        root = self.nodes[root_id]
+        root.depth = 0
+        root.cumulative_evidence = 0.0
+        stack = [root_id]
+        while stack:
+            cur_id = stack.pop()
+            cur = self.nodes[cur_id]
+            for child_id in cur.children_ids:
+                child = self.nodes[child_id]
+                child.depth = cur.depth + 1
+                child.cumulative_evidence = cur.cumulative_evidence + child.local_evidence
+                stack.append(child_id)
+
+    def orthogonal_node_ids(self) -> "set[int]":
+        """Node ids whose direction lineage no longer aligns with the current anchor.
+
+        A pure, stateless display query -- never used by pressure,
+        expansion, or starvation, and never mutates anything. Re-rooting
+        (see _reroot) never removes or partitions nodes; it only changes
+        which node is treated as anchor, so a subtree grown under a
+        now-superseded orientation can end up with a direction that no
+        longer matches its (new) parent's. The anchor's own two direct
+        children are always exempt -- they're definitionally the roots of
+        the current forward/backward hemispheres -- and orthogonality
+        propagates downward: once a node disagrees with its parent, its
+        whole subtree is orthogonal too, since direction never changes
+        again below that point.
+        """
+        orthogonal: set = set()
+        anchor = self.nodes[self.anchor_id]
+        stack = list(anchor.children_ids)
+        while stack:
+            node_id = stack.pop()
+            node = self.nodes[node_id]
+            for child_id in node.children_ids:
+                child = self.nodes[child_id]
+                if node_id in orthogonal or child.direction != node.direction:
+                    orthogonal.add(child_id)
+                stack.append(child_id)
+        return orthogonal
 
     def _edge_conductance(self, node_id: int, neighbor_id: int) -> float:
         """Conductance of the edge between ``node_id`` and ``neighbor_id``.
@@ -436,7 +709,9 @@ class FluxGraph:
         previous = {nid: n.pressure for nid, n in self.nodes.items() if not n.burned}
         max_delta = 0.0
         for node_id, node in self.nodes.items():
-            if node.burned or node_id == self.anchor_id:
+            if node.burned:
+                continue
+            if node_id == self.anchor_id and not cfg.anchor_can_decay:
                 continue
             neighbors = self._neighbors(node_id)
             if neighbors:
@@ -637,6 +912,46 @@ class FluxGraph:
                     blocked.add(window[0])
         return blocked
 
+    def _plan_expand_chunks(self, row_lens: List[int], vocab_size: int) -> List[Tuple[int, int]]:
+        """Split row indices into chunk (start, end) boundaries, one model call each.
+
+        Greedy left-to-right: grow the current chunk while adding the next
+        row keeps it under both expand_batch_chunk_size (row-count cap)
+        and, if config.max_expand_elements is set, that element budget --
+        a chunk's real memory cost is set by its *longest* row, since
+        every row in a chunk gets padded to match, so the check uses the
+        running max row_len seen so far in the chunk, not each row's own
+        length. A single row that alone exceeds the element budget still
+        gets its own one-row chunk rather than being dropped or raising --
+        there's no correct way to serve it smaller than one row, and
+        refusing to make progress at all would be worse than the request
+        it's trying to bound.
+        """
+        cfg = self.config
+        n = len(row_lens)
+        if n == 0:
+            return []
+        if cfg.max_expand_elements is None:
+            chunk_size = cfg.expand_batch_chunk_size
+            return [(s, min(s + chunk_size, n)) for s in range(0, n, chunk_size)]
+
+        chunks: List[Tuple[int, int]] = []
+        start = 0
+        chunk_max_len = 0
+        for i in range(n):
+            candidate_len = max(chunk_max_len, row_lens[i])
+            candidate_count = i - start + 1
+            over_row_cap = candidate_count > cfg.expand_batch_chunk_size
+            over_element_budget = candidate_count * candidate_len * vocab_size > cfg.max_expand_elements
+            if (over_row_cap or over_element_budget) and candidate_count > 1:
+                chunks.append((start, i))
+                start = i
+                chunk_max_len = row_lens[i]
+            else:
+                chunk_max_len = candidate_len
+        chunks.append((start, n))
+        return chunks
+
     def _expand_batch(self, nodes: List[FluxNode]) -> None:
         """Expand every node selected this tick in one shared, padded batch.
 
@@ -715,9 +1030,9 @@ class FluxGraph:
         forward_logits: Dict[int, AbstractTensor] = {}
         backward_scores: Dict[int, List[Tuple[int, float]]] = {}
 
-        chunk_size = self.config.expand_batch_chunk_size
-        for start in range(0, len(rows), chunk_size):
-            end = start + chunk_size
+        vocab_size = self.backward_scorer.tokenizer.vocab_size
+        all_row_lens = [len(r) for r in rows]
+        for start, end in self._plan_expand_chunks(all_row_lens, vocab_size):
             chunk_rows = rows[start:end]
             chunk_kind = row_kind[start:end]
             chunk_node = row_node[start:end]
@@ -781,9 +1096,13 @@ class FluxGraph:
                     bucket.append((chunk_candidate[row_i], totals[k] / max(L, 1)))
                 i = j
 
+            # See implicit_backpath.py's _score_batch for why this drops
+            # references but deliberately doesn't call
+            # torch.cuda.empty_cache() -- an A/B test against the
+            # unmodified original showed that call makes no measurable
+            # difference to a real OOM this workload can hit at large
+            # candidate-pool/context sizes.
             del logits, log_probs, outputs, batch_tokens, attention_mask
-            if torch is not None and torch.cuda.is_available():
-                torch.cuda.empty_cache()
 
         poetic = self.config.poetic_attractor
         word_trie = self.config.word_trie
@@ -837,21 +1156,39 @@ class FluxGraph:
     ) -> List[Tuple[List[int], float]]:
         """Grow each round-0 candidate (one subtoken) into a complete word.
 
-        A word's first token is accepted unconditionally (it may or may not
-        itself carry GPT-2's leading-space marker -- that's not the signal
-        used here). From then on, a beam only keeps growing while the
-        model's own next-candidate does *not* start a new word; the moment
-        one does, that candidate belongs to the *next* word, not this one,
-        so the beam finalizes with whatever it already has and the fresh-
-        start candidate is not consumed. Every step branches (keeps up to
-        branch_factor continuations, not just the top one) and prunes back
-        to branch_factor by mean log-prob so growth stays bounded; a
-        continuation that stops being a valid prefix in ``word_trie`` is
-        dropped outright. Returns every word that finished (bounded by how
-        many round0 seeds were given), best mean-log-prob first -- final
-        truncation to branch_factor happens later, in
-        _select_with_poetic_bonus, the same single choke point used
-        whether or not word growth is involved.
+        Boundary detection is unchanged from the original design: each
+        step, the model's own top branch_factor next-token picks (over the
+        *full* vocab -- this step's forward pass already produces that
+        distribution for free) are checked with starts_new_word; the
+        moment one carries GPT-2's fresh-word marker, the beam finalizes
+        with what it already has (that candidate belongs to the *next*
+        word, not this one) -- multiple tied boundary candidates in the
+        same round still only finalize once.
+
+        What changed is how *continuation* candidates are chosen. The
+        original design took the model's top branch_factor picks and
+        discarded whichever didn't extend a valid trie prefix -- which
+        meant a beam could starve outright if none of the model's top
+        picks happened to fit the dictionary, with no way to recover a
+        lower-ranked-but-trie-valid candidate the model just didn't rank
+        in the top few. Now, ``word_trie``'s own children at the beam's
+        current trie state are looked up first (TrieGate, cached by node
+        -- no extra model call, since the full-vocab distribution is
+        already in hand), and choice_policy only ranks *among* those
+        already-guaranteed-valid candidates, gathered from the same
+        logits. A completed word can now only ever be a real trie member
+        (see TrieGate/WordTrie), and the candidate count considered for
+        growth shrinks as the word gets longer instead of staying flat at
+        the full vocabulary. Scores for growth candidates are therefore
+        relative to the trie-narrowed set, not the full vocabulary --
+        renormalized log-probability over the candidates actually being
+        chosen among, which is the semantically correct quantity once
+        growth is constrained rather than merely filtered after the fact.
+
+        ``word_trie=None`` (round0 seeded via _expand_batch never even
+        calls this function in that case, but direct callers/tests can)
+        falls back to the original top-k-then-unfiltered behavior exactly,
+        so this stays a true no-op when word growth's trie isn't set.
         """
         trie = self.config.word_trie
         tokenizer = self.backward_scorer.tokenizer
@@ -859,12 +1196,22 @@ class FluxGraph:
         prefix_tokens, _ = self.path_tokens(node.id)
         base_context = self.anchor_tokens + prefix_tokens
 
+        trie_gate = self._get_word_trie_gate(trie) if trie is not None else None
+
         beams = []
         for token_id, score in round0:
+            text = tokenizer.decode([token_id]).strip()
+            node_state = trie.walk_from(trie.root_node(), text) if trie is not None else None
+            if trie is not None and node_state is None:
+                # This round-0 seed's own text isn't even a valid trie
+                # prefix -- it can never grow into a real dictionary word,
+                # so don't waste a beam slot on it.
+                continue
             beams.append({
                 "tokens": [token_id],
                 "sum": float(score),
-                "text": tokenizer.decode([token_id]).strip(),
+                "text": text,
+                "node": node_state,
             })
 
         finalized: List[Tuple[List[int], float]] = []
@@ -891,39 +1238,63 @@ class FluxGraph:
             new_beams = []
             for bi, beam in enumerate(beams):
                 row_logits = log_probs[bi, row_lens[bi] - 1, :].unsqueeze(0)
+
+                # Boundary detection: same mechanism as before this change,
+                # the model's own top-k over the full vocab.
                 scores, indices = self.choice_policy.choose(row_logits, k=branch_factor)
-                produced_anything = False
                 already_finalized_this_beam = False
+                fallback_growth: List[Tuple[int, float, str]] = []
                 for cand_id, cand_score in zip(indices.tolist()[0], scores.tolist()[0]):
                     cand_text = tokenizer.decode([cand_id])
                     if starts_new_word(cand_text):
-                        # Multiple candidates this round can independently
-                        # signal "the word is already done" (e.g. several
-                        # tied fresh-word candidates) -- that's still only
-                        # one finalized word, not one per candidate.
                         if not already_finalized_this_beam:
                             finalized.append((list(beam["tokens"]), beam["sum"] / len(beam["tokens"])))
                             already_finalized_this_beam = True
-                        produced_anything = True
                         continue
-                    new_text = beam["text"] + cand_text.strip()
-                    if trie is not None and not trie.is_prefix(new_text):
-                        continue
-                    new_beams.append({
-                        "tokens": beam["tokens"] + [cand_id],
-                        "sum": beam["sum"] + float(cand_score),
-                        "text": new_text,
-                    })
-                    produced_anything = True
-                if not produced_anything:
-                    # every candidate was trie-pruned -- no valid completion
-                    # exists from here; keep the word as-is rather than
-                    # losing it outright.
+                    if trie_gate is None:
+                        # No trie configured -- fall back to the original
+                        # unfiltered behavior exactly (matches direct
+                        # word_trie=None callers/tests).
+                        fallback_growth.append((cand_id, cand_score, cand_text.strip()))
+
+                produced_growth = False
+                if trie_gate is not None:
+                    if beam["node"] is not None:
+                        valid = trie_gate.continuations(beam["node"])
+                        if valid:
+                            valid_ids = [tid for tid, _ in valid]
+                            id_tensor = backend_cls.tensor(valid_ids, dtype=long_dtype, device=self.device)
+                            narrowed_logits = row_logits[:, id_tensor]
+                            k = min(branch_factor, len(valid_ids))
+                            g_scores, g_indices = self.choice_policy.choose(narrowed_logits, k=k)
+                            for local_idx, g_score in zip(g_indices.tolist()[0], g_scores.tolist()[0]):
+                                cand_id, next_node = valid[local_idx]
+                                new_beams.append({
+                                    "tokens": beam["tokens"] + [cand_id],
+                                    "sum": beam["sum"] + float(g_score),
+                                    "text": beam["text"] + tokenizer.decode([cand_id]).strip(),
+                                    "node": next_node,
+                                })
+                                produced_growth = True
+                else:
+                    for cand_id, cand_score, stripped_text in fallback_growth:
+                        new_beams.append({
+                            "tokens": beam["tokens"] + [cand_id],
+                            "sum": beam["sum"] + float(cand_score),
+                            "text": beam["text"] + stripped_text,
+                            "node": None,
+                        })
+                        produced_growth = True
+
+                if not produced_growth and not already_finalized_this_beam:
+                    # Trie dead-end (or, with no trie, no candidate at all)
+                    # and no boundary signal either -- keep the word as-is
+                    # rather than losing it outright.
                     finalized.append((list(beam["tokens"]), beam["sum"] / len(beam["tokens"])))
 
+            # See implicit_backpath.py's _score_batch for why this
+            # deliberately skips torch.cuda.empty_cache().
             del logits, log_probs, outputs, batch_tokens, attention_mask
-            if torch is not None and torch.cuda.is_available():
-                torch.cuda.empty_cache()
 
             new_beams.sort(key=lambda b: b["sum"] / len(b["tokens"]), reverse=True)
             beams = new_beams[:branch_factor]
@@ -944,25 +1315,43 @@ class FluxGraph:
         reading order), the completion signal is simpler than forward's
         look-ahead rule: a beam finalizes the instant the token it just
         prepended itself starts a new word -- that token *is* the word's
-        first token, nothing earlier belongs to this word. Reuses
-        ImplicitBackpathScorer.score_candidates directly rather than a
-        hand-rolled batched pass (round0 already paid for the expensive
-        full-pool sweep; these follow-up rounds are only branch_factor-wide
-        and comparatively cheap to leave unbatched across beams).
+        first token, nothing earlier belongs to this word.
 
-        Deliberately skips trie pruning during growth: word_trie.is_prefix
-        checks a *left-to-right* prefix, but a partial span built backward
-        (e.g. just "ly" of "quickly") is a *suffix* of the eventual word,
-        not a prefix -- checking it against the same trie would ask the
-        wrong question. Correctly checking that requires a second trie built
-        from reversed words, which this doesn't build; completed words are
-        simply left unvalidated against the dictionary rather than
-        mis-validated against it. A real gap, not a hidden one.
+        Uses ``FluxGraphConfig.backward_word_trie`` -- a *reversed* WordTrie
+        (see WordTrie's ``reverse`` parameter), since backward growth
+        discovers a word from its end toward its start; validating against
+        the forward word_trie would ask a prefix question about what's
+        actually a suffix-in-progress. Growth candidates are that trie's
+        children at the beam's current state (TrieGate, cached by node),
+        scored via a single ``score_candidates`` call over just that
+        narrowed set -- a real, usually dramatic reduction versus scoring
+        the *entire* dictionary-filtered pool (tens of thousands of ids)
+        on every single step, and it structurally guarantees a completed
+        word is a real trie member, closing a real, previously-documented
+        gap where backward-grown words were never validated against the
+        dictionary at all (repeatedly prepending a token whose *own* text
+        happens to be a short dictionary word, e.g. "ab", produced
+        garbage like "AbAbAbAballah" -- each token passed a flat,
+        no-memory per-token filter individually, nothing ever checked
+        whether the *accumulating* span stayed on a path toward a real
+        word). starts_new_word is still checked on whatever gets scored,
+        as a defensive backstop -- in practice a reversed-trie child is
+        always a plain lowercase letter continuation and essentially never
+        trips it; a trie dead end (no valid continuations left) is the
+        primary, expected way growth stops now.
+
+        ``backward_word_trie=None`` falls back to the original
+        score-the-whole-pool-then-topk behavior exactly, so this stays a
+        true no-op when it isn't set (e.g. direct callers/tests that only
+        configure the forward word_trie).
         """
         tokenizer = self.backward_scorer.tokenizer
+        trie = self.config.backward_word_trie
         branch_factor = self.config.branch_factor
         ops = self.tensor_ops
         backend_cls = type(ops)
+
+        trie_gate = self._get_word_trie_gate(trie) if trie is not None else None
 
         beams = []
         finalized: List[Tuple[List[int], float]] = []
@@ -970,30 +1359,73 @@ class FluxGraph:
             text = tokenizer.decode([token_id])
             if starts_new_word(text):
                 finalized.append(([token_id], float(score)))
-            else:
-                beams.append({"tokens": [token_id], "mean": float(score)})
+                continue
+            stripped = text.strip()
+            node_state = trie.walk_from(trie.root_node(), stripped[::-1]) if trie is not None else None
+            if trie is not None and node_state is None:
+                # This round-0 seed's own text isn't even a valid
+                # (reversed) trie prefix -- it can never grow into a real
+                # dictionary word.
+                continue
+            beams.append({"tokens": [token_id], "mean": float(score), "node": node_state})
 
         for _step in range(1, self.config.max_subword_steps):
             if not beams:
                 break
             new_beams = []
             for beam in beams:
+                if trie_gate is not None:
+                    if beam["node"] is None:
+                        continue
+                    valid = trie_gate.continuations(beam["node"])
+                    if not valid:
+                        # Trie dead end: no candidate can extend this span
+                        # any further toward a real word -- keep it as-is.
+                        finalized.append((beam["tokens"], beam["mean"]))
+                        continue
+                    candidate_ids = [tid for tid, _ in valid]
+                    node_by_id = dict(valid)
+                else:
+                    pool = self.backward_scorer.candidate_pool(
+                        ops, vocab_size=self.backward_scorer.tokenizer.vocab_size, device=self.device
+                    )
+                    candidate_ids = pool.tolist()
+                    node_by_id = {}
+
                 suffix_t = backend_cls.tensor(beam["tokens"], dtype=ops.long_dtype, device=self.device)
-                pool = self.backward_scorer.candidate_pool(
-                    ops, vocab_size=self.backward_scorer.tokenizer.vocab_size, device=self.device
-                )
-                raw = self.backward_scorer.score_candidates(suffix_t, pool)
+                cand_t = backend_cls.tensor(candidate_ids, dtype=ops.long_dtype, device=self.device)
+                # See FluxGraphConfig.max_expand_elements: the same element
+                # budget that bounds _expand_batch's round-0 chunking also
+                # bounds this call -- matters mainly for the no-trie
+                # fallback path above, where candidate_ids can still be the
+                # full multi-ten-thousand-token pool. Leaving max_batch_size
+                # at score_candidates's own default (2048) when no budget is
+                # configured -- passing None explicitly here would instead
+                # *disable* chunking entirely, the opposite of preserving
+                # original behavior.
+                score_kwargs = {}
+                if self.config.max_expand_elements is not None:
+                    row_len = 1 + len(beam["tokens"])
+                    vocab_size = self.backward_scorer.tokenizer.vocab_size
+                    score_kwargs["max_batch_size"] = max(
+                        1, self.config.max_expand_elements // max(row_len * vocab_size, 1)
+                    )
+                raw = self.backward_scorer.score_candidates(suffix_t, cand_t, **score_kwargs)
                 raw = raw / max(len(beam["tokens"]), 1)
                 k = min(branch_factor, raw.shape[0])
                 top_scores, top_idx = AbstractTensor.topk(raw, k=k, dim=0)
                 for cand_mean, idx in zip(top_scores.tolist(), top_idx.tolist()):
-                    cand_id = int(pool[idx].item())
+                    cand_id = candidate_ids[idx]
                     text = tokenizer.decode([cand_id])
                     new_tokens = [cand_id] + beam["tokens"]
                     if starts_new_word(text):
                         finalized.append((new_tokens, cand_mean))
                     else:
-                        new_beams.append({"tokens": new_tokens, "mean": cand_mean})
+                        new_beams.append({
+                            "tokens": new_tokens,
+                            "mean": cand_mean,
+                            "node": node_by_id.get(cand_id),
+                        })
             new_beams.sort(key=lambda b: b["mean"], reverse=True)
             beams = new_beams[:branch_factor]
 
@@ -1157,3 +1589,4 @@ class FluxGraph:
                 rollup_mean=cumulative / new_depth,
             )
             parent.children_ids.append(child_id)
+

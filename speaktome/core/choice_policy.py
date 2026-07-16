@@ -20,6 +20,8 @@ import random
 from abc import ABC, abstractmethod
 from typing import List, Optional, Tuple
 
+import numpy as np
+
 from tensors import AbstractTensor
 # --- END HEADER ---
 
@@ -76,12 +78,26 @@ class AlphaBetaPolicy(ChoicePolicy):
 
     Sampling is without replacement, via the Efraimidis-Spirakis weighted
     reservoir trick: draw ``u ~ Uniform(0, 1)`` per candidate and keep the
-    ``k`` candidates with the largest ``u ** (1 / weight)``. This runs
-    row-by-row in plain Python because ``AbstractTensor`` has no sampling
-    primitive yet, and extending the tensor abstraction is explicitly out
-    of scope for this pass -- see the bidirectional-diffusion vision brief.
-    Pulling a row of probabilities out via ``.tolist()`` is a deliberate,
-    honest cost, not a shortcut around a solvable problem.
+    ``k`` candidates with the largest ``u ** (1 / weight)``. This still
+    runs row-by-row because ``AbstractTensor`` has no sampling primitive
+    yet, and extending the tensor abstraction is explicitly out of scope
+    for this pass -- see the bidirectional-diffusion vision brief. Pulling
+    a row of probabilities out via ``.tolist()`` is a deliberate, honest
+    cost, not a shortcut around a solvable problem.
+
+    The per-row arithmetic (mixed_weights, the sampling key, and the
+    final ranking) is vectorized with plain numpy rather than a Python
+    loop -- real profiling on a GPT-2 run showed this doing a full-vocab
+    (~50k) ``pow()`` + Python-level sort on *every* choose() call, even
+    though only ``k`` candidates ever survive, and that alone cost more
+    wall-clock time than any GPU work in the same tick. This is CPU-only
+    housekeeping around an unchanged algorithm, not an extension of
+    ``AbstractTensor`` itself: same formula, same number and order of
+    ``self._rng.random()`` draws (only for candidates with weight > 0,
+    exactly like the original), same tie-breaking (numpy's stable sort
+    matches Python's stable ``sort(reverse=True)`` for equal keys) --
+    verified bit-for-bit against the original over hundreds of seeded
+    trials, including zero/negative-weight edge cases, before landing.
     """
 
     def __init__(self, alpha: float, beta: float = 1.0, seed: Optional[int] = None):
@@ -105,10 +121,13 @@ class AlphaBetaPolicy(ChoicePolicy):
         chosen_scores: List[List[float]] = []
         chosen_indices: List[List[int]] = []
         for row in rows:
-            mixed_weights = [
-                self.alpha * pow(2.718281828459045, lp) + (1.0 - self.alpha) * uniform_p
-                for lp in row
-            ]
+            row_arr = np.asarray(row, dtype=np.float64)
+            # np.power(e, x), not np.exp(x): the two aren't guaranteed
+            # bit-identical (verified they can differ by ~1ulp), and
+            # np.power matches the original per-element pow() exactly.
+            mixed_weights = self.alpha * np.power(2.718281828459045, row_arr) + (
+                1.0 - self.alpha
+            ) * uniform_p
             picked = self._weighted_sample_without_replacement(mixed_weights, k)
             # Report the true model log-probability, sorted descending so
             # the output shape/order matches AbstractTensor.topk's contract.
@@ -127,15 +146,27 @@ class AlphaBetaPolicy(ChoicePolicy):
         return scores_t, indices_t
 
     def _weighted_sample_without_replacement(
-        self, weights: List[float], k: int
+        self, weights: np.ndarray, k: int
     ) -> List[int]:
-        keyed = []
-        for i, w in enumerate(weights):
-            if w <= 0.0:
-                key = float("-inf")
-            else:
-                u = self._rng.random()
-                key = u ** (1.0 / w)
-            keyed.append((key, i))
-        keyed.sort(key=lambda pair: pair[0], reverse=True)
-        return [i for _, i in keyed[:k]]
+        """Vectorized Efraimidis-Spirakis top-k, bit-identical to the original loop.
+
+        ``self._rng.random()`` is drawn only for weight > 0 candidates, in
+        ascending index order -- exactly the subset and sequence the
+        original per-element loop consumed -- so the RNG stream a given
+        seed produces is unaffected. ``np.argsort(..., kind="stable")``
+        mirrors Python's ``list.sort(reverse=True)`` tie-breaking (equal
+        keys keep ascending-index order), which matters when several
+        weight <= 0 candidates tie at key=-inf.
+        """
+        n = weights.shape[0]
+        keys = np.full(n, -np.inf, dtype=np.float64)
+        positive_idx = np.flatnonzero(weights > 0.0)
+        u = np.fromiter(
+            (self._rng.random() for _ in range(positive_idx.shape[0])),
+            dtype=np.float64,
+            count=positive_idx.shape[0],
+        )
+        if positive_idx.size:
+            keys[positive_idx] = u ** (1.0 / weights[positive_idx])
+        order = np.argsort(-keys, kind="stable")
+        return order[:k].tolist()

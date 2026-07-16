@@ -1,0 +1,509 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>FluxGraph radar</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+:root{
+  --panel-bg:#07110c;
+  --panel-bg-dark:#050c08;
+  --panel-bg-lighter:#0c1a12;
+  --grid:#1c3327;
+  --grid-dim:#122019;
+  --fwd:#5eead4;
+  --fwd-dim:#1f4a41;
+  --fwd-wedge:rgba(94,234,212,0.05);
+  --bwd:#ffb454;
+  --bwd-dim:#4a3319;
+  --bwd-wedge:rgba(255,180,84,0.05);
+  --anchor:#f2fff2;
+  --ink:#8fae8f;
+  --ink-bright:#d8f5d8;
+  --readout:#8affc1;
+  --danger:#ff8080;
+}
+*{box-sizing:border-box}
+html,body{ margin:0; background:var(--panel-bg-dark); }
+body{
+  font-family: ui-monospace, "SF Mono", "Cascadia Code", "Roboto Mono", Consolas, monospace;
+  color: var(--ink);
+  padding: 20px;
+}
+.fg-root{ max-width: 1000px; margin: 0 auto; }
+h1{
+  font-size: 15px; font-weight: 500; color: var(--ink-bright); letter-spacing:0.04em;
+  text-transform: uppercase; margin: 0 0 14px;
+}
+.fg-panel{
+  background: var(--panel-bg);
+  border: 0.5px solid var(--grid);
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin-bottom: 12px;
+}
+.fg-form{ display:flex; flex-wrap:wrap; gap: 12px 18px; align-items:flex-end; }
+.fg-field{ display:flex; flex-direction:column; gap:4px; }
+.fg-field label{ font-size:10px; color:var(--ink); text-transform:uppercase; letter-spacing:0.06em; }
+.fg-field input[type="text"], .fg-field input[type="number"]{
+  background: var(--panel-bg-lighter); border:0.5px solid var(--grid); border-radius:5px;
+  color: var(--ink-bright); font-family:inherit; font-size:12px; padding:6px 8px; width:110px;
+}
+.fg-field input[type="text"]{ width: 220px; }
+.fg-field input[type="range"]{ width:100px; }
+.fg-field output{ font-size:11px; color:var(--readout); }
+.fg-btn{
+  background: transparent; color: var(--ink-bright); border:0.5px solid var(--fwd-dim);
+  border-radius:6px; padding:8px 14px; font-family:inherit; font-size:12px; cursor:pointer;
+  height: 32px;
+}
+.fg-btn:hover{ background: var(--grid-dim); border-color: var(--fwd); }
+.fg-btn:disabled{ opacity:0.4; cursor:default; }
+.fg-error{ color: var(--danger); font-size:12px; margin-top:8px; display:none; }
+.fg-readout{
+  display:flex; align-items:baseline; gap:10px; flex-wrap:wrap;
+  padding: 8px 12px; margin-bottom: 10px;
+  background: var(--panel-bg-dark);
+  border: 0.5px solid var(--grid);
+  border-radius: 6px;
+}
+.fg-readout .tag{ font-size:11px; color:var(--ink); letter-spacing:0.08em; text-transform:uppercase; }
+.fg-readout .val{ font-size:14px; color:var(--readout); }
+.fg-readout .path{ font-size:14px; color:var(--ink-bright); flex:1; min-width:200px; }
+.fg-stage{ width:100%; background: var(--panel-bg-dark); border:0.5px solid var(--grid); border-radius:8px; overflow:hidden; position:relative; }
+.fg-node-label{ font-size:9px; fill: var(--ink); pointer-events:none; }
+.fg-wedge-label{ font-size:11px; fill: var(--ink); letter-spacing:0.08em; }
+.fg-controls{ display:flex; align-items:center; gap:14px; flex-wrap:wrap; margin-top:10px; padding: 8px 12px; background: var(--panel-bg-dark); border:0.5px solid var(--grid); border-radius:6px; }
+.fg-controls .grp{ display:flex; align-items:center; gap:8px; }
+.fg-controls label{ font-size:11px; color:var(--ink); white-space:nowrap; }
+.fg-controls input[type="range"]{ width:110px; }
+.fg-controls output{ font-size:11px; color:var(--readout); min-width:32px; display:inline-block; }
+.fg-controls select{
+  background: var(--panel-bg-lighter); color: var(--ink-bright); border:0.5px solid var(--grid);
+  border-radius:5px; font-family:inherit; font-size:11px; padding:5px 6px;
+}
+.fg-legend{ display:flex; gap:16px; flex-wrap:wrap; margin-top:8px; font-size:11px; color:var(--ink); }
+.fg-legend .sw{ display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:5px; vertical-align:-1px; }
+.fg-tooltip{
+  position:absolute; pointer-events:none; font-size:11px; line-height:1.5;
+  background: var(--panel-bg-dark); border:0.5px solid var(--grid); border-radius:6px;
+  padding:8px 10px; color: var(--ink-bright); max-width:220px; display:none; z-index:5;
+}
+.fg-tooltip .k{ color:var(--ink); }
+.fg-loading{
+  position:absolute; inset:0; background: rgba(5,12,8,0.85);
+  display:none; align-items:center; justify-content:center; flex-direction:column; gap:10px;
+  font-size:12px; color: var(--readout); z-index:10;
+}
+.fg-spinner{
+  width:22px; height:22px; border-radius:50%;
+  border: 2px solid var(--grid); border-top-color: var(--fwd);
+  animation: fg-spin 0.9s linear infinite;
+}
+@keyframes fg-spin{ to{ transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+<div class="fg-root">
+  <h1>FluxGraph radar</h1>
+
+  <div class="fg-panel">
+    <div class="fg-form">
+      <div class="fg-field">
+        <label for="fSeed">seed text</label>
+        <input type="text" id="fSeed" value="the ocean" />
+      </div>
+      <div class="fg-field">
+        <label for="fTicks">ticks</label>
+        <input type="number" id="fTicks" value="6" min="1" max="20" />
+      </div>
+      <div class="fg-field">
+        <label for="fBudget">budget</label>
+        <input type="number" id="fBudget" value="3" min="1" max="8" />
+      </div>
+      <div class="fg-field">
+        <label for="fBranch">branch</label>
+        <input type="number" id="fBranch" value="3" min="1" max="8" />
+      </div>
+      <div class="fg-field">
+        <label for="fAlpha">alpha</label>
+        <input type="range" id="fAlpha" min="0" max="1" step="0.05" value="0.8" />
+        <output id="fAlphaOut">0.80</output>
+      </div>
+      <div class="fg-field">
+        <label for="fBeta">beta</label>
+        <input type="range" id="fBeta" min="0.2" max="5" step="0.1" value="1.0" />
+        <output id="fBetaOut">1.0</output>
+      </div>
+      <div class="fg-field">
+        <label for="fAnchorDecay">anchor can decay</label>
+        <input type="checkbox" id="fAnchorDecay" />
+      </div>
+      <button class="fg-btn" id="fRun">run new scenario</button>
+    </div>
+    <div class="fg-error" id="fError"></div>
+  </div>
+
+  <div class="fg-readout">
+    <span class="tag">run</span>
+    <select id="fgRunSelect" style="background:var(--panel-bg-lighter); color:var(--ink-bright); border:0.5px solid var(--grid); border-radius:5px; font-family:inherit; font-size:11px; padding:4px 6px;"></select>
+    <span class="tag">tick</span><span class="val" id="fgTick">0</span>
+    <span class="tag">live</span><span class="val" id="fgLive">0</span>
+    <span class="tag">score</span><span class="val" id="fgScore">0.000</span>
+    <span class="path" id="fgPath"></span>
+  </div>
+
+  <div class="fg-stage">
+    <svg id="fgSvg" viewBox="0 0 900 560" style="width:100%; display:block;"></svg>
+    <div class="fg-tooltip" id="fgTooltip"></div>
+    <div class="fg-loading" id="fgLoading">
+      <div class="fg-spinner"></div>
+      <div id="fgLoadingText">running FluxGraph...</div>
+    </div>
+  </div>
+
+  <div class="fg-controls">
+    <button class="fg-btn" id="fgPlay">play</button>
+    <div class="grp">
+      <label for="fgTickSlider">tick</label>
+      <input type="range" id="fgTickSlider" min="0" max="1" value="0" step="1" />
+      <output id="fgTickOut">0</output>
+    </div>
+    <div class="grp">
+      <label for="fgStiff">spring stiffness</label>
+      <input type="range" id="fgStiff" min="0.05" max="1" value="0.55" step="0.01" />
+      <output id="fgStiffOut">0.55</output>
+    </div>
+    <div class="grp">
+      <label for="fgRest">resting length</label>
+      <input type="range" id="fgRest" min="30" max="110" value="58" step="1" />
+      <output id="fgRestOut">58</output>
+    </div>
+  </div>
+
+  <div class="fg-legend">
+    <span><span class="sw" style="background:var(--fwd)"></span>forward (right)</span>
+    <span><span class="sw" style="background:var(--bwd)"></span>backward (left)</span>
+    <span><span class="sw" style="background:var(--anchor)"></span>anchor</span>
+    <span>size = pressure &middot; brightness = score &middot; ring = generation depth</span>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<script>
+(function(){
+const svg = d3.select('#fgSvg');
+const W = 900, H = 560, CX = 450, CY = 280;
+const RING_SPACING = 40;
+
+const wedgeLayer = svg.append('g');
+const guideLayer = svg.append('g');
+const edgeLayer = svg.append('g');
+const nodeLayer = svg.append('g');
+const labelLayer = svg.append('g');
+
+const runs = []; // { key, label, data }
+let activeRun = null;
+let simNodes = new Map();
+
+function arcPath(cx, cy, rOuter, startAngle, endAngle){
+  const x0 = cx + rOuter * Math.cos(startAngle), y0 = cy + rOuter * Math.sin(startAngle);
+  const x1 = cx + rOuter * Math.cos(endAngle), y1 = cy + rOuter * Math.sin(endAngle);
+  return `M ${cx} ${cy} L ${x0} ${y0} A ${rOuter} ${rOuter} 0 0 1 ${x1} ${y1} Z`;
+}
+
+function drawStaticGuides(maxDepth){
+  wedgeLayer.selectAll('*').remove();
+  guideLayer.selectAll('*').remove();
+  const rOuter = Math.max(1, maxDepth) * RING_SPACING + 20;
+  wedgeLayer.append('path')
+    .attr('d', arcPath(CX, CY, rOuter, -Math.PI/2, Math.PI/2))
+    .attr('fill', 'var(--fwd-wedge)');
+  wedgeLayer.append('path')
+    .attr('d', arcPath(CX, CY, rOuter, Math.PI/2, Math.PI*1.5))
+    .attr('fill', 'var(--bwd-wedge)');
+
+  for (let d = 1; d <= Math.max(1, maxDepth); d++){
+    guideLayer.append('circle')
+      .attr('cx', CX).attr('cy', CY).attr('r', d*RING_SPACING)
+      .attr('fill', 'none').attr('stroke', 'var(--grid)').attr('stroke-width', 0.75)
+      .attr('opacity', 0.6);
+  }
+  guideLayer.append('line').attr('x1', CX).attr('y1', 20).attr('x2', CX).attr('y2', H-20)
+    .attr('stroke', 'var(--grid-dim)').attr('stroke-width', 0.5);
+  guideLayer.append('text').attr('x', CX+rOuter*0.55).attr('y', CY-8).attr('class','fg-wedge-label').attr('fill','var(--fwd)').text('forward →');
+  guideLayer.append('text').attr('x', CX-rOuter*0.55).attr('y', CY-8).attr('text-anchor','end').attr('class','fg-wedge-label').attr('fill','var(--bwd)').text('← backward');
+}
+
+function targetRadius(n){ return n.depth * RING_SPACING; }
+function targetAngle(n){
+  // Hard hemisphere split: forward is the whole right half (centered on
+  // east, 0deg), backward the whole left half (centered on west, 180deg).
+  // A boundary force (see hemisphereForce below) keeps nodes from ever
+  // crossing the midline regardless of spring dynamics -- this isn't just
+  // a soft bias.
+  const spread = Math.PI * 0.82;
+  const base = n.direction === 'backward' ? Math.PI : 0;
+  const jitter = ((n.id * 2654435761) % 1000) / 1000 - 0.5;
+  return base + jitter * spread;
+}
+function pressureRadius(p){ return Math.max(3, Math.min(11, 3 + p*7)); }
+function scoreBrightness(le){ return Math.max(0.25, Math.min(1, Math.exp(le))); }
+
+function hemisphereForce(strength){
+  let nodes;
+  function force(alpha){
+    for (const n of nodes){
+      if (n.data.parent_id === null) continue;
+      const dx = n.x - CX;
+      const wantRight = n.data.direction !== 'backward';
+      if (wantRight && dx < 0) n.vx += (-dx) * strength * alpha;
+      else if (!wantRight && dx > 0) n.vx += (-dx) * strength * alpha;
+    }
+  }
+  force.initialize = (_nodes) => { nodes = _nodes; };
+  return force;
+}
+
+let simulation = d3.forceSimulation([])
+  .force('radial', d3.forceRadial(d => d.targetR, CX, CY).strength(1))
+  .force('link', d3.forceLink([]).id(d => d.id).distance(58).strength(0.55))
+  .force('collide', d3.forceCollide(d => d.r + 3))
+  .force('hemisphere', hemisphereForce(0.4))
+  .alphaDecay(0.06)
+  .on('tick', render);
+
+let currentTickIdx = 0;
+
+function applySnapshot(snap){
+  const liveIds = new Set(snap.nodes.filter(n => !n.burned).map(n => n.id));
+
+  for (const id of Array.from(simNodes.keys())){
+    if (!liveIds.has(id)) simNodes.delete(id);
+  }
+  for (const n of snap.nodes){
+    if (!liveIds.has(n.id)) continue;
+    let sn = simNodes.get(n.id);
+    if (!sn){
+      const parentSn = n.parent_id != null ? simNodes.get(n.parent_id) : null;
+      sn = { id: n.id, x: parentSn ? parentSn.x : CX, y: parentSn ? parentSn.y : CY };
+      simNodes.set(n.id, sn);
+    }
+    sn.data = n;
+    sn.targetR = targetRadius(n);
+    if (sn.angle === undefined) sn.angle = targetAngle(n);
+    sn.r = n.parent_id === null ? 13 : pressureRadius(n.pressure);
+  }
+
+  const nodesArr = Array.from(simNodes.values());
+  const links = nodesArr.filter(d => d.data.parent_id != null && simNodes.has(d.data.parent_id))
+    .map(d => ({ source: d.data.parent_id, target: d.id }));
+
+  simulation.nodes(nodesArr);
+  simulation.force('link').links(links);
+  simulation.force('radial', d3.forceRadial(d => d.targetR, CX, CY).strength(1));
+  simulation.alpha(0.9).restart();
+
+  document.getElementById('fgTick').textContent = snap.tick;
+  document.getElementById('fgLive').textContent = nodesArr.length;
+  document.getElementById('fgScore').textContent = snap.best_score.toFixed(3);
+  document.getElementById('fgPath').textContent = snap.best_path;
+}
+
+function colorFor(n){
+  if (n.parent_id === null) return 'var(--anchor)';
+  return n.direction === 'backward' ? 'var(--bwd)' : 'var(--fwd)';
+}
+
+function render(){
+  const nodesArr = Array.from(simNodes.values());
+
+  // Hard clamp, on top of the soft hemisphereForce nudge: guarantees zero
+  // crossing in what's actually drawn on every single frame, including
+  // the first few after new data lands (before the soft force has had
+  // time to converge), not just in the eventual settled state. Mutates
+  // d.x/d.vx directly (not just the rendered attribute) so subsequent
+  // force calculations also see the corrected position.
+  for (const d of nodesArr){
+    if (d.data.parent_id === null) continue;
+    const dx = d.x - CX;
+    const wantRight = d.data.direction !== 'backward';
+    if (wantRight && dx < 0){ d.x = CX; d.vx = Math.abs(d.vx); }
+    else if (!wantRight && dx > 0){ d.x = CX; d.vx = -Math.abs(d.vx); }
+  }
+
+  const edges = edgeLayer.selectAll('line').data(
+    nodesArr.filter(d => d.data.parent_id != null && simNodes.has(d.data.parent_id)), d => d.id
+  );
+  edges.join('line')
+    .attr('x1', d => d.x).attr('y1', d => d.y)
+    .attr('x2', d => { const p = simNodes.get(d.data.parent_id); return p ? p.x : d.x; })
+    .attr('y2', d => { const p = simNodes.get(d.data.parent_id); return p ? p.y : d.y; })
+    .attr('stroke', d => colorFor(d.data))
+    .attr('stroke-width', 1)
+    .attr('opacity', d => 0.15 + 0.35*scoreBrightness(d.data.local_evidence));
+
+  const circles = nodeLayer.selectAll('circle').data(nodesArr, d => d.id);
+  circles.join('circle')
+    .attr('cx', d => d.x).attr('cy', d => d.y)
+    .attr('r', d => d.r)
+    .attr('fill', d => colorFor(d.data))
+    .attr('opacity', d => d.data.parent_id === null ? 1 : scoreBrightness(d.data.local_evidence))
+    .style('cursor', 'pointer')
+    .on('mouseenter', showTooltip)
+    .on('mousemove', moveTooltip)
+    .on('mouseleave', hideTooltip);
+
+  const labels = labelLayer.selectAll('text').data(nodesArr, d => d.id);
+  labels.join('text')
+    .attr('x', d => d.x + d.r + 3).attr('y', d => d.y + 3)
+    .attr('class', 'fg-node-label')
+    .text(d => d.data.text.trim().slice(0, 14));
+}
+
+const tooltip = document.getElementById('fgTooltip');
+const stage = document.querySelector('.fg-stage');
+function showTooltip(event, d){
+  const n = d.data;
+  tooltip.innerHTML =
+    '<div><span class="k">text</span> ' + n.text.trim() + '</div>' +
+    '<div><span class="k">direction</span> ' + (n.direction || 'anchor') + '</div>' +
+    '<div><span class="k">depth</span> ' + n.depth + '</div>' +
+    '<div><span class="k">pressure</span> ' + n.pressure.toFixed(3) + '</div>' +
+    '<div><span class="k">local evidence</span> ' + n.local_evidence.toFixed(3) + '</div>' +
+    '<div><span class="k">path mean</span> ' + n.path_mean.toFixed(3) + '</div>' +
+    '<div><span class="k">created tick</span> ' + n.created_tick + '</div>';
+  tooltip.style.display = 'block';
+  moveTooltip(event);
+}
+function moveTooltip(event){
+  const rect = stage.getBoundingClientRect();
+  tooltip.style.left = (event.clientX - rect.left + 12) + 'px';
+  tooltip.style.top = (event.clientY - rect.top + 12) + 'px';
+}
+function hideTooltip(){ tooltip.style.display = 'none'; }
+
+const tickSlider = document.getElementById('fgTickSlider');
+const tickOut = document.getElementById('fgTickOut');
+tickSlider.addEventListener('input', () => {
+  currentTickIdx = +tickSlider.value;
+  tickOut.textContent = currentTickIdx;
+  applySnapshot(activeRun.data.history[currentTickIdx]);
+});
+
+document.getElementById('fgStiff').addEventListener('input', (e) => {
+  const v = +e.target.value;
+  document.getElementById('fgStiffOut').textContent = v.toFixed(2);
+  simulation.force('link').strength(v);
+  simulation.alpha(0.6).restart();
+});
+document.getElementById('fgRest').addEventListener('input', (e) => {
+  const v = +e.target.value;
+  document.getElementById('fgRestOut').textContent = v;
+  simulation.force('link').distance(v);
+  simulation.alpha(0.6).restart();
+});
+
+let playing = false, playTimer = null;
+const playBtn = document.getElementById('fgPlay');
+playBtn.addEventListener('click', () => {
+  playing = !playing;
+  playBtn.textContent = playing ? 'pause' : 'play';
+  if (playing){
+    playTimer = setInterval(() => {
+      const hist = activeRun.data.history;
+      currentTickIdx = (currentTickIdx + 1) % hist.length;
+      tickSlider.value = currentTickIdx;
+      tickOut.textContent = currentTickIdx;
+      applySnapshot(hist[currentTickIdx]);
+      if (currentTickIdx === hist.length - 1){
+        clearInterval(playTimer); playing = false; playBtn.textContent = 'play';
+      }
+    }, 1400);
+  } else {
+    clearInterval(playTimer);
+  }
+});
+
+function selectRun(key){
+  const run = runs.find(r => r.key === key);
+  if (!run) return;
+  activeRun = run;
+  const maxDepth = Math.max(...run.data.history[run.data.history.length-1].nodes.map(n => n.depth));
+  drawStaticGuides(maxDepth);
+  simNodes = new Map();
+  currentTickIdx = 0;
+  tickSlider.max = run.data.history.length - 1;
+  tickSlider.value = 0;
+  tickOut.textContent = 0;
+  applySnapshot(run.data.history[0]);
+}
+
+const runSelect = document.getElementById('fgRunSelect');
+runSelect.addEventListener('change', () => selectRun(runSelect.value));
+
+function addRun(data){
+  const key = 'run' + runs.length + '_' + data.run_id;
+  const label = data.run_id + ' (t' + data.params.ticks + ' b' + data.params.budget + ' br' + data.params.branch + ')';
+  runs.push({ key, label, data });
+  const opt = document.createElement('option');
+  opt.value = key; opt.textContent = label;
+  runSelect.appendChild(opt);
+  runSelect.value = key;
+  selectRun(key);
+}
+
+// ---- run-new-scenario form ----
+const loadingEl = document.getElementById('fgLoading');
+const loadingTextEl = document.getElementById('fgLoadingText');
+const errorEl = document.getElementById('fError');
+const runBtn = document.getElementById('fRun');
+
+document.getElementById('fAlpha').addEventListener('input', (e) => {
+  document.getElementById('fAlphaOut').textContent = (+e.target.value).toFixed(2);
+});
+document.getElementById('fBeta').addEventListener('input', (e) => {
+  document.getElementById('fBetaOut').textContent = (+e.target.value).toFixed(1);
+});
+
+async function runScenario(){
+  const params = {
+    seed: document.getElementById('fSeed').value || 'the ocean',
+    ticks: +document.getElementById('fTicks').value,
+    budget: +document.getElementById('fBudget').value,
+    branch: +document.getElementById('fBranch').value,
+    alpha: +document.getElementById('fAlpha').value,
+    beta: +document.getElementById('fBeta').value,
+    anchor_can_decay: document.getElementById('fAnchorDecay').checked,
+  };
+  errorEl.style.display = 'none';
+  runBtn.disabled = true;
+  loadingEl.style.display = 'flex';
+  loadingTextEl.textContent = runs.length === 0
+    ? 'loading GPT-2 (first run only, can take a while)...'
+    : 'running FluxGraph...';
+  try {
+    const resp = await fetch('/api/run', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(params),
+    });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.error || ('server error ' + resp.status));
+    addRun(data);
+  } catch (err) {
+    errorEl.textContent = 'run failed: ' + err.message;
+    errorEl.style.display = 'block';
+  } finally {
+    runBtn.disabled = false;
+    loadingEl.style.display = 'none';
+  }
+}
+runBtn.addEventListener('click', runScenario);
+
+// Kick off a first run with the default form values on page load.
+runScenario();
+})();
+</script>
+</body>
+</html>

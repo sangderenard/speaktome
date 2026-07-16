@@ -52,6 +52,7 @@ def run_demo(
     dictionary_file: str | None, auto_dictionary: bool, dictionary_size: int,
     word_growth: bool, max_subword_steps: int,
     auxin_suppression: float, auxin_decay: float, head_pressure_coefficient: float,
+    max_expand_elements: int | None,
 ) -> None:
     print("Loading GPT-2 ...")
     t0 = time.time()
@@ -64,24 +65,32 @@ def run_demo(
     wrapper = PyTorchModelWrapper(model)
     writing_filter = WritingTokenFilter(tokenizer)
     word_trie = None
+    backward_word_trie = None
     if dictionary_file:
         t0 = time.time()
         dictionary_filter = DictionaryTokenFilter.from_file(tokenizer, dictionary_file)
         print(f"  [dictionary: {dictionary_file}, {time.time() - t0:.1f}s]")
         if word_growth:
             word_trie = WordTrie.from_file(dictionary_file)
+            # Backward growth discovers a word from its end toward its
+            # start (each new token gets prepended), so it needs a trie
+            # built over reversed word strings to ask "is this a valid
+            # suffix-so-far" instead of "is this a valid prefix-so-far" --
+            # see WordTrie's reverse parameter.
+            backward_word_trie = WordTrie.from_file(dictionary_file, reverse=True)
     elif auto_dictionary:
         t0 = time.time()
         # Real dictionary (nltk) narrowed to its dictionary_size most common
         # words (wordfreq rank) -- see word_sources.curated_english_wordlist
         # for why neither source alone is enough. Built once here; both the
-        # filter and the trie draw from the exact same word list.
+        # filter and the tries draw from the exact same word list.
         dictionary_filter = DictionaryTokenFilter.from_curated_wordlist(tokenizer, n=dictionary_size)
         print(f"  [auto dictionary: {dictionary_size} words (real dictionary x popularity rank), {time.time() - t0:.1f}s]")
         if word_growth:
             t0 = time.time()
             word_trie = WordTrie.from_curated_wordlist(n=dictionary_size)
-            print(f"  [word trie built from the same auto dictionary, {time.time() - t0:.1f}s]")
+            backward_word_trie = WordTrie.from_curated_wordlist(n=dictionary_size, reverse=True)
+            print(f"  [word tries built from the same auto dictionary (forward + reversed), {time.time() - t0:.1f}s]")
     else:
         dictionary_filter = None
         print("  [NO DICTIONARY FILTER ACTIVE -- backward will score the full junk-filtered vocab "
@@ -112,10 +121,12 @@ def run_demo(
         poetic_scale=poetic_scale,
         poetic_shortlist_k=poetic_shortlist_k,
         word_trie=word_trie,
+        backward_word_trie=backward_word_trie,
         max_subword_steps=max_subword_steps,
         auxin_suppression=auxin_suppression,
         auxin_decay=auxin_decay,
         head_pressure_coefficient=head_pressure_coefficient,
+        max_expand_elements=max_expand_elements,
     )
     # TopKPolicy (deterministic top-k) makes forward expansion structurally
     # favor whichever child the model itself ranks highest -- the same
@@ -230,8 +241,18 @@ def main() -> None:
         help="cost subtracted from a node's pressure proportional to |height| (token-distance from the "
              "anchor, same in either direction) -- sustaining flow further out costs more. 0 disables it.",
     )
+    parser.add_argument(
+        "--max-expand-elements", type=int, default=400_000_000,
+        help="memory-budget cap (rows x row_len x vocab_size) for any single model forward call inside "
+             "a tick's expand batch -- the row count per call shrinks as context grows instead of staying "
+             "flat, which is what actually caused a real CUDA OOM on a long run (expand-batch-chunk-size "
+             "alone doesn't account for row_len growing over time). Default (400,000,000) is ~1.6GB per "
+             "call in float32; lower it on a smaller GPU, or pass 0 to disable and fall back to the flat "
+             "--expand-batch-chunk-size cap only (the pre-this-safeguard behavior).",
+    )
     args = parser.parse_args()
     no_repeat = args.no_repeat_ngram_size if args.no_repeat_ngram_size > 0 else None
+    max_expand_elements = args.max_expand_elements if args.max_expand_elements > 0 else None
     poetic = None
     if args.poetic:
         poetic = PoeticAttractor(
@@ -245,7 +266,7 @@ def main() -> None:
         args.visualize, poetic, args.poetic_scale, args.poetic_shortlist_k,
         args.dictionary_file, args.auto_dictionary, args.dictionary_size,
         args.word_growth, args.max_subword_steps, args.auxin_suppression, args.auxin_decay,
-        args.head_pressure,
+        args.head_pressure, max_expand_elements,
     )
 
 

@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "flux-radar",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["-m", "speaktome.flux_radar_server", "--port", "8877"],
+      "port": 8877
+    }
+  ]
+}
