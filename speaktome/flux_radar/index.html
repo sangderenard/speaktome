@@ -42,6 +42,11 @@ h1{
   padding: 12px 14px;
   margin-bottom: 12px;
 }
+.fg-section{ margin-bottom: 10px; }
+.fg-section-title{
+  font-size:10px; color:var(--readout); text-transform:uppercase; letter-spacing:0.1em;
+  border-bottom:0.5px solid var(--grid); padding-bottom:4px; margin-bottom:8px;
+}
 .fg-form{ display:flex; flex-wrap:wrap; gap: 12px 18px; align-items:flex-end; }
 .fg-field{ display:flex; flex-direction:column; gap:4px; }
 .fg-field label{ font-size:10px; color:var(--ink); text-transform:uppercase; letter-spacing:0.06em; }
@@ -52,6 +57,10 @@ h1{
 .fg-field input[type="text"]{ width: 220px; }
 .fg-field input[type="range"]{ width:100px; }
 .fg-field output{ font-size:11px; color:var(--readout); }
+.fg-field select{
+  background: var(--panel-bg-lighter); border:0.5px solid var(--grid); border-radius:5px;
+  color: var(--ink-bright); font-family:inherit; font-size:12px; padding:6px 8px;
+}
 .fg-btn{
   background: transparent; color: var(--ink-bright); border:0.5px solid var(--fwd-dim);
   border-radius:6px; padding:8px 14px; font-family:inherit; font-size:12px; cursor:pointer;
@@ -108,38 +117,276 @@ h1{
   <h1>FluxGraph radar</h1>
 
   <div class="fg-panel">
-    <div class="fg-form">
-      <div class="fg-field">
-        <label for="fSeed">seed text</label>
-        <input type="text" id="fSeed" value="the ocean" />
+    <div class="fg-section">
+      <div class="fg-section-title">engine &amp; seed</div>
+      <div class="fg-form">
+        <div class="fg-field">
+          <label for="fEngine">engine</label>
+          <select id="fEngine"></select>
+        </div>
+        <div class="fg-field">
+          <label for="fSeed">seed text</label>
+          <input type="text" id="fSeed" value="the ocean" />
+        </div>
+        <div class="fg-field">
+          <label for="fTicks">ticks</label>
+          <input type="number" id="fTicks" value="6" min="1" max="20" />
+        </div>
       </div>
-      <div class="fg-field">
-        <label for="fTicks">ticks</label>
-        <input type="number" id="fTicks" value="6" min="1" max="20" />
+    </div>
+
+    <div class="fg-section">
+      <div class="fg-section-title">growth</div>
+      <div class="fg-form">
+        <div class="fg-field">
+          <label for="fBudget">budget</label>
+          <input type="number" id="fBudget" value="3" min="1" max="8" />
+        </div>
+        <div class="fg-field">
+          <label for="fBranch">branch</label>
+          <input type="number" id="fBranch" value="3" min="1" max="8" />
+        </div>
+        <div class="fg-field">
+          <label for="fHotLoopDepth" title="How many rounds of real beam search each tick's picks run in one hot loop before control returns to the pressure system. 1 = today's one-level-per-tick behavior. Cost grows like branch**depth for the picked batch -- raise with care.">hot loop depth</label>
+          <input type="number" id="fHotLoopDepth" value="1" min="1" max="8" />
+        </div>
+        <div class="fg-field">
+          <label for="fAlpha">alpha</label>
+          <input type="range" id="fAlpha" min="0" max="1" step="0.05" value="0.8" />
+          <output id="fAlphaOut">0.80</output>
+        </div>
+        <div class="fg-field">
+          <label for="fBeta">beta</label>
+          <input type="range" id="fBeta" min="0.2" max="5" step="0.1" value="1.0" />
+          <output id="fBetaOut">1.0</output>
+        </div>
+        <div class="fg-field">
+          <label for="fMaxContext">max context tokens</label>
+          <input type="number" id="fMaxContext" value="64" min="8" max="1024" />
+        </div>
+        <div class="fg-field">
+          <label for="fMaxSubwordSteps">max subword steps</label>
+          <input type="number" id="fMaxSubwordSteps" value="8" min="1" max="32" />
+        </div>
+        <div class="fg-field">
+          <label for="fExpandChunk">expand batch chunk size</label>
+          <input type="number" id="fExpandChunk" value="2048" min="1" max="65536" />
+        </div>
+        <div class="fg-field">
+          <label for="fMaxExpandElements">max expand elements (0=unbounded)</label>
+          <input type="number" id="fMaxExpandElements" value="400000000" min="0" />
+        </div>
       </div>
-      <div class="fg-field">
-        <label for="fBudget">budget</label>
-        <input type="number" id="fBudget" value="3" min="1" max="8" />
+    </div>
+
+    <div class="fg-section">
+      <div class="fg-section-title">forward / backward overrides (0 or topk = shared default above)</div>
+      <div class="fg-form">
+        <div class="fg-field">
+          <label for="fFwdBranch" title="0 = use the shared branch value above.">forward branch</label>
+          <input type="number" id="fFwdBranch" value="0" min="0" max="50" />
+        </div>
+        <div class="fg-field">
+          <label for="fBwdBranch" title="0 = use the shared branch value above.">backward branch</label>
+          <input type="number" id="fBwdBranch" value="0" min="0" max="50" />
+        </div>
+        <div class="fg-field">
+          <label for="fFwdHotLoopDepth" title="0 = use the shared hot loop depth above.">forward hot loop depth</label>
+          <input type="number" id="fFwdHotLoopDepth" value="0" min="0" max="8" />
+        </div>
+        <div class="fg-field">
+          <label for="fBwdHotLoopDepth" title="0 = use the shared hot loop depth above.">backward hot loop depth</label>
+          <input type="number" id="fBwdHotLoopDepth" value="0" min="0" max="8" />
+        </div>
+        <div class="fg-field">
+          <label for="fFwdBudget" title="0 = fall back to an even floor-split of budget with leftover redistribution. Any other value is a hard per-tick cap for forward -- no redistribution to backward.">forward budget/tick</label>
+          <input type="number" id="fFwdBudget" value="0" min="0" max="50" />
+        </div>
+        <div class="fg-field">
+          <label for="fBwdBudget" title="0 = fall back to an even floor-split of budget with leftover redistribution. Any other value is a hard per-tick cap for backward -- no redistribution to forward.">backward budget/tick</label>
+          <input type="number" id="fBwdBudget" value="0" min="0" max="50" />
+        </div>
+        <div class="fg-field">
+          <label for="fFwdSelectionMode">forward selection</label>
+          <select id="fFwdSelectionMode">
+            <option value="topk">topk</option>
+            <option value="topp">topp (nucleus)</option>
+          </select>
+        </div>
+        <div class="fg-field">
+          <label for="fFwdTopP" title="Used only when forward selection is topp.">forward top-p</label>
+          <input type="number" id="fFwdTopP" value="0.9" min="0.01" max="1" step="0.01" />
+        </div>
+        <div class="fg-field">
+          <label for="fBwdSelectionMode">backward selection</label>
+          <select id="fBwdSelectionMode">
+            <option value="topk">topk</option>
+            <option value="topp">topp (nucleus)</option>
+          </select>
+        </div>
+        <div class="fg-field">
+          <label for="fBwdTopP" title="Used only when backward selection is topp.">backward top-p</label>
+          <input type="number" id="fBwdTopP" value="0.9" min="0.01" max="1" step="0.01" />
+        </div>
+        <div class="fg-field">
+          <label for="fTopPShortlistCeiling" title="How many of the model's own top candidates are even fetched when a direction is in topp mode -- a safety ceiling against a truly flat distribution pulling in far too much.">top-p shortlist ceiling</label>
+          <input type="number" id="fTopPShortlistCeiling" value="40" min="1" max="500" />
+        </div>
       </div>
-      <div class="fg-field">
-        <label for="fBranch">branch</label>
-        <input type="number" id="fBranch" value="3" min="1" max="8" />
+    </div>
+
+    <div class="fg-section">
+      <div class="fg-section-title">physics</div>
+      <div class="fg-form">
+        <div class="fg-field">
+          <label for="fFoundBonus">found bonus</label>
+          <input type="number" id="fFoundBonus" value="0.05" min="0" max="5" step="0.01" />
+        </div>
+        <div class="fg-field">
+          <label for="fDamping">damping</label>
+          <input type="range" id="fDamping" min="0" max="1" step="0.05" value="0.5" />
+          <output id="fDampingOut">0.50</output>
+        </div>
+        <div class="fg-field">
+          <label for="fStarvationFloor">starvation floor</label>
+          <input type="number" id="fStarvationFloor" value="0.08" min="0" max="5" step="0.01" />
+        </div>
+        <div class="fg-field">
+          <label for="fOverpressureCeiling">overpressure ceiling (0=off)</label>
+          <input type="number" id="fOverpressureCeiling" value="0" min="0" max="100" step="0.1" />
+        </div>
+        <div class="fg-field">
+          <label for="fBurnAfterTicks">burn after ticks</label>
+          <input type="number" id="fBurnAfterTicks" value="3" min="1" max="50" />
+        </div>
+        <div class="fg-field">
+          <label for="fMaxRelaxIter">max relaxation iterations</label>
+          <input type="number" id="fMaxRelaxIter" value="25" min="1" max="500" />
+        </div>
+        <div class="fg-field">
+          <label for="fRelaxTolerance">relaxation tolerance</label>
+          <input type="number" id="fRelaxTolerance" value="0.0001" min="0" step="0.0001" />
+        </div>
+        <div class="fg-field">
+          <label for="fRollupWeight">rollup weight</label>
+          <input type="number" id="fRollupWeight" value="0.3" min="0" max="5" step="0.05" />
+        </div>
+        <div class="fg-field">
+          <label for="fExplorationConstant">exploration constant</label>
+          <input type="number" id="fExplorationConstant" value="0.05" min="0" max="5" step="0.01" />
+        </div>
+        <div class="fg-field">
+          <label for="fHeadPressure">head pressure coefficient</label>
+          <input type="number" id="fHeadPressure" value="0" min="0" max="5" step="0.01" />
+        </div>
+        <div class="fg-field">
+          <label for="fBalanceWeight" title="Corrects forward/backward asymmetry: whichever side's frontier is behind the other gets an expansion-priority boost proportional to the gap. 0 disables it.">balance weight</label>
+          <input type="number" id="fBalanceWeight" value="0" min="0" max="5" step="0.01" />
+        </div>
       </div>
-      <div class="fg-field">
-        <label for="fAlpha">alpha</label>
-        <input type="range" id="fAlpha" min="0" max="1" step="0.05" value="0.8" />
-        <output id="fAlphaOut">0.80</output>
+    </div>
+
+    <div class="fg-section">
+      <div class="fg-section-title">decay &amp; population</div>
+      <div class="fg-form">
+        <div class="fg-field">
+          <label for="fAnchorDecay">anchor can decay</label>
+          <input type="checkbox" id="fAnchorDecay" />
+        </div>
+        <div class="fg-field">
+          <label for="fDecayRate">decay rate (0=off)</label>
+          <input type="number" id="fDecayRate" value="0" min="0" max="1" step="0.01" />
+        </div>
+        <div class="fg-field">
+          <label for="fPopulationTarget">population target (0=off)</label>
+          <input type="number" id="fPopulationTarget" value="0" min="0" max="5000" />
+        </div>
+        <div class="fg-field">
+          <label for="fSharedTokenPressure">shared token pressure</label>
+          <input type="checkbox" id="fSharedTokenPressure" checked />
+        </div>
+        <div class="fg-field">
+          <label for="fReturnConductance" title="First step toward directional edges: scales how much a child's own pressure reports back to its parent (the 'return' leg). Delivery (parent to child) is always unscaled. 1.0 = symmetric, today's behavior; below 1.0, growth still gets full support flowing outward but success no longer automatically inflates its whole ancestry just by existing.">return conductance scale</label>
+          <input type="number" id="fReturnConductance" value="1" min="0" max="2" step="0.05" />
+        </div>
       </div>
-      <div class="fg-field">
-        <label for="fBeta">beta</label>
-        <input type="range" id="fBeta" min="0.2" max="5" step="0.1" value="1.0" />
-        <output id="fBetaOut">1.0</output>
+    </div>
+
+    <div class="fg-section">
+      <div class="fg-section-title">dictionary</div>
+      <div class="fg-form">
+        <div class="fg-field">
+          <label for="fDictionaryEnabled">dictionary filtering</label>
+          <input type="checkbox" id="fDictionaryEnabled" checked />
+        </div>
+        <div class="fg-field">
+          <label for="fDictionarySize">vocabulary cap</label>
+          <input type="number" id="fDictionarySize" value="20000" min="100" max="200000" />
+        </div>
+        <div class="fg-field">
+          <label for="fMinWordLen">min word length</label>
+          <input type="number" id="fMinWordLen" value="2" min="1" max="20" />
+        </div>
+        <div class="fg-field">
+          <label for="fMaxWordLen">max word length (0=off)</label>
+          <input type="number" id="fMaxWordLen" value="0" min="0" max="40" />
+        </div>
+        <div class="fg-field">
+          <label for="fNgram">no-repeat ngram (0=off)</label>
+          <input type="number" id="fNgram" value="3" min="0" max="10" />
+        </div>
       </div>
-      <div class="fg-field">
-        <label for="fAnchorDecay">anchor can decay</label>
-        <input type="checkbox" id="fAnchorDecay" />
+    </div>
+
+    <div class="fg-section">
+      <div class="fg-section-title">poetic booster</div>
+      <div class="fg-form">
+        <div class="fg-field">
+          <label for="fPoeticEnabled">poetry booster</label>
+          <input type="checkbox" id="fPoeticEnabled" />
+        </div>
+        <div class="fg-field">
+          <label for="fPoeticScale">poetry strength</label>
+          <input type="range" id="fPoeticScale" min="0" max="5" step="0.1" value="1.0" />
+          <output id="fPoeticScaleOut">1.0</output>
+        </div>
+        <div class="fg-field">
+          <label for="fPoeticShortlist">poetic shortlist k</label>
+          <input type="number" id="fPoeticShortlist" value="20" min="1" max="200" />
+        </div>
       </div>
-      <button class="fg-btn" id="fRun">run new scenario</button>
+    </div>
+
+    <div class="fg-section">
+      <div class="fg-section-title">auxin (branching suppression)</div>
+      <div class="fg-form">
+        <div class="fg-field">
+          <label for="fAuxinSuppression">auxin suppression (0=off)</label>
+          <input type="number" id="fAuxinSuppression" value="0" min="0" max="5" step="0.05" />
+        </div>
+        <div class="fg-field">
+          <label for="fAuxinDecay">auxin decay</label>
+          <input type="range" id="fAuxinDecay" min="0" max="1" step="0.05" value="0.6" />
+          <output id="fAuxinDecayOut">0.60</output>
+        </div>
+      </div>
+    </div>
+
+    <div class="fg-section">
+      <div class="fg-section-title">live mode</div>
+      <div class="fg-form">
+        <div class="fg-field">
+          <label for="fWindow">live window</label>
+          <input type="number" id="fWindow" value="30" min="2" max="200" />
+        </div>
+        <div class="fg-field">
+          <label for="fInterval">live interval (ms)</label>
+          <input type="number" id="fInterval" value="800" min="200" max="10000" step="100" />
+        </div>
+        <button class="fg-btn" id="fRun">run new scenario</button>
+        <button class="fg-btn" id="fLive">go live</button>
+        <button class="fg-btn" id="fReset" title="Stop any live session and drop cached engines/models -- a clean slate for the next run. Can't rescue a request already hung inside a model call; for that, run flux_radar_restart.py.">reset server</button>
+      </div>
     </div>
     <div class="fg-error" id="fError"></div>
   </div>
@@ -148,8 +395,10 @@ h1{
     <span class="tag">run</span>
     <select id="fgRunSelect" style="background:var(--panel-bg-lighter); color:var(--ink-bright); border:0.5px solid var(--grid); border-radius:5px; font-family:inherit; font-size:11px; padding:4px 6px;"></select>
     <span class="tag">tick</span><span class="val" id="fgTick">0</span>
-    <span class="tag">live</span><span class="val" id="fgLive">0</span>
+    <span class="tag">live nodes</span><span class="val" id="fgLive">0</span>
     <span class="tag">score</span><span class="val" id="fgScore">0.000</span>
+    <span class="val" id="fgLiveStatus" style="color:var(--danger); display:none;">● LIVE</span>
+    <span class="tag">traversals</span><span class="val" id="fgTraversals">0</span>
     <span class="path" id="fgPath"></span>
   </div>
 
@@ -179,13 +428,20 @@ h1{
       <input type="range" id="fgRest" min="30" max="110" value="58" step="1" />
       <output id="fgRestOut">58</output>
     </div>
+    <div class="grp">
+      <label for="fgLabelPct">hide labels below percentile</label>
+      <input type="range" id="fgLabelPct" min="0" max="100" value="0" step="1" />
+      <output id="fgLabelPctOut">0</output>
+    </div>
   </div>
 
   <div class="fg-legend">
     <span><span class="sw" style="background:var(--fwd)"></span>forward (right)</span>
     <span><span class="sw" style="background:var(--bwd)"></span>backward (left)</span>
     <span><span class="sw" style="background:var(--anchor)"></span>anchor</span>
-    <span>size = pressure &middot; brightness = score &middot; ring = generation depth</span>
+    <span>node size = pressure &middot; node brightness = score &middot; ring = generation depth</span>
+    <span>colored wedges = re-rooted sibling/cousin networks &middot; wedge width = share of that side's live pressure</span>
+    <span>edge color = avg causal-path quality through that edge (red low &rarr; green high) &middot; edge width = how many traversals use it, recomputed every tick</span>
   </div>
 </div>
 
@@ -193,8 +449,12 @@ h1{
 <script>
 (function(){
 const svg = d3.select('#fgSvg');
-const W = 900, H = 560, CX = 450, CY = 280;
+const BASE_W = 900, BASE_H = 560;
+const ASPECT = BASE_W / BASE_H;
+const STAGE_MARGIN = 60;
+let W = BASE_W, H = BASE_H, CX = W/2, CY = H/2;
 const RING_SPACING = 40;
+let currentRingRadii = [0]; // index d -> pixel radius for display_radius d, see computeRingRadii
 
 const wedgeLayer = svg.append('g');
 const guideLayer = svg.append('g');
@@ -205,6 +465,13 @@ const labelLayer = svg.append('g');
 const runs = []; // { key, label, data }
 let activeRun = null;
 let simNodes = new Map();
+// keyed "from-to" -> {from,to,total,count,avg}, rebuilt from the active
+// snapshot's own "edges" field every applySnapshot() call -- see
+// snapshot_graph() server-side, which recomputes this for every tick of
+// every run (one-shot or live), not just the graph's current live state,
+// so edge appearance reflects whichever tick is actually being viewed.
+let currentEdgeInfluence = new Map();
+let labelHidePercentile = 0;
 
 function arcPath(cx, cy, rOuter, startAngle, endAngle){
   const x0 = cx + rOuter * Math.cos(startAngle), y0 = cy + rOuter * Math.sin(startAngle);
@@ -212,77 +479,388 @@ function arcPath(cx, cy, rOuter, startAngle, endAngle){
   return `M ${cx} ${cy} L ${x0} ${y0} A ${rOuter} ${rOuter} 0 0 1 ${x1} ${y1} Z`;
 }
 
-function drawStaticGuides(maxDepth){
-  wedgeLayer.selectAll('*').remove();
-  guideLayer.selectAll('*').remove();
-  const rOuter = Math.max(1, maxDepth) * RING_SPACING + 20;
-  wedgeLayer.append('path')
-    .attr('d', arcPath(CX, CY, rOuter, -Math.PI/2, Math.PI/2))
-    .attr('fill', 'var(--fwd-wedge)');
-  wedgeLayer.append('path')
-    .attr('d', arcPath(CX, CY, rOuter, Math.PI/2, Math.PI*1.5))
-    .attr('fill', 'var(--bwd-wedge)');
+// The ring guides aren't rigid -- each one is a soft spring around its own
+// structural (crowding-based) radius, and the live nodes sitting on it
+// pull it around: displayRingRadii is what's actually drawn, eased every
+// render() frame toward wherever that ring's own nodes currently are
+// (pressure-weighted), clamped to within RING_SLIP of the structural
+// radius so a ring can flex but never drift far enough to cross its
+// neighbor. currentRingRadii stays the untouched "ideal" both this eases
+// toward and the pull target itself is clamped around.
+let displayRingRadii = [0];
+const RING_SLIP = 14; // < RING_SPACING/2, so two neighboring rings can never cross even at max opposite slip
+const RING_EASE = 0.08; // per-frame lerp fraction -- a slow, weighty settle rather than a jittery snap
 
-  for (let d = 1; d <= Math.max(1, maxDepth); d++){
-    guideLayer.append('circle')
-      .attr('cx', CX).attr('cy', CY).attr('r', d*RING_SPACING)
-      .attr('fill', 'none').attr('stroke', 'var(--grid)').attr('stroke-width', 0.75)
-      .attr('opacity', 0.6);
+function syncRingRadiiArrays(maxDepth){
+  while (displayRingRadii.length <= maxDepth){
+    const d = displayRingRadii.length;
+    displayRingRadii.push(currentRingRadii[d] != null ? currentRingRadii[d] : d * RING_SPACING);
   }
-  guideLayer.append('line').attr('x1', CX).attr('y1', 20).attr('x2', CX).attr('y2', H-20)
-    .attr('stroke', 'var(--grid-dim)').attr('stroke-width', 0.5);
-  guideLayer.append('text').attr('x', CX+rOuter*0.55).attr('y', CY-8).attr('class','fg-wedge-label').attr('fill','var(--fwd)').text('forward →');
-  guideLayer.append('text').attr('x', CX-rOuter*0.55).attr('y', CY-8).attr('text-anchor','end').attr('class','fg-wedge-label').attr('fill','var(--bwd)').text('← backward');
+  displayRingRadii.length = maxDepth + 1;
 }
 
-function targetRadius(n){ return n.depth * RING_SPACING; }
-function targetAngle(n){
-  // Hard hemisphere split: forward is the whole right half (centered on
-  // east, 0deg), backward the whole left half (centered on west, 180deg).
-  // A boundary force (see hemisphereForce below) keeps nodes from ever
-  // crossing the midline regardless of spring dynamics -- this isn't just
-  // a soft bias.
-  const spread = Math.PI * 0.82;
-  const base = n.direction === 'backward' ? Math.PI : 0;
-  const jitter = ((n.id * 2654435761) % 1000) / 1000 - 0.5;
-  return base + jitter * spread;
+function drawCenterDivider(){
+  guideLayer.selectAll('line').remove();
+  guideLayer.append('line').attr('x1', CX).attr('y1', 20).attr('x2', CX).attr('y2', H-20)
+    .attr('stroke', 'var(--grid-dim)').attr('stroke-width', 0.5);
+}
+
+// Pressure-weighted average of where a depth's live nodes actually
+// currently are, falling off with the inverse square of how far each
+// node already sits from that ring's own structural radius -- a node
+// right on the ring pulls it hard, one that's drifted way off (an
+// outlier still mid-transit, or fighting the wedge/collision forces)
+// barely tugs it at all, the same falloff a real physical tether would
+// have, instead of a distant straggler dragging the ring around by
+// sheer pressure alone.
+function ringPullTargets(nodesArr){
+  const acc = new Map(); // depth -> {sum, weight}
+  for (const d of nodesArr){
+    const n = d.data;
+    if (n.parent_id === null) continue;
+    const depth = n.display_radius != null ? n.display_radius : n.depth;
+    const structural = currentRingRadii[depth] != null ? currentRingRadii[depth] : depth * RING_SPACING;
+    const actualR = Math.hypot(d.x - CX, d.y - CY);
+    const dist = Math.abs(actualR - structural);
+    const falloff = 1 / ((1 + dist) * (1 + dist)); // +1 avoids a divide-by-zero singularity at dist=0
+    const weight = Math.max(0.05, n.pressure) * falloff;
+    const cur = acc.get(depth) || { sum: 0, weight: 0 };
+    cur.sum += actualR * weight;
+    cur.weight += weight;
+    acc.set(depth, cur);
+  }
+  const targets = new Map();
+  for (const [depth, { sum, weight }] of acc){
+    if (weight > 1e-9) targets.set(depth, sum / weight);
+  }
+  return targets;
+}
+
+function updateRingElasticity(nodesArr){
+  const pulls = ringPullTargets(nodesArr);
+  for (let d = 1; d < displayRingRadii.length; d++){
+    const structural = currentRingRadii[d] != null ? currentRingRadii[d] : d * RING_SPACING;
+    const pulled = pulls.get(d);
+    const target = pulled == null
+      ? structural
+      : Math.min(structural + RING_SLIP, Math.max(structural - RING_SLIP, pulled));
+    displayRingRadii[d] += (target - displayRingRadii[d]) * RING_EASE;
+  }
+}
+
+// A ring's full circumference is shared by every wedge at that depth, but
+// each wedge only gets its own angular slice of it -- a wedge that's
+// narrow (little live pressure) and crowded (lots of nodes at that one
+// depth) runs out of arc length long before a wide wedge would, even
+// though they're drawn on the exact same circle. So instead of a flat
+// depth*RING_SPACING radius, grow each ring outward just enough that the
+// single most-crowded wedge at that depth still gets MIN_ARC_PER_NODE
+// pixels of arc per node -- every later ring inherits that push outward
+// too, since rings have to stay strictly increasing with depth.
+const MIN_ARC_PER_NODE = 16;
+
+function computeRingRadii(liveNodes, wedgeLayout, maxDepth){
+  const countAt = new Map(); // "wedgeKey:depth" -> live node count sharing that ring band
+  for (const n of liveNodes){
+    if (n.parent_id === null) continue;
+    const d = n.display_radius != null ? n.display_radius : n.depth;
+    const key = wedgeKey(n) + ':' + d;
+    countAt.set(key, (countAt.get(key) || 0) + 1);
+  }
+  const radii = [0];
+  for (let d = 1; d <= Math.max(1, maxDepth); d++){
+    let required = 0;
+    for (const [wk, w] of wedgeLayout){
+      const count = countAt.get(wk + ':' + d) || 0;
+      if (count <= 1) continue; // one node never needs elbow room
+      const angularWidth = Math.max(0.02, w.end - w.start);
+      required = Math.max(required, (count * MIN_ARC_PER_NODE) / angularWidth);
+    }
+    radii.push(Math.max(radii[d - 1] + RING_SPACING, required));
+  }
+  return radii;
+}
+
+// Growing rings outward for a crowded generation is pointless if the
+// stage itself stays a fixed size -- everything just marches off the
+// edge of the SVG. Keep the original 900x560 aspect ratio, but scale the
+// whole viewBox (and re-center CX/CY on it) up to whatever the current
+// outermost ring actually needs, so a crowded tick auto-zooms out instead
+// of clipping.
+function updateViewBoxForRadius(outerRadius){
+  const neededHalfH = Math.max(BASE_H/2, outerRadius + STAGE_MARGIN);
+  const newH = neededHalfH * 2;
+  const newW = newH * ASPECT;
+  if (Math.abs(newH - H) > 0.5){
+    H = newH; W = newW; CX = W/2; CY = H/2;
+    svg.attr('viewBox', `0 0 ${W} ${H}`);
+  }
+}
+
+// ---- radial pie subdivision: main forward/backward plus one wedge-pair
+// per orthogonal "sibling/cousin" network (see FluxGraph.orthogonal_
+// network_roots). One network (just main) = two halves; each additional
+// network bisects further -- two (two, quarters), three (sixths), etc --
+// always split symmetrically between the forward and backward
+// semicircles so the radar stays legible no matter how many re-rootings
+// have left old branches lying around, instead of hiding or dimming them.
+const NET_COLORS = ['#c58bff', '#8bd4ff', '#ff8ba0', '#d4ff8b', '#ff8bde', '#8bffb0', '#ffd48b', '#8bb0ff'];
+function networkColor(rootId){
+  // Stable hash -> palette slot, so one network keeps its color across
+  // ticks even as sibling networks come and go.
+  return NET_COLORS[Math.abs(rootId * 2654435761) % NET_COLORS.length];
+}
+function groupKey(n){ return n.network_root == null ? 'main' : ('net:' + n.network_root); }
+function wedgeKey(n){ return groupKey(n) + ':' + (n.direction === 'backward' ? 'backward' : 'forward'); }
+
+// Every wedge keeps at least this fraction of an equal share regardless
+// of mass, so a currently-sparse network never fully collapses out of
+// view -- the rest of each semicircle is handed out in proportion to
+// live pressure, so a "thick" (high-pressure) network's wall pushes
+// outward into a "thin" one's territory.
+const WEDGE_FLOOR_FRAC = 0.25;
+
+// Each hemisphere's internal boundaries (the "rays" between adjacent
+// sibling/cousin networks) target a mass-proportional split -- this is
+// itself already a pressure balance, just computed fresh from the
+// snapshot instead of a live simulation: each ray's target angle is
+// exactly the point where the summed live pressure on its two sides is
+// in the same proportion as the angular room they're getting. The two
+// hemisphere-splitting boundaries (index 0 and M, pinned at +-PI/2) are
+// the fixed forward/backward divide, never physical -- only the M-1
+// internal ones between them are real rays with give.
+function computeStructuralBoundaries(nodesArr){
+  const groupOrder = [];
+  const seen = new Set();
+  const mass = new Map(); // wedgeKey -> summed live pressure
+  for (const d of nodesArr){
+    const n = d.data;
+    if (n.parent_id === null) continue; // anchor sits at center, no wedge
+    const g = groupKey(n);
+    if (!seen.has(g)){ seen.add(g); groupOrder.push(g); }
+    const wk = wedgeKey(n);
+    mass.set(wk, (mass.get(wk) || 0) + Math.max(0.01, n.pressure));
+  }
+  groupOrder.sort((a, b) => a === 'main' ? -1 : b === 'main' ? 1 : (a < b ? -1 : 1));
+  const M = Math.max(1, groupOrder.length);
+
+  const boundaries = new Map(); // dirSuffix -> [angle_0, angle_1, ..., angle_M]
+  for (const [semiStart, dirSuffix] of [[-Math.PI/2, 'forward'], [Math.PI/2, 'backward']]){
+    const keys = groupOrder.map(g => g + ':' + dirSuffix);
+    const masses = keys.map(k => mass.get(k) || 0);
+    const totalMass = masses.reduce((a, b) => a + b, 0);
+    const floorEach = (Math.PI * WEDGE_FLOOR_FRAC) / M;
+    const pool = Math.PI * (1 - WEDGE_FLOOR_FRAC);
+    const arr = [semiStart];
+    let cursor = semiStart;
+    for (let i = 0; i < keys.length; i++){
+      const share = totalMass > 0 ? masses[i] / totalMass : 1 / M;
+      cursor += floorEach + pool * share;
+      arr.push(cursor);
+    }
+    boundaries.set(dirSuffix, arr);
+  }
+  return { groupOrder, boundaries };
+}
+
+let currentGroupOrder = [];
+let currentBoundaries = new Map();
+let rayAngles = new Map(); // "dirSuffix:i" -> physical angle, eased toward its structural target
+const RAY_EASE = 0.08; // same slow, weighty settle as RING_EASE -- one connected material, not two systems
+
+// Eases every internal ray toward this snapshot's current pressure-balance
+// target; the two hemisphere-splitting rays (i=0 and i=M) are pinned
+// exactly, they're a semantic divide (forward vs backward), not a soft
+// grouping.
+function updateRayElasticity(){
+  for (const dirSuffix of ['forward', 'backward']){
+    const targets = currentBoundaries.get(dirSuffix);
+    if (!targets) continue;
+    const M = targets.length - 1;
+    for (let i = 0; i <= M; i++){
+      const key = dirSuffix + ':' + i;
+      if (i === 0 || i === M){ rayAngles.set(key, targets[i]); continue; }
+      const cur = rayAngles.has(key) ? rayAngles.get(key) : targets[i];
+      rayAngles.set(key, cur + (targets[i] - cur) * RAY_EASE);
+    }
+  }
+}
+
+// The layout everything else actually uses (rendering, targetAngle,
+// containment) -- rebuilt from wherever the physical rays currently sit,
+// not straight from the structural target, so a ray under real pressure
+// visibly lags/bulges instead of snapping.
+function physicalWedgeLayoutFrom(){
+  const layout = new Map(); // wedgeKey -> {start, end, mid, group}
+  for (const dirSuffix of ['forward', 'backward']){
+    for (let i = 0; i < currentGroupOrder.length; i++){
+      const start = rayAngles.get(dirSuffix + ':' + i);
+      const end = rayAngles.get(dirSuffix + ':' + (i + 1));
+      if (start == null || end == null) continue;
+      layout.set(currentGroupOrder[i] + ':' + dirSuffix, { start, end, mid: (start + end) / 2, group: currentGroupOrder[i] });
+    }
+  }
+  return layout;
+}
+
+function drawWedgeGuides(layout, rOuter){
+  const groups = [];
+  const seen = new Set();
+  for (const w of layout.values()){
+    if (!seen.has(w.group)){ seen.add(w.group); groups.push(w.group); }
+  }
+
+  const fillData = [], strokeData = [], labelData = [];
+  for (const group of groups){
+    const isMain = group === 'main';
+    const color = isMain ? null : networkColor(+group.slice(4));
+    const fwdW = layout.get(group + ':forward');
+    const bwdW = layout.get(group + ':backward');
+    for (const [wedge, dirTag] of [[fwdW, 'fwd'], [bwdW, 'bwd']]){
+      if (!wedge) continue;
+      fillData.push({
+        key: group + ':' + dirTag,
+        d: arcPath(CX, CY, rOuter, wedge.start, wedge.end),
+        fill: isMain ? (dirTag === 'fwd' ? 'var(--fwd-wedge)' : 'var(--bwd-wedge)') : color,
+        opacity: isMain ? 1 : 0.08,
+      });
+      if (!isMain){
+        strokeData.push({ key: group + ':' + dirTag, d: arcPath(CX, CY, rOuter, wedge.start, wedge.end), stroke: color });
+      }
+    }
+    if (!isMain){
+      const labelWedge = fwdW || bwdW;
+      if (labelWedge){
+        labelData.push({
+          key: group,
+          x: CX + rOuter * 0.55 * Math.cos(labelWedge.mid),
+          y: CY + rOuter * 0.55 * Math.sin(labelWedge.mid),
+          color,
+          text: 'branch ' + group.slice(4),
+        });
+      }
+    }
+  }
+
+  wedgeLayer.selectAll('path.fg-wedge-fill').data(fillData, d => d.key).join('path')
+    .attr('class', 'fg-wedge-fill')
+    .attr('d', d => d.d).attr('fill', d => d.fill).attr('opacity', d => d.opacity);
+
+  wedgeLayer.selectAll('path.fg-wedge-stroke').data(strokeData, d => d.key).join('path')
+    .attr('class', 'fg-wedge-stroke')
+    .attr('d', d => d.d).attr('fill', 'none').attr('stroke', d => d.stroke).attr('stroke-width', 1).attr('opacity', 0.35);
+
+  wedgeLayer.selectAll('text.fg-wedge-label').data(labelData, d => d.key).join('text')
+    .attr('class', 'fg-wedge-label')
+    .attr('x', d => d.x).attr('y', d => d.y)
+    .attr('text-anchor', 'middle')
+    .attr('fill', d => d.color)
+    .text(d => d.text);
+}
+
+// display_radius (see snapshot_graph): depth for an ordinary node --
+// distance from the anchor, the active seed where the graph is actually
+// growing -- but for a node inside an orthogonal "cousin" network, depth
+// relative to that *network's own root* instead, so a cousin network's
+// ring position doesn't get dragged around by a re-root that happened
+// somewhere else entirely.
+function targetRadius(n){
+  const d = n.display_radius != null ? n.display_radius : n.depth;
+  return currentRingRadii[d] != null ? currentRingRadii[d] : d * RING_SPACING;
+}
+function targetAngle(n, layout){
+  const w = layout.get(wedgeKey(n));
+  if (!w) return 0;
+  const margin = (w.end - w.start) * 0.12;
+  const jitter = ((n.id * 2654435761) % 1000) / 1000;
+  return w.start + margin + jitter * Math.max(0, (w.end - w.start) - 2*margin);
 }
 function pressureRadius(p){ return Math.max(3, Math.min(11, 3 + p*7)); }
 function scoreBrightness(le){ return Math.max(0.25, Math.min(1, Math.exp(le))); }
 
-function hemisphereForce(strength){
+let currentWedgeLayout = new Map();
+
+// Containment through pressure, not position override: a node that's
+// crossed (or is nearing) its own wedge's ray gets an inward velocity
+// nudge proportional to how far past it is -- the ray genuinely resists,
+// it doesn't teleport the node back. No hard clamp backs this up
+// anymore, so a node under enough real pressure can still press a ray
+// and visibly bow it (see updateRayElasticity/computeStructuralBoundaries,
+// which folds live pressure back into where the ray wants to sit).
+function rayContainmentForce(strength){
   let nodes;
   function force(alpha){
     for (const n of nodes){
       if (n.data.parent_id === null) continue;
-      const dx = n.x - CX;
-      const wantRight = n.data.direction !== 'backward';
-      if (wantRight && dx < 0) n.vx += (-dx) * strength * alpha;
-      else if (!wantRight && dx > 0) n.vx += (-dx) * strength * alpha;
+      const w = currentWedgeLayout.get(wedgeKey(n.data));
+      if (!w) continue;
+      const dx = n.x - CX, dy = n.y - CY;
+      const r = Math.hypot(dx, dy) || 1;
+      let angle = Math.atan2(dy, dx);
+      // Backward-side wedges live in [PI/2, 3PI/2], which spills past
+      // atan2's native (-PI, PI] range -- unwrap by one full turn when
+      // that makes the angle fall inside this wedge's own range.
+      if (angle < w.start - 1e-6) angle += Math.PI * 2;
+
+      const margin = 0.04; // radians of buffer before the push starts
+      let push = 0;
+      if (angle < w.start + margin) push = (w.start + margin) - angle;
+      else if (angle > w.end - margin) push = (w.end - margin) - angle;
+      if (push === 0) continue;
+
+      const pushedAngle = angle + push * strength * alpha;
+      const tx = CX + r * Math.cos(pushedAngle), ty = CY + r * Math.sin(pushedAngle);
+      n.vx += (tx - n.x);
+      n.vy += (ty - n.y);
     }
   }
   force.initialize = (_nodes) => { nodes = _nodes; };
   return force;
 }
 
+// Soft, not rigid: a node aims for its ring but isn't pinned to it, so
+// collision/link/wedge pressure can genuinely nudge it off-radius -- that
+// same give is what the ring guides themselves are tracking in
+// updateRingElasticity(), so the two read as one connected material
+// instead of a hard skeleton with cosmetic decoration on top.
+const RADIAL_GIVE = 0.5;
+
 let simulation = d3.forceSimulation([])
-  .force('radial', d3.forceRadial(d => d.targetR, CX, CY).strength(1))
+  .force('radial', d3.forceRadial(d => d.targetR, CX, CY).strength(RADIAL_GIVE))
   .force('link', d3.forceLink([]).id(d => d.id).distance(58).strength(0.55))
   .force('collide', d3.forceCollide(d => d.r + 3))
-  .force('hemisphere', hemisphereForce(0.4))
+  .force('ray', rayContainmentForce(0.6))
   .alphaDecay(0.06)
   .on('tick', render);
 
 let currentTickIdx = 0;
 
 function applySnapshot(snap){
-  const liveIds = new Set(snap.nodes.filter(n => !n.burned).map(n => n.id));
+  const liveNodes = snap.nodes.filter(n => !n.burned);
+  const liveIds = new Set(liveNodes.map(n => n.id));
+
+  // Recomputed fresh every snapshot -- each network's wedge target tracks
+  // its current live pressure, not whatever it was when first drawn. The
+  // rays themselves don't jump straight there though (see
+  // updateRayElasticity/render()); this just updates what they're aiming
+  // for. One synchronous ease step here so currentWedgeLayout is already
+  // sane for the per-node loop below, before render() has even run once.
+  const structural = computeStructuralBoundaries(liveNodes.map(n => ({ data: n })));
+  currentGroupOrder = structural.groupOrder;
+  currentBoundaries = structural.boundaries;
+  updateRayElasticity();
+  currentWedgeLayout = physicalWedgeLayoutFrom();
+
+  const maxDepth = Math.max(1, ...liveNodes.map(n => n.display_radius != null ? n.display_radius : n.depth));
+  currentRingRadii = computeRingRadii(liveNodes, currentWedgeLayout, maxDepth);
+  updateViewBoxForRadius(currentRingRadii[maxDepth]); // must happen before anything below reads CX/CY/W/H
+  syncRingRadiiArrays(maxDepth);
+  drawCenterDivider();
 
   for (const id of Array.from(simNodes.keys())){
     if (!liveIds.has(id)) simNodes.delete(id);
   }
-  for (const n of snap.nodes){
-    if (!liveIds.has(n.id)) continue;
+  for (const n of liveNodes){
     let sn = simNodes.get(n.id);
     if (!sn){
       const parentSn = n.parent_id != null ? simNodes.get(n.parent_id) : null;
@@ -291,7 +869,7 @@ function applySnapshot(snap){
     }
     sn.data = n;
     sn.targetR = targetRadius(n);
-    if (sn.angle === undefined) sn.angle = targetAngle(n);
+    if (sn.angle === undefined) sn.angle = targetAngle(n, currentWedgeLayout);
     sn.r = n.parent_id === null ? 13 : pressureRadius(n.pressure);
   }
 
@@ -301,36 +879,69 @@ function applySnapshot(snap){
 
   simulation.nodes(nodesArr);
   simulation.force('link').links(links);
-  simulation.force('radial', d3.forceRadial(d => d.targetR, CX, CY).strength(1));
+  simulation.force('radial', d3.forceRadial(d => d.targetR, CX, CY).strength(RADIAL_GIVE));
   simulation.alpha(0.9).restart();
+
+  // Edge appearance (color + width) is driven entirely by this tick's
+  // own audited influence data -- not a toggle, not an overlay, just
+  // what render() always uses to draw the real parent/child edges below.
+  currentEdgeInfluence = new Map((snap.edges || []).map(e => [e.from + '-' + e.to, e]));
 
   document.getElementById('fgTick').textContent = snap.tick;
   document.getElementById('fgLive').textContent = nodesArr.length;
   document.getElementById('fgScore').textContent = snap.best_score.toFixed(3);
   document.getElementById('fgPath').textContent = snap.best_path;
+  document.getElementById('fgTraversals').textContent = snap.traversal_count != null ? snap.traversal_count : 0;
 }
 
 function colorFor(n){
   if (n.parent_id === null) return 'var(--anchor)';
+  if (n.network_root != null) return networkColor(n.network_root);
   return n.direction === 'backward' ? 'var(--bwd)' : 'var(--fwd)';
 }
 
 function render(){
   const nodesArr = Array.from(simNodes.values());
 
-  // Hard clamp, on top of the soft hemisphereForce nudge: guarantees zero
-  // crossing in what's actually drawn on every single frame, including
-  // the first few after new data lands (before the soft force has had
-  // time to converge), not just in the eventual settled state. Mutates
-  // d.x/d.vx directly (not just the rendered attribute) so subsequent
-  // force calculations also see the corrected position.
-  for (const d of nodesArr){
-    if (d.data.parent_id === null) continue;
-    const dx = d.x - CX;
-    const wantRight = d.data.direction !== 'backward';
-    if (wantRight && dx < 0){ d.x = CX; d.vx = Math.abs(d.vx); }
-    else if (!wantRight && dx > 0){ d.x = CX; d.vx = -Math.abs(d.vx); }
-  }
+  // Rays are soft too, same material as the rings: ease toward this
+  // snapshot's pressure-balance target, rebuild the layout everyone else
+  // reads from those eased angles, then redraw the wedges at their actual
+  // physical position -- no hard clamp anywhere below this. Containment
+  // now happens purely through rayContainmentForce (a real push, not a
+  // position override), so a node under real pressure can still visibly
+  // bow its own ray outward rather than being invisibly teleported back.
+  updateRayElasticity();
+  currentWedgeLayout = physicalWedgeLayoutFrom();
+  drawWedgeGuides(currentWedgeLayout, currentRingRadii[currentRingRadii.length - 1] + 20);
+
+  // Ring guides are soft: ease each one toward wherever its own live
+  // nodes actually are this frame (clamped to RING_SLIP either way), then
+  // redraw them at that eased radius -- a data-joined update keyed by
+  // depth, not a remove/recreate, so this is cheap enough to run every
+  // single simulation tick.
+  updateRingElasticity(nodesArr);
+  const ringData = displayRingRadii.map((r, d) => ({ d, r })).slice(1);
+  const rings = guideLayer.selectAll('circle.fg-ring').data(ringData, r => r.d);
+  rings.join('circle')
+    .attr('class', 'fg-ring')
+    .attr('cx', CX).attr('cy', CY).attr('r', r => r.r)
+    .attr('fill', 'none').attr('stroke', 'var(--grid)').attr('stroke-width', 0.75)
+    .attr('opacity', 0.6);
+
+  // Edge color/width come straight from this tick's own audited
+  // influence (see applySnapshot -- currentEdgeInfluence is rebuilt from
+  // snap.edges every time the graph changes, live or scrubbed history
+  // alike): color is purely that edge's average causal-path quality
+  // across every traversal crossing it (red low -> green high) -- a
+  // fair, count-normalized figure, comparable edge to edge. Width is
+  // deliberately a *different*, not-fairness-normalized quantity: how
+  // many distinct traversals actually use this edge, i.e. how central/
+  // load-bearing it is to the graph's causal-path structure, regardless
+  // of whether those paths are any good. A missing lookup (only possible
+  // for a snapshot saved before this field existed) falls back to the
+  // old direction/score-based look rather than drawing nothing.
+  const influenceValues = Array.from(currentEdgeInfluence.values());
+  const maxCount = Math.max(1, ...influenceValues.map(e => e.count));
 
   const edges = edgeLayer.selectAll('line').data(
     nodesArr.filter(d => d.data.parent_id != null && simNodes.has(d.data.parent_id)), d => d.id
@@ -339,9 +950,19 @@ function render(){
     .attr('x1', d => d.x).attr('y1', d => d.y)
     .attr('x2', d => { const p = simNodes.get(d.data.parent_id); return p ? p.x : d.x; })
     .attr('y2', d => { const p = simNodes.get(d.data.parent_id); return p ? p.y : d.y; })
-    .attr('stroke', d => colorFor(d.data))
-    .attr('stroke-width', 1)
-    .attr('opacity', d => 0.15 + 0.35*scoreBrightness(d.data.local_evidence));
+    .attr('stroke', d => {
+      const inf = currentEdgeInfluence.get(d.data.parent_id + '-' + d.id);
+      return inf ? d3.interpolateRdYlGn(Math.max(0, Math.min(1, inf.avg))) : colorFor(d.data);
+    })
+    .attr('stroke-width', d => {
+      const inf = currentEdgeInfluence.get(d.data.parent_id + '-' + d.id);
+      return inf ? 1.5 + 7 * Math.sqrt(inf.count / maxCount) : 1;
+    })
+    .attr('stroke-linecap', 'round')
+    .attr('opacity', d => {
+      const inf = currentEdgeInfluence.get(d.data.parent_id + '-' + d.id);
+      return inf ? 0.85 : 0.15 + 0.35*scoreBrightness(d.data.local_evidence);
+    });
 
   const circles = nodeLayer.selectAll('circle').data(nodesArr, d => d.id);
   circles.join('circle')
@@ -354,7 +975,17 @@ function render(){
     .on('mousemove', moveTooltip)
     .on('mouseleave', hideTooltip);
 
-  const labels = labelLayer.selectAll('text').data(nodesArr, d => d.id);
+  // Percentile label declutter: rank non-anchor nodes by pressure
+  // (descending) and drop the bottom labelHidePercentile% of labels --
+  // the anchor's own label is exempt (there's only ever one, and it's
+  // always the thing everything else is relative to).
+  const ranked = nodesArr.filter(d => d.data.parent_id !== null)
+    .slice().sort((a, b) => b.data.pressure - a.data.pressure);
+  const keepCount = Math.ceil(ranked.length * (1 - labelHidePercentile / 100));
+  const labelKeep = new Set(ranked.slice(0, keepCount).map(d => d.id));
+  const labelData = nodesArr.filter(d => d.data.parent_id === null || labelKeep.has(d.id));
+
+  const labels = labelLayer.selectAll('text').data(labelData, d => d.id);
   labels.join('text')
     .attr('x', d => d.x + d.r + 3).attr('y', d => d.y + 3)
     .attr('class', 'fg-node-label')
@@ -368,7 +999,7 @@ function showTooltip(event, d){
   tooltip.innerHTML =
     '<div><span class="k">text</span> ' + n.text.trim() + '</div>' +
     '<div><span class="k">direction</span> ' + (n.direction || 'anchor') + '</div>' +
-    '<div><span class="k">depth</span> ' + n.depth + '</div>' +
+    '<div><span class="k">depth</span> ' + n.depth + (n.network_root != null ? ' (display radius ' + n.display_radius + ')' : '') + '</div>' +
     '<div><span class="k">pressure</span> ' + n.pressure.toFixed(3) + '</div>' +
     '<div><span class="k">local evidence</span> ' + n.local_evidence.toFixed(3) + '</div>' +
     '<div><span class="k">path mean</span> ' + n.path_mean.toFixed(3) + '</div>' +
@@ -425,12 +1056,16 @@ playBtn.addEventListener('click', () => {
   }
 });
 
+document.getElementById('fgLabelPct').addEventListener('input', (e) => {
+  labelHidePercentile = +e.target.value;
+  document.getElementById('fgLabelPctOut').textContent = labelHidePercentile;
+  render();
+});
+
 function selectRun(key){
   const run = runs.find(r => r.key === key);
   if (!run) return;
   activeRun = run;
-  const maxDepth = Math.max(...run.data.history[run.data.history.length-1].nodes.map(n => n.depth));
-  drawStaticGuides(maxDepth);
   simNodes = new Map();
   currentTickIdx = 0;
   tickSlider.max = run.data.history.length - 1;
@@ -444,7 +1079,7 @@ runSelect.addEventListener('change', () => selectRun(runSelect.value));
 
 function addRun(data){
   const key = 'run' + runs.length + '_' + data.run_id;
-  const label = data.run_id + ' (t' + data.params.ticks + ' b' + data.params.budget + ' br' + data.params.branch + ')';
+  const label = data.run_id + ' [' + data.params.engine + '] (t' + data.params.ticks + ' b' + data.params.budget + ' br' + data.params.branch + ')';
   runs.push({ key, label, data });
   const opt = document.createElement('option');
   opt.value = key; opt.textContent = label;
@@ -458,30 +1093,172 @@ const loadingEl = document.getElementById('fgLoading');
 const loadingTextEl = document.getElementById('fgLoadingText');
 const errorEl = document.getElementById('fError');
 const runBtn = document.getElementById('fRun');
+const engineSelect = document.getElementById('fEngine');
 
-document.getElementById('fAlpha').addEventListener('input', (e) => {
-  document.getElementById('fAlphaOut').textContent = (+e.target.value).toFixed(2);
-});
-document.getElementById('fBeta').addEventListener('input', (e) => {
-  document.getElementById('fBetaOut').textContent = (+e.target.value).toFixed(1);
-});
+// Single source of truth for every plain form field <-> request param --
+// used both to build a request (commonParams) and to restore saved
+// settings into the form (applyParamsToForm). engine and seed are
+// special-cased (dynamic <select>, and a non-empty-string fallback).
+const FIELD_SPECS = [
+  ['fBudget', 'budget', 'number'],
+  ['fBranch', 'branch', 'number'],
+  ['fHotLoopDepth', 'hot_loop_depth', 'number'],
+  ['fFwdBranch', 'forward_branch_factor', 'number'],
+  ['fBwdBranch', 'backward_branch_factor', 'number'],
+  ['fFwdHotLoopDepth', 'forward_hot_loop_depth', 'number'],
+  ['fBwdHotLoopDepth', 'backward_hot_loop_depth', 'number'],
+  ['fFwdBudget', 'forward_budget_per_tick', 'number'],
+  ['fBwdBudget', 'backward_budget_per_tick', 'number'],
+  ['fFwdSelectionMode', 'forward_selection_mode', 'select'],
+  ['fBwdSelectionMode', 'backward_selection_mode', 'select'],
+  ['fFwdTopP', 'forward_top_p', 'number'],
+  ['fBwdTopP', 'backward_top_p', 'number'],
+  ['fTopPShortlistCeiling', 'top_p_shortlist_ceiling', 'number'],
+  ['fAlpha', 'alpha', 'number'],
+  ['fBeta', 'beta', 'number'],
+  ['fMaxContext', 'max_context_tokens', 'number'],
+  ['fMaxSubwordSteps', 'max_subword_steps', 'number'],
+  ['fExpandChunk', 'expand_batch_chunk_size', 'number'],
+  ['fMaxExpandElements', 'max_expand_elements', 'number'],
+  ['fFoundBonus', 'found_bonus', 'number'],
+  ['fDamping', 'damping', 'number'],
+  ['fStarvationFloor', 'starvation_floor', 'number'],
+  ['fOverpressureCeiling', 'overpressure_ceiling', 'number'],
+  ['fBurnAfterTicks', 'burn_after_ticks', 'number'],
+  ['fMaxRelaxIter', 'max_relaxation_iterations', 'number'],
+  ['fRelaxTolerance', 'relaxation_tolerance', 'number'],
+  ['fRollupWeight', 'rollup_weight', 'number'],
+  ['fExplorationConstant', 'exploration_constant', 'number'],
+  ['fHeadPressure', 'head_pressure_coefficient', 'number'],
+  ['fBalanceWeight', 'balance_weight', 'number'],
+  ['fAnchorDecay', 'anchor_can_decay', 'checkbox'],
+  ['fDecayRate', 'decay_rate', 'number'],
+  ['fPopulationTarget', 'population_target', 'number'],
+  ['fSharedTokenPressure', 'shared_token_pressure_enabled', 'checkbox'],
+  ['fReturnConductance', 'return_conductance_scale', 'number'],
+  ['fDictionaryEnabled', 'dictionary_enabled', 'checkbox'],
+  ['fDictionarySize', 'dictionary_size', 'number'],
+  ['fMinWordLen', 'min_word_len', 'number'],
+  ['fMaxWordLen', 'max_word_len', 'number'],
+  ['fNgram', 'no_repeat_ngram_size', 'number'],
+  ['fPoeticEnabled', 'poetic_enabled', 'checkbox'],
+  ['fPoeticScale', 'poetic_scale', 'number'],
+  ['fPoeticShortlist', 'poetic_shortlist_k', 'number'],
+  ['fAuxinSuppression', 'auxin_suppression', 'number'],
+  ['fAuxinDecay', 'auxin_decay', 'number'],
+];
+// [input id, output id, decimals] -- range inputs whose paired <output>
+// needs refreshing both on user drag (via the 'input' event) and
+// whenever a value gets set programmatically (applyParamsToForm), since
+// setting .value in JS doesn't fire 'input' on its own.
+const SLIDER_OUTPUTS = [
+  ['fAlpha', 'fAlphaOut', 2],
+  ['fBeta', 'fBetaOut', 1],
+  ['fPoeticScale', 'fPoeticScaleOut', 1],
+  ['fDamping', 'fDampingOut', 2],
+  ['fAuxinDecay', 'fAuxinDecayOut', 2],
+];
+
+function refreshSliderOutputs(){
+  for (const [id, outId, digits] of SLIDER_OUTPUTS){
+    document.getElementById(outId).textContent = (+document.getElementById(id).value).toFixed(digits);
+  }
+}
+for (const [id, outId, digits] of SLIDER_OUTPUTS){
+  document.getElementById(id).addEventListener('input', (e) => {
+    document.getElementById(outId).textContent = (+e.target.value).toFixed(digits);
+  });
+}
+
+// Params shared by both a one-shot run and a live session -- everything
+// except how many ticks / how often, which each caller adds itself.
+function commonParams(){
+  const params = {
+    engine: engineSelect.value || undefined,
+    seed: document.getElementById('fSeed').value || 'the ocean',
+  };
+  for (const [id, key, kind] of FIELD_SPECS){
+    const el = document.getElementById(id);
+    params[key] = kind === 'checkbox' ? el.checked : kind === 'select' ? el.value : +el.value;
+  }
+  return params;
+}
+
+// The inverse of commonParams() -- restores a previously-saved params
+// object (see GET /api/last_params) into the form. Silently skips any
+// field the saved object doesn't have (e.g. an older save from before a
+// control was added), leaving that field at its HTML default.
+function applyParamsToForm(params){
+  if (!params) return;
+  if (params.engine && Array.from(engineSelect.options).some(o => o.value === params.engine)){
+    engineSelect.value = params.engine;
+  }
+  if (params.seed !== undefined) document.getElementById('fSeed').value = params.seed;
+  if (params.ticks !== undefined) document.getElementById('fTicks').value = params.ticks;
+  if (params.window !== undefined) document.getElementById('fWindow').value = params.window;
+  if (params.interval_ms !== undefined) document.getElementById('fInterval').value = params.interval_ms;
+  for (const [id, key, kind] of FIELD_SPECS){
+    if (!(key in params)) continue;
+    const el = document.getElementById(id);
+    if (kind === 'checkbox') el.checked = !!params[key];
+    else el.value = params[key];
+  }
+  refreshSliderOutputs();
+}
+
+async function loadEngineOptions(){
+  try {
+    const resp = await fetch('/api/engines');
+    const data = await resp.json();
+    engineSelect.innerHTML = '';
+    for (const name of data.engines){
+      const opt = document.createElement('option');
+      opt.value = name; opt.textContent = name;
+      engineSelect.appendChild(opt);
+    }
+    engineSelect.value = data.default;
+  } catch (err) {
+    // If this fails, engineSelect stays empty and commonParams() sends
+    // engine: undefined -- the server falls back to its own default.
+  }
+}
+
+// While a run is building server-side, poll GET /api/run/progress (the
+// same tick-by-tick snapshot LiveSession already exposes for continuous
+// mode, just for the one in-flight one-shot run) so the loading overlay
+// shows live tick/node/score stats instead of a static "loading..."
+// message for however long the run actually takes.
+let runProgressTimer = null;
+function stopRunProgressPolling(){
+  if (runProgressTimer){ clearInterval(runProgressTimer); runProgressTimer = null; }
+}
+function startRunProgressPolling(engineLabel){
+  stopRunProgressPolling();
+  runProgressTimer = setInterval(async () => {
+    let progress;
+    try {
+      const resp = await fetch('/api/run/progress');
+      progress = await resp.json();
+    } catch (err) {
+      return; // transient fetch hiccup -- next tick tries again
+    }
+    if (!progress || !progress.active || !progress.latest) return;
+    const n = progress.latest;
+    const live = n.nodes ? n.nodes.filter(x => !x.burned).length : 0;
+    loadingTextEl.textContent =
+      `running ${engineLabel} -- tick ${progress.tick}/${progress.total_ticks} -- ` +
+      `${live} live nodes -- score ${(+n.best_score).toFixed(3)}`;
+  }, 400);
+}
 
 async function runScenario(){
-  const params = {
-    seed: document.getElementById('fSeed').value || 'the ocean',
-    ticks: +document.getElementById('fTicks').value,
-    budget: +document.getElementById('fBudget').value,
-    branch: +document.getElementById('fBranch').value,
-    alpha: +document.getElementById('fAlpha').value,
-    beta: +document.getElementById('fBeta').value,
-    anchor_can_decay: document.getElementById('fAnchorDecay').checked,
-  };
+  const params = { ...commonParams(), ticks: +document.getElementById('fTicks').value };
   errorEl.style.display = 'none';
   runBtn.disabled = true;
   loadingEl.style.display = 'flex';
-  loadingTextEl.textContent = runs.length === 0
-    ? 'loading GPT-2 (first run only, can take a while)...'
-    : 'running FluxGraph...';
+  const engineLabel = params.engine || 'engine';
+  loadingTextEl.textContent = 'loading ' + engineLabel + ' (first use of it can take a while)...';
+  startRunProgressPolling(engineLabel);
   try {
     const resp = await fetch('/api/run', {
       method: 'POST',
@@ -495,14 +1272,236 @@ async function runScenario(){
     errorEl.textContent = 'run failed: ' + err.message;
     errorEl.style.display = 'block';
   } finally {
+    stopRunProgressPolling();
     runBtn.disabled = false;
     loadingEl.style.display = 'none';
   }
 }
 runBtn.addEventListener('click', runScenario);
 
-// Kick off a first run with the default form values on page load.
-runScenario();
+// ---- live mode: one FluxGraph, ticking forever server-side, polled here ----
+const liveBtn = document.getElementById('fLive');
+const liveStatusEl = document.getElementById('fgLiveStatus');
+let liveActive = false;
+let livePollTimer = null;
+let liveRunKey = null;
+
+function liveParams(){
+  return {
+    ...commonParams(),
+    window: +document.getElementById('fWindow').value,
+    interval_ms: +document.getElementById('fInterval').value,
+  };
+}
+
+function applyLiveState(state){
+  const run = runs.find(r => r.key === liveRunKey);
+  if (!run) return;
+  run.data.history = state.history;
+  run.label = 'LIVE: ' + run.data.seed_text + ' [' + state.params.engine + '] (tick ' + state.tick_index + (state.running ? '' : ', stopped') + ')';
+  const opt = Array.from(runSelect.options).find(o => o.value === liveRunKey);
+  if (opt) opt.textContent = run.label;
+
+  liveStatusEl.style.display = state.running ? 'inline' : 'none';
+
+  // Only touch the live render/scrubber if the live run is the one
+  // currently being viewed -- switching to a different run in the
+  // dropdown still lets polling keep run.data.history current in the
+  // background, it just doesn't yank the view back.
+  if (activeRun && activeRun.key === liveRunKey && state.history.length){
+    const newest = state.history[state.history.length - 1];
+    tickSlider.max = state.history.length - 1;
+    currentTickIdx = state.history.length - 1;
+    tickSlider.value = currentTickIdx;
+    tickOut.textContent = state.tick_index;
+    applySnapshot(newest);
+  }
+
+  if (!state.running){
+    stopLivePolling();
+    if (state.error){
+      errorEl.textContent = 'live session stopped: ' + state.error;
+      errorEl.style.display = 'block';
+    }
+  }
+}
+
+function stopLivePolling(){
+  if (livePollTimer) clearInterval(livePollTimer);
+  livePollTimer = null;
+  liveActive = false;
+  liveBtn.textContent = 'go live';
+  liveStatusEl.style.display = 'none';
+}
+
+async function pollLive(){
+  try {
+    const resp = await fetch('/api/live/state');
+    const state = await resp.json();
+    if (!resp.ok) throw new Error(state.error || ('server error ' + resp.status));
+    // A poll already in flight when the user clicks "stop live" can
+    // resolve after stopLivePolling() has already cleared the interval
+    // and hidden the badge -- without this guard its callback would
+    // silently re-show a "LIVE" badge for a session that's already gone.
+    if (!liveActive) return;
+    applyLiveState(state);
+    pushClientPhysics();
+  } catch (err) {
+    // Transient poll hiccup -- skip this tick rather than spamming the
+    // error banner; a real server-side failure surfaces via state.error.
+  }
+}
+
+// The client's half of the physics exchange: this interface sim is its
+// own physics domain -- ring nearness only exists HERE, in the gamified
+// layout the user is actually watching (the backend has no positions) --
+// so each poll cycle publishes what it observed and the backend's ring
+// dispensing consumes it. Same door a shader domain would publish
+// through later (POST /api/live/physics with a different "domain").
+async function pushClientPhysics(){
+  if (!liveActive || !activeRun || activeRun.key !== liveRunKey) return;
+  const ring_proximity = {};
+  for (const d of simNodes.values()){
+    if (d.data.parent_id === null) continue;
+    const r = Math.hypot(d.x - CX, d.y - CY);
+    const p = Math.max(0, 1 - Math.abs(r - d.targetR) / RING_SPACING);
+    if (p > 0) ring_proximity[d.data.id] = +p.toFixed(4);
+  }
+  try {
+    await fetch('/api/live/physics', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ domain: 'client', ring_proximity }),
+    });
+  } catch (err) { /* dropped observation is fine -- next poll publishes fresh ones */ }
+}
+
+function registerLiveRun(state, seedForLabel){
+  liveRunKey = 'live_' + Date.now();
+  const data = { run_id: 'LIVE ' + seedForLabel, seed_text: state.seed_text, params: state.params, history: state.history };
+  const label = 'LIVE: ' + state.seed_text + ' [' + state.params.engine + '] (tick ' + state.tick_index + ')';
+  runs.push({ key: liveRunKey, label, data });
+  const opt = document.createElement('option');
+  opt.value = liveRunKey; opt.textContent = label;
+  runSelect.appendChild(opt);
+}
+
+async function startLive(){
+  errorEl.style.display = 'none';
+  liveBtn.disabled = true;
+  loadingEl.style.display = 'flex';
+  const params = liveParams();
+  loadingTextEl.textContent = 'starting live session (loading ' + (params.engine || 'engine') + ' if not already loaded)...';
+  try {
+    const resp = await fetch('/api/live/start', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(params),
+    });
+    const state = await resp.json();
+    if (!resp.ok) throw new Error(state.error || ('server error ' + resp.status));
+
+    registerLiveRun(state, params.seed);
+    runSelect.value = liveRunKey;
+    activeRun = runs[runs.length - 1];
+    simNodes = new Map();
+    currentTickIdx = 0;
+    applyLiveState(state);
+
+    liveActive = true;
+    liveBtn.textContent = 'stop live';
+    livePollTimer = setInterval(pollLive, 400);
+  } catch (err) {
+    errorEl.textContent = 'live start failed: ' + err.message;
+    errorEl.style.display = 'block';
+  } finally {
+    liveBtn.disabled = false;
+    loadingEl.style.display = 'none';
+  }
+}
+
+async function stopLive(){
+  stopLivePolling();
+  try {
+    await fetch('/api/live/stop', { method: 'POST' });
+  } catch (err) { /* best effort -- daemon thread dies with the server regardless */ }
+}
+
+liveBtn.addEventListener('click', () => {
+  if (liveActive) stopLive(); else startLive();
+});
+
+// ---- reset server: clear cached engines/bundles, stop any live session ----
+const resetBtn = document.getElementById('fReset');
+resetBtn.addEventListener('click', async () => {
+  errorEl.style.display = 'none';
+  resetBtn.disabled = true;
+  stopLivePolling();  // this page's own view of a live session, if any
+  const prevText = resetBtn.textContent;
+  resetBtn.textContent = 'resetting...';
+  try {
+    const resp = await fetch('/api/reset', { method: 'POST' });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.error || ('server error ' + resp.status));
+  } catch (err) {
+    errorEl.textContent = 'reset failed: ' + err.message +
+      ' -- if the server is truly unresponsive, run flux_radar_restart.py instead.';
+    errorEl.style.display = 'block';
+  } finally {
+    resetBtn.disabled = false;
+    resetBtn.textContent = prevText;
+  }
+});
+
+// If a live session is already running server-side (e.g. this page was
+// reloaded), reattach to it instead of silently losing sight of it --
+// the server keeps ticking whether or not a browser is watching.
+async function tryReattachLive(){
+  try {
+    const resp = await fetch('/api/live/state');
+    if (!resp.ok) return false;
+    const state = await resp.json();
+    registerLiveRun(state, state.seed_text);
+    runSelect.value = liveRunKey;
+    activeRun = runs[runs.length - 1];
+    simNodes = new Map();
+    currentTickIdx = 0;
+    applyLiveState(state);
+    if (state.running){
+      liveActive = true;
+      liveBtn.textContent = 'stop live';
+      livePollTimer = setInterval(pollLive, 400);
+    }
+    return true;
+  } catch (err) {
+    return false;
+  }
+}
+
+// Autosaved server-side (see GET /api/last_params) after every run/live
+// start -- restoring it here means a server restart doesn't reset the
+// form back to hardcoded HTML defaults.
+async function loadLastParams(){
+  try {
+    const resp = await fetch('/api/last_params');
+    const data = await resp.json();
+    applyParamsToForm(data.params);
+  } catch (err) {
+    // No saved params yet, or the fetch failed -- form just keeps its
+    // HTML defaults.
+  }
+}
+
+// On page load: restore last-used settings, then reattach to an
+// already-running live session if there is one (the server itself may
+// have resumed a saved live session on its own restart -- see
+// LiveSession.resume), otherwise kick off a one-shot run.
+(async function boot(){
+  await loadEngineOptions();
+  await loadLastParams();
+  const reattached = await tryReattachLive();
+  if (!reattached) runScenario();
+})();
 })();
 </script>
 </body>

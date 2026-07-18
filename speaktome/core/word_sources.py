@@ -19,7 +19,7 @@ hard membership filtering, not as a scoring signal by itself.
 """
 from __future__ import annotations
 
-from typing import List
+from typing import List, Optional
 # --- END HEADER ---
 
 
@@ -34,7 +34,12 @@ def _load_nltk_dictionary_words() -> set:
         return {w.lower() for w in nltk_words.words()}
 
 
-def curated_english_wordlist(n: int = 20000, pool_size: int = 200000, min_word_len: int = 2) -> List[str]:
+def curated_english_wordlist(
+    n: int = 20000,
+    pool_size: int = 200000,
+    min_word_len: int = 2,
+    max_word_len: Optional[int] = None,
+) -> List[str]:
     """Real dictionary words, narrowed to the ``n`` most common among them.
 
     ``pool_size`` is how far down wordfreq's ranking to search for real
@@ -52,11 +57,23 @@ def curated_english_wordlist(n: int = 20000, pool_size: int = 200000, min_word_l
     2 characters; raise it further (3+) to also drop two-letter entries
     like "ok"/"hi" if those aren't wanted either.
 
+    ``max_word_len`` (None = no upper bound) is the mirror knob -- caps
+    how long a word is allowed to be, for callers who specifically want
+    to bias word-growth toward short, common words rather than exclude
+    single letters at the other end.
+
     Requires the optional ``nltk`` (with its ``words`` corpus, downloaded
     on first use) and ``wordfreq`` packages.
     """
-    real_words = {w for w in _load_nltk_dictionary_words() if len(w) >= min_word_len}
+    def _in_range(word: str) -> bool:
+        if len(word) < min_word_len:
+            return False
+        if max_word_len is not None and len(word) > max_word_len:
+            return False
+        return True
+
+    real_words = {w for w in _load_nltk_dictionary_words() if _in_range(w)}
     from wordfreq import top_n_list
     ranked = top_n_list("en", pool_size)
-    curated = [w for w in ranked if len(w) >= min_word_len and w in real_words]
+    curated = [w for w in ranked if _in_range(w) and w in real_words]
     return curated[:n]

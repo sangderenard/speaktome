@@ -10,7 +10,7 @@ from speaktome.core.model_abstraction import AbstractModelWrapper
 from speaktome.core.choice_policy import TopKPolicy
 from speaktome.core.implicit_backpath import ImplicitBackpathScorer
 from speaktome.core.noodle_explorer import Direction
-from speaktome.core.flux_graph import FluxGraph, FluxGraphConfig, FluxNode
+from speaktome.core.flux_graph import FluxGraph, FluxGraphConfig, FluxNode, Edge, Channel
 from speaktome.core.poetic_attractor import PoeticAttractor
 
 
@@ -86,6 +86,315 @@ def test_spawn_first_children_creates_both_directions():
     fwd_children = [c for c in children if c.direction is Direction.FORWARD]
     best_fwd = max(fwd_children, key=lambda c: c.local_evidence)
     assert best_fwd.tokens[0] == 1
+
+
+def test_attach_children_creates_a_real_edge_object_for_every_child():
+    graph = _build_graph(branch_factor=3)
+    anchor_id = graph.seed([0])
+    graph.spawn_first_children()
+
+    anchor = graph.nodes[anchor_id]
+    assert len(anchor.children_ids) == 6
+    for child_id in anchor.children_ids:
+        edge = graph.edges.get((anchor_id, child_id))
+        assert edge is not None
+        assert edge.from_id == anchor_id
+        assert edge.to_id == child_id
+
+
+def test_edge_formation_is_postfix_beam_for_forward_growth_and_prefix_beam_for_backward():
+    graph = _build_graph(branch_factor=2)
+    anchor_id = graph.seed([0])
+    graph.spawn_first_children()
+
+    anchor = graph.nodes[anchor_id]
+    for child_id in anchor.children_ids:
+        edge = graph.edges[(anchor_id, child_id)]
+        child = graph.nodes[child_id]
+        if child.direction is Direction.FORWARD:
+            assert edge.formation == "postfix_beam"
+        else:
+            assert edge.formation == "prefix_beam"
+
+
+def test_edge_records_the_seed_at_formation_time_permanently():
+    graph = _build_graph(branch_factor=1)
+    anchor_id = graph.seed([0])
+    graph.spawn_first_children()
+    fwd_child_id = next(c for c in graph.nodes[anchor_id].children_ids if graph.nodes[c].direction is Direction.FORWARD)
+    edge = graph.edges[(anchor_id, fwd_child_id)]
+    assert edge.seed_id_at_formation == anchor_id
+
+    # Re-root away from anchor_id -- the edge's own record must not change,
+    # even though anchor_id is no longer graph.anchor_id.
+    graph._reroot(fwd_child_id)
+    assert graph.anchor_id != anchor_id
+    assert graph.edges[(anchor_id, fwd_child_id)].seed_id_at_formation == anchor_id
+
+
+def test_edge_conductance_matches_directional_conductance_at_creation():
+    graph = _build_graph(branch_factor=1)
+    graph.config.return_conductance_scale = 0.4
+    anchor_id = graph.seed([0])
+    graph.spawn_first_children()
+    child_id = graph.nodes[anchor_id].children_ids[0]
+    edge = graph.edges[(anchor_id, child_id)]
+
+    assert math.isclose(edge.forward.conductance, graph._directional_conductance(child_id, anchor_id))
+    assert math.isclose(edge.reverse.conductance, graph._directional_conductance(anchor_id, child_id))
+    # forward (delivery) is unscaled, reverse (return) is scaled down --
+    # they should differ given return_conductance_scale != 1.0.
+    assert edge.forward.conductance != edge.reverse.conductance
+
+
+def test_edge_channels_default_to_bidirectional_with_no_filters():
+    graph = _build_graph(branch_factor=1)
+    anchor_id = graph.seed([0])
+    graph.spawn_first_children()
+    child_id = graph.nodes[anchor_id].children_ids[0]
+    edge = graph.edges[(anchor_id, child_id)]
+
+    assert edge.forward.style == "bidirectional"
+    assert edge.reverse.style == "bidirectional"
+    assert edge.forward.whitelist is None
+    assert edge.forward.blacklist == set()
+
+
+def test_graph_auditor_disabled_by_default_does_not_run_during_tick():
+    graph = _build_graph(branch_factor=1, compute_budget=1)
+    assert graph.config.graph_auditor_enabled is False
+    graph.seed([0])
+    graph.spawn_first_children()
+
+    graph.tick()
+
+    assert graph.traversals == {}
+
+
+def test_graph_auditor_does_not_create_edges():
+    graph = _build_graph(branch_factor=1)
+    seed_id = graph.seed([0])
+    a_id = _add_hand_node(graph, seed_id, 1, -0.5, 1)
+    b_id = _add_hand_node(graph, a_id, 2, -0.5, 2)
+    edge_count_before = len(graph.edges)
+
+    graph._run_graph_auditor()
+
+    assert len(graph.edges) == edge_count_before  # unchanged -- the auditor only ever touches traversals
+    assert len(graph.traversals) > 0
+
+
+def test_graph_auditor_enumerates_every_ancestor_descendant_pair():
+    # Not just direct edges -- every (ancestor, descendant) pair anywhere
+    # in the chain, since a traversal is any causal path, not just an
+    # adjacent one.
+    graph = _build_graph(branch_factor=1)
+    seed_id = graph.seed([0])
+    a_id = _add_hand_node(graph, seed_id, 1, -0.5, 1)
+    b_id = _add_hand_node(graph, a_id, 2, -0.5, 2)
+    c_id = _add_hand_node(graph, b_id, 3, -0.5, 3)
+
+    graph._run_graph_auditor()
+
+    expected_keys = {
+        (seed_id, a_id), (seed_id, b_id), (seed_id, c_id),
+        (a_id, b_id), (a_id, c_id),
+        (b_id, c_id),
+    }
+    assert set(graph.traversals.keys()) == expected_keys
+    assert graph.traversals[(seed_id, c_id)].node_ids == [seed_id, a_id, b_id, c_id]
+    assert graph.traversals[(a_id, c_id)].node_ids == [a_id, b_id, c_id]
+
+
+def test_graph_auditor_never_reruns_an_already_recorded_traversal():
+    graph = _build_graph(branch_factor=1)
+    seed_id = graph.seed([0])
+    a_id = _add_hand_node(graph, seed_id, 1, -0.5, 1)
+
+    graph._run_graph_auditor()
+    existing = graph.traversals[(seed_id, a_id)]
+
+    graph._run_graph_auditor()  # a second pass with nothing new
+
+    assert graph.traversals[(seed_id, a_id)] is existing  # exact same object, never rebuilt
+
+
+def test_traversal_mean_score_for_a_seed_rooted_path_matches_path_mean():
+    graph = _build_graph(branch_factor=1)
+    seed_id = graph.seed([0])
+    a_id = _add_hand_node(graph, seed_id, 1, -0.5, 1)
+    b_id = _add_hand_node(graph, a_id, 2, -0.3, 2)
+
+    graph._run_graph_auditor()
+
+    assert math.isclose(graph.traversals[(seed_id, b_id)].mean_score, graph.nodes[b_id].path_mean)
+
+
+def test_traversal_mean_score_for_an_internal_path_is_the_sub_span_average():
+    # (a, c)'s score must be exactly the mean evidence of JUST the a->c
+    # sub-span, not the whole seed->c path -- genuinely derivable from
+    # the two endpoints' own cumulative_evidence, not re-scored from
+    # scratch.
+    graph = _build_graph(branch_factor=1)
+    seed_id = graph.seed([0])
+    a_id = _add_hand_node(graph, seed_id, 1, -0.5, 1)
+    b_id = _add_hand_node(graph, a_id, 2, -0.5, 2)
+    c_id = _add_hand_node(graph, b_id, 3, -0.5, 3)
+
+    graph._run_graph_auditor()
+
+    assert math.isclose(graph.traversals[(a_id, c_id)].mean_score, -0.5)
+
+
+def test_burn_does_not_create_traversals():
+    # Burn never *creates* traversals -- only the graph auditor populates
+    # them, enumerating causal paths among whatever is currently live.
+    # (Burn does prune already-recorded ones that reference the newly-dead
+    # node -- see test_burn_prunes_traversals_touching_the_burned_node.)
+    graph = _build_graph()
+    seed_id = graph.seed([0])
+    leaf_id = _add_hand_node(graph, seed_id, 1, -0.5, 1)
+
+    graph._burn(leaf_id)
+
+    assert graph.traversals == {}
+
+
+def test_burn_prunes_traversals_touching_the_burned_node():
+    # self.traversals must not grow forever: a Traversal is recorded once
+    # and never re-derived, so without pruning it would accumulate one
+    # entry per (ancestor, descendant) pair ever seen across the whole
+    # session, not just the ones still live -- a real unbounded-memory
+    # risk given audit_edge_influence walks every recorded traversal on
+    # every single tick.
+    graph = _build_graph(branch_factor=1)
+    seed_id = graph.seed([0])
+    a_id = _add_hand_node(graph, seed_id, 1, -0.5, 1)
+    b_id = _add_hand_node(graph, a_id, 2, -0.5, 2)
+
+    graph._run_graph_auditor()
+    assert set(graph.traversals.keys()) == {(seed_id, a_id), (seed_id, b_id), (a_id, b_id)}
+
+    graph._burn(a_id)  # cascades: a_id and its live child b_id both burn
+
+    # Every traversal touching a_id or b_id is gone -- nothing references
+    # a dead node anymore.
+    assert graph.traversals == {}
+
+
+def test_burn_leaves_traversals_among_still_live_nodes_alone():
+    graph = _build_graph(branch_factor=1)
+    seed_id = graph.seed([0])
+    a_id = _add_hand_node(graph, seed_id, 1, -0.5, 1)
+    b_id = _add_hand_node(graph, seed_id, 2, -0.5, 1)  # sibling of a_id, not a descendant
+
+    graph._run_graph_auditor()
+    assert (seed_id, b_id) in graph.traversals
+
+    graph._burn(a_id)
+
+    # a_id is gone, but the unrelated (seed_id, b_id) traversal survives.
+    assert (seed_id, b_id) in graph.traversals
+    assert (seed_id, a_id) not in graph.traversals
+
+
+def test_graph_auditor_handles_a_mixed_direction_chain_from_a_reroot():
+    # A causal path isn't guaranteed to be direction-pure: re-rooting can
+    # flip direction partway along an ancestry chain, so a single
+    # ancestor-to-descendant walk can genuinely contain both forward and
+    # backward segments. node_ids stays plain tree order either way; each
+    # segment's own direction is looked up from that segment's own Edge,
+    # not summarized on the traversal.
+    graph = _build_graph()
+    seed_id = graph.seed([99])
+    f1_id = _add_node(graph, seed_id, 1, -0.1, 1, direction=Direction.FORWARD, pressure=1.0)
+    f2_id = _add_node(graph, f1_id, 2, -0.1, 2, direction=Direction.FORWARD, pressure=3.0)
+    graph._reroot(f2_id)  # old seed_id is now a BACKWARD-direction node under the new seed f2_id
+
+    leaf_id = _add_hand_node(graph, seed_id, 3, -0.1, graph.nodes[seed_id].depth + 1)
+    graph._run_graph_auditor()
+
+    traversal = graph.traversals[(f2_id, leaf_id)]
+    assert seed_id in traversal.node_ids  # the old seed is a real waypoint, direction notwithstanding
+    assert traversal.node_ids[0] == f2_id
+    assert traversal.node_ids[-1] == leaf_id
+
+
+def test_evaluator_is_a_direct_view_over_traversals():
+    graph = _build_graph()
+    seed_id = graph.seed([0])
+    fwd_id = _add_hand_node(graph, seed_id, 1, -0.5, 1)
+    graph.nodes[fwd_id].direction = Direction.FORWARD
+    bwd_id = _add_hand_node(graph, seed_id, 2, -0.5, 1)
+    graph.nodes[bwd_id].direction = Direction.BACKWARD
+
+    graph._run_graph_auditor()
+
+    assert graph.evaluator() is graph.traversals
+    assert len(graph.evaluator()) == 2  # (seed,fwd) and (seed,bwd)
+
+
+def test_audit_edge_influence_runs_the_auditor_itself():
+    graph = _build_graph(branch_factor=1)
+    seed_id = graph.seed([0])
+    a_id = _add_hand_node(graph, seed_id, 1, -0.5, 1)
+    assert graph.traversals == {}
+
+    graph.audit_edge_influence()
+
+    assert (seed_id, a_id) in graph.traversals  # no need to call _run_graph_auditor separately
+
+
+def test_audit_edge_influence_sums_traversal_quality_per_real_edge():
+    # seed->a->b: three traversals exist -- (seed,a), (a,b), and the
+    # longer (seed,b) -- and (seed,b)'s path crosses both real edges, so
+    # each real edge should see contributions from two traversals, not
+    # just its own direct one.
+    graph = _build_graph(branch_factor=1)
+    seed_id = graph.seed([0])
+    a_id = _add_hand_node(graph, seed_id, 1, -0.5, 1)
+    b_id = _add_hand_node(graph, a_id, 2, -0.5, 2)
+
+    influence = graph.audit_edge_influence()
+
+    assert set(influence.keys()) == {(seed_id, a_id), (a_id, b_id)}
+    quality = math.exp(-0.5)  # every traversal here has mean_score == -0.5
+    for entry in influence.values():
+        assert entry["count"] == 2
+        assert math.isclose(entry["total"], 2 * quality, rel_tol=1e-6)
+
+
+def test_meta_edges_bundles_edges_by_region():
+    graph = _build_graph(branch_factor=1)
+    anchor_id = graph.seed([0])
+    graph.spawn_first_children()
+
+    metas = graph.meta_edges()
+
+    assert ("main", "main") in metas
+    meta = metas[("main", "main")]
+    assert meta.from_region == "main"
+    assert meta.to_region == "main"
+    assert meta.member_edge_keys == set(graph.edges.keys())  # nothing orthogonal yet
+
+
+def test_meta_edges_separates_an_orthogonal_network_into_its_own_region():
+    graph = _build_graph()
+    anchor_id = graph.seed([99])
+    f1_id = _add_node(graph, anchor_id, 1, -0.1, 1, direction=Direction.FORWARD, pressure=1.0)
+    cousin_id = _add_node(graph, f1_id, 10, -0.1, 2, direction=Direction.BACKWARD, pressure=1.0)
+    assert cousin_id in graph.orthogonal_node_ids()
+    graph.edges[(f1_id, cousin_id)] = Edge(
+        from_id=f1_id, to_id=cousin_id,
+        forward=Channel(conductance=0.5), reverse=Channel(conductance=0.5),
+        formation="postfix_beam", seed_id_at_formation=anchor_id, created_tick=0,
+    )
+
+    metas = graph.meta_edges()
+
+    net_region = f"net:{cousin_id}"
+    assert ("main", net_region) in metas
+    assert metas[("main", net_region)].member_edge_keys == {(f1_id, cousin_id)}
 
 
 def test_tick_keeps_pressures_finite():
@@ -350,6 +659,186 @@ def test_expansion_priority_gives_a_long_waiting_node_a_boost():
     graph.nodes[new_id].created_tick = 20  # new_id "arrives" much later
     graph.tick_count = 20
     assert graph._expansion_priority(graph.nodes[old_id]) > graph._expansion_priority(graph.nodes[new_id])
+
+
+def test_hot_loop_depth_one_matches_current_single_level_behavior():
+    graph = _build_graph(branch_factor=2, compute_budget=2)
+    graph.config.hot_loop_depth = 1
+    graph.seed([0])
+    graph.spawn_first_children()
+
+    graph._expand_top_pressure_nodes()
+
+    live_depths = [n.depth for n in graph.nodes.values() if not n.burned]
+    assert max(live_depths) == 2  # anchor(0) -> spawn_first_children(1) -> one round(2)
+
+
+def test_hot_loop_depth_grows_several_levels_in_one_call():
+    graph = _build_graph(branch_factor=2, compute_budget=2)
+    graph.config.hot_loop_depth = 4
+    graph.seed([0])
+    graph.spawn_first_children()
+
+    graph._expand_top_pressure_nodes()
+
+    live_depths = [n.depth for n in graph.nodes.values() if not n.burned]
+    assert max(live_depths) == 5  # depth-1 leaves selected, then 4 hot-loop rounds on top
+
+
+def test_hot_loop_depth_every_round_uses_the_same_branch_factor():
+    graph = _build_graph(branch_factor=2, compute_budget=2)
+    graph.config.hot_loop_depth = 3
+    graph.seed([0])
+    graph.spawn_first_children()
+
+    graph._expand_top_pressure_nodes()
+
+    by_depth = {}
+    for n in graph.nodes.values():
+        if n.burned:
+            continue
+        by_depth[n.depth] = by_depth.get(n.depth, 0) + 1
+    # 2 selected depth-1 leaves (compute_budget=2), branch_factor=2 at every
+    # round: depth 2 has 2*2=4, depth 3 has 4*2=8, depth 4 has 8*2=16.
+    assert by_depth[2] == 4
+    assert by_depth[3] == 8
+    assert by_depth[4] == 16
+
+
+def test_hot_loop_depth_handles_an_empty_frontier_without_erroring():
+    # If some round ever produces zero children (e.g. no_repeat_ngram_size
+    # blocks every candidate), the remaining rounds must no-op cleanly
+    # instead of erroring on an empty frontier.
+    graph = _build_graph(branch_factor=1, compute_budget=1)
+    graph._expand_batch_hot_loop([], depth=5)  # should not raise on an empty starting frontier either
+
+    graph.config.hot_loop_depth = 10
+    graph.seed([0])
+    graph.spawn_first_children()
+    graph._expand_top_pressure_nodes()  # should not raise despite depth=10
+
+
+def test_direction_reach_is_zero_when_a_side_has_no_live_nodes():
+    graph = _build_graph()
+    graph.seed([0])
+    assert graph._direction_reach(Direction.FORWARD) == 0.0
+    assert graph._direction_reach(Direction.BACKWARD) == 0.0
+
+
+def test_direction_reach_tracks_the_furthest_live_node_on_that_side():
+    graph = _build_graph()
+    graph.seed([0])
+    for depth in (1, 2, 5):
+        nid = graph._alloc_id()
+        graph.nodes[nid] = FluxNode(
+            id=nid, tokens=[depth], direction=Direction.FORWARD, parent_id=graph.anchor_id,
+            depth=depth, local_evidence=0.0, pressure=1.0,
+        )
+    assert graph._direction_reach(Direction.FORWARD) == 5.0
+    assert graph._direction_reach(Direction.BACKWARD) == 0.0
+
+
+def test_direction_reach_ignores_burned_nodes():
+    graph = _build_graph()
+    graph.seed([0])
+    nid = graph._alloc_id()
+    graph.nodes[nid] = FluxNode(
+        id=nid, tokens=[1], direction=Direction.FORWARD, parent_id=graph.anchor_id,
+        depth=7, local_evidence=0.0, pressure=1.0, burned=True,
+    )
+    assert graph._direction_reach(Direction.FORWARD) == 0.0
+
+
+def test_balance_weight_zero_is_a_true_noop():
+    graph = _build_graph()
+    graph.config.balance_weight = 0.0
+    graph.seed([0])
+    fwd_id = graph._alloc_id()
+    graph.nodes[fwd_id] = FluxNode(
+        id=fwd_id, tokens=[1], direction=Direction.FORWARD, parent_id=graph.anchor_id,
+        depth=1, local_evidence=0.0, pressure=0.5,
+    )
+    bwd_id = graph._alloc_id()
+    graph.nodes[bwd_id] = FluxNode(
+        id=bwd_id, tokens=[2], direction=Direction.BACKWARD, parent_id=graph.anchor_id,
+        depth=1, local_evidence=0.0, pressure=0.5,
+    )
+    # Forward is way out ahead, backward barely started -- with the knob
+    # off, that imbalance must not change either node's priority at all.
+    plain = graph._expansion_priority(graph.nodes[bwd_id])
+    boosted = graph._expansion_priority(graph.nodes[bwd_id], forward_reach=50.0, backward_reach=1.0)
+    assert math.isclose(plain, boosted)
+
+
+def test_balance_weight_boosts_only_the_trailing_sides_candidates():
+    graph = _build_graph()
+    graph.config.balance_weight = 1.0
+    graph.seed([0])
+    fwd_id = graph._alloc_id()
+    graph.nodes[fwd_id] = FluxNode(
+        id=fwd_id, tokens=[1], direction=Direction.FORWARD, parent_id=graph.anchor_id,
+        depth=1, local_evidence=0.0, pressure=0.5,
+    )
+    bwd_id = graph._alloc_id()
+    graph.nodes[bwd_id] = FluxNode(
+        id=bwd_id, tokens=[2], direction=Direction.BACKWARD, parent_id=graph.anchor_id,
+        depth=1, local_evidence=0.0, pressure=0.5,
+    )
+    # Forward has pulled ahead (reach 10 vs backward's 1): the lagging
+    # backward candidate should get boosted...
+    bwd_priority = graph._expansion_priority(graph.nodes[bwd_id], forward_reach=10.0, backward_reach=1.0)
+    bwd_baseline = graph._expansion_priority(graph.nodes[bwd_id], forward_reach=1.0, backward_reach=1.0)
+    assert bwd_priority > bwd_baseline
+    assert math.isclose(bwd_priority, bwd_baseline + 1.0 * (10.0 - 1.0))
+    # ...while the already-leading forward candidate gets nothing extra.
+    fwd_priority = graph._expansion_priority(graph.nodes[fwd_id], forward_reach=10.0, backward_reach=1.0)
+    fwd_baseline = graph._expansion_priority(graph.nodes[fwd_id], forward_reach=1.0, backward_reach=1.0)
+    assert math.isclose(fwd_priority, fwd_baseline)
+
+
+def test_balance_weight_shifts_which_node_expand_top_pressure_picks():
+    # Integration-level: a lower-pressure backward leaf, once boosted for
+    # trailing far behind an already-deep forward side, can outrank a
+    # slightly-stronger forward leaf for the tick's single expansion slot.
+    graph = _build_graph(branch_factor=1, compute_budget=1)
+    graph.config.balance_weight = 5.0
+    graph.seed([0])
+
+    prev = graph.anchor_id
+    for depth in range(1, 6):
+        nid = graph._alloc_id()
+        graph.nodes[nid] = FluxNode(
+            id=nid, tokens=[depth], direction=Direction.FORWARD, parent_id=prev,
+            depth=depth, local_evidence=0.0, pressure=1.0, expanded=(depth < 5),
+        )
+        graph.nodes[prev].children_ids.append(nid)
+        prev = nid
+    forward_leaf = prev
+
+    backward_leaf = graph._alloc_id()
+    graph.nodes[backward_leaf] = FluxNode(
+        id=backward_leaf, tokens=[99], direction=Direction.BACKWARD, parent_id=graph.anchor_id,
+        depth=1, local_evidence=0.0, pressure=0.9,
+    )
+    graph.nodes[graph.anchor_id].children_ids.append(backward_leaf)
+
+    candidates = graph._expandable_nodes()
+    assert {forward_leaf, backward_leaf} <= {n.id for n in candidates}
+    # Without balance, the higher-pressure forward leaf wins outright.
+    assert (
+        graph._expansion_priority(graph.nodes[forward_leaf])
+        > graph._expansion_priority(graph.nodes[backward_leaf])
+    )
+
+    forward_reach = graph._direction_reach(Direction.FORWARD)
+    backward_reach = graph._direction_reach(Direction.BACKWARD)
+    assert forward_reach > backward_reach
+    # With balance active, the trailing backward leaf's boost (proportional
+    # to the reach gap) overtakes the forward leaf's pressure edge.
+    assert (
+        graph._expansion_priority(graph.nodes[backward_leaf], forward_reach, backward_reach)
+        > graph._expansion_priority(graph.nodes[forward_leaf], forward_reach, backward_reach)
+    )
 
 
 def test_repeated_ngram_tokens_blocks_exact_trigram_repeat_on_append():
@@ -909,14 +1398,21 @@ def test_expand_batch_with_word_trie_produces_multi_token_nodes():
     assert math.isfinite(score)
 
     # path_tokens must flatten a multi-token node's own span in its own
-    # internal order, not reversed by the leaf-to-anchor walk that
-    # assembles the full path -- check directly against one multi-token
-    # node rather than best_path() (which may not have selected that
-    # exact node's leaf).
-    node = multi_token_nodes[0]
-    path, _ = graph.path_tokens(node.id)
-    span = node.tokens
-    assert path[-len(span):] == span
+    # internal order, not scrambled by the leaf-to-anchor walk that
+    # assembles the full path -- check directly against every multi-token
+    # node rather than best_path() (which may not have selected any of
+    # their leaves). Where the node's own span lands depends on
+    # direction: FORWARD reverses the walked spans (so the queried
+    # leaf's own span, appended first in the raw walk, ends up last),
+    # BACKWARD does not (leaf-first is already reading order -- see
+    # path_tokens's own docstring), so the leaf's span stays first.
+    for node in multi_token_nodes:
+        path, direction = graph.path_tokens(node.id)
+        span = node.tokens
+        if direction is Direction.FORWARD:
+            assert path[-len(span):] == span
+        else:
+            assert path[:len(span)] == span
 
 
 def test_expand_batch_without_word_trie_keeps_single_token_nodes():
@@ -1072,6 +1568,333 @@ def test_head_pressure_never_drives_pressure_negative():
     assert graph.nodes[node_id].pressure >= 0.0
 
 
+def test_direction_branch_factor_falls_back_to_shared_default():
+    graph = _build_graph(branch_factor=5)
+    assert graph._direction_branch_factor(Direction.FORWARD) == 5
+    assert graph._direction_branch_factor(Direction.BACKWARD) == 5
+
+
+def test_direction_branch_factor_override_applies_to_only_that_direction():
+    graph = _build_graph(branch_factor=5)
+    graph.config.forward_branch_factor = 7
+    assert graph._direction_branch_factor(Direction.FORWARD) == 7
+    assert graph._direction_branch_factor(Direction.BACKWARD) == 5
+
+
+def test_direction_hot_loop_depth_falls_back_to_shared_default():
+    graph = _build_graph()
+    graph.config.hot_loop_depth = 3
+    assert graph._direction_hot_loop_depth(Direction.FORWARD) == 3
+    assert graph._direction_hot_loop_depth(Direction.BACKWARD) == 3
+
+
+def test_direction_hot_loop_depth_override_applies_to_only_that_direction():
+    graph = _build_graph()
+    graph.config.hot_loop_depth = 1
+    graph.config.backward_hot_loop_depth = 4
+    assert graph._direction_hot_loop_depth(Direction.FORWARD) == 1
+    assert graph._direction_hot_loop_depth(Direction.BACKWARD) == 4
+
+
+def test_top_p_keep_count_stops_once_cumulative_mass_is_reached():
+    graph = _build_graph()
+    scores = [math.log(p) for p in (0.5, 0.3, 0.15, 0.05)]
+    assert graph._top_p_keep_count(scores, top_p=0.5) == 1
+    assert graph._top_p_keep_count(scores, top_p=0.7) == 2
+    assert graph._top_p_keep_count(scores, top_p=0.79) == 2
+    assert graph._top_p_keep_count(scores, top_p=0.81) == 3
+    assert graph._top_p_keep_count(scores, top_p=0.99) == 4
+
+
+def test_top_p_keep_count_keeps_at_least_one_even_if_it_alone_exceeds_top_p():
+    graph = _build_graph()
+    scores = [math.log(0.95), math.log(0.05)]
+    assert graph._top_p_keep_count(scores, top_p=0.5) == 1
+
+
+def test_top_p_keep_count_empty_input_keeps_nothing():
+    graph = _build_graph()
+    assert graph._top_p_keep_count([], top_p=0.9) == 0
+
+
+def test_resolve_keep_count_topk_mode_matches_effective_branch_factor():
+    graph = _build_graph(branch_factor=3)
+    anchor_id = graph.seed([0])
+    node_id = _add_hand_node(graph, anchor_id, 1, -0.5, 1)
+    node = graph.nodes[node_id]
+    spans = [([i], math.log(0.4)) for i in range(5)]
+    assert graph._resolve_keep_count(node, spans) == graph._effective_branch_factor(node) == 3
+
+
+def test_resolve_keep_count_topp_mode_ignores_branch_factor_and_uses_top_p():
+    graph = _build_graph(branch_factor=1)  # deliberately tiny, to prove topp isn't capped by it
+    graph.config.forward_top_p = 0.81
+    graph.config.forward_selection_mode = "topp"
+    anchor_id = graph.seed([0])
+    node_id = _add_hand_node(graph, anchor_id, 1, -0.5, 1)
+    node = graph.nodes[node_id]
+    node.direction = Direction.FORWARD
+    spans = [([i], s) for i, s in enumerate(math.log(p) for p in (0.5, 0.3, 0.15, 0.05))]
+    assert graph._resolve_keep_count(node, spans) == 3  # would be 1 under topk with branch_factor=1
+
+
+def test_resolve_keep_count_topp_mode_capped_by_auxin_suppression_when_on():
+    graph = _build_graph(branch_factor=10)
+    graph.config.forward_selection_mode = "topp"
+    graph.config.forward_top_p = 0.999  # would otherwise keep everything
+    graph.config.auxin_suppression = 1.0
+    anchor_id = graph.seed([0])
+    node_id = _add_hand_node(graph, anchor_id, 1, -0.5, 1)
+    node = graph.nodes[node_id]
+    node.direction = Direction.FORWARD
+    node.auxin_level = 100.0  # heavy ambient suppression -> effective_branch_factor collapses to 1
+    spans = [([i], math.log(0.1)) for i in range(10)]
+    assert graph._resolve_keep_count(node, spans) == graph._effective_branch_factor(node) == 1
+
+
+def test_expand_top_pressure_nodes_explicit_per_direction_budget_is_a_hard_cap_no_redistribution():
+    # Forward gets a hard cap of 1 even though backward has room left in
+    # compute_budget_per_tick and forward has more eligible candidates --
+    # explicit per-direction budgets don't redistribute leftover the way
+    # the default floor-split does.
+    graph = _build_graph(branch_factor=1, compute_budget=10)
+    graph.config.forward_budget_per_tick = 1
+    graph.config.backward_budget_per_tick = 0
+    anchor_id = graph.seed([0])
+    graph.spawn_first_children()
+    forward_leaves_before = [n for n in graph.nodes.values() if not n.burned and n.direction is Direction.FORWARD]
+    assert len(forward_leaves_before) >= 1
+
+    graph._expand_top_pressure_nodes()
+
+    live_depths_by_dir = {}
+    for n in graph.nodes.values():
+        if n.burned or n.direction is None:
+            continue
+        live_depths_by_dir.setdefault(n.direction, []).append(n.depth)
+    # Only forward should have grown (backward_budget_per_tick=0 means no
+    # backward candidates were selected at all this tick).
+    assert max(live_depths_by_dir.get(Direction.FORWARD, [0])) == 2
+    assert max(live_depths_by_dir.get(Direction.BACKWARD, [0])) == 1  # unchanged from spawn_first_children
+
+
+def test_expand_top_pressure_nodes_reseeds_anchor_after_a_total_stall():
+    """Real dead-end bug: _expandable_nodes() never includes the anchor
+    (no direction, so _expand_batch can't score it), and nothing else
+    ever re-triggers growth on it after spawn_first_children()'s one-time
+    call. If every forward/backward node ever burns away, leaving only
+    the anchor, the graph must be able to recover -- not sit there
+    forever with both candidate pools permanently empty.
+    """
+    graph = _build_graph(branch_factor=2)
+    anchor_id = graph.seed([0])
+    graph.spawn_first_children()
+    for child_id in list(graph.nodes[anchor_id].children_ids):
+        graph._burn(child_id)
+    assert graph._live_children(anchor_id) == []
+
+    graph._expand_top_pressure_nodes()
+
+    live_children = graph._live_children(anchor_id)
+    assert live_children
+    directions = {graph.nodes[c].direction for c in live_children}
+    assert Direction.FORWARD in directions
+    assert Direction.BACKWARD in directions
+
+
+def test_expand_top_pressure_nodes_does_not_reseed_when_anchor_still_has_children():
+    graph = _build_graph(branch_factor=2)
+    anchor_id = graph.seed([0])
+    graph.spawn_first_children()
+    before = set(graph.nodes[anchor_id].children_ids)
+    assert before  # spawn_first_children already gave it real children
+
+    graph._expand_top_pressure_nodes()
+
+    # The anchor's *own* direct children set is untouched by an ordinary
+    # tick -- new growth happens further out, not by re-seeding the root.
+    assert set(graph.nodes[anchor_id].children_ids) == before
+
+
+def test_return_conductance_scale_default_matches_edge_conductance_exactly():
+    graph = _build_graph()
+    assert graph.config.return_conductance_scale == 1.0
+    anchor_id = graph.seed([0])
+    child_id = _add_hand_node(graph, anchor_id, 1, -0.5, 1)
+    graph.nodes[child_id].direction = Direction.FORWARD
+
+    assert graph._directional_conductance(anchor_id, child_id) == graph._edge_conductance(anchor_id, child_id)
+    assert graph._directional_conductance(child_id, anchor_id) == graph._edge_conductance(child_id, anchor_id)
+
+
+def test_return_conductance_scale_only_dampens_the_return_leg():
+    graph = _build_graph()
+    graph.config.return_conductance_scale = 0.25
+    anchor_id = graph.seed([0])
+    child_id = _add_hand_node(graph, anchor_id, 1, -0.5, 1)
+    graph.nodes[child_id].direction = Direction.FORWARD
+
+    # Delivery: parent (anchor) flowing out to child -- child's own
+    # inflow-from-parent term must stay exactly the base value.
+    delivery = graph._directional_conductance(child_id, anchor_id)
+    assert delivery == graph._edge_conductance(child_id, anchor_id)
+
+    # Return: child flowing back to parent -- the anchor's inflow-from-
+    # child term must be scaled down.
+    ret = graph._directional_conductance(anchor_id, child_id)
+    assert math.isclose(ret, graph._edge_conductance(anchor_id, child_id) * 0.25)
+
+
+def test_return_conductance_scale_dampens_how_much_a_strong_child_inflates_its_parent():
+    strong_child_evidence = -0.05  # near-zero evidence -> local_value close to 1.0, a strong claim
+
+    full_return = _build_graph()
+    full_anchor = full_return.seed([0])
+    weak_parent_id = _add_hand_node(full_return, full_anchor, 1, -3.0, 1)
+    full_return.nodes[weak_parent_id].direction = Direction.FORWARD
+    strong_child_id = _add_hand_node(full_return, weak_parent_id, 2, strong_child_evidence, 2)
+    full_return.nodes[strong_child_id].direction = Direction.FORWARD
+    full_return._settle_circuit()
+
+    damped_return = _build_graph()
+    damped_return.config.return_conductance_scale = 0.1
+    damped_anchor = damped_return.seed([0])
+    damped_weak_parent_id = _add_hand_node(damped_return, damped_anchor, 1, -3.0, 1)
+    damped_return.nodes[damped_weak_parent_id].direction = Direction.FORWARD
+    damped_strong_child_id = _add_hand_node(damped_return, damped_weak_parent_id, 2, strong_child_evidence, 2)
+    damped_return.nodes[damped_strong_child_id].direction = Direction.FORWARD
+    damped_return._settle_circuit()
+
+    # Same weak parent, same strong child -- but with the return leg
+    # dampened, the parent's settled pressure ends up lower: the child's
+    # strength reports back less than it would through a symmetric edge.
+    assert full_return.nodes[weak_parent_id].pressure > damped_return.nodes[damped_weak_parent_id].pressure
+
+
+def test_inflow_is_weighted_by_conductance_not_diluted_by_raw_neighbor_count():
+    """Pins down the actual bug: inflow used to normalize by (1 + neighbor
+    count), so adding a neighbor diluted the average purely by existing,
+    regardless of how weak its connection was. A near-zero-conductance
+    extra neighbor must barely move inflow at all now -- a thin, almost-
+    disconnected wire shouldn't meaningfully dilute a strong one, the way
+    it would in any real resistor network.
+    """
+    solo = _build_graph()
+    anchor_id = solo.seed([0])
+    hub_id = _add_hand_node(solo, anchor_id, 1, -0.5, 1)
+    strong_child_id = _add_hand_node(solo, hub_id, 2, -0.1, 2)
+    solo.nodes[strong_child_id].pressure = 2.0
+    solo._update_pressures()
+    solo_pressure = solo.nodes[hub_id].pressure
+
+    plus_weak = _build_graph()
+    anchor_id2 = plus_weak.seed([0])
+    hub_id2 = _add_hand_node(plus_weak, anchor_id2, 1, -0.5, 1)
+    strong_child_id2 = _add_hand_node(plus_weak, hub_id2, 2, -0.1, 2)
+    plus_weak.nodes[strong_child_id2].pressure = 2.0
+    # A near-zero-evidence -- wait, near *negative-infinity* evidence --
+    # child: local_value = exp(evidence) is essentially 0, so its
+    # conductance is essentially 0 too.
+    weak_child_id = _add_hand_node(plus_weak, hub_id2, 3, -50.0, 2)
+    plus_weak.nodes[weak_child_id].pressure = 2.0
+    plus_weak._update_pressures()
+    plus_weak_pressure = plus_weak.nodes[hub_id2].pressure
+
+    assert math.isclose(solo_pressure, plus_weak_pressure, rel_tol=1e-3)
+
+
+def test_inflow_rewards_more_strong_connections_not_just_one():
+    # A hub with three well-supported neighbors ends up with more settled
+    # pressure than an otherwise-identical node with just one -- real
+    # connectivity is a genuine advantage now, not something that gets
+    # diluted the more neighbors a node happens to have.
+    solo = _build_graph()
+    anchor_id = solo.seed([0])
+    hub_id = _add_hand_node(solo, anchor_id, 1, -0.5, 1)
+    child_id = _add_hand_node(solo, hub_id, 2, -0.1, 2)
+    solo.nodes[child_id].pressure = 2.0
+    solo._update_pressures()
+    solo_pressure = solo.nodes[hub_id].pressure
+
+    trio = _build_graph()
+    anchor_id2 = trio.seed([0])
+    hub_id2 = _add_hand_node(trio, anchor_id2, 1, -0.5, 1)
+    for tok in (10, 11, 12):
+        cid = _add_hand_node(trio, hub_id2, tok, -0.1, 2)
+        trio.nodes[cid].pressure = 2.0
+    trio._update_pressures()
+    trio_pressure = trio.nodes[hub_id2].pressure
+
+    assert trio_pressure > solo_pressure
+
+
+def test_balance_weight_disabled_by_default_is_a_true_noop_on_settled_pressure():
+    graph = _build_graph()
+    assert graph.config.balance_weight == 0.0
+    anchor_id = graph.seed([0])
+
+    far_fwd_id = _add_hand_node(graph, anchor_id, 1, -0.5, 8)
+    graph.nodes[far_fwd_id].direction = Direction.FORWARD
+    near_bwd_id = _add_hand_node(graph, anchor_id, 2, -0.5, 1)
+    graph.nodes[near_bwd_id].direction = Direction.BACKWARD
+
+    baseline = _build_graph()
+    baseline_anchor = baseline.seed([0])
+    baseline_bwd_id = _add_hand_node(baseline, baseline_anchor, 2, -0.5, 1)
+    baseline.nodes[baseline_bwd_id].direction = Direction.BACKWARD
+
+    graph._settle_circuit()
+    baseline._settle_circuit()
+    # Forward being way out ahead must change nothing about the backward
+    # node's settled pressure while the knob is off.
+    assert math.isclose(graph.nodes[near_bwd_id].pressure, baseline.nodes[baseline_bwd_id].pressure, rel_tol=1e-9)
+
+
+def test_balance_weight_raises_settled_pressure_of_the_lagging_side():
+    graph = _build_graph()
+    graph.config.balance_weight = 0.1
+    anchor_id = graph.seed([0])
+
+    far_fwd_id = _add_hand_node(graph, anchor_id, 1, -0.5, 8)
+    graph.nodes[far_fwd_id].direction = Direction.FORWARD
+    near_bwd_id = _add_hand_node(graph, anchor_id, 2, -0.5, 1)
+    graph.nodes[near_bwd_id].direction = Direction.BACKWARD
+
+    baseline = _build_graph()
+    baseline_anchor = baseline.seed([0])
+    baseline_bwd_id = _add_hand_node(baseline, baseline_anchor, 2, -0.5, 1)
+    baseline.nodes[baseline_bwd_id].direction = Direction.BACKWARD
+
+    graph._settle_circuit()
+    baseline._settle_circuit()
+    # Same backward node, but this time forward is way out ahead with the
+    # knob on -- its settled pressure should come out higher than the
+    # exact same node settled with nothing to lag behind.
+    assert graph.nodes[near_bwd_id].pressure > baseline.nodes[baseline_bwd_id].pressure
+    # The far-ahead forward node itself is already leading -- it gets no
+    # gain from its own knob.
+    far_baseline = _build_graph()
+    far_baseline_anchor = far_baseline.seed([0])
+    far_baseline_fwd_id = _add_hand_node(far_baseline, far_baseline_anchor, 1, -0.5, 8)
+    far_baseline.nodes[far_baseline_fwd_id].direction = Direction.FORWARD
+    far_baseline._settle_circuit()
+    assert math.isclose(graph.nodes[far_fwd_id].pressure, far_baseline.nodes[far_baseline_fwd_id].pressure, rel_tol=1e-9)
+
+
+def test_balance_weight_never_drives_pressure_negative():
+    graph = _build_graph()
+    graph.config.balance_weight = 1000.0
+    graph.config.head_pressure_coefficient = 1000.0
+    anchor_id = graph.seed([0])
+    far_fwd_id = _add_hand_node(graph, anchor_id, 1, -0.5, 8)
+    graph.nodes[far_fwd_id].direction = Direction.FORWARD
+    near_bwd_id = _add_hand_node(graph, anchor_id, 2, -0.5, 1)
+    graph.nodes[near_bwd_id].direction = Direction.BACKWARD
+    graph._settle_circuit()
+    assert graph.nodes[far_fwd_id].pressure >= 0.0
+    assert graph.nodes[near_bwd_id].pressure >= 0.0
+
+
 # ---------------------------------------------------------------------------
 # Root displacement / re-rooting
 # ---------------------------------------------------------------------------
@@ -1187,6 +2010,44 @@ def test_reroot_old_anchor_opposite_direction_children_stay_attached_not_orthogo
     assert f2_id in old_anchor.children_ids  # still attached, just orthogonal now
 
 
+def test_orthogonal_network_roots_are_the_shallowest_diverging_node():
+    graph = _build_graph()
+    anchor_id = graph.seed([99])
+    f1_id = _add_node(graph, anchor_id, 1, -0.1, 1, direction=Direction.FORWARD, pressure=1.0)
+    grandchild_id = _add_node(graph, f1_id, 2, -0.1, 2, direction=Direction.BACKWARD, pressure=1.0)
+    great_grandchild_id = _add_node(graph, grandchild_id, 3, -0.1, 3, direction=Direction.BACKWARD, pressure=1.0)
+
+    roots = graph.orthogonal_network_roots()
+
+    assert roots[grandchild_id] == grandchild_id  # it's the divergence point itself
+    assert roots[great_grandchild_id] == grandchild_id  # inherits its network's root
+    assert f1_id not in roots  # never orthogonal -- direct anchor child
+
+
+def test_orthogonal_network_roots_keeps_unrelated_branches_distinct():
+    graph = _build_graph()
+    anchor_id = graph.seed([99])
+    f1_id = _add_node(graph, anchor_id, 1, -0.1, 1, direction=Direction.FORWARD, pressure=1.0)
+    f2_id = _add_node(graph, anchor_id, 2, -0.1, 1, direction=Direction.FORWARD, pressure=1.0)
+    branch_a_id = _add_node(graph, f1_id, 10, -0.1, 2, direction=Direction.BACKWARD, pressure=1.0)
+    branch_b_id = _add_node(graph, f2_id, 20, -0.1, 2, direction=Direction.BACKWARD, pressure=1.0)
+
+    roots = graph.orthogonal_network_roots()
+
+    assert roots[branch_a_id] == branch_a_id
+    assert roots[branch_b_id] == branch_b_id
+    assert roots[branch_a_id] != roots[branch_b_id]  # two separate networks, not merged
+
+
+def test_orthogonal_network_roots_empty_when_nothing_orthogonal():
+    graph = _build_graph()
+    anchor_id = graph.seed([99])
+    _add_node(graph, anchor_id, 1, -0.1, 1, direction=Direction.FORWARD, pressure=1.0)
+    _add_node(graph, anchor_id, 2, -0.1, 1, direction=Direction.BACKWARD, pressure=1.0)
+
+    assert graph.orthogonal_network_roots() == {}
+
+
 def test_reroot_demoted_anchor_becomes_vulnerable_to_starvation():
     graph = _build_graph()
     graph.config.starvation_floor = 0.5
@@ -1201,6 +2062,28 @@ def test_reroot_demoted_anchor_becomes_vulnerable_to_starvation():
     assert old_anchor.low_pressure_ticks == 1
     graph._starve_and_burn()
     assert old_anchor.burned is True
+
+
+def test_reroot_restores_a_demoted_nodes_real_local_evidence():
+    # _reset_to_anchor_invariants zeroes local_evidence for whichever node
+    # is being promoted (an anchor is treated as free/certain) -- but that
+    # must come back once the node is later demoted, or its real score is
+    # gone forever and every future cumulative_evidence sum through it is
+    # silently wrong. Needs two reroots: the first promotion's demoted
+    # node (the original seed) always had local_evidence==0.0 anyway, so
+    # only a *second* reroot -- demoting a node that had a real non-zero
+    # score before its own promotion -- actually exercises the bug.
+    graph = _build_graph()
+    seed_id = graph.seed([99])
+    a_id = _add_node(graph, seed_id, 1, -0.1, 1, direction=Direction.FORWARD, pressure=1.0)
+    b_id = _add_node(graph, a_id, 2, -0.4, 2, direction=Direction.FORWARD, pressure=1.0)
+
+    graph._reroot(b_id)  # promotes b -- its real -0.4 must be stashed
+    assert graph.nodes[b_id].local_evidence == 0.0  # zeroed while it holds anchor status
+    assert graph.anchor_local_evidence == -0.4
+
+    graph._reroot(a_id)  # demotes b -- its real -0.4 must come back
+    assert graph.nodes[b_id].local_evidence == -0.4
 
 
 def test_demoted_anchor_pressure_is_now_recomputed_not_frozen():
@@ -1277,4 +2160,343 @@ def test_path_tokens_correct_after_reroot_includes_demoted_anchor_seed():
 
     seq = graph.full_sequence(forward_leaf=f2_id, backward_leaf=anchor_id)
     assert seq == [99, 1, 2]
+
+
+def test_path_tokens_multi_hop_forward_reads_anchor_outward_in_append_order():
+    graph = _build_graph()
+    anchor_id = graph.seed([0])
+    f1 = _add_node(graph, anchor_id, 10, -0.1, 1, direction=Direction.FORWARD, pressure=1.0)
+    f2 = _add_node(graph, f1, 20, -0.1, 2, direction=Direction.FORWARD, pressure=1.0)
+    f3 = _add_node(graph, f2, 30, -0.1, 3, direction=Direction.FORWARD, pressure=1.0)
+
+    tokens, direction = graph.path_tokens(f3)
+    assert direction is Direction.FORWARD
+    assert tokens == [10, 20, 30]  # append order: closest to anchor first, reads left to right
+
+
+def test_path_tokens_multi_hop_backward_reads_furthest_from_anchor_first():
+    """Regression test for a real bug: backward growth prepends (each new
+    node is grown further *away* from the anchor, extending leftward), so
+    the deepest node is the leftmost word and must come first when read
+    left to right -- the opposite of forward's append order. path_tokens
+    used to reverse both directions identically, which silently scrambled
+    any backward chain deeper than one hop (e.g. "near situated the
+    ocean" instead of the intended "situated near the ocean") -- not just
+    display, since this same text is what _expand_backward/_expand_batch
+    feed the model as real scoring context.
+    """
+    graph = _build_graph()
+    anchor_id = graph.seed([0])
+    b1 = _add_node(graph, anchor_id, 10, -0.1, 1, direction=Direction.BACKWARD, pressure=1.0)
+    b2 = _add_node(graph, b1, 20, -0.1, 2, direction=Direction.BACKWARD, pressure=1.0)
+    b3 = _add_node(graph, b2, 30, -0.1, 3, direction=Direction.BACKWARD, pressure=1.0)
+
+    tokens, direction = graph.path_tokens(b3)
+    assert direction is Direction.BACKWARD
+    assert tokens == [30, 20, 10]  # furthest from anchor first, reads left to right into the anchor
+
+
+def test_full_sequence_reads_correctly_with_multi_hop_backward_and_forward():
+    graph = _build_graph()
+    anchor_id = graph.seed([0])
+    b1 = _add_node(graph, anchor_id, 10, -0.1, 1, direction=Direction.BACKWARD, pressure=1.0)
+    b2 = _add_node(graph, b1, 20, -0.1, 2, direction=Direction.BACKWARD, pressure=1.0)
+    f1 = _add_node(graph, anchor_id, 40, -0.1, 1, direction=Direction.FORWARD, pressure=1.0)
+    f2 = _add_node(graph, f1, 50, -0.1, 2, direction=Direction.FORWARD, pressure=1.0)
+
+    seq = graph.full_sequence(forward_leaf=f2, backward_leaf=b2)
+    assert seq == [20, 10, 0, 40, 50]  # backward (far-to-near) + anchor + forward (near-to-far)
+
+
+# ---------------------------------------------------------------------------
+# Shared token pressure: redundant tokens weaken all instances
+# ---------------------------------------------------------------------------
+
+def test_attach_children_spawns_a_duplicate_token_at_zero_pressure():
+    graph = _build_graph()
+    anchor_id = graph.seed([0])
+    _add_node(graph, anchor_id, 5, -0.1, 1, direction=Direction.FORWARD, pressure=1.0)
+
+    graph._attach_children(anchor_id, Direction.FORWARD, [-0.2], [[5]])
+    new_id = max(graph.nodes)
+    assert graph.nodes[new_id].tokens == [5]
+    assert graph.nodes[new_id].pressure == 0.0
+
+
+def test_attach_children_spawns_a_novel_token_at_normal_pressure():
+    graph = _build_graph()
+    anchor_id = graph.seed([0])
+    _add_node(graph, anchor_id, 5, -0.1, 1, direction=Direction.FORWARD, pressure=1.0)
+
+    graph._attach_children(anchor_id, Direction.FORWARD, [-0.2], [[6]])
+    new_id = max(graph.nodes)
+    assert graph.nodes[new_id].tokens == [6]
+    assert graph.nodes[new_id].pressure > 0.0
+
+
+def test_attach_children_duplicate_siblings_in_the_same_batch_are_also_zeroed():
+    graph = _build_graph()
+    anchor_id = graph.seed([0])
+
+    graph._attach_children(anchor_id, Direction.FORWARD, [-0.1, -0.2], [[7], [7]])
+    children = [graph.nodes[c] for c in graph.nodes[anchor_id].children_ids]
+    pressures = sorted(c.pressure for c in children)
+    assert pressures[0] == 0.0  # the second [7] in the same batch
+    assert pressures[1] > 0.0   # the first one, nothing lived at [7] yet
+
+
+def test_shared_token_pressure_disabled_keeps_normal_spawn_pressure():
+    graph = _build_graph()
+    graph.config.shared_token_pressure_enabled = False
+    anchor_id = graph.seed([0])
+    _add_node(graph, anchor_id, 5, -0.1, 1, direction=Direction.FORWARD, pressure=1.0)
+
+    graph._attach_children(anchor_id, Direction.FORWARD, [-0.2], [[5]])
+    new_id = max(graph.nodes)
+    assert graph.nodes[new_id].pressure > 0.0
+
+
+def test_shared_token_intrinsic_divides_claim_by_live_instance_count():
+    """Pins down the actual algorithm: each member's own ordinary
+    intrinsic claim (found_bonus + local_value) is divided by how many
+    live instances of that token span exist. A stronger claim still ends
+    up with a bigger override than a weaker one, but neither keeps its
+    full original claim once there's anyone to share with -- that's the
+    "regulating effect": redundancy costs something for every member,
+    including the best one.
+    """
+    graph = _build_graph()
+    anchor_id = graph.seed([0])
+    strong = _add_node(graph, anchor_id, 5, -0.1, 1, direction=Direction.FORWARD, pressure=1.0)
+    weak = _add_node(graph, anchor_id, 5, -2.0, 1, direction=Direction.FORWARD, pressure=1.0)
+
+    overrides = graph._shared_token_intrinsic()
+
+    strong_claim = graph.config.found_bonus + graph.nodes[strong].local_value
+    weak_claim = graph.config.found_bonus + graph.nodes[weak].local_value
+
+    assert math.isclose(overrides[strong], strong_claim / 2)
+    assert math.isclose(overrides[weak], weak_claim / 2)
+    assert overrides[strong] > overrides[weak]
+    assert overrides[strong] < strong_claim
+
+
+def test_shared_token_intrinsic_divides_evenly_across_identical_claims():
+    graph = _build_graph()
+    anchor_id = graph.seed([0])
+    a = _add_node(graph, anchor_id, 5, -0.5, 1, direction=Direction.FORWARD, pressure=1.0)
+    b = _add_node(graph, anchor_id, 5, -0.5, 1, direction=Direction.FORWARD, pressure=1.0)
+    c = _add_node(graph, anchor_id, 5, -0.5, 1, direction=Direction.FORWARD, pressure=1.0)
+
+    overrides = graph._shared_token_intrinsic()
+    claim = graph.config.found_bonus + graph.nodes[a].local_value
+
+    assert overrides[a] == overrides[b] == overrides[c]
+    assert math.isclose(overrides[a], claim / 3)
+
+
+def test_shared_token_intrinsic_ignores_lone_instances():
+    graph = _build_graph()
+    anchor_id = graph.seed([0])
+    solo = _add_node(graph, anchor_id, 9, -0.3, 1, direction=Direction.FORWARD, pressure=1.0)
+
+    overrides = graph._shared_token_intrinsic()
+
+    assert solo not in overrides  # nothing to trade against -- keeps its own ordinary intrinsic
+
+
+def test_shared_token_pressure_divides_settled_pressure_by_group_size():
+    solo = _build_graph()
+    anchor_id = solo.seed([0])
+    solo_leaf = _add_node(solo, anchor_id, 5, -0.1, 1, direction=Direction.FORWARD, pressure=1.0)
+    solo._settle_circuit()
+    solo_pressure = solo.nodes[solo_leaf].pressure
+
+    duo = _build_graph()
+    anchor_id2 = duo.seed([0])
+    a = _add_node(duo, anchor_id2, 5, -0.1, 1, direction=Direction.FORWARD, pressure=1.0)
+    b = _add_node(duo, anchor_id2, 5, -0.1, 1, direction=Direction.FORWARD, pressure=1.0)
+    duo._settle_circuit()
+
+    assert duo.nodes[a].pressure < solo_pressure
+    assert duo.nodes[b].pressure < solo_pressure
+    assert abs(duo.nodes[a].pressure - duo.nodes[b].pressure) < 1e-9  # identical siblings, identical share
+
+
+def test_shared_token_pressure_persists_across_multiple_settles():
+    """Regression test for a real bug: an earlier design pooled shared
+    pressure once, as a post-processing step *after* _settle_circuit
+    reached equilibrium. But relaxation is a fixed-point iteration that
+    converges to the same equilibrium regardless of its starting value --
+    so the very next tick's from-scratch re-settle silently undid the
+    pooling before it could have any lasting effect. Folding the division
+    directly into _update_pressures (so it's part of the equilibrium
+    itself, recomputed fresh every sweep from current structure) fixes
+    this: repeated settling must NOT drift back toward the undivided,
+    lone-instance value.
+    """
+    graph = _build_graph()
+    anchor_id = graph.seed([0])
+    a = _add_node(graph, anchor_id, 5, -0.1, 1, direction=Direction.FORWARD, pressure=1.0)
+    _add_node(graph, anchor_id, 5, -0.1, 1, direction=Direction.FORWARD, pressure=1.0)
+    graph._settle_circuit()
+    first = graph.nodes[a].pressure
+
+    graph._settle_circuit()
+    second = graph.nodes[a].pressure
+
+    assert abs(second - first) < 1e-6
+
+
+def test_shared_token_pressure_ignores_lone_instances():
+    graph = _build_graph()
+    anchor_id = graph.seed([0])
+    solo = _add_node(graph, anchor_id, 9, -0.1, 1, direction=Direction.FORWARD, pressure=1.0)
+    graph._settle_circuit()
+
+    baseline = _build_graph()
+    anchor_id2 = baseline.seed([0])
+    solo2 = _add_node(baseline, anchor_id2, 9, -0.1, 1, direction=Direction.FORWARD, pressure=1.0)
+    baseline._settle_circuit()
+
+    assert graph.nodes[solo].pressure == baseline.nodes[solo2].pressure
+
+
+def test_shared_token_pressure_ignores_burned_duplicates():
+    graph = _build_graph()
+    anchor_id = graph.seed([0])
+    live = _add_node(graph, anchor_id, 5, -0.1, 1, direction=Direction.FORWARD, pressure=1.0)
+    burned = _add_node(graph, anchor_id, 5, -0.1, 1, direction=Direction.FORWARD, pressure=1.0)
+    graph.nodes[burned].burned = True
+    graph._settle_circuit()
+
+    baseline = _build_graph()
+    anchor_id2 = baseline.seed([0])
+    solo_leaf = _add_node(baseline, anchor_id2, 5, -0.1, 1, direction=Direction.FORWARD, pressure=1.0)
+    baseline._settle_circuit()
+
+    assert graph.nodes[live].pressure == baseline.nodes[solo_leaf].pressure  # a burned sibling doesn't count
+
+
+def test_shared_token_pressure_disabled_is_a_true_noop():
+    graph = _build_graph()
+    graph.config.shared_token_pressure_enabled = False
+    anchor_id = graph.seed([0])
+    a = _add_node(graph, anchor_id, 5, -0.1, 1, direction=Direction.FORWARD, pressure=1.0)
+    b = _add_node(graph, anchor_id, 5, -0.1, 1, direction=Direction.FORWARD, pressure=1.0)
+    graph._settle_circuit()
+
+    baseline = _build_graph()
+    anchor_id2 = baseline.seed([0])
+    solo_leaf = _add_node(baseline, anchor_id2, 5, -0.1, 1, direction=Direction.FORWARD, pressure=1.0)
+    baseline._settle_circuit()
+
+    assert graph.nodes[a].pressure == baseline.nodes[solo_leaf].pressure
+    assert graph.nodes[b].pressure == baseline.nodes[solo_leaf].pressure
+
+
+# ---------------------------------------------------------------------------
+# decay_rate / population_target
+# ---------------------------------------------------------------------------
+
+def test_decay_rate_zero_is_a_true_noop():
+    graph = _build_graph()
+    graph.config.decay_rate = 0.0
+    anchor_id = graph.seed([0])
+    leaf = _add_hand_node(graph, anchor_id, 1, -0.5, 1)
+    graph._settle_circuit()
+    without_decay = graph.nodes[leaf].pressure
+
+    graph2 = _build_graph()
+    graph2.config.decay_rate = 0.0
+    anchor_id2 = graph2.seed([0])
+    leaf2 = _add_hand_node(graph2, anchor_id2, 1, -0.5, 1)
+    graph2._settle_circuit()
+
+    assert graph2.nodes[leaf2].pressure == without_decay
+
+
+def test_decay_rate_lowers_the_settled_pressure_of_an_unsupported_node():
+    baseline = _build_graph()
+    anchor_id = baseline.seed([0])
+    leaf = _add_hand_node(baseline, anchor_id, 1, -0.5, 1)
+    baseline._settle_circuit()
+    baseline_pressure = baseline.nodes[leaf].pressure
+
+    decaying = _build_graph()
+    decaying.config.decay_rate = 0.5
+    anchor_id2 = decaying.seed([0])
+    leaf2 = _add_hand_node(decaying, anchor_id2, 1, -0.5, 1)
+    decaying._settle_circuit()
+
+    assert decaying.nodes[leaf2].pressure < baseline_pressure
+
+
+def test_population_target_scales_up_decay_when_over_target():
+    under_target = _build_graph()
+    under_target.config.decay_rate = 0.5
+    under_target.config.population_target = 100  # nowhere near the live count below
+    anchor_id = under_target.seed([0])
+    leaf = _add_hand_node(under_target, anchor_id, 1, -0.5, 1)
+    _add_hand_node(under_target, anchor_id, 2, -0.5, 1)
+    under_target._settle_circuit()
+    under_target_pressure = under_target.nodes[leaf].pressure
+
+    over_target = _build_graph()
+    over_target.config.decay_rate = 0.5
+    over_target.config.population_target = 1  # both nodes below already exceed this
+    anchor_id2 = over_target.seed([0])
+    leaf2 = _add_hand_node(over_target, anchor_id2, 1, -0.5, 1)
+    _add_hand_node(over_target, anchor_id2, 2, -0.5, 1)
+    over_target._settle_circuit()
+
+    assert over_target.nodes[leaf2].pressure < under_target_pressure
+
+
+def test_population_target_alone_drives_decay_without_decay_rate():
+    """Regression test for a real bug: an earlier version gated the whole
+    population_target mechanism behind decay_rate > 0 (`if cfg.decay_rate
+    > 0 and cfg.population_target`), so leaving decay_rate at its default
+    of 0 -- the natural thing to do if population_target is the only
+    control you actually touched -- made population_target a silent
+    no-op no matter how far over target the graph was. It must now be
+    additive: population_target drives real decay on its own.
+    """
+    under_target = _build_graph()
+    under_target.config.decay_rate = 0.0  # deliberately left at its default
+    under_target.config.population_target = 100
+    anchor_id = under_target.seed([0])
+    leaf = _add_hand_node(under_target, anchor_id, 1, -0.5, 1)
+    _add_hand_node(under_target, anchor_id, 2, -0.5, 1)
+    under_target._settle_circuit()
+    under_target_pressure = under_target.nodes[leaf].pressure
+
+    over_target = _build_graph()
+    over_target.config.decay_rate = 0.0  # deliberately left at its default
+    over_target.config.population_target = 1
+    anchor_id2 = over_target.seed([0])
+    leaf2 = _add_hand_node(over_target, anchor_id2, 1, -0.5, 1)
+    _add_hand_node(over_target, anchor_id2, 2, -0.5, 1)
+    over_target._settle_circuit()
+
+    assert over_target.nodes[leaf2].pressure < under_target_pressure
+
+
+def test_population_target_none_leaves_decay_rate_unscaled():
+    graph = _build_graph()
+    graph.config.decay_rate = 0.5
+    graph.config.population_target = None
+    anchor_id = graph.seed([0])
+    leaf = _add_hand_node(graph, anchor_id, 1, -0.5, 1)
+    graph._settle_circuit()
+    with_none = graph.nodes[leaf].pressure
+
+    graph2 = _build_graph()
+    graph2.config.decay_rate = 0.5
+    graph2.config.population_target = 10_000  # far above live count either way
+    anchor_id2 = graph2.seed([0])
+    leaf2 = _add_hand_node(graph2, anchor_id2, 1, -0.5, 1)
+    graph2._settle_circuit()
+
+    assert graph2.nodes[leaf2].pressure == with_none
 

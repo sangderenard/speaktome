@@ -10,7 +10,7 @@ model again.
 """
 from __future__ import annotations
 
-from typing import Any, Dict, Iterable, List, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Tuple
 # --- END HEADER ---
 
 
@@ -87,7 +87,13 @@ class WordTrie:
         return cls(words, reverse=reverse)
 
     @classmethod
-    def from_curated_wordlist(cls, n: int = 20000, reverse: bool = False) -> "WordTrie":
+    def from_curated_wordlist(
+        cls,
+        n: int = 20000,
+        reverse: bool = False,
+        min_word_len: int = 2,
+        max_word_len: Optional[int] = None,
+    ) -> "WordTrie":
         """Build from a real dictionary narrowed to its n most common words.
 
         See word_sources.curated_english_wordlist -- cross-references
@@ -98,7 +104,7 @@ class WordTrie:
         dependency on either.
         """
         from .word_sources import curated_english_wordlist
-        return cls(curated_english_wordlist(n), reverse=reverse)
+        return cls(curated_english_wordlist(n, min_word_len=min_word_len, max_word_len=max_word_len), reverse=reverse)
 
 
 class TrieGate:
