@@ -81,6 +81,28 @@ h1{
 .fg-readout .path{ font-size:14px; color:var(--ink-bright); flex:1; min-width:200px; }
 .fg-stage{ width:100%; background: var(--panel-bg-dark); border:0.5px solid var(--grid); border-radius:8px; overflow:hidden; position:relative; }
 .fg-node-label{ font-size:9px; fill: var(--ink); pointer-events:none; }
+.fg-heart-hud{
+  position:absolute; top:10px; right:10px; z-index:4;
+  width:min(330px, 38%); max-height:48%; overflow:auto;
+  background:rgba(5,12,8,0.91); border:0.5px solid var(--grid);
+  border-radius:7px; box-shadow:0 6px 22px rgba(0,0,0,0.28);
+  color:var(--ink); font-size:9px; line-height:1.35;
+  scrollbar-color:var(--grid) transparent;
+}
+.fg-heart-hud-title{
+  position:sticky; top:0; z-index:1; padding:6px 8px;
+  background:rgba(7,17,12,0.97); border-bottom:0.5px solid var(--grid);
+  color:var(--readout); text-transform:uppercase; letter-spacing:0.1em;
+}
+.fg-heart-region{ padding:6px 8px; border-bottom:0.5px solid var(--grid-dim); }
+.fg-heart-region:last-child{ border-bottom:0; }
+.fg-heart-region-head{ display:flex; justify-content:space-between; gap:8px; color:var(--ink-bright); }
+.fg-heart-region-total{ color:var(--readout); white-space:nowrap; }
+.fg-heart-subhead{ margin-top:4px; color:var(--ink-dim); text-transform:uppercase; letter-spacing:0.08em; }
+.fg-heart-row{ display:grid; grid-template-columns:minmax(78px,1fr) minmax(0,1.5fr); gap:6px; padding-top:2px; }
+.fg-heart-key{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--ink); }
+.fg-heart-value{ text-align:right; color:var(--ink-bright); overflow-wrap:anywhere; }
+.fg-heart-empty{ padding:8px; color:var(--ink-dim); }
 .fg-wedge-label{ font-size:11px; fill: var(--ink); letter-spacing:0.08em; }
 .fg-controls{ display:flex; align-items:center; gap:14px; flex-wrap:wrap; margin-top:10px; padding: 8px 12px; background: var(--panel-bg-dark); border:0.5px solid var(--grid); border-radius:6px; }
 .fg-controls .grp{ display:flex; align-items:center; gap:8px; }
@@ -108,6 +130,9 @@ h1{
   width:22px; height:22px; border-radius:50%;
   border: 2px solid var(--grid); border-top-color: var(--fwd);
   animation: fg-spin 0.9s linear infinite;
+}
+.fg-midtick-progress{
+  width:min(360px, 72vw); height:5px; accent-color:var(--fwd);
 }
 @keyframes fg-spin{ to{ transform: rotate(360deg); } }
 </style>
@@ -235,6 +260,81 @@ h1{
       </div>
     </div>
 
+    <div class="fg-section">
+      <div class="fg-section-title">need-driven cross-growth</div>
+      <div class="fg-form">
+        <div class="fg-field">
+          <label for="fSproutBranch" title="Forward growth launched from backward tissue that needs forward supply. Separate from ordinary forward branch width.">sprout width</label>
+          <input type="number" id="fSproutBranch" value="1" min="1" max="50" />
+        </div>
+        <div class="fg-field">
+          <label for="fSproutDepth" title="How many forward rounds a selected sprout runs immediately. Separate from ordinary forward hot-loop depth.">sprout depth</label>
+          <input type="number" id="fSproutDepth" value="1" min="1" max="8" />
+        </div>
+        <div class="fg-field">
+          <label for="fAirRootBranch" title="Backward growth launched from forward tissue that needs backward supply. Separate from ordinary backward branch width.">air-root width</label>
+          <input type="number" id="fAirRootBranch" value="1" min="1" max="50" />
+        </div>
+        <div class="fg-field">
+          <label for="fAirRootDepth" title="How many backward rounds a selected air root runs immediately. Separate from ordinary backward hot-loop depth.">air-root depth</label>
+          <input type="number" id="fAirRootDepth" value="1" min="1" max="8" />
+        </div>
+      </div>
+    </div>
+    <div class="fg-section">
+      <div class="fg-section-title">global CSF and active-seed rhizome</div>
+      <div class="fg-form">
+        <div class="fg-field">
+          <label for="fGrowthIonTarget">growth ion target concentration</label>
+          <input type="number" id="fGrowthIonTarget" value="0.1" min="0.0001" max="1" step="0.01" />
+        </div>
+        <div class="fg-field">
+          <label for="fCsfLinkRate">cousin-heart ↔ CSF rate</label>
+          <input type="number" id="fCsfLinkRate" value="0.05" min="0" max="1" step="0.01" />
+        </div>
+        <div class="fg-field">
+          <label for="fLymphReturnRate">CSF lymph return rate</label>
+          <input type="number" id="fLymphReturnRate" value="0.02" min="0" max="1" step="0.01" />
+        </div>
+        <div class="fg-field">
+          <label for="fRhizomePumpRate">CSF → rhizome cleanup rate</label>
+          <input type="number" id="fRhizomePumpRate" value="0.1" min="0" max="1" step="0.01" />
+        </div>
+        <div class="fg-field">
+          <label for="fRhizomeExudeRate">rhizome → soil salt rate</label>
+          <input type="number" id="fRhizomeExudeRate" value="0.01" min="0" max="1" step="0.01" />
+        </div>
+      </div>
+    </div>
+    <div class="fg-section">
+      <div class="fg-section-title">differentiable physiology</div>
+      <div class="fg-form">
+        <div class="fg-field">
+          <label for="fPhysiologyEnabled">learn every valve and pore</label>
+          <input type="checkbox" id="fPhysiologyEnabled" checked />
+        </div>
+        <div class="fg-field">
+          <label for="fPhysiologyRate">physiology learning rate</label>
+          <input type="number" id="fPhysiologyRate" value="0.05" min="0" max="2" step="0.005" />
+        </div>
+        <div class="fg-field">
+          <label for="fPhysiologyCost">open-gate resource cost</label>
+          <input type="number" id="fPhysiologyCost" value="0.1" min="0" max="2" step="0.01" />
+        </div>
+        <div class="fg-field">
+          <label for="fPhysiologyInitial">initial opening</label>
+          <input type="number" id="fPhysiologyInitial" value="0.8" min="0.01" max="0.99" step="0.01" />
+        </div>
+        <div class="fg-field">
+          <label for="fPhysiologyTemperature">traversal diffusion temperature</label>
+          <input type="number" id="fPhysiologyTemperature" value="0.5" min="0.001" max="10" step="0.05" />
+        </div>
+        <div class="fg-field">
+          <label for="fModelGradients" title="Keeps PyTorch autograd enabled around model forwards. Token selection remains discrete.">track model forward gradients</label>
+          <input type="checkbox" id="fModelGradients" />
+        </div>
+      </div>
+    </div>
     <div class="fg-section">
       <div class="fg-section-title">physics</div>
       <div class="fg-form">
@@ -404,10 +504,15 @@ h1{
 
   <div class="fg-stage">
     <svg id="fgSvg" viewBox="0 0 900 560" style="width:100%; display:block;"></svg>
+    <div class="fg-heart-hud" id="fgHeartHud">
+      <div class="fg-heart-hud-title" id="fgHeartHudTitle">heart array</div>
+      <div id="fgHeartHudBody"><div class="fg-heart-empty">no heart state</div></div>
+    </div>
     <div class="fg-tooltip" id="fgTooltip"></div>
     <div class="fg-loading" id="fgLoading">
       <div class="fg-spinner"></div>
       <div id="fgLoadingText">running FluxGraph...</div>
+      <progress class="fg-midtick-progress" id="fgMidTickProgress" max="1" value="0" style="display:none;"></progress>
     </div>
   </div>
 
@@ -429,6 +534,11 @@ h1{
       <output id="fgRestOut">58</output>
     </div>
     <div class="grp">
+      <label for="fgPressureLength">pressure length factor</label>
+      <input type="range" id="fgPressureLength" min="0" max="30" value="12" step="0.5" />
+      <output id="fgPressureLengthOut">12.0</output>
+    </div>
+    <div class="grp">
       <label for="fgLabelPct">hide labels below percentile</label>
       <input type="range" id="fgLabelPct" min="0" max="100" value="0" step="1" />
       <output id="fgLabelPctOut">0</output>
@@ -442,6 +552,9 @@ h1{
     <span>node size = pressure &middot; node brightness = score &middot; ring = generation depth</span>
     <span>colored wedges = re-rooted sibling/cousin networks &middot; wedge width = share of that side's live pressure</span>
     <span>edge color = avg causal-path quality through that edge (red low &rarr; green high) &middot; edge width = how many traversals use it, recomputed every tick</span>
+    <span><span class="sw" style="background:hsl(200,85%,68%)"></span>blue dashes = water &middot; separately colored dashes = individual ions</span>
+    <span id="fgIonLegend">active ions: none</span>
+    <span>dash direction/speed = material transport &middot; red halo = pressure drop &middot; pressure length factor = pipe housing expansion &middot; inner fill = node volume</span>
   </div>
 </div>
 
@@ -456,15 +569,162 @@ let W = BASE_W, H = BASE_H, CX = W/2, CY = H/2;
 const RING_SPACING = 40;
 let currentRingRadii = [0]; // index d -> pixel radius for display_radius d, see computeRingRadii
 
+const bathLayer = svg.append('g');   // faint full-stage wash: the CSF everything sits in
 const wedgeLayer = svg.append('g');
 const guideLayer = svg.append('g');
 const edgeLayer = svg.append('g');
+const flowLayer = svg.append('g');   // blue marching dashes: bulk water
+const ionFlowLayer = svg.append('g'); // one independently colored lane per dissolved ion
 const nodeLayer = svg.append('g');
+const fluidLayer = svg.append('g');  // inner liquid-level fill inside each node
+const heartLayer = svg.append('g');  // four-lobe pump glyphs at each region's pump node
 const labelLayer = svg.append('g');
 
 const runs = []; // { key, label, data }
 let activeRun = null;
 let simNodes = new Map();
+let currentHearts = {};  // region -> chamber-key -> mixture (from snapshot)
+let currentReservoirs = {}; // region -> ion name -> storage telemetry
+let currentBath = {};    // soluble name -> amount
+let currentRhizome = {}; // single active-seed-owned ion/waste store
+let currentRhizomeOwner = null;
+let currentPhysiology = {};
+let currentLinks = [];    // every causal parent->child connection in the active snapshot
+let currentPressureData = [], currentWaterData = [], currentIonData = [];
+let currentFluidData = [], currentLabelData = [];
+let currentMaxEdgeCount = 1, currentMaxDrop = 1e-4, currentMaxWater = 1e-5, currentMaxIon = 1e-5, currentMaxVolume = 1e-6;
+let basePipeLength = 58;
+let pressureLengthFactor = 12;
+let flowPhase = 0;       // advances every frame so dashes march
+function isAnchor(n){ return n.is_anchor === true; }
+function isCenter(n){ return n.is_center === true || n.level === 0; }
+function parentIds(n){
+  return Array.isArray(n.parent_ids)
+    ? n.parent_ids
+    : (n.parent_id == null ? [] : [n.parent_id]);
+}
+function endpointId(endpoint){
+  return endpoint != null && typeof endpoint === 'object' ? endpoint.id : endpoint;
+}
+function linkKey(link){ return endpointId(link.source) + '-' + endpointId(link.target); }
+function linkSource(link){ return link.source != null && typeof link.source === 'object' ? link.source : simNodes.get(link.source); }
+function linkTarget(link){ return link.target != null && typeof link.target === 'object' ? link.target : simNodes.get(link.target); }
+// Stable hue per soluble/slice name, for bath wash + node tint.
+function solubleHue(name){
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) % 360;
+  return h;
+}
+function updateMaterialLegend(){
+  const names = Array.from(new Set(Array.from(currentEdgeInfluence.values()).flatMap(inf =>
+    Object.keys(inf.component_flows || {}).filter(name => name !== 'solvent')
+  ))).sort();
+  const legend = d3.select('#fgIonLegend');
+  legend.text(names.length ? 'active ions: ' : 'active ions: none');
+  legend.selectAll('span.fg-ion-key').data(names, d => d).join('span')
+    .attr('class', 'fg-ion-key')
+    .style('color', d => `hsl(${solubleHue(d)}, 85%, 62%)`)
+    .style('margin-left', '8px')
+    .text(d => '● ' + d);
+}
+function hudNumber(value){
+  const n = Number(value) || 0;
+  if (Math.abs(n) >= 1000) return n.toExponential(2);
+  if (Math.abs(n) >= 10) return n.toFixed(1);
+  return n.toFixed(3).replace(/0+$/, '').replace(/\.$/, '');
+}
+function hudNode(tag, className, text){
+  const node = document.createElement(tag);
+  if (className) node.className = className;
+  if (text != null) node.textContent = text;
+  return node;
+}
+function addHudRow(parent, key, value, title){
+  const row = hudNode('div', 'fg-heart-row');
+  const keyNode = hudNode('div', 'fg-heart-key', key);
+  if (title) keyNode.title = title;
+  row.appendChild(keyNode);
+  row.appendChild(hudNode('div', 'fg-heart-value', value));
+  parent.appendChild(row);
+}
+function chamberHudValue(mixture){
+  const entries = Object.entries(mixture || {}).filter(([, amount]) => Math.abs(Number(amount) || 0) > 1e-9);
+  const total = entries.reduce((sum, [, amount]) => sum + (Number(amount) || 0), 0);
+  const parts = [`Σ ${hudNumber(total)}`];
+  const solvent = Number((mixture || {}).solvent) || 0;
+  if (solvent) parts.push(`H₂O ${hudNumber(solvent)}`);
+  for (const [name, amount] of entries.filter(([name]) => name !== 'solvent')){
+    parts.push(`${name} ${hudNumber(amount)}`);
+  }
+  return parts.join(' · ');
+}
+function renderHeartHud(){
+  const title = document.getElementById('fgHeartHudTitle');
+  const body = document.getElementById('fgHeartHudBody');
+  const regions = Array.from(new Set([
+    ...Object.keys(currentHearts || {}), ...Object.keys(currentReservoirs || {})
+  ])).sort((a, b) => a === 'main' ? -1 : b === 'main' ? 1 : a.localeCompare(b));
+  title.textContent = `heart array · ${regions.length}`;
+  body.replaceChildren();
+  const globalNode = hudNode('section', 'fg-heart-region');
+  const globalHead = hudNode('div', 'fg-heart-region-head');
+  globalHead.appendChild(hudNode('span', '', 'global fluid'));
+  globalHead.appendChild(hudNode('span', 'fg-heart-region-total', `rhizome owner ${currentRhizomeOwner == null ? '—' : currentRhizomeOwner}`));
+  globalNode.appendChild(globalHead);
+  addHudRow(globalNode, 'CSF / lymph', chamberHudValue(currentBath), 'one graph-global bath shared by every cousin heart');
+  addHudRow(globalNode, 'rhizome', chamberHudValue(currentRhizome), 'single store owned by the active seed');
+  const physiologySummary = currentPhysiology.enabled
+    ? `${currentPhysiology.parameter_count || 0} gates · step ${currentPhysiology.steps || 0} · loss ${Number(currentPhysiology.loss || 0).toFixed(5)} · score ${Number(currentPhysiology.best_score || 0).toFixed(4)}`
+    : 'disabled';
+  addHudRow(globalNode, 'learned physiology', physiologySummary, currentPhysiology.error || 'soft traversal-score reward diffused through valves and pores');
+  body.appendChild(globalNode);
+  if (!regions.length){
+    body.appendChild(hudNode('div', 'fg-heart-empty', 'no heart state'));
+    return;
+  }
+  for (const region of regions){
+    const chambers = currentHearts[region] || {};
+    const stores = currentReservoirs[region] || {};
+    const regionNode = hudNode('section', 'fg-heart-region');
+    const chamberEntries = Object.entries(chambers).sort(([a], [b]) => a.localeCompare(b));
+    const chamberTotal = chamberEntries.reduce((sum, [, mix]) =>
+      sum + Object.values(mix || {}).reduce((subtotal, amount) => subtotal + (Number(amount) || 0), 0), 0);
+    const head = hudNode('div', 'fg-heart-region-head');
+const pumpNode = pumpNodeForRegion(region);
+    const tokenString = pumpNode && pumpNode.data ? String(pumpNode.data.text || '').trim() : '';
+    const heartName = tokenString ? `${region} · “${tokenString}”` : region;
+    const heartNameNode = hudNode('span', '', heartName);
+    heartNameNode.title = tokenString || region;
+    head.appendChild(heartNameNode);
+    head.appendChild(hudNode('span', 'fg-heart-region-total', `${chamberEntries.length} ventricles · Σ ${hudNumber(chamberTotal)}`));
+    regionNode.appendChild(head);
+
+    regionNode.appendChild(hudNode('div', 'fg-heart-subhead', 'ventricles'));
+    if (!chamberEntries.length) addHudRow(regionNode, '—', 'empty');
+    for (const [key, mixture] of chamberEntries){
+      const shortKey = key.startsWith(region + ':') ? key.slice(region.length + 1) : key;
+      addHudRow(regionNode, shortKey, chamberHudValue(mixture), key);
+    }
+
+    regionNode.appendChild(hudNode('div', 'fg-heart-subhead', 'storage'));
+    const storeEntries = Object.entries(stores).sort(([a], [b]) => a.localeCompare(b));
+    if (!storeEntries.length) addHudRow(regionNode, '—', 'none');
+    for (const [name, store] of storeEntries){
+      const ionName = String(store.ion_name || name);
+      const band = Array.isArray(store.band) ? store.band : [0, 0];
+      const value = [
+        `Σ ${hudNumber(store.storage_volume)}`,
+        `${ionName} ${hudNumber(store.ion_amount)}`,
+        `H₂O ${hudNumber(store.solvent)}`,
+        `full ${hudNumber((Number(store.fullness) || 0)*100)}%`,
+        `c ${hudNumber(store.concentration)}`,
+        `[${hudNumber(band[0])}, ${hudNumber(band[1])}]`,
+      ].join(' · ');
+      addHudRow(regionNode, name, value, `${name} · owner ${store.owner_id}`);
+    }
+    body.appendChild(regionNode);
+  }
+}
 // keyed "from-to" -> {from,to,total,count,avg}, rebuilt from the active
 // snapshot's own "edges" field every applySnapshot() call -- see
 // snapshot_graph() server-side, which recomputes this for every tick of
@@ -472,6 +732,55 @@ let simNodes = new Map();
 // so edge appearance reflects whichever tick is actually being viewed.
 let currentEdgeInfluence = new Map();
 let labelHidePercentile = 0;
+
+const materialKey = d => linkKey(d.link) + '|' + d.name;
+function materialPoint(d, endpoint){
+  const source = linkSource(d.link), target = linkTarget(d.link);
+  if (!source || !target) return { x: CX, y: CY };
+  const dx = target.x - source.x, dy = target.y - source.y;
+  const length = Math.hypot(dx, dy) || 1;
+  const offset = d.lane * 4;
+  const base = endpoint === 'source' ? source : target;
+  return { x: base.x - dy/length*offset, y: base.y + dx/length*offset };
+}
+function rebuildLabelCache(nodesArr){
+  const ranked = nodesArr.filter(d => !isCenter(d.data))
+    .slice().sort((a, b) => b.data.pressure - a.data.pressure);
+  const keepCount = Math.ceil(ranked.length * (1 - labelHidePercentile / 100));
+  const keep = new Set(ranked.slice(0, keepCount).map(d => d.id));
+  currentLabelData = nodesArr.filter(d => isCenter(d.data) || keep.has(d.id));
+}
+function rebuildSnapshotRenderCaches(nodesArr){
+  for (const link of currentLinks){
+    link.influence = currentEdgeInfluence.get(linkKey(link)) || null;
+  }
+  currentMaxEdgeCount = Math.max(1, ...currentLinks.map(link => link.influence ? (Number(link.influence.count) || 0) : 0));
+  currentPressureData = currentLinks.filter(link =>
+    link.influence && Math.abs(link.influence.pressure_drop || 0) > 1e-4
+  );
+  currentMaxDrop = Math.max(1e-4, ...currentPressureData.map(link => Math.abs(link.influence.pressure_drop || 0)));
+
+  currentWaterData = [];
+  currentIonData = [];
+  for (const link of currentLinks){
+    const components = (link.influence && link.influence.component_flows) || {};
+    const solvent = Number(components.solvent) || 0;
+    if (Math.abs(solvent) > 1e-5){
+      currentWaterData.push({ link, name: 'solvent', amount: solvent, lane: 0 });
+    }
+    const ions = Object.entries(components).filter(([name, amount]) =>
+      name !== 'solvent' && Math.abs(Number(amount) || 0) > 1e-5
+    );
+    ions.forEach(([name, amount], index) => currentIonData.push({
+      link, name, amount: Number(amount), lane: index - (ions.length - 1) / 2,
+    }));
+  }
+  currentMaxWater = Math.max(1e-5, ...currentWaterData.map(d => Math.abs(d.amount)));
+  currentMaxIon = Math.max(1e-5, ...currentIonData.map(d => Math.abs(d.amount)));
+  currentMaxVolume = Math.max(1e-6, ...nodesArr.map(d => d.data.volume || 0));
+  currentFluidData = nodesArr.filter(d => (d.data.volume || 0) > 1e-4);
+  rebuildLabelCache(nodesArr);
+}
 
 function arcPath(cx, cy, rOuter, startAngle, endAngle){
   const x0 = cx + rOuter * Math.cos(startAngle), y0 = cy + rOuter * Math.sin(startAngle);
@@ -517,7 +826,7 @@ function ringPullTargets(nodesArr){
   const acc = new Map(); // depth -> {sum, weight}
   for (const d of nodesArr){
     const n = d.data;
-    if (n.parent_id === null) continue;
+    if (isCenter(n)) continue;
     const depth = n.display_radius != null ? n.display_radius : n.depth;
     const structural = currentRingRadii[depth] != null ? currentRingRadii[depth] : depth * RING_SPACING;
     const actualR = Math.hypot(d.x - CX, d.y - CY);
@@ -562,7 +871,7 @@ const MIN_ARC_PER_NODE = 16;
 function computeRingRadii(liveNodes, wedgeLayout, maxDepth){
   const countAt = new Map(); // "wedgeKey:depth" -> live node count sharing that ring band
   for (const n of liveNodes){
-    if (n.parent_id === null) continue;
+    if (isCenter(n)) continue;
     const d = n.display_radius != null ? n.display_radius : n.depth;
     const key = wedgeKey(n) + ':' + d;
     countAt.set(key, (countAt.get(key) || 0) + 1);
@@ -592,7 +901,15 @@ function updateViewBoxForRadius(outerRadius){
   const newH = neededHalfH * 2;
   const newW = newH * ASPECT;
   if (Math.abs(newH - H) > 0.5){
+    const oldCX = CX, oldCY = CY;
     H = newH; W = newW; CX = W/2; CY = H/2;
+    const shiftX = CX - oldCX, shiftY = CY - oldCY;
+    // Resizing the camera must not change any node's center-relative radius.
+    for (const node of simNodes.values()){
+      node.x += shiftX; node.y += shiftY;
+      if (node.fx != null) node.fx += shiftX;
+      if (node.fy != null) node.fy += shiftY;
+    }
     svg.attr('viewBox', `0 0 ${W} ${H}`);
   }
 }
@@ -635,7 +952,7 @@ function computeStructuralBoundaries(nodesArr){
   const mass = new Map(); // wedgeKey -> summed live pressure
   for (const d of nodesArr){
     const n = d.data;
-    if (n.parent_id === null) continue; // anchor sits at center, no wedge
+    if (isCenter(n)) continue; // every seed-layer cousin sits at center, outside the wedges
     const g = groupKey(n);
     if (!seen.has(g)){ seen.add(g); groupOrder.push(g); }
     const wk = wedgeKey(n);
@@ -665,13 +982,16 @@ function computeStructuralBoundaries(nodesArr){
 
 let currentGroupOrder = [];
 let currentBoundaries = new Map();
-let rayAngles = new Map(); // "dirSuffix:i" -> physical angle, eased toward its structural target
-const RAY_EASE = 0.08; // same slow, weighty settle as RING_EASE -- one connected material, not two systems
+let rayAngles = new Map(); // "dirSuffix:i" -> physical angle, eased toward structural target + node load
+let rayLoads = new Map();  // equal-and-opposite wall impulse accumulated by regionBindingForce
+const RAY_EASE = 0.12;
+const RAY_LOAD_GIVE = 0.08;
 
-// Eases every internal ray toward this snapshot's current pressure-balance
-// target; the two hemisphere-splitting rays (i=0 and i=M) are pinned
-// exactly, they're a semantic divide (forward vs backward), not a soft
-// grouping.
+function addRayLoad(key, load){ rayLoads.set(key, (rayLoads.get(key) || 0) + load); }
+
+// Internal boundaries receive the opposite side of node-wall contact. Load
+// can bow a ray, but deflection is capped to 20% of the smaller neighboring
+// structural wedge so regions can exchange force without crossing/inverting.
 function updateRayElasticity(){
   for (const dirSuffix of ['forward', 'backward']){
     const targets = currentBoundaries.get(dirSuffix);
@@ -680,10 +1000,19 @@ function updateRayElasticity(){
     for (let i = 0; i <= M; i++){
       const key = dirSuffix + ':' + i;
       if (i === 0 || i === M){ rayAngles.set(key, targets[i]); continue; }
-      const cur = rayAngles.has(key) ? rayAngles.get(key) : targets[i];
-      rayAngles.set(key, cur + (targets[i] - cur) * RAY_EASE);
+      const leftWidth = targets[i] - targets[i - 1];
+      const rightWidth = targets[i + 1] - targets[i];
+      const maxDeflection = 0.2 * Math.min(leftWidth, rightWidth);
+      const load = rayLoads.get(key) || 0;
+      const deflection = Math.max(-maxDeflection, Math.min(maxDeflection,
+        RAY_LOAD_GIVE * load / (1 + Math.abs(load))
+      ));
+      const target = targets[i] + deflection;
+      const cur = rayAngles.has(key) ? rayAngles.get(key) : target;
+      rayAngles.set(key, cur + (target - cur) * RAY_EASE);
     }
   }
+  rayLoads.clear();
 }
 
 // The layout everything else actually uses (rendering, targetAngle,
@@ -776,68 +1105,203 @@ function targetAngle(n, layout){
   return w.start + margin + jitter * Math.max(0, (w.end - w.start) - 2*margin);
 }
 function pressureRadius(p){ return Math.max(3, Math.min(11, 3 + p*7)); }
+function pipeRestLength(link){
+  const source = linkSource(link), target = linkTarget(link);
+  const meanPressure = source && target
+    ? Math.max(0, ((Number(source.data.pressure) || 0) + (Number(target.data.pressure) || 0)) / 2)
+    : 0;
+  return basePipeLength + pressureLengthFactor * Math.log1p(meanPressure);
+}
 function scoreBrightness(le){ return Math.max(0.25, Math.min(1, Math.exp(le))); }
 
 let currentWedgeLayout = new Map();
 
-// Containment through pressure, not position override: a node that's
-// crossed (or is nearing) its own wedge's ray gets an inward velocity
-// nudge proportional to how far past it is -- the ray genuinely resists,
-// it doesn't teleport the node back. No hard clamp backs this up
-// anymore, so a node under enough real pressure can still press a ray
-// and visibly bow it (see updateRayElasticity/computeStructuralBoundaries,
-// which folds live pressure back into where the ray wants to sit).
-function rayContainmentForce(strength){
+// Continuous regional binding plus predictive wall contact. Link/collision
+// forces may rearrange a branch inside its wedge, but every node has a
+// stable angular slot and its full circle must remain behind both rays.
+// Contact is an exchange: the node receives inward tangential impulse and
+// the shared internal ray receives the equal outward load.
+function regionBindingForce(slotStrength, wallStrength){
   let nodes;
   function force(alpha){
     for (const n of nodes){
-      if (n.data.parent_id === null) continue;
-      const w = currentWedgeLayout.get(wedgeKey(n.data));
+      if (isCenter(n.data)) continue;
+      const key = wedgeKey(n.data);
+      const w = currentWedgeLayout.get(key);
       if (!w) continue;
       const dx = n.x - CX, dy = n.y - CY;
       const r = Math.hypot(dx, dy) || 1;
-      let angle = Math.atan2(dy, dx);
-      // Backward-side wedges live in [PI/2, 3PI/2], which spills past
-      // atan2's native (-PI, PI] range -- unwrap by one full turn when
-      // that makes the angle fall inside this wedge's own range.
+      const predictedX = dx + (n.vx || 0);
+      const predictedY = dy + (n.vy || 0);
+      let angle = Math.atan2(predictedY, predictedX);
       if (angle < w.start - 1e-6) angle += Math.PI * 2;
 
-      const margin = 0.04; // radians of buffer before the push starts
-      let push = 0;
-      if (angle < w.start + margin) push = (w.start + margin) - angle;
-      else if (angle > w.end - margin) push = (w.end - margin) - angle;
-      if (push === 0) continue;
+      // Stable ID-based slot: a soft regional tether, not a hard position.
+      const desired = targetAngle(n.data, currentWedgeLayout);
+      const slotDelta = desired - angle;
+      const tangentX = -Math.sin(angle), tangentY = Math.cos(angle);
+      const slotImpulse = r * slotDelta * slotStrength * alpha;
+      n.vx += tangentX * slotImpulse;
+      n.vy += tangentY * slotImpulse;
 
-      const pushedAngle = angle + push * strength * alpha;
-      const tx = CX + r * Math.cos(pushedAngle), ty = CY + r * Math.sin(pushedAngle);
-      n.vx += (tx - n.x);
-      n.vy += (ty - n.y);
+      // Predict contact using the node's angular half-width, so its visible
+      // body stays in-region rather than waiting for its center to cross.
+      const angularRadius = Math.asin(Math.min(0.95, (n.r + 2) / r));
+      let safeStart = w.start + angularRadius + 0.015;
+      let safeEnd = w.end - angularRadius - 0.015;
+      if (safeStart > safeEnd){ safeStart = safeEnd = (w.start + w.end) / 2; }
+      let wallDelta = 0, boundaryIndex = null;
+      const dirSuffix = n.data.direction === 'backward' ? 'backward' : 'forward';
+      const groupIndex = currentGroupOrder.indexOf(groupKey(n.data));
+      if (angle < safeStart){ wallDelta = safeStart - angle; boundaryIndex = groupIndex; }
+      else if (angle > safeEnd){ wallDelta = safeEnd - angle; boundaryIndex = groupIndex + 1; }
+      if (wallDelta === 0) continue;
+
+      const wallImpulse = r * wallDelta * wallStrength * (0.35 + alpha);
+      n.vx += tangentX * wallImpulse;
+      n.vy += tangentY * wallImpulse;
+
+      // Hemisphere dividers remain fixed; only genuine inter-region rays
+      // accept the equal-and-opposite reaction.
+      if (boundaryIndex > 0 && boundaryIndex < currentGroupOrder.length){
+        const pressure = Math.max(0.05, Number(n.data.pressure) || 0.05);
+        addRayLoad(dirSuffix + ':' + boundaryIndex, -wallDelta * pressure);
+      }
     }
   }
   force.initialize = (_nodes) => { nodes = _nodes; };
   return force;
 }
 
-// Soft, not rigid: a node aims for its ring but isn't pinned to it, so
-// collision/link/wedge pressure can genuinely nudge it off-radius -- that
-// same give is what the ring guides themselves are tracking in
-// updateRingElasticity(), so the two read as one connected material
-// instead of a hard skeleton with cosmetic decoration on top.
-const RADIAL_GIVE = 0.5;
+// A bend in a flowing pipe experiences a straightening moment. Use the
+// hydraulic power available on each edge, |Q * dP|, as the load rather
+// than inventing another always-on layout spring. At a through-joint we
+// project the joint onto the chord between its upstream/downstream
+// neighbours and apply only that lateral correction: this opens the angle
+// without pulling the endpoints together and shortening the pipe.
+function pipeStraighteningForce(strength){
+  let nodes;
+  function force(alpha){
+    if (!nodes || !currentLinks.length || !currentEdgeInfluence.size) return;
+    const incoming = new Map(), outgoing = new Map();
+    let maxPower = 0;
+
+    for (const link of currentLinks){
+      const source = linkSource(link), target = linkTarget(link);
+      const influence = currentEdgeInfluence.get(linkKey(link));
+      if (!source || !target || !influence) continue;
+      const flow = Number(influence.flow) || 0;
+      const pressureDrop = Number(influence.pressure_drop) || 0;
+      const power = Math.abs(flow * pressureDrop);
+      if (power <= 1e-10) continue;
+      maxPower = Math.max(maxPower, power);
+      const loaded = { node: source, flow, power };
+      const received = { node: target, flow, power };
+      if (!outgoing.has(source.id)) outgoing.set(source.id, []);
+      if (!incoming.has(target.id)) incoming.set(target.id, []);
+      outgoing.get(source.id).push(received);
+      incoming.get(target.id).push(loaded);
+    }
+    if (maxPower <= 0) return;
+
+    for (const joint of nodes){
+      if (isCenter(joint.data)) continue;
+      const ins = incoming.get(joint.id) || [];
+      const outs = outgoing.get(joint.id) || [];
+      if (!ins.length || !outs.length) continue;
+      let correctionX = 0, correctionY = 0, pairCount = 0;
+
+      for (const inPipe of ins){
+        for (const outPipe of outs){
+          // Equal signs mean fluid is passing through this joint along
+          // parent -> joint -> child (or the exact reverse), rather than
+          // two streams meeting or separating here.
+          if (Math.sign(inPipe.flow) !== Math.sign(outPipe.flow)) continue;
+          const upstream = inPipe.node, downstream = outPipe.node;
+          const chordX = downstream.x - upstream.x;
+          const chordY = downstream.y - upstream.y;
+          const chordLength2 = chordX*chordX + chordY*chordY;
+          if (chordLength2 < 1e-8) continue;
+          const projection = Math.max(0, Math.min(1,
+            ((joint.x - upstream.x)*chordX + (joint.y - upstream.y)*chordY) / chordLength2
+          ));
+          const projectedX = upstream.x + projection*chordX;
+          const projectedY = upstream.y + projection*chordY;
+          const pairPower = Math.sqrt(inPipe.power * outPipe.power);
+          const weight = pairPower / maxPower;
+          correctionX += (projectedX - joint.x) * weight;
+          correctionY += (projectedY - joint.y) * weight;
+          pairCount += 1;
+        }
+      }
+      if (pairCount > 0){
+        // Divide only by competing paths. The hydraulic weight remains
+        // in the correction, so low-power pipes exert less torque.
+        const gain = strength * alpha / pairCount;
+        joint.vx += correctionX * gain;
+        joint.vy += correctionY * gain;
+      }
+    }
+  }
+  force.initialize = (_nodes) => { nodes = _nodes; };
+  return force;
+}
+
+function hasHydraulicActivity(){
+  for (const influence of currentEdgeInfluence.values()){
+    if (Math.abs((Number(influence.flow) || 0) * (Number(influence.pressure_drop) || 0)) > 1e-10){
+      return true;
+    }
+  }
+  return false;
+}
+// Damped restoration toward the exact ring indexed by edge hops from each
+// node's own network seed/center. Pressure can deflect a pipe temporarily;
+// it cannot permanently redefine which generation ring the node belongs to.
+function depthRingRecoveryForce(strength, damping){
+  let nodes = [];
+  function force(alpha){
+    const drive = Math.max(alpha, 0.12);
+    for (const node of nodes){
+      const dx = node.x - CX, dy = node.y - CY;
+      const radius = Math.hypot(dx, dy);
+      if (radius < 1e-8) continue;
+      const ux = dx / radius, uy = dy / radius;
+      const radialVelocity = (node.vx || 0)*ux + (node.vy || 0)*uy;
+      const impulse = (node.targetR - radius)*strength*drive - radialVelocity*damping;
+      node.vx += ux*impulse;
+      node.vy += uy*impulse;
+    }
+  }
+  force.initialize = (_nodes) => { nodes = _nodes; };
+  return force;
+}
+const RADIAL_GIVE = 0.72;
+const RADIAL_DAMPING = 0.68;
 
 let simulation = d3.forceSimulation([])
-  .force('radial', d3.forceRadial(d => d.targetR, CX, CY).strength(RADIAL_GIVE))
-  .force('link', d3.forceLink([]).id(d => d.id).distance(58).strength(0.55))
-  .force('collide', d3.forceCollide(d => d.r + 3))
-  .force('ray', rayContainmentForce(0.6))
+  .force('radial', depthRingRecoveryForce(RADIAL_GIVE, RADIAL_DAMPING))
+  .force('link', d3.forceLink([]).id(d => d.id).distance(pipeRestLength).strength(0.55))
+  // Every seed-layer cousin occupies the same center. Give centers zero
+  // collision radius so this force does not contradict that geometry by
+  // pushing them apart; ordinary non-center nodes still keep spacing.
+  .force('collide', d3.forceCollide(d => isCenter(d.data) ? 0 : d.r + 3))
+  .force('region', regionBindingForce(0.10, 0.9))
+  .force('pipeStraighten', pipeStraighteningForce(0.32))
   .alphaDecay(0.06)
+  .velocityDecay(0.55)
   .on('tick', render);
 
 let currentTickIdx = 0;
+let lastAppliedSnapshotKey = null;
 
 function applySnapshot(snap){
   const liveNodes = snap.nodes.filter(n => !n.burned);
   const liveIds = new Set(liveNodes.map(n => n.id));
+  const previousIds = new Set(simNodes.keys());
+  const previousLinkKeys = new Set(currentLinks.map(linkKey));
+  const snapshotKey = (activeRun ? activeRun.key : 'detached') + ':' + snap.tick;
+  const snapshotChanged = snapshotKey !== lastAppliedSnapshotKey;
 
   // Recomputed fresh every snapshot -- each network's wedge target tracks
   // its current live pressure, not whatever it was when first drawn. The
@@ -848,6 +1312,7 @@ function applySnapshot(snap){
   const structural = computeStructuralBoundaries(liveNodes.map(n => ({ data: n })));
   currentGroupOrder = structural.groupOrder;
   currentBoundaries = structural.boundaries;
+  rayLoads.clear(); // never carry wall impulse across snapshots/runs
   updateRayElasticity();
   currentWedgeLayout = physicalWedgeLayoutFrom();
 
@@ -863,29 +1328,64 @@ function applySnapshot(snap){
   for (const n of liveNodes){
     let sn = simNodes.get(n.id);
     if (!sn){
-      const parentSn = n.parent_id != null ? simNodes.get(n.parent_id) : null;
-      sn = { id: n.id, x: parentSn ? parentSn.x : CX, y: parentSn ? parentSn.y : CY };
+      // Start on the intended ring/wedge instead of stacking every new
+      // node on its parent and relying on a high-alpha explosion to prise
+      // the pile apart.
+      const initialAngle = targetAngle(n, currentWedgeLayout);
+      const initialRadius = targetRadius(n);
+      sn = {
+        id: n.id,
+        x: CX + initialRadius*Math.cos(initialAngle),
+        y: CY + initialRadius*Math.sin(initialAngle),
+        angle: initialAngle,
+      };
       simNodes.set(n.id, sn);
     }
     sn.data = n;
     sn.targetR = targetRadius(n);
     if (sn.angle === undefined) sn.angle = targetAngle(n, currentWedgeLayout);
-    sn.r = n.parent_id === null ? 13 : pressureRadius(n.pressure);
+    sn.r = isCenter(n) ? 13 : pressureRadius(n.pressure);
   }
 
   const nodesArr = Array.from(simNodes.values());
-  const links = nodesArr.filter(d => d.data.parent_id != null && simNodes.has(d.data.parent_id))
-    .map(d => ({ source: d.data.parent_id, target: d.id }));
+  currentLinks = nodesArr.flatMap(d => parentIds(d.data)
+    .filter(parentId => simNodes.has(parentId))
+    .map(parentId => ({ source: parentId, target: d.id })));
 
+  const currentLinkKeys = new Set(currentLinks.map(linkKey));
+  const topologyChanged = previousIds.size !== liveIds.size
+    || previousLinkKeys.size !== currentLinkKeys.size
+    || Array.from(liveIds).some(id => !previousIds.has(id))
+    || Array.from(currentLinkKeys).some(key => !previousLinkKeys.has(key));
+
+  // Install this tick's hydraulic state before a restarted simulation can
+  // evaluate pipeStraighteningForce.
+  currentEdgeInfluence = new Map((snap.edges || []).map(e => [e.from + '-' + e.to, e]));
+  updateMaterialLegend();
+  rebuildSnapshotRenderCaches(nodesArr);
   simulation.nodes(nodesArr);
-  simulation.force('link').links(links);
-  simulation.force('radial', d3.forceRadial(d => d.targetR, CX, CY).strength(RADIAL_GIVE));
-  simulation.alpha(0.9).restart();
+  simulation.force('link').links(currentLinks).distance(pipeRestLength);
+  simulation.force('radial', depthRingRecoveryForce(RADIAL_GIVE, RADIAL_DAMPING));
+  // Live polling can deliver the same completed tick many times. The old
+  // unconditional alpha(0.9) restart kicked the user's settled graph on
+  // every poll. Reheat only for a genuinely new snapshot, and then just
+  // enough for new topology or hydraulic torque to ease into place.
+  if (snapshotChanged){
+    const heat = topologyChanged ? 0.24 : (hasHydraulicActivity() ? 0.09 : 0.035);
+    simulation.alpha(Math.max(simulation.alpha(), heat)).restart();
+    lastAppliedSnapshotKey = snapshotKey;
+  }
 
   // Edge appearance (color + width) is driven entirely by this tick's
   // own audited influence data -- not a toggle, not an overlay, just
   // what render() always uses to draw the real parent/child edges below.
-  currentEdgeInfluence = new Map((snap.edges || []).map(e => [e.from + '-' + e.to, e]));
+  currentHearts = snap.hearts || {};
+  currentReservoirs = snap.reservoirs || {};
+  currentBath = snap.bath || {};
+  currentRhizome = snap.rhizome || {};
+  currentRhizomeOwner = snap.rhizome_owner_id == null ? null : snap.rhizome_owner_id;
+  currentPhysiology = snap.physiology || {};
+  renderHeartHud();
 
   document.getElementById('fgTick').textContent = snap.tick;
   document.getElementById('fgLive').textContent = nodesArr.length;
@@ -895,8 +1395,9 @@ function applySnapshot(snap){
 }
 
 function colorFor(n){
-  if (n.parent_id === null) return 'var(--anchor)';
+  if (isAnchor(n)) return 'var(--anchor)';
   if (n.network_root != null) return networkColor(n.network_root);
+  if (isCenter(n)) return 'var(--anchor)';
   return n.direction === 'backward' ? 'var(--bwd)' : 'var(--fwd)';
 }
 
@@ -906,27 +1407,23 @@ function render(){
   // Rays are soft too, same material as the rings: ease toward this
   // snapshot's pressure-balance target, rebuild the layout everyone else
   // reads from those eased angles, then redraw the wedges at their actual
-  // physical position -- no hard clamp anywhere below this. Containment
-  // now happens purely through rayContainmentForce (a real push, not a
-  // position override), so a node under real pressure can still visibly
+  // physical position. regionBindingForce keeps each visible node inside
+  // its assigned wedge while exchanging wall load back into soft rays,
+  // so a node under real pressure can still visibly
   // bow its own ray outward rather than being invisibly teleported back.
   updateRayElasticity();
   currentWedgeLayout = physicalWedgeLayoutFrom();
   drawWedgeGuides(currentWedgeLayout, currentRingRadii[currentRingRadii.length - 1] + 20);
 
-  // Ring guides are soft: ease each one toward wherever its own live
-  // nodes actually are this frame (clamped to RING_SLIP either way), then
-  // redraw them at that eased radius -- a data-joined update keyed by
-  // depth, not a remove/recreate, so this is cheap enough to run every
-  // single simulation tick.
-  updateRingElasticity(nodesArr);
-  const ringData = displayRingRadii.map((r, d) => ({ d, r })).slice(1);
+  // Ring d is the exact radius targeted by every node d edge hops from
+  // its own network seed/center. Rings do not chase displaced nodes.
+  const ringData = currentRingRadii.map((r, d) => ({ d, r })).slice(1);
   const rings = guideLayer.selectAll('circle.fg-ring').data(ringData, r => r.d);
   rings.join('circle')
     .attr('class', 'fg-ring')
     .attr('cx', CX).attr('cy', CY).attr('r', r => r.r)
-    .attr('fill', 'none').attr('stroke', 'var(--grid)').attr('stroke-width', 0.75)
-    .attr('opacity', 0.6);
+    .attr('fill', 'none').attr('stroke', 'var(--ink)').attr('stroke-width', 1.15)
+    .attr('opacity', 0.72);
 
   // Edge color/width come straight from this tick's own audited
   // influence (see applySnapshot -- currentEdgeInfluence is rebuilt from
@@ -940,57 +1437,209 @@ function render(){
   // of whether those paths are any good. A missing lookup (only possible
   // for a snapshot saved before this field existed) falls back to the
   // old direction/score-based look rather than drawing nothing.
-  const influenceValues = Array.from(currentEdgeInfluence.values());
-  const maxCount = Math.max(1, ...influenceValues.map(e => e.count));
 
-  const edges = edgeLayer.selectAll('line').data(
-    nodesArr.filter(d => d.data.parent_id != null && simNodes.has(d.data.parent_id)), d => d.id
+  const edges = edgeLayer.selectAll('line.fg-edge').data(
+    currentLinks, linkKey
   );
   edges.join('line')
-    .attr('x1', d => d.x).attr('y1', d => d.y)
-    .attr('x2', d => { const p = simNodes.get(d.data.parent_id); return p ? p.x : d.x; })
-    .attr('y2', d => { const p = simNodes.get(d.data.parent_id); return p ? p.y : d.y; })
+    .attr('class', 'fg-edge')
+    .attr('x1', d => { const n = linkTarget(d); return n ? n.x : CX; })
+    .attr('y1', d => { const n = linkTarget(d); return n ? n.y : CY; })
+    .attr('x2', d => { const n = linkSource(d); return n ? n.x : CX; })
+    .attr('y2', d => { const n = linkSource(d); return n ? n.y : CY; })
     .attr('stroke', d => {
-      const inf = currentEdgeInfluence.get(d.data.parent_id + '-' + d.id);
-      return inf ? d3.interpolateRdYlGn(Math.max(0, Math.min(1, inf.avg))) : colorFor(d.data);
+      const inf = d.influence;
+      const target = linkTarget(d);
+      return inf ? d3.interpolateRdYlGn(Math.max(0, Math.min(1, inf.avg))) : colorFor(target.data);
     })
     .attr('stroke-width', d => {
-      const inf = currentEdgeInfluence.get(d.data.parent_id + '-' + d.id);
-      return inf ? 1.5 + 7 * Math.sqrt(inf.count / maxCount) : 1;
+      const inf = d.influence;
+      return inf ? 1.5 + 7 * Math.sqrt((Number(inf.count) || 0) / currentMaxEdgeCount) : 1;
     })
     .attr('stroke-linecap', 'round')
     .attr('opacity', d => {
-      const inf = currentEdgeInfluence.get(d.data.parent_id + '-' + d.id);
-      return inf ? 0.85 : 0.15 + 0.35*scoreBrightness(d.data.local_evidence);
+      const inf = d.influence;
+      const target = linkTarget(d);
+      return inf ? 0.85 : 0.15 + 0.35*scoreBrightness(target.data.local_evidence);
     });
+
+  // Pressure halo: a soft translucent underlay whose opacity tracks the
+  // pressure drop across the pipe -- kept separate from the quality
+  // color / count width channels above, so it reads as its own signal.
+  edgeLayer.selectAll('line.fg-pressure').data(currentPressureData, linkKey).join('line')
+    .attr('class', 'fg-pressure')
+    .attr('x1', d => { const n = linkTarget(d); return n ? n.x : CX; })
+    .attr('y1', d => { const n = linkTarget(d); return n ? n.y : CY; })
+    .attr('x2', d => { const n = linkSource(d); return n ? n.x : CX; })
+    .attr('y2', d => { const n = linkSource(d); return n ? n.y : CY; })
+    .attr('stroke', 'var(--danger)').attr('stroke-linecap', 'round')
+    .attr('stroke-width', 9)
+    .attr('opacity', d => 0.05 + 0.2 * Math.abs(d.influence.pressure_drop) / currentMaxDrop);
+
+  // Material transport is split into real channels from the backend:
+  // solvent (water) stays on the pipe centerline in blue; every dissolved
+  // ion gets its own stable-color parallel lane, direction and dash speed
+  // taken from that component's signed transported amount.
+  flowLayer.selectAll('line').data(currentWaterData, materialKey).join('line')
+    .attr('class', 'fg-material-flow fg-water-flow')
+    .attr('x1', d => materialPoint(d, 'source').x).attr('y1', d => materialPoint(d, 'source').y)
+    .attr('x2', d => materialPoint(d, 'target').x).attr('y2', d => materialPoint(d, 'target').y)
+    .attr('stroke', 'hsl(200, 85%, 68%)').attr('stroke-width', 3)
+    .attr('stroke-dasharray', '6 7').attr('stroke-linecap', 'round').attr('opacity', 0.95)
+    .attr('data-march', d => -Math.sign(d.amount) * (0.4 + 2.5*Math.abs(d.amount)/currentMaxWater));
+
+  ionFlowLayer.selectAll('line').data(currentIonData, materialKey).join('line')
+    .attr('class', 'fg-material-flow fg-ion-flow')
+    .attr('x1', d => materialPoint(d, 'source').x).attr('y1', d => materialPoint(d, 'source').y)
+    .attr('x2', d => materialPoint(d, 'target').x).attr('y2', d => materialPoint(d, 'target').y)
+    .attr('stroke', d => `hsl(${solubleHue(d.name)}, 85%, 62%)`).attr('stroke-width', 2)
+    .attr('stroke-dasharray', '2 8').attr('stroke-linecap', 'round').attr('opacity', 0.95)
+    .attr('data-march', d => -Math.sign(d.amount) * (0.5 + 3*Math.abs(d.amount)/currentMaxIon));
 
   const circles = nodeLayer.selectAll('circle').data(nodesArr, d => d.id);
   circles.join('circle')
     .attr('cx', d => d.x).attr('cy', d => d.y)
     .attr('r', d => d.r)
     .attr('fill', d => colorFor(d.data))
-    .attr('opacity', d => d.data.parent_id === null ? 1 : scoreBrightness(d.data.local_evidence))
+    .attr('opacity', d => isCenter(d.data) ? 1 : scoreBrightness(d.data.local_evidence))
     .style('cursor', 'pointer')
     .on('mouseenter', showTooltip)
     .on('mousemove', moveTooltip)
     .on('mouseleave', hideTooltip);
 
-  // Percentile label declutter: rank non-anchor nodes by pressure
-  // (descending) and drop the bottom labelHidePercentile% of labels --
-  // the anchor's own label is exempt (there's only ever one, and it's
-  // always the thing everything else is relative to).
-  const ranked = nodesArr.filter(d => d.data.parent_id !== null)
-    .slice().sort((a, b) => b.data.pressure - a.data.pressure);
-  const keepCount = Math.ceil(ranked.length * (1 - labelHidePercentile / 100));
-  const labelKeep = new Set(ranked.slice(0, keepCount).map(d => d.id));
-  const labelData = nodesArr.filter(d => d.data.parent_id === null || labelKeep.has(d.id));
+  // Inner fluid-level fill: a second circle inside each node whose radius
+  // tracks how much volume it's holding (relative to the busiest node),
+  // tinted by its dominant soluble. You can see who's full and who's dry.
+  fluidLayer.selectAll('circle').data(currentFluidData, d => d.id).join('circle')
+    .attr('cx', d => d.x).attr('cy', d => d.y)
+    .attr('r', d => d.r * Math.min(1, Math.sqrt((d.data.volume || 0) / currentMaxVolume)))
+    .attr('fill', d => {
+      const sol = d.data.solubles || {};
+      const names = Object.keys(sol);
+      if (!names.length) return 'hsl(200, 70%, 70%)';  // pure solvent = watery blue
+      const dom = names.reduce((a, b) => sol[a] >= sol[b] ? a : b);
+      return `hsl(${solubleHue(dom)}, 70%, 65%)`;
+    })
+    .attr('opacity', 0.85)
+    .style('pointer-events', 'none');
 
-  const labels = labelLayer.selectAll('text').data(labelData, d => d.id);
+  drawHearts();
+
+  // Label ranking is snapshot data, not frame data; only positions update here.
+
+  const labels = labelLayer.selectAll('text').data(currentLabelData, d => d.id);
   labels.join('text')
     .attr('x', d => d.x + d.r + 3).attr('y', d => d.y + 3)
     .attr('class', 'fg-node-label')
     .text(d => d.data.text.trim().slice(0, 14));
+
+  drawBath();
 }
+
+// The pump node for each region: the anchor for "main", the node whose
+// id is the level-zero seed owner for a "net:<seed>" region.
+function pumpNodeForRegion(region){
+  if (region === 'main'){
+    for (const sn of simNodes.values()) if (isAnchor(sn.data)) return sn;
+    return null;
+  }
+  const rootId = +region.slice(4);
+  return simNodes.get(rootId) || null;
+}
+
+// Four-lobe heart glyph at each region's pump node: quadrants are the
+// forward/backward in/out chambers, each lobe's fill opacity tracking how
+// full that chamber is, with a beat-phase pulse in overall size.
+function drawHearts(){
+  const glyphs = [];
+  for (const [region, chambers] of Object.entries(currentHearts)){
+    const pn = pumpNodeForRegion(region);
+    if (!pn) continue;
+    // Total per (direction,stage) lobe across every slice in this region.
+    const lobes = { 'forward|in': 0, 'forward|out': 0, 'backward|in': 0, 'backward|out': 0 };
+    let total = 0;
+    for (const [key, mix] of Object.entries(chambers)){
+      const bar = key.indexOf('|');
+      const dir = key.startsWith('net:') ? key.split(':')[2].split('|')[0] : key.split(':')[1].split('|')[0];
+      const stage = key.slice(bar + 1);
+      const vol = Object.values(mix).reduce((a, b) => a + b, 0);
+      const lk = dir + '|' + stage;
+      if (lk in lobes){ lobes[lk] += vol; total += vol; }
+    }
+    glyphs.push({ region, x: pn.x, y: pn.y, lobes, total });
+  }
+  const g = heartLayer.selectAll('g.fg-heart').data(glyphs, d => d.region);
+  const gEnter = g.enter().append('g').attr('class', 'fg-heart');
+  // four wedge lobes + an outline ring, created once per heart
+  const R = 16;
+  const LOBES = ['forward|out', 'backward|out', 'forward|in', 'backward|in'];
+  gEnter.each(function(){
+    const sel = d3.select(this);
+    LOBES.forEach(lobe => sel.append('path').attr('class', 'lobe').attr('data-lobe', lobe));
+    sel.append('circle').attr('class', 'ring').attr('r', R)
+      .attr('fill', 'none').attr('stroke', 'var(--ink)').attr('stroke-width', 0.75).attr('opacity', 0.5);
+  });
+  const gAll = gEnter.merge(g);
+  gAll.attr('transform', d => {
+    const pulse = 1 + 0.12 * Math.sin(flowPhase * 0.15);  // gentle beat
+    return `translate(${d.x},${d.y}) scale(${pulse})`;
+  });
+  gAll.each(function(d){
+    const maxLobe = Math.max(1e-6, ...Object.values(d.lobes));
+    d3.select(this).selectAll('path.lobe').each(function(){
+      const lobe = this.getAttribute('data-lobe');
+      const [dir, stage] = lobe.split('|');
+      // forward on the right (0..PI half), backward on the left; in = inner
+      // (toward center vertical), out = outer. Simple quadrant mapping.
+      const a0 = dir === 'forward' ? (stage === 'out' ? -Math.PI/2 : 0) : (stage === 'in' ? Math.PI/2 : Math.PI);
+      const a1 = a0 + Math.PI/2;
+      const x0 = R*Math.cos(a0), y0 = R*Math.sin(a0), x1 = R*Math.cos(a1), y1 = R*Math.sin(a1);
+      d3.select(this)
+        .attr('d', `M0 0 L ${x0} ${y0} A ${R} ${R} 0 0 1 ${x1} ${y1} Z`)
+        .attr('fill', dir === 'forward' ? 'var(--fwd)' : 'var(--bwd)')
+        .attr('opacity', 0.15 + 0.6 * (d.lobes[lobe] / maxLobe));
+    });
+  });
+  g.exit().remove();
+}
+
+// The CSF bath as a faint full-stage wash -- hue from its dominant
+// dissolved soluble, opacity from how much total volume it holds. The
+// fluid everything is suspended in, visible as atmosphere.
+let bathMaxSeen = 1e-6;
+function drawBath(){
+  const names = Object.keys(currentBath);
+  const total = names.reduce((a, n) => a + currentBath[n], 0);
+  bathMaxSeen = Math.max(bathMaxSeen, total);
+  let hue = 200;
+  if (names.length){
+    const dom = names.reduce((a, b) => currentBath[a] >= currentBath[b] ? a : b);
+    hue = dom === 'solvent' ? 200 : solubleHue(dom);
+  }
+  const rect = bathLayer.selectAll('rect').data([total]);
+  rect.join('rect')
+    .attr('x', 0).attr('y', 0).attr('width', W).attr('height', H)
+    .attr('fill', `hsl(${hue}, 60%, 45%)`)
+    .attr('opacity', total > 0 ? Math.min(0.18, 0.18 * total / bathMaxSeen) : 0);
+}
+
+// Continuous marching animation: advances flowPhase and re-applies the
+// dash offset (and heart pulse) every frame, independent of the force
+// sim -- so flow keeps marching even after node positions settle.
+function animateFluid(){
+  flowPhase += 1;
+  svg.selectAll('line.fg-material-flow').attr('stroke-dashoffset', function(){
+    const march = +this.getAttribute('data-march') || 0;
+    return march * flowPhase;
+  });
+  heartLayer.selectAll('g.fg-heart').attr('transform', function(){
+    const m = (this.getAttribute('transform') || '').match(/translate\(([^)]+)\)/);
+    const pulse = 1 + 0.12 * Math.sin(flowPhase * 0.15);
+    return (m ? `translate(${m[1]})` : '') + ` scale(${pulse})`;
+  });
+  requestAnimationFrame(animateFluid);
+}
+requestAnimationFrame(animateFluid);
 
 const tooltip = document.getElementById('fgTooltip');
 const stage = document.querySelector('.fg-stage');
@@ -1003,6 +1652,13 @@ function showTooltip(event, d){
     '<div><span class="k">pressure</span> ' + n.pressure.toFixed(3) + '</div>' +
     '<div><span class="k">local evidence</span> ' + n.local_evidence.toFixed(3) + '</div>' +
     '<div><span class="k">path mean</span> ' + n.path_mean.toFixed(3) + '</div>' +
+    '<div><span class="k">root demand</span> backward ' + (n.backward_growth_interest || 0).toFixed(2) +
+      ', forward ' + (n.forward_growth_interest || 0).toFixed(2) + '</div>' +
+    '<div><span class="k">volume</span> ' + (n.volume != null ? n.volume.toFixed(3) : '0') +
+      ' (solvent ' + (n.solvent != null ? n.solvent.toFixed(2) : '0') + ')</div>' +
+    (n.solubles && Object.keys(n.solubles).length
+      ? '<div><span class="k">solubles</span> ' + Object.entries(n.solubles).map(([k,v]) => k + ':' + v.toFixed(2)).join(', ') + '</div>'
+      : '') +
     '<div><span class="k">created tick</span> ' + n.created_tick + '</div>';
   tooltip.style.display = 'block';
   moveTooltip(event);
@@ -1029,10 +1685,16 @@ document.getElementById('fgStiff').addEventListener('input', (e) => {
   simulation.alpha(0.6).restart();
 });
 document.getElementById('fgRest').addEventListener('input', (e) => {
-  const v = +e.target.value;
-  document.getElementById('fgRestOut').textContent = v;
-  simulation.force('link').distance(v);
-  simulation.alpha(0.6).restart();
+  basePipeLength = +e.target.value;
+  document.getElementById('fgRestOut').textContent = basePipeLength;
+  simulation.force('link').distance(pipeRestLength);
+  simulation.alpha(0.25).restart();
+});
+document.getElementById('fgPressureLength').addEventListener('input', (e) => {
+  pressureLengthFactor = +e.target.value;
+  document.getElementById('fgPressureLengthOut').textContent = pressureLengthFactor.toFixed(1);
+  simulation.force('link').distance(pipeRestLength);
+  simulation.alpha(0.25).restart();
 });
 
 let playing = false, playTimer = null;
@@ -1059,6 +1721,7 @@ playBtn.addEventListener('click', () => {
 document.getElementById('fgLabelPct').addEventListener('input', (e) => {
   labelHidePercentile = +e.target.value;
   document.getElementById('fgLabelPctOut').textContent = labelHidePercentile;
+  rebuildLabelCache(Array.from(simNodes.values()));
   render();
 });
 
@@ -1091,6 +1754,7 @@ function addRun(data){
 // ---- run-new-scenario form ----
 const loadingEl = document.getElementById('fgLoading');
 const loadingTextEl = document.getElementById('fgLoadingText');
+const midTickProgressEl = document.getElementById('fgMidTickProgress');
 const errorEl = document.getElementById('fError');
 const runBtn = document.getElementById('fRun');
 const engineSelect = document.getElementById('fEngine');
@@ -1107,6 +1771,21 @@ const FIELD_SPECS = [
   ['fBwdBranch', 'backward_branch_factor', 'number'],
   ['fFwdHotLoopDepth', 'forward_hot_loop_depth', 'number'],
   ['fBwdHotLoopDepth', 'backward_hot_loop_depth', 'number'],
+  ['fSproutBranch', 'sprout_branch_factor', 'number'],
+  ['fSproutDepth', 'sprout_hot_loop_depth', 'number'],
+  ['fAirRootBranch', 'air_root_branch_factor', 'number'],
+  ['fAirRootDepth', 'air_root_hot_loop_depth', 'number'],
+  ['fGrowthIonTarget', 'growth_target_ion_concentration', 'number'],
+  ['fCsfLinkRate', 'csf_link_rate', 'number'],
+  ['fLymphReturnRate', 'lymph_return_rate', 'number'],
+  ['fRhizomePumpRate', 'rhizome_csf_pump_rate', 'number'],
+  ['fRhizomeExudeRate', 'rhizome_soil_exudation_rate', 'number'],
+  ['fPhysiologyEnabled', 'physiology_learning_enabled', 'checkbox'],
+  ['fPhysiologyRate', 'physiology_learning_rate', 'number'],
+  ['fPhysiologyCost', 'physiology_resource_cost', 'number'],
+  ['fPhysiologyInitial', 'physiology_initial_opening', 'number'],
+  ['fPhysiologyTemperature', 'physiology_traversal_temperature', 'number'],
+  ['fModelGradients', 'physiology_track_model_gradients', 'checkbox'],
   ['fFwdBudget', 'forward_budget_per_tick', 'number'],
   ['fBwdBudget', 'backward_budget_per_tick', 'number'],
   ['fFwdSelectionMode', 'forward_selection_mode', 'select'],
@@ -1242,12 +1921,30 @@ function startRunProgressPolling(engineLabel){
     } catch (err) {
       return; // transient fetch hiccup -- next tick tries again
     }
-    if (!progress || !progress.active || !progress.latest) return;
+    if (!progress || !progress.active) return;
+    const mid = progress.mid_tick;
+    if (mid){
+      const work = Number.isFinite(mid.current) && Number.isFinite(mid.total) && mid.total > 0
+        ? ` ${mid.current}/${mid.total}` : '';
+      const detail = mid.detail ? ` — ${mid.detail}` : '';
+      loadingTextEl.textContent =
+        `running ${engineLabel} — tick ${mid.tick}/${progress.total_ticks} — ` +
+        `${mid.phase}${work}${detail} — ${mid.live_nodes} live — ${(+mid.elapsed_seconds).toFixed(1)}s`;
+      if (Number.isFinite(mid.current) && Number.isFinite(mid.total) && mid.total > 0){
+        midTickProgressEl.max = mid.total;
+        midTickProgressEl.value = mid.current;
+        midTickProgressEl.style.display = 'block';
+      } else {
+        midTickProgressEl.style.display = 'none';
+      }
+      return;
+    }
+    if (!progress.latest) return;
     const n = progress.latest;
     const live = n.nodes ? n.nodes.filter(x => !x.burned).length : 0;
     loadingTextEl.textContent =
-      `running ${engineLabel} -- tick ${progress.tick}/${progress.total_ticks} -- ` +
-      `${live} live nodes -- score ${(+n.best_score).toFixed(3)}`;
+      `running ${engineLabel} — tick ${progress.tick}/${progress.total_ticks} — ` +
+      `${live} live nodes — score ${(+n.best_score).toFixed(3)}`;
   }, 400);
 }
 
@@ -1256,6 +1953,7 @@ async function runScenario(){
   errorEl.style.display = 'none';
   runBtn.disabled = true;
   loadingEl.style.display = 'flex';
+  midTickProgressEl.style.display = 'none';
   const engineLabel = params.engine || 'engine';
   loadingTextEl.textContent = 'loading ' + engineLabel + ' (first use of it can take a while)...';
   startRunProgressPolling(engineLabel);
@@ -1275,6 +1973,7 @@ async function runScenario(){
     stopRunProgressPolling();
     runBtn.disabled = false;
     loadingEl.style.display = 'none';
+    midTickProgressEl.style.display = 'none';
   }
 }
 runBtn.addEventListener('click', runScenario);
@@ -1285,6 +1984,7 @@ const liveStatusEl = document.getElementById('fgLiveStatus');
 let liveActive = false;
 let livePollTimer = null;
 let liveRunKey = null;
+let liveLastSnapshotTick = -1;
 
 function liveParams(){
   return {
@@ -1297,12 +1997,26 @@ function liveParams(){
 function applyLiveState(state){
   const run = runs.find(r => r.key === liveRunKey);
   if (!run) return;
-  run.data.history = state.history;
+  const merged = new Map(run.data.history.map(snap => [snap.tick, snap]));
+  for (const snap of (state.history || [])) merged.set(snap.tick, snap);
+  const windowSize = Math.max(1, Number(state.params.window) || 30);
+  run.data.history = Array.from(merged.values()).sort((a, b) => a.tick - b.tick).slice(-windowSize);
+  if (run.data.history.length){
+    liveLastSnapshotTick = run.data.history[run.data.history.length - 1].tick;
+  }
   run.label = 'LIVE: ' + run.data.seed_text + ' [' + state.params.engine + '] (tick ' + state.tick_index + (state.running ? '' : ', stopped') + ')';
   const opt = Array.from(runSelect.options).find(o => o.value === liveRunKey);
   if (opt) opt.textContent = run.label;
 
   liveStatusEl.style.display = state.running ? 'inline' : 'none';
+  if (state.running){
+    const mid = state.mid_tick || {};
+    const work = Number.isFinite(mid.current) && Number.isFinite(mid.total) && mid.total > 0
+      ? ` ${mid.current}/${mid.total}` : '';
+    liveStatusEl.textContent = mid.phase
+      ? `● LIVE · ${mid.phase}${work} · ${mid.live_nodes} nodes`
+      : '● LIVE';
+  }
 
   // Only touch the live render/scrubber if the live run is the one
   // currently being viewed -- switching to a different run in the
@@ -1332,11 +2046,12 @@ function stopLivePolling(){
   liveActive = false;
   liveBtn.textContent = 'go live';
   liveStatusEl.style.display = 'none';
+  liveStatusEl.textContent = '● LIVE';
 }
 
 async function pollLive(){
   try {
-    const resp = await fetch('/api/live/state');
+    const resp = await fetch('/api/live/state?after_tick=' + encodeURIComponent(liveLastSnapshotTick), { cache: 'no-store' });
     const state = await resp.json();
     if (!resp.ok) throw new Error(state.error || ('server error ' + resp.status));
     // A poll already in flight when the user clicks "stop live" can
@@ -1362,7 +2077,7 @@ async function pushClientPhysics(){
   if (!liveActive || !activeRun || activeRun.key !== liveRunKey) return;
   const ring_proximity = {};
   for (const d of simNodes.values()){
-    if (d.data.parent_id === null) continue;
+    if (isCenter(d.data)) continue;
     const r = Math.hypot(d.x - CX, d.y - CY);
     const p = Math.max(0, 1 - Math.abs(r - d.targetR) / RING_SPACING);
     if (p > 0) ring_proximity[d.data.id] = +p.toFixed(4);
@@ -1379,6 +2094,7 @@ async function pushClientPhysics(){
 function registerLiveRun(state, seedForLabel){
   liveRunKey = 'live_' + Date.now();
   const data = { run_id: 'LIVE ' + seedForLabel, seed_text: state.seed_text, params: state.params, history: state.history };
+  liveLastSnapshotTick = state.history && state.history.length ? state.history[state.history.length - 1].tick : -1;
   const label = 'LIVE: ' + state.seed_text + ' [' + state.params.engine + '] (tick ' + state.tick_index + ')';
   runs.push({ key: liveRunKey, label, data });
   const opt = document.createElement('option');
@@ -1458,7 +2174,7 @@ resetBtn.addEventListener('click', async () => {
 // the server keeps ticking whether or not a browser is watching.
 async function tryReattachLive(){
   try {
-    const resp = await fetch('/api/live/state');
+    const resp = await fetch('/api/live/state?latest=1', { cache: 'no-store' });
     if (!resp.ok) return false;
     const state = await resp.json();
     registerLiveRun(state, state.seed_text);

@@ -63,10 +63,12 @@ import json
 import os
 import threading
 import time
+import traceback
 from collections import deque
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any, Deque, Dict, List, Optional, Tuple
+from urllib.parse import parse_qs, urlsplit
 
 from tensors.torch_backend import PyTorchTensorOperations
 from .core.model_engine import ENGINES, DEFAULT_ENGINE, load_engine
@@ -75,7 +77,7 @@ from .core.writing_token_filter import WritingTokenFilter
 from .core.token_filters import DictionaryTokenFilter, CombinedTokenFilter
 from .core.implicit_backpath import ImplicitBackpathScorer
 from .core.choice_policy import AlphaBetaPolicy
-from .core.flux_graph import FluxGraph, FluxGraphConfig, FluxNode
+from .core.flux_graph import FluxGraph, FluxGraphConfig, FluxNode, MaterialFactory
 from .core.poetic_attractor import PoeticAttractor
 from .core.word_trie import WordTrie
 from .core.noodle_explorer import Direction
@@ -90,7 +92,10 @@ def _node_to_dict(node: FluxNode) -> Dict[str, Any]:
         "tokens": node.tokens,
         "direction": node.direction.name if node.direction is not None else None,
         "parent_id": node.parent_id,
+        "parent_ids": node.parent_ids,
         "depth": node.depth,
+        "level": node.level,
+        "center_id": node.center_id,
         "local_evidence": node.local_evidence,
         "children_ids": node.children_ids,
         "pressure": node.pressure,
@@ -102,6 +107,25 @@ def _node_to_dict(node: FluxNode) -> Dict[str, Any]:
         "rollup_mean": node.rollup_mean,
         "subtree_auxin": node.subtree_auxin,
         "auxin_level": node.auxin_level,
+        "solvent": node.solvent,
+        "solubles": node.solubles,
+        "humidity_exchange": node.humidity_exchange,
+        "hull_permeability": node.hull_permeability,
+        "pore_permeabilities": node.pore_permeabilities,
+        "factories": [
+            {
+                "name": factory.name,
+                "inputs": factory.inputs,
+                "outputs": factory.outputs,
+                "medium": factory.medium,
+                "throughput": factory.throughput,
+                "enabled": factory.enabled,
+            }
+            for factory in node.factories
+        ],
+        "factory_auxin": node.factory_auxin,
+        "backward_growth_interest": node.backward_growth_interest,
+        "forward_growth_interest": node.forward_growth_interest,
     }
 
 
@@ -109,10 +133,31 @@ def _node_from_dict(d: Dict[str, Any]) -> FluxNode:
     direction = Direction[d["direction"]] if d["direction"] is not None else None
     return FluxNode(
         id=d["id"], tokens=list(d["tokens"]), direction=direction, parent_id=d["parent_id"],
-        depth=d["depth"], local_evidence=d["local_evidence"], children_ids=list(d["children_ids"]),
+        parent_ids=list(d.get("parent_ids", [])),
+        depth=d["depth"], level=d.get("level"), center_id=d.get("center_id"),
+        local_evidence=d["local_evidence"], children_ids=list(d["children_ids"]),
         pressure=d["pressure"], low_pressure_ticks=d["low_pressure_ticks"], created_tick=d["created_tick"],
         burned=d["burned"], expanded=d["expanded"], cumulative_evidence=d["cumulative_evidence"],
         rollup_mean=d["rollup_mean"], subtree_auxin=d["subtree_auxin"], auxin_level=d["auxin_level"],
+        # Fluid state -- defaulted for saves written before it existed.
+        solvent=d.get("solvent", 0.0), solubles=dict(d.get("solubles", {})),
+        humidity_exchange=d.get("humidity_exchange", 1.0),
+        hull_permeability=d.get("hull_permeability", 1.0),
+        pore_permeabilities=dict(d.get("pore_permeabilities", {})),
+        factories=[
+            MaterialFactory(
+                name=f["name"],
+                inputs=dict(f.get("inputs", {})),
+                outputs=dict(f.get("outputs", {})),
+                medium=f.get("medium", "circulatory"),
+                throughput=f.get("throughput", 1.0),
+                enabled=f.get("enabled", True),
+            )
+            for f in d.get("factories", [])
+        ],
+        factory_auxin=d.get("factory_auxin", 0.0),
+        backward_growth_interest=d.get("backward_growth_interest", 0.0),
+        forward_growth_interest=d.get("forward_growth_interest", 0.0),
     )
 
 STATIC_DIR = Path(__file__).parent / "flux_radar"
@@ -123,6 +168,11 @@ _CONTENT_TYPES = {
     ".css": "text/css",
     ".json": "application/json",
 }
+
+
+def _ring_index_from_level(node: FluxNode) -> int:
+    """Generation ring around the shared middle layer: 0, ±1, ±2, ..."""
+    return abs(int(node.level or 0))
 
 
 class ModelBundle:
@@ -263,6 +313,10 @@ class ModelBundle:
             backward_branch_factor=backward_branch_factor,
             forward_hot_loop_depth=forward_hot_loop_depth,
             backward_hot_loop_depth=backward_hot_loop_depth,
+            sprout_branch_factor=max(1, int(params.get("sprout_branch_factor", 1))),
+            sprout_hot_loop_depth=max(1, int(params.get("sprout_hot_loop_depth", 1))),
+            air_root_branch_factor=max(1, int(params.get("air_root_branch_factor", 1))),
+            air_root_hot_loop_depth=max(1, int(params.get("air_root_hot_loop_depth", 1))),
             forward_budget_per_tick=forward_budget_per_tick,
             backward_budget_per_tick=backward_budget_per_tick,
             forward_selection_mode=str(params.get("forward_selection_mode", "topk")),
@@ -270,6 +324,57 @@ class ModelBundle:
             forward_top_p=float(params.get("forward_top_p", 0.9)),
             backward_top_p=float(params.get("backward_top_p", 0.9)),
             top_p_shortlist_ceiling=int(params.get("top_p_shortlist_ceiling", 40)),
+            # Fluid system: the auditor gates the whole pipe-network phase
+            # (traversals/subedges/humidity/hearts). On by default now that
+            # the fluid layer is a real feature -- it's a per-tick cost, so
+            # a caller can still turn it off.
+            graph_auditor_enabled=bool(params.get("fluid_enabled", True)),
+            heart_script=str(params.get("heart_script", "crossover")),
+            seed_ion_gate_opening_coverage=float(
+                params.get("seed_ion_gate_opening_coverage", 1.0)
+            ),
+            seed_ion_exchange_probability=float(
+                params.get("seed_ion_exchange_probability", 1.0)
+            ),
+            seed_reservoir_membrane_permeability=float(
+                params.get("seed_reservoir_membrane_permeability", 1.0)
+            ),
+            level_zero_background_permeability=float(
+                params.get("level_zero_background_permeability", 0.1)
+            ),
+            soil_forward_ion_permeability=float(
+                params.get("soil_forward_ion_permeability", 0.025)
+            ),
+            root_soil_uptake_permeability=float(
+                params.get("root_soil_uptake_permeability", 1.0)
+            ),
+            growth_target_ion_concentration=float(
+                params.get("growth_target_ion_concentration", 0.1)
+            ),
+            csf_link_rate=float(params.get("csf_link_rate", 0.05)),
+            lymph_return_rate=float(params.get("lymph_return_rate", 0.02)),
+            rhizome_csf_pump_rate=float(params.get("rhizome_csf_pump_rate", 0.1)),
+            rhizome_soil_exudation_rate=float(
+                params.get("rhizome_soil_exudation_rate", 0.01)
+            ),
+            physiology_learning_enabled=bool(
+                params.get("physiology_learning_enabled", True)
+            ),
+            physiology_learning_rate=float(
+                params.get("physiology_learning_rate", 0.05)
+            ),
+            physiology_resource_cost=float(
+                params.get("physiology_resource_cost", 0.1)
+            ),
+            physiology_initial_opening=float(
+                params.get("physiology_initial_opening", 0.8)
+            ),
+            physiology_traversal_temperature=float(
+                params.get("physiology_traversal_temperature", 0.5)
+            ),
+            physiology_track_model_gradients=bool(
+                params.get("physiology_track_model_gradients", False)
+            ),
         )
         choice_policy = AlphaBetaPolicy(
             alpha=float(params.get("alpha", 0.8)),
@@ -319,6 +424,10 @@ class ModelBundle:
             "backward_branch_factor": config.backward_branch_factor or 0,
             "forward_hot_loop_depth": config.forward_hot_loop_depth or 0,
             "backward_hot_loop_depth": config.backward_hot_loop_depth or 0,
+            "sprout_branch_factor": config.sprout_branch_factor,
+            "sprout_hot_loop_depth": config.sprout_hot_loop_depth,
+            "air_root_branch_factor": config.air_root_branch_factor,
+            "air_root_hot_loop_depth": config.air_root_hot_loop_depth,
             "forward_budget_per_tick": config.forward_budget_per_tick or 0,
             "backward_budget_per_tick": config.backward_budget_per_tick or 0,
             "forward_selection_mode": config.forward_selection_mode,
@@ -326,6 +435,25 @@ class ModelBundle:
             "forward_top_p": config.forward_top_p,
             "backward_top_p": config.backward_top_p,
             "top_p_shortlist_ceiling": config.top_p_shortlist_ceiling,
+            "fluid_enabled": config.graph_auditor_enabled,
+            "heart_script": config.heart_script,
+            "seed_ion_gate_opening_coverage": config.seed_ion_gate_opening_coverage,
+            "seed_ion_exchange_probability": config.seed_ion_exchange_probability,
+            "seed_reservoir_membrane_permeability": config.seed_reservoir_membrane_permeability,
+            "level_zero_background_permeability": config.level_zero_background_permeability,
+            "soil_forward_ion_permeability": config.soil_forward_ion_permeability,
+            "root_soil_uptake_permeability": config.root_soil_uptake_permeability,
+            "growth_target_ion_concentration": config.growth_target_ion_concentration,
+            "csf_link_rate": config.csf_link_rate,
+            "lymph_return_rate": config.lymph_return_rate,
+            "rhizome_csf_pump_rate": config.rhizome_csf_pump_rate,
+            "rhizome_soil_exudation_rate": config.rhizome_soil_exudation_rate,
+            "physiology_learning_enabled": config.physiology_learning_enabled,
+            "physiology_learning_rate": config.physiology_learning_rate,
+            "physiology_resource_cost": config.physiology_resource_cost,
+            "physiology_initial_opening": config.physiology_initial_opening,
+            "physiology_traversal_temperature": config.physiology_traversal_temperature,
+            "physiology_track_model_gradients": config.physiology_track_model_gradients,
         }
         return graph, resolved_params
 
@@ -356,22 +484,11 @@ class ModelBundle:
         -- the frontend groups by this to give each branch its own pair of
         pie wedges instead of lumping every orthogonal node together.
 
-        "display_radius" is what the frontend actually positions nodes
-        with. For an ordinary (non-orthogonal) node it's just depth --
-        the anchor is the active seed, the crown where the live graph is
-        actually growing, so anchor-relative depth is exactly the right
-        distance to show. A node in an orthogonal "cousin" network isn't
-        part of the seed's own bowtie though -- it's part of its own
-        separate one, centered on its own network_root (the exact point
-        where that lineage's direction first broke from its parent's, and
-        always a strict ancestor of every other member of its network,
-        since orthogonal status only ever propagates downward). Using
-        plain depth for those would measure distance from the *current*
-        anchor instead, dragging every cousin network's ring radius
-        around on every re-root even though nothing in that cousin
-        network moved.
-
-        Also runs the graph auditor and folds its result into "edges" --
+        "display_radius" is the absolute signed level around the shared
+        middle seed layer. Every main or cousin seed is level 0; either
+        direction at level ±1 is ring one, and level ±2 is ring two. Since
+        every causal edge changes level by exactly one, an edge cannot jump
+        directly from a nonzero backward ring to the same forward ring.        Also runs the graph auditor and folds its result into "edges" --
         every real parent/child connection currently alive gets its own
         {"from", "to", "total", "count", "avg"} entry (see FluxGraph.
         audit_edge_influence): "avg" is that edge's mean causal-path
@@ -384,7 +501,7 @@ class ModelBundle:
         never something a caller has to separately ask for.
         """
         orthogonal = graph.orthogonal_node_ids()
-        network_roots = graph.orthogonal_network_roots()
+        network_roots = graph.orthogonal_network_roots(orthogonal)
         nodes = []
         for nid, n in graph.nodes.items():
             # A node's own tokens are empty only while it's the current
@@ -396,13 +513,18 @@ class ModelBundle:
                 "forward" if n.direction is Direction.FORWARD else "backward"
             )
             root_id = network_roots.get(nid)
-            display_radius = n.depth if root_id is None else n.depth - graph.nodes[root_id].depth
+            display_radius = _ring_index_from_level(n)
             nodes.append({
                 "id": nid,
                 "parent_id": n.parent_id,
+                "parent_ids": n.parent_ids,
+                "is_anchor": nid == graph.anchor_id,
+                "is_center": nid == graph.anchor_id or n.center_id == nid,
                 "direction": direction,
                 "height": n.height,
                 "depth": n.depth,
+                "level": n.level,
+                "center_id": n.center_id,
                 "display_radius": display_radius,
                 "pressure": round(n.pressure, 4),
                 "local_evidence": round(n.local_evidence, 4),
@@ -412,23 +534,87 @@ class ModelBundle:
                 "text": text,
                 "orthogonal": nid in orthogonal,
                 "network_root": network_roots.get(nid),
+                "volume": round(n.volume, 4),
+                "solvent": round(n.solvent, 4),
+                "solubles": {k: round(v, 4) for k, v in n.solubles.items() if v},
+                "hull_permeability": n.hull_permeability,
+                "pore_permeabilities": dict(n.pore_permeabilities),
+                "learned_hull_opening": graph._gate_value(
+                    graph._node_hull_gate_key(nid)
+                ),
+                "learned_pore_openings": {
+                    key.split(":pore:", 1)[1]: graph._gate_value(key)
+                    for key in graph.physiology_parameters
+                    if key.startswith(f"node:{nid}:pore:")
+                },
+                "factory_roles": [factory.name for factory in n.factories if factory.enabled],
+                "factory_auxin": round(n.factory_auxin, 4),
+                "backward_growth_interest": round(n.backward_growth_interest, 4),
+                "forward_growth_interest": round(n.forward_growth_interest, 4),
             })
         influence = graph.audit_edge_influence()
-        edges = [
-            {
+        # audit_edge_influence's key set is the live parent/child edges;
+        # fold each one's fluid flow + pressure drop (see Edge) in beside
+        # its quality/count so the frontend can animate direction/speed.
+        edges = []
+        for (a, b), v in influence.items():
+            edge = graph.edges.get((a, b))
+            edges.append({
                 "from": a,
                 "to": b,
                 "total": round(v["total"], 6),
                 "count": v["count"],
                 "avg": round(v["total"] / v["count"], 6),
+                "flow": round(edge.flow, 5) if edge is not None else 0.0,
+                "pressure_drop": round(edge.pressure_drop, 5) if edge is not None else 0.0,
+                "component_flows": (
+                    {name: round(amount, 5) for name, amount in edge.component_flows.items() if amount}
+                    if edge is not None else {}
+                ),
+                "forward_valve": graph._gate_value(
+                    graph._edge_gate_key(a, b, "forward")
+                ),
+                "reverse_valve": graph._gate_value(
+                    graph._edge_gate_key(a, b, "reverse")
+                ),
+            })
+        # Per-region heart chamber contents and the shared CSF bath.
+        hearts = {
+            region: heart.state()
+            for region, heart in graph.hearts.items()
+        }
+        reservoirs = {
+            region: {
+                name: {
+                    "owner_id": heart.seed_owner_id,
+                    "ion_name": reservoir.ion_name,
+                    "ion_amount": round(reservoir.ion_amount, 4),
+                    "solvent": round(reservoir.solvent, 4),
+                    "storage_volume": round(reservoir.storage_volume, 4),
+                    "fullness": round(reservoir.fullness, 4),
+                    "concentration": round(reservoir.concentration, 4),
+                    "band": [round(value, 4) for value in reservoir.concentration_band()],
+                    "opening_coverage": reservoir.opening_coverage,
+                    "exchange_probability": reservoir.exchange_probability,
+                    "membrane_permeability": reservoir.membrane_permeability,
+                }
+                for name, reservoir in heart.reservoirs.items()
             }
-            for (a, b), v in influence.items()
-        ]
+            for region, heart in graph.hearts.items()
+        }
         tokens, score = graph.best_path()
         return {
             "nodes": nodes,
             "edges": edges,
             "traversal_count": len(graph.traversals),
+            "hearts": hearts,
+            "reservoirs": reservoirs,
+            "bath": {k: round(v, 4) for k, v in graph.bath.items() if v},
+            "background": {k: round(v, 4) for k, v in graph.background.items() if v},
+            "soil": {k: round(v, 4) for k, v in graph.soil.items() if v},
+            "rhizome": {k: round(v, 4) for k, v in graph.rhizome.items() if v},
+            "rhizome_owner_id": graph.rhizome_owner_id,
+            "physiology": graph.physiology_state(),
             "best_path": self.tokenizer.decode(tokens),
             "best_score": round(score, 4),
         }
@@ -454,23 +640,32 @@ class ModelBundle:
             run_id = params.get("run_id") or seed_text
             _publish_run_progress(
                 active=True, run_id=run_id, seed_text=seed_text,
-                total_ticks=ticks, tick=0, latest=None, error=None,
+                total_ticks=ticks, tick=0, latest=None, mid_tick=None, error=None,
+            )
+            graph.set_status_callback(
+                lambda status: _publish_run_progress(mid_tick=status)
             )
 
             try:
                 history: List[Dict[str, Any]] = []
+                graph._emit_status("seeding", "growing the first roots and shoots")
                 graph.spawn_first_children()
+                graph._emit_status("snapshotting", "serializing tick 0")
                 snapshot = {"tick": 0, **self.snapshot_graph(graph)}
                 history.append(snapshot)
-                _publish_run_progress(tick=0, latest=snapshot)
+                graph._emit_status("complete", "tick 0 snapshot published", 1, 1)
+                _publish_run_progress(tick=0, latest=snapshot, mid_tick=dict(graph.tick_status))
 
                 for t in range(1, ticks + 1):
                     graph.tick()
+                    graph._emit_status("snapshotting", f"serializing tick {t}")
                     snapshot = {"tick": t, **self.snapshot_graph(graph)}
                     history.append(snapshot)
-                    _publish_run_progress(tick=t, latest=snapshot)
+                    graph._emit_status("complete", f"tick {t} snapshot published", 1, 1)
+                    _publish_run_progress(tick=t, latest=snapshot, mid_tick=dict(graph.tick_status))
             except Exception as e:  # noqa: BLE001 -- surfaced to the poller, then re-raised for _handle_run
-                _publish_run_progress(active=False, error=str(e))
+                detail = f"{type(e).__name__}: {e!r}"
+                _publish_run_progress(active=False, error=detail)
                 raise
             else:
                 _publish_run_progress(active=False)
@@ -510,7 +705,10 @@ class LiveSession:
         self.history: Deque[Dict[str, Any]] = deque(maxlen=self.window)
         self.tick_index = 0
         self.error: Optional[str] = None
-        self._state_lock = threading.Lock()
+        self.mid_tick_status: Dict[str, Any] = {}
+        self._state_lock = threading.RLock()
+        if hasattr(self.graph, "set_status_callback"):
+            self.graph.set_status_callback(self._receive_tick_status)
         self._stop_event = threading.Event()
         self._thread = threading.Thread(target=self._run_loop, daemon=True, name="flux-live-tick")
 
@@ -534,6 +732,8 @@ class LiveSession:
             nodes, saved_graph["anchor_id"], saved_graph["anchor_tokens"], saved_graph["tick_count"],
             anchor_local_evidence=saved_graph.get("anchor_local_evidence", 0.0),
         )
+        if "fluid" in saved_graph:
+            graph.import_fluid_state(saved_graph["fluid"])
         session.graph = graph
         session.seed_text = saved["seed_text"]
         session.window = max(1, min(int(params.get("window", 30)), cls.MAX_WINDOW))
@@ -543,7 +743,10 @@ class LiveSession:
         session.history = deque(saved["history"], maxlen=session.window)
         session.tick_index = saved["tick_index"]
         session.error = None
-        session._state_lock = threading.Lock()
+        session.mid_tick_status = {}
+        session._state_lock = threading.RLock()
+        if hasattr(session.graph, "set_status_callback"):
+            session.graph.set_status_callback(session._receive_tick_status)
         session._stop_event = threading.Event()
         session._thread = threading.Thread(target=session._run_loop, daemon=True, name="flux-live-tick")
         return session
@@ -569,6 +772,7 @@ class LiveSession:
                 "anchor_local_evidence": graph.anchor_local_evidence,
                 "tick_count": graph.tick_count,
                 "nodes": {str(nid): _node_to_dict(n) for nid, n in graph.nodes.items()},
+                "fluid": graph.export_fluid_state(),
             },
         }
 
@@ -581,6 +785,10 @@ class LiveSession:
     def start_resumed(self) -> None:
         """Like start(), but the graph is already fully grown from saved state -- just resume ticking."""
         self._thread.start()
+
+    def _receive_tick_status(self, status: Dict[str, Any]) -> None:
+        with self._state_lock:
+            self.mid_tick_status = dict(status)
 
     def _run_loop(self) -> None:
         try:
@@ -601,15 +809,29 @@ class LiveSession:
         self._stop_event.set()
         self._thread.join(timeout=5)
 
-    def snapshot_state(self) -> Dict[str, Any]:
+    def snapshot_state(
+        self, after_tick: Optional[int] = None, latest_only: bool = False
+    ) -> Dict[str, Any]:
+        """Browser state with optional incremental history.
+
+        Persistence still uses ``to_dict`` and keeps the full rolling window.
+        Polling and refresh use this filtered view so a mature graph does not
+        serialize and download the same multi-megabyte history every 400 ms.
+        """
         with self._state_lock:
+            history = list(self.history)
+            if latest_only:
+                history = history[-1:]
+            elif after_tick is not None:
+                history = [snap for snap in history if int(snap.get("tick", -1)) > after_tick]
             return {
                 "seed_text": self.seed_text,
                 "params": self.params,
                 "tick_index": self.tick_index,
                 "running": self._thread.is_alive() and not self._stop_event.is_set(),
                 "error": self.error,
-                "history": list(self.history),
+                "mid_tick": dict(self.mid_tick_status),
+                "history": history,
             }
 
 
@@ -827,18 +1049,21 @@ class Handler(BaseHTTPRequestHandler):
         print("[flux-radar]", fmt % args)
 
     def do_GET(self) -> None:
-        if self.path in ("/", ""):
+        parsed = urlsplit(self.path)
+        path = parsed.path
+        query = parse_qs(parsed.query)
+        if path in ("/", ""):
             self._serve_file(STATIC_DIR / "index.html")
-        elif self.path.startswith("/static/"):
-            rel = self.path[len("/static/"):]
+        elif path.startswith("/static/"):
+            rel = path[len("/static/"):]
             self._serve_file(STATIC_DIR / rel)
-        elif self.path == "/api/live/state":
-            self._handle_live_state()
-        elif self.path == "/api/run/progress":
+        elif path == "/api/live/state":
+            self._handle_live_state(query)
+        elif path == "/api/run/progress":
             self._handle_run_progress()
-        elif self.path == "/api/engines":
+        elif path == "/api/engines":
             self._send_json(200, {"engines": sorted(ENGINES), "default": _default_engine})
-        elif self.path == "/api/last_params":
+        elif path == "/api/last_params":
             self._send_json(200, {"params": _last_params})
         else:
             self.send_error(404)
@@ -872,7 +1097,11 @@ class Handler(BaseHTTPRequestHandler):
             _autosave()
             self._send_json(200, result)
         except Exception as e:  # noqa: BLE001 -- surfaced to the browser, not swallowed
-            self._send_json(500, {"error": str(e)})
+            traceback.print_exc()
+            self._send_json(500, {
+                "error": f"{type(e).__name__}: {e!r}",
+                "traceback": traceback.format_exc(),
+            })
 
     def _handle_live_start(self) -> None:
         global _live_session, _last_params
@@ -904,13 +1133,22 @@ class Handler(BaseHTTPRequestHandler):
         except Exception as e:  # noqa: BLE001 -- surfaced to the browser, not swallowed
             self._send_json(500, {"error": str(e)})
 
-    def _handle_live_state(self) -> None:
+    def _handle_live_state(self, query: Optional[Dict[str, List[str]]] = None) -> None:
         with _live_session_lock:
             session = _live_session
         if session is None:
             self._send_json(404, {"error": "no live session running"})
             return
-        self._send_json(200, session.snapshot_state())
+        query = query or {}
+        latest_only = query.get("latest", ["0"])[0] == "1"
+        after_raw = query.get("after_tick", [None])[0]
+        try:
+            after_tick = int(after_raw) if after_raw is not None else None
+        except (TypeError, ValueError):
+            after_tick = None
+        self._send_json(
+            200, session.snapshot_state(after_tick=after_tick, latest_only=latest_only)
+        )
 
     def _handle_live_physics(self) -> None:
         """A foreign physics domain (the browser's interface sim) publishing
@@ -945,11 +1183,16 @@ class Handler(BaseHTTPRequestHandler):
 
     def _send_json(self, status: int, payload: Dict[str, Any]) -> None:
         data = json.dumps(payload).encode("utf-8")
-        self.send_response(status)
-        self.send_header("Content-Type", "application/json")
-        self.send_header("Content-Length", str(len(data)))
-        self.end_headers()
-        self.wfile.write(data)
+        try:
+            self.send_response(status)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(data)))
+            self.end_headers()
+            self.wfile.write(data)
+        except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+            # Normal browser refresh/navigation: the old page cancels its
+            # in-flight poll while the replacement page starts a new one.
+            self.close_connection = True
 
     def _serve_file(self, path: Path) -> None:
         resolved = path.resolve()

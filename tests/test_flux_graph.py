@@ -6,11 +6,22 @@ import torch
 
 from tensors import AbstractTensor
 from tensors.torch_backend import PyTorchTensorOperations
-from speaktome.core.model_abstraction import AbstractModelWrapper
+from speaktome.core.model_abstraction import (
+    AbstractModelWrapper,
+    PyTorchModelWrapper,
+)
 from speaktome.core.choice_policy import TopKPolicy
 from speaktome.core.implicit_backpath import ImplicitBackpathScorer
 from speaktome.core.noodle_explorer import Direction
-from speaktome.core.flux_graph import FluxGraph, FluxGraphConfig, FluxNode, Edge, Channel
+from speaktome.core.flux_graph import (
+    Channel,
+    Edge,
+    FluxGraph,
+    FluxGraphConfig,
+    FluxNode,
+    IonReservoir,
+    MaterialFactory,
+)
 from speaktome.core.poetic_attractor import PoeticAttractor
 
 
@@ -70,36 +81,333 @@ def test_seed_creates_anchor():
     assert anchor.pressure > 0
 
 
-def test_spawn_first_children_creates_both_directions():
+def test_tick_publishes_aggregate_mid_tick_status_without_graph_objects():
+    graph = _build_graph(branch_factor=1, compute_budget=1)
+    graph.seed([0])
+    graph.spawn_first_children()
+    statuses = []
+    graph.set_status_callback(statuses.append)
+
+    graph.tick()
+
+    phases = [status["phase"] for status in statuses]
+    assert phases[0] == "settling"
+    assert "model_inference" in phases
+    assert "auditing" in phases
+    assert phases[-1] == "complete"
+    assert statuses[-1]["tick"] == 1
+    assert statuses[-1]["current"] == statuses[-1]["total"] == 1
+    assert statuses[-1]["live_nodes"] > 0
+    assert statuses[-1]["elapsed_seconds"] >= 0
+    assert all("nodes" not in status and "edges" not in status for status in statuses)
+
+
+def test_initial_seed_reservoirs_are_full_at_one_ion_unit_per_token():
+    graph = _build_graph()
+    anchor_id = graph.seed([0, 1, 2])
+
+    heart = graph.hearts["main"]
+    assert heart.seed_owner_id == anchor_id
+    assert set(heart.reservoirs) == {"main:forward", "main:backward"}
+    for reservoir in heart.reservoirs.values():
+        assert reservoir.design_storage == 3.0
+        assert reservoir.ion_amount == 3.0
+        assert reservoir.storage_volume == 3.0
+        assert reservoir.fullness == 1.0
+        assert reservoir.concentration_band() == (1.0, 1.0, 1.0)
+
+
+def test_seed_reservoir_gate_supplies_and_skims_ions_bidirectionally():
+    reservoir = IonReservoir(
+        ion_name="main:forward",
+        design_storage=2.0,
+        ion_amount=2.0,
+        concentration_window=[0.5, 0.5],
+        window_size=4,
+    )
+    deficient = {"solvent": 1.0}
+
+    reservoir.exchange_with(deficient)
+
+    assert deficient["main:forward"] > 0.0
+    supplied_balance = reservoir.ion_amount
+
+    saturated = {"main:forward": 1.0}
+    reservoir.exchange_with(saturated)
+
+    assert saturated["main:forward"] < 1.0
+    assert reservoir.ion_amount > supplied_balance
+    assert reservoir.storage_volume >= reservoir.mixture_volume
+
+
+def test_seed_displacement_dumps_all_old_heart_contents_to_csf():
+    graph = _build_graph(branch_factor=1)
+    old_anchor_id = graph.seed([0, 1, 2])
+    old_heart = graph.hearts["main"]
+    old_heart.chamber("main:forward", "in").update({"solvent": 2.0, "salt": 0.5})
+    graph._attach_forward_children(old_anchor_id, [-0.1], [[3]])
+    new_anchor_id = graph.nodes[old_anchor_id].children_ids[-1]
+
+    graph._reroot(new_anchor_id)
+
+    heart = graph.hearts["main"]
+    assert heart.seed_owner_id == new_anchor_id
+    assert heart.chambers == {}
+    assert all(reservoir.ion_amount == 0.0 for reservoir in heart.reservoirs.values())
+    assert all(reservoir.design_storage == 1.0 for reservoir in heart.reservoirs.values())
+    assert graph.bath["main:forward"] == 3.0
+    assert graph.bath["main:backward"] == 3.0
+    assert graph.bath["solvent"] == 2.0
+    assert graph.bath["salt"] == 0.5
+
+
+def test_off_seed_tier_heart_is_spilled_and_removed():
+    graph = _build_graph(branch_factor=1)
+    seed_id = graph.seed([0])
+    graph._attach_forward_children(seed_id, [-0.1], [[1]])
+    forward_id = graph.nodes[seed_id].children_ids[-1]
+    stray = graph._configure_seed_heart(f"net:{forward_id}", forward_id, initially_full=False)
+    stray.chamber("stray:forward", "in")["solvent"] = 1.25
+    stray.reservoirs[f"net:{forward_id}:forward"].ion_amount = 0.75
+
+    pumps = graph._region_pump_nodes()
+    graph._reap_dead_hearts(set(pumps))
+
+    assert pumps == {"main": seed_id}
+    assert f"net:{forward_id}" not in graph.hearts
+    assert graph.bath["solvent"] == 1.25
+    assert graph.bath[f"net:{forward_id}:forward"] == 0.75
+
+def test_seed_reservoir_state_round_trips_with_fluid_persistence():
+    graph = _build_graph()
+    graph.seed([0, 1])
+    reservoir = graph.hearts["main"].reservoirs["main:forward"]
+    reservoir.ion_amount = 1.25
+    reservoir.solvent = 0.75
+    reservoir.concentration_window = [0.4, 0.5, 0.6]
+    graph.background["main:forward"] = 0.3
+    graph.soil["main:forward"] = 0.1
+    graph.rhizome["waste:salt"] = 0.4
+
+    state = graph.export_fluid_state()
+    restored = _build_graph()
+    restored.seed([0, 1])
+    restored.import_fluid_state(state)
+
+    restored_reservoir = restored.hearts["main"].reservoirs["main:forward"]
+    assert restored.hearts["main"].seed_owner_id == graph.anchor_id
+    assert restored_reservoir.ion_amount == 1.25
+    assert restored_reservoir.solvent == 0.75
+    assert restored_reservoir.concentration_window == [0.4, 0.5, 0.6]
+    assert restored.background == {"main:forward": 0.3}
+    assert restored.soil == {"main:forward": 0.1}
+    assert restored.rhizome == {"waste:salt": 0.4}
+    assert restored.rhizome_owner_id == restored.anchor_id
+
+
+def test_generic_node_factory_consumes_declared_materials_in_declared_medium():
+    graph = _build_graph(branch_factor=1)
+    anchor_id = graph.seed([0])
+    graph._attach_forward_children(anchor_id, [-0.1], [[1]])
+    node = graph.nodes[graph.nodes[anchor_id].children_ids[-1]]
+    node.solubles = {"feedstock": 2.0}
+    node.factories = [
+        MaterialFactory(
+            name="auxin synthesis",
+            inputs={"feedstock": 2.0},
+            outputs={"auxin": 0.5, "byproduct": 1.0},
+            medium="circulatory",
+            throughput=1.0,
+        )
+    ]
+
+    graph._run_node_factories()
+
+    assert node.solubles.get("feedstock", 0.0) == 0.0
+    assert node.solubles["byproduct"] == 1.0
+    assert node.factory_auxin == 0.5
+
+
+def test_material_scarcity_drives_fractional_growth_interest():
+    graph = _build_graph(branch_factor=1)
+    graph.config.growth_target_ion_concentration = 0.2
+    anchor_id = graph.seed([0])
+    graph._attach_forward_children(anchor_id, [-0.1], [[1]])
+    node = graph.nodes[graph.nodes[anchor_id].children_ids[-1]]
+    node.solvent = 9.0
+    node.solubles["main:backward"] = 1.0
+
+    graph._update_nutrient_growth_interest()
+
+    assert math.isclose(node.backward_growth_interest, 0.5)
+    node.solubles["main:backward"] = 3.0
+    graph._update_nutrient_growth_interest(accumulate=False)
+    assert node.backward_growth_interest == 0.0
+
+
+def test_factory_waste_dumps_into_global_csf():
+    graph = _build_graph(branch_factor=1)
+    anchor_id = graph.seed([0])
+    graph._attach_forward_children(anchor_id, [-0.1], [[1]])
+    node = graph.nodes[graph.nodes[anchor_id].children_ids[-1]]
+    node.solubles = {"feedstock": 2.0}
+    node.factories = [
+        MaterialFactory(
+            name="metabolism",
+            inputs={"feedstock": 1.0},
+            outputs={"useful": 0.5},
+            waste_outputs={"waste:salt": 0.25},
+            throughput=2.0,
+        )
+    ]
+
+    graph._run_node_factories()
+
+    assert node.solubles["useful"] == 1.0
+    assert graph.bath["waste:salt"] == 0.5
+
+
+def test_all_cousin_hearts_share_one_global_csf_bath():
+    graph = _build_graph(branch_factor=1)
+    graph.config.csf_link_rate = 0.5
+    anchor_id = graph.seed([0])
+    graph._attach_forward_children(anchor_id, [-0.1], [[1]])
+    forward_id = graph.nodes[anchor_id].children_ids[-1]
+    graph._attach_backward_parents(forward_id, [-0.1], [[2]])
+    cousin_id = [nid for nid in graph.nodes[forward_id].parent_ids if nid != anchor_id][0]
+    cousin_region = f"net:{cousin_id}"
+    main = graph.hearts["main"]
+    cousin = graph.hearts[cousin_region]
+    main.chamber("main:forward", "out")["main:forward"] = 2.0
+    cousin.chamber(f"{cousin_region}:backward", "out")[f"{cousin_region}:backward"] = 2.0
+
+    main._run_hooks("post")
+    cousin._run_hooks("post")
+
+    assert graph.bath["main:forward"] > 0.0
+    assert graph.bath[f"{cousin_region}:backward"] > 0.0
+
+
+def test_active_seed_owns_one_conserved_rhizome_and_exudes_soil_salts():
+    graph = _build_graph(branch_factor=1)
+    graph.config.rhizome_csf_pump_rate = 0.5
+    graph.config.rhizome_soil_exudation_rate = 0.2
+    anchor_id = graph.seed([0])
+    graph.bath = {"solvent": 2.0, "main:forward": 10.0, "waste:salt": 4.0}
+
+    graph._pump_csf_to_rhizome()
+    graph._exude_rhizome_to_soil()
+
+    assert graph.rhizome_owner_id == anchor_id
+    assert graph.bath == {"solvent": 2.0, "main:forward": 5.0, "waste:salt": 2.0}
+    assert graph.rhizome == {"main:forward": 4.0, "waste:salt": 1.6}
+    assert graph.soil == {"main:forward": 1.0, "waste:salt": 0.4}
+    graph._attach_forward_children(anchor_id, [-0.1], [[3]])
+    new_anchor_id = graph.nodes[anchor_id].children_ids[-1]
+    stored = dict(graph.rhizome)
+
+    graph._reroot(new_anchor_id)
+
+    assert graph.rhizome_owner_id == new_anchor_id
+    assert graph.rhizome == stored
+
+def test_level_zero_forward_supply_reaches_roots_through_reduced_soil_boundary():
+    graph = _build_graph(branch_factor=2)
+    graph.config.level_zero_background_permeability = 0.1
+    graph.config.soil_forward_ion_permeability = 0.25
+    graph.config.root_soil_uptake_permeability = 1.0
+    anchor_id = graph.seed([0])
+    graph.spawn_first_children()
+    backward_nodes = [
+        graph.nodes[parent_id] for parent_id in graph.nodes[anchor_id].parent_ids
+    ]
+    heart = graph.hearts["main"]
+    heart.chamber("main:forward", "out")["main:forward"] = 100.0
+
+    graph._permeate_heart_forward_to_background(heart)
+    graph._permeate_background_into_soil()
+    graph._absorb_soil_by_roots()
+
+    assert math.isclose(graph.background["main:forward"], 7.5)
+    assert math.isclose(graph.soil["main:forward"], 0.0)
+    assert math.isclose(
+        sum(node.solubles.get("main:forward", 0.0) for node in backward_nodes),
+        2.5,
+    )
+
+
+def test_level_zero_background_material_can_permeate_back_into_circulation():
+    graph = _build_graph()
+    graph.config.level_zero_background_permeability = 0.1
+    graph.seed([0])
+    heart = graph.hearts["main"]
+    heart.chamber("main:forward", "out")
+    graph.background["main:forward"] = 10.0
+
+    graph._permeate_heart_forward_to_background(heart)
+
+    assert math.isclose(graph.background["main:forward"], 9.0)
+    assert math.isclose(
+        heart.chambers["main:forward|out"]["main:forward"], 1.0
+    )
+
+
+def test_humidity_dissolved_materials_permeate_and_raise_osmotic_water_demand():
+    graph = _build_graph(branch_factor=1)
+    anchor_id = graph.seed([0])
+    graph._attach_forward_children(anchor_id, [-0.1], [[1]])
+    node = graph.nodes[graph.nodes[anchor_id].children_ids[-1]]
+    graph.config.scalar_fields = {
+        "humidity": lambda _radius: 0.5,
+        "ambient_salt": lambda _radius: 0.5,
+    }
+
+    graph._exchange_humidity()
+    first_solvent = node.solvent
+    graph._exchange_humidity()
+
+    assert node.solubles["ambient_salt"] == 0.5
+    assert first_solvent == 0.5
+    assert node.solvent > first_solvent
+
+
+def test_spawn_first_growth_creates_backward_parents_and_forward_children():
     graph = _build_graph(branch_factor=3)
     graph.seed([0])
     graph.spawn_first_children()
 
     anchor = graph.nodes[graph.anchor_id]
     children = [graph.nodes[c] for c in anchor.children_ids]
-    directions = {c.direction for c in children}
+    parents = [graph.nodes[p] for p in anchor.parent_ids]
 
-    assert Direction.FORWARD in directions
-    assert Direction.BACKWARD in directions
-    assert len(children) == 6  # branch_factor each direction
+    assert len(children) == 3
+    assert len(parents) == 3
+    assert {c.direction for c in children} == {Direction.FORWARD}
+    assert {p.direction for p in parents} == {Direction.BACKWARD}
     # The cycle table makes token 1 the overwhelmingly likely forward pick after 0.
     fwd_children = [c for c in children if c.direction is Direction.FORWARD]
     best_fwd = max(fwd_children, key=lambda c: c.local_evidence)
     assert best_fwd.tokens[0] == 1
 
 
-def test_attach_children_creates_a_real_edge_object_for_every_child():
+def test_growth_creates_a_real_edge_object_in_causal_order():
     graph = _build_graph(branch_factor=3)
     anchor_id = graph.seed([0])
     graph.spawn_first_children()
 
     anchor = graph.nodes[anchor_id]
-    assert len(anchor.children_ids) == 6
+    assert len(anchor.children_ids) == 3
+    assert len(anchor.parent_ids) == 3
     for child_id in anchor.children_ids:
         edge = graph.edges.get((anchor_id, child_id))
         assert edge is not None
         assert edge.from_id == anchor_id
         assert edge.to_id == child_id
+    for parent_id in anchor.parent_ids:
+        edge = graph.edges.get((parent_id, anchor_id))
+        assert edge is not None
+        assert edge.from_id == parent_id
+        assert edge.to_id == anchor_id
 
 
 def test_edge_formation_is_postfix_beam_for_forward_growth_and_prefix_beam_for_backward():
@@ -110,11 +418,223 @@ def test_edge_formation_is_postfix_beam_for_forward_growth_and_prefix_beam_for_b
     anchor = graph.nodes[anchor_id]
     for child_id in anchor.children_ids:
         edge = graph.edges[(anchor_id, child_id)]
-        child = graph.nodes[child_id]
-        if child.direction is Direction.FORWARD:
-            assert edge.formation == "postfix_beam"
-        else:
-            assert edge.formation == "prefix_beam"
+        assert edge.formation == "postfix_beam"
+    for parent_id in anchor.parent_ids:
+        assert graph.edges[(parent_id, anchor_id)].formation == "prefix_beam"
+
+
+def test_backward_branching_gives_one_node_simultaneous_causal_parents():
+    graph = _build_graph(branch_factor=3)
+    anchor_id = graph.seed([0])
+
+    graph._attach_backward_parents(anchor_id, [-0.1, -0.2, -0.3], [[1], [2], [3]])
+
+    anchor = graph.nodes[anchor_id]
+    assert len(anchor.parent_ids) == 3
+    for parent_id in anchor.parent_ids:
+        assert anchor_id in graph.nodes[parent_id].children_ids
+        assert graph.nodes[parent_id].level == -1
+        assert (parent_id, anchor_id) in graph.edges
+
+
+def test_auditor_threads_every_parent_tree_through_the_seed_layer():
+    graph = _build_graph(branch_factor=2)
+    anchor_id = graph.seed([0])
+    graph._attach_backward_parents(anchor_id, [-0.1, -0.2], [[1], [2]])
+    graph._attach_forward_children(anchor_id, [-0.3], [[3]])
+    child_id = graph.nodes[anchor_id].children_ids[-1]
+
+    graph._run_graph_auditor()
+
+    for parent_id in graph.nodes[anchor_id].parent_ids:
+        traversal = graph.traversals[(parent_id, child_id)]
+        assert traversal.node_ids == [parent_id, anchor_id, child_id]
+
+
+def test_reciprocal_ion_shortage_accumulates_center_seeking_interest():
+    graph = _build_graph(branch_factor=1)
+    anchor_id = graph.seed([0])
+    graph._attach_forward_children(anchor_id, [-0.1], [[1]])
+    graph._attach_backward_parents(anchor_id, [-0.1], [[2]])
+    forward_id = graph.nodes[anchor_id].children_ids[-1]
+    backward_id = graph.nodes[anchor_id].parent_ids[-1]
+
+    graph._update_nutrient_growth_interest()
+    assert graph.nodes[forward_id].backward_growth_interest == 1.0
+    assert graph.nodes[backward_id].forward_growth_interest == 1.0
+
+    graph.nodes[forward_id].solubles["main:backward"] = 1.0
+    graph.nodes[backward_id].solubles["main:forward"] = 1.0
+    graph._update_nutrient_growth_interest()
+    assert graph.nodes[forward_id].backward_growth_interest == 0.0
+    assert graph.nodes[backward_id].forward_growth_interest == 0.0
+
+
+def test_nutrient_reconciliation_clears_supply_without_double_counting_shortage():
+    graph = _build_graph(branch_factor=1)
+    anchor_id = graph.seed([0])
+    graph._attach_forward_children(anchor_id, [-0.1], [[1]])
+    forward = graph.nodes[graph.nodes[anchor_id].children_ids[-1]]
+
+    graph._update_nutrient_growth_interest()
+    assert forward.backward_growth_interest == 1.0
+    graph._update_nutrient_growth_interest(accumulate=False)
+    assert forward.backward_growth_interest == 1.0
+
+    forward.solubles["main:backward"] = 0.5
+    graph._update_nutrient_growth_interest(accumulate=False)
+    assert forward.backward_growth_interest == 0.0
+
+
+def test_edge_records_water_and_each_ion_flow_separately():
+    graph = _build_graph(branch_factor=1)
+    anchor_id = graph.seed([0])
+    graph._attach_forward_children(anchor_id, [-0.1], [[1]])
+    child_id = graph.nodes[anchor_id].children_ids[-1]
+    edge = graph.edges[(anchor_id, child_id)]
+
+    graph._record_edge_flow(
+        [anchor_id, child_id], downward=True, amount=3.0,
+        mixture={"solvent": 2.0, "main:forward": 0.75, "salt": 0.25},
+    )
+    assert edge.flow == 3.0
+    assert edge.component_flows == {
+        "solvent": 2.0, "main:forward": 0.75, "salt": 0.25,
+    }
+
+    graph._reset_edge_flow()
+    assert edge.flow == 0.0
+    assert edge.component_flows == {}
+
+def test_each_named_ion_diffuses_osmotically_and_counterflows_without_bulk_current():
+    graph = _build_graph(branch_factor=1)
+    anchor_id = graph.seed([0])
+    graph._attach_forward_children(anchor_id, [-0.1], [[1]])
+    start_id = graph.nodes[anchor_id].children_ids[-1]
+    graph._attach_forward_children(start_id, [-0.1], [[2]])
+    end_id = graph.nodes[start_id].children_ids[-1]
+    start = graph.nodes[start_id]
+    end = graph.nodes[end_id]
+    start.pressure = end.pressure = 1.0
+    start.solvent = end.solvent = 9.0
+    start.solubles = {"main:forward": 1.0, "main:backward": 0.0}
+    end.solubles = {"main:forward": 0.0, "main:backward": 1.0}
+    graph._run_graph_auditor()
+
+    graph._transport_subedges()
+
+    assert math.isclose(start.solubles["main:forward"], 0.5)
+    assert math.isclose(end.solubles["main:forward"], 0.5)
+    assert math.isclose(start.solubles["main:backward"], 0.5)
+    assert math.isclose(end.solubles["main:backward"], 0.5)
+    edge = graph.edges[(start_id, end_id)]
+    assert math.isclose(edge.flow, 0.0)
+    assert math.isclose(edge.component_flows["main:forward"], 0.5)
+    assert math.isclose(edge.component_flows["main:backward"], -0.5)
+
+def test_tick_one_heart_count_uses_safe_cross_growth_defaults():
+    graph = _build_graph(branch_factor=VOCAB, compute_budget=2)
+    graph.config.graph_auditor_enabled = True
+    graph.seed([0])
+    graph.spawn_first_children()
+
+    graph.tick()
+
+    assert len(graph.hearts) == 1 + graph.config.compute_budget_per_tick
+
+
+def test_air_root_width_and_depth_are_separate_from_backward_beam_controls():
+    graph = _build_graph(branch_factor=1)
+    graph.config.backward_branch_factor = VOCAB
+    graph.config.backward_hot_loop_depth = 7
+    graph.config.air_root_branch_factor = 2
+    graph.config.air_root_hot_loop_depth = 2
+    anchor_id = graph.seed([0])
+    graph._attach_forward_children(anchor_id, [-0.1], [[1]])
+    source = graph.nodes[graph.nodes[anchor_id].children_ids[-1]]
+
+    graph._expand_nutrient_hot_loop(source, Direction.BACKWARD)
+
+    assert sum(node.level == 0 for node in graph.nodes.values()) == 3
+    assert sum(node.level == -1 for node in graph.nodes.values()) == 4
+    assert len(graph.hearts) == 3
+
+
+def test_sprout_width_and_depth_are_separate_from_forward_beam_controls():
+    graph = _build_graph(branch_factor=1)
+    graph.config.forward_branch_factor = VOCAB
+    graph.config.forward_hot_loop_depth = 7
+    graph.config.sprout_branch_factor = 2
+    graph.config.sprout_hot_loop_depth = 2
+    anchor_id = graph.seed([0])
+    graph._attach_backward_parents(anchor_id, [-0.1], [[1]])
+    source = graph.nodes[graph.nodes[anchor_id].parent_ids[-1]]
+
+    graph._expand_nutrient_hot_loop(source, Direction.FORWARD)
+
+    assert sum(node.level == 0 for node in graph.nodes.values()) == 3
+    assert sum(node.level == 1 for node in graph.nodes.values()) == 4
+    assert len(graph.hearts) == 3
+
+
+def test_any_needy_node_can_launch_cross_growth():
+    graph = _build_graph(branch_factor=VOCAB, compute_budget=1)
+    anchor_id = graph.seed([0])
+    graph._attach_forward_children(anchor_id, [-0.1], [[1]])
+    internal_id = graph.nodes[anchor_id].children_ids[-1]
+    graph._attach_forward_children(internal_id, [-0.1], [[2]])
+    leaf_id = graph.nodes[internal_id].children_ids[-1]
+    graph._attach_backward_parents(anchor_id, [-0.1], [[3]])
+    graph.nodes[internal_id].backward_growth_interest = 1_000.0
+    graph.nodes[leaf_id].backward_growth_interest = 100.0
+    graph.config.forward_budget_per_tick = 0
+    graph.config.backward_budget_per_tick = 1
+    calls = []
+
+    def record_cross_growth(node, direction):
+        calls.append((node.id, direction))
+
+    graph._expand_nutrient_hot_loop = record_cross_growth
+
+    graph._expand_top_pressure_nodes()
+
+    assert calls == [(internal_id, Direction.BACKWARD)]
+
+def test_backward_growth_from_forward_level_one_creates_a_cousin_center_with_a_heart():
+    graph = _build_graph(branch_factor=1)
+    anchor_id = graph.seed([0])
+    graph._attach_forward_children(anchor_id, [-0.1], [[1]])
+    forward_id = graph.nodes[anchor_id].children_ids[-1]
+
+    graph._attach_backward_parents(forward_id, [-0.2], [[2]])
+
+    cousin_id = graph.nodes[forward_id].parent_ids[-1]
+    cousin = graph.nodes[cousin_id]
+    assert cousin.level == 0
+    assert cousin.direction is None
+    assert cousin.center_id == cousin_id
+    assert set(graph.nodes[forward_id].parent_ids) == {anchor_id, cousin_id}
+    assert f"net:{cousin_id}" in graph.hearts
+    assert graph._region_pump_nodes()[f"net:{cousin_id}"] == cousin_id
+
+
+def test_forward_growth_from_backward_level_one_creates_a_cousin_center_with_a_heart():
+    graph = _build_graph(branch_factor=1)
+    anchor_id = graph.seed([0])
+    graph._attach_backward_parents(anchor_id, [-0.1], [[1]])
+    backward_id = graph.nodes[anchor_id].parent_ids[-1]
+
+    graph._attach_forward_children(backward_id, [-0.2], [[2]])
+
+    cousin_id = graph.nodes[backward_id].children_ids[-1]
+    cousin = graph.nodes[cousin_id]
+    assert cousin.level == 0
+    assert cousin.direction is None
+    assert cousin.center_id == cousin_id
+    assert set(graph.nodes[backward_id].children_ids) == {anchor_id, cousin_id}
+    assert cousin.parent_ids == [backward_id]
+    assert f"net:{cousin_id}" in graph.hearts
+    assert graph._region_pump_nodes()[f"net:{cousin_id}"] == cousin_id
 
 
 def test_edge_records_the_seed_at_formation_time_permanently():
@@ -298,26 +818,95 @@ def test_burn_leaves_traversals_among_still_live_nodes_alone():
     assert (seed_id, a_id) not in graph.traversals
 
 
-def test_graph_auditor_handles_a_mixed_direction_chain_from_a_reroot():
-    # A causal path isn't guaranteed to be direction-pure: re-rooting can
-    # flip direction partway along an ancestry chain, so a single
-    # ancestor-to-descendant walk can genuinely contain both forward and
-    # backward segments. node_ids stays plain tree order either way; each
-    # segment's own direction is looked up from that segment's own Edge,
-    # not summarized on the traversal.
+def test_burn_reaps_a_farther_backward_component_cut_off_from_the_seed():
+    graph = _build_graph(branch_factor=1)
+    seed_id = graph.seed([0])
+    graph._attach_backward_parents(seed_id, [-0.1], [[1]])
+    connector_id = graph.nodes[seed_id].parent_ids[-1]
+    graph._attach_backward_parents(connector_id, [-0.2], [[2]])
+    far_id = graph.nodes[connector_id].parent_ids[-1]
+    graph.nodes[far_id].solubles["stored-ion"] = 2.0
+    graph._run_graph_auditor()
+
+    graph._burn(connector_id)
+
+    assert graph.nodes[connector_id].burned is True
+    assert graph.nodes[far_id].burned is True
+    assert graph.bath["stored-ion"] == 2.0
+    assert all(far_id not in edge_key for edge_key in graph.edges)
+    assert all(
+        far_id not in traversal.node_ids
+        for traversal in graph.traversals.values()
+    )
+
+
+def test_connect_rejects_a_direct_backward_to_forward_level_jump():
+    graph = _build_graph(branch_factor=1)
+    seed_id = graph.seed([0])
+    graph._attach_backward_parents(seed_id, [-0.1], [[1]])
+    graph._attach_forward_children(seed_id, [-0.2], [[2]])
+    backward_id = graph.nodes[seed_id].parent_ids[-1]
+    forward_id = graph.nodes[seed_id].children_ids[-1]
+
+    try:
+        graph._connect(backward_id, forward_id)
+        assert False, "expected a non-adjacent signed-level edge to be rejected"
+    except ValueError as error:
+        assert "must advance one signed level" in str(error)
+
+def test_burn_preserves_a_backward_cousin_with_an_alternate_live_route():
+    graph = _build_graph(branch_factor=1)
+    seed_id = graph.seed([0])
+    graph._attach_backward_parents(seed_id, [-0.1], [[1]])
+    connector_id = graph.nodes[seed_id].parent_ids[-1]
+    graph._attach_backward_parents(connector_id, [-0.2], [[2]])
+    far_id = graph.nodes[connector_id].parent_ids[-1]
+    graph._attach_backward_parents(seed_id, [-0.3], [[3]])
+    alternate_id = graph.nodes[seed_id].parent_ids[-1]
+    graph._connect(far_id, alternate_id)
+
+    graph._burn(connector_id)
+
+    assert graph.nodes[connector_id].burned is True
+    assert graph.nodes[far_id].burned is False
+    assert alternate_id in graph.nodes[far_id].children_ids
+
+
+def test_survivor_of_a_burned_cousin_center_is_rehomed_to_a_live_center():
+    graph = _build_graph(branch_factor=1)
+    seed_id = graph.seed([0])
+    graph._attach_forward_children(seed_id, [-0.1], [[1]])
+    forward_id = graph.nodes[seed_id].children_ids[-1]
+    graph._attach_backward_parents(forward_id, [-0.2], [[2]])
+    cousin_id = [
+        parent_id for parent_id in graph.nodes[forward_id].parent_ids
+        if parent_id != seed_id
+    ][0]
+    graph._attach_forward_children(cousin_id, [-0.3], [[3]])
+    survivor_id = graph.nodes[cousin_id].children_ids[-1]
+    graph._connect(seed_id, survivor_id)
+    assert graph.nodes[survivor_id].center_id == cousin_id
+
+    graph._burn(cousin_id)
+
+    assert graph.nodes[survivor_id].burned is False
+    assert graph.nodes[survivor_id].center_id == seed_id
+    assert cousin_id not in graph.orthogonal_network_roots().values()
+
+
+def test_graph_auditor_keeps_causal_edges_unchanged_when_focus_moves():
     graph = _build_graph()
     seed_id = graph.seed([99])
     f1_id = _add_node(graph, seed_id, 1, -0.1, 1, direction=Direction.FORWARD, pressure=1.0)
     f2_id = _add_node(graph, f1_id, 2, -0.1, 2, direction=Direction.FORWARD, pressure=3.0)
-    graph._reroot(f2_id)  # old seed_id is now a BACKWARD-direction node under the new seed f2_id
+    graph._reroot(f2_id)
 
     leaf_id = _add_hand_node(graph, seed_id, 3, -0.1, graph.nodes[seed_id].depth + 1)
     graph._run_graph_auditor()
 
-    traversal = graph.traversals[(f2_id, leaf_id)]
-    assert seed_id in traversal.node_ids  # the old seed is a real waypoint, direction notwithstanding
-    assert traversal.node_ids[0] == f2_id
-    assert traversal.node_ids[-1] == leaf_id
+    assert graph.traversals[(seed_id, f2_id)].node_ids == [seed_id, f1_id, f2_id]
+    assert graph.traversals[(seed_id, leaf_id)].node_ids == [seed_id, leaf_id]
+    assert (f2_id, leaf_id) not in graph.traversals
 
 
 def test_evaluator_is_a_direct_view_over_traversals():
@@ -480,11 +1069,9 @@ def test_starvation_burns_a_low_evidence_leaf_with_no_support():
     assert healthy_id in graph.nodes[anchor_id].children_ids
 
 
-def test_internal_nodes_are_never_burned_even_with_low_pressure():
-    # Only extremities (current leaves) are candidates for burning, so a
-    # struggling internal node with a live child is protected from being
-    # pruned out from under its descendant -- burning never orphans a
-    # subtree.
+def test_starved_internal_branch_burns_without_leaving_orphans():
+    # Starvation applies to every non-anchor node. When an internal node
+    # burns, descendants that have no other causal parent burn with it.
     graph = _build_graph()
     anchor_id = graph.seed([0])
 
@@ -506,10 +1093,8 @@ def test_internal_nodes_are_never_burned_even_with_low_pressure():
         graph._update_pressures()
         graph._starve_and_burn()
 
-    # The leaf (child_id) starves and burns; its parent, no longer a leaf
-    # once the child is gone... but we check mid-run behavior: at no point
-    # was weak_parent_id burned while it still had a live child.
-    assert graph.nodes[weak_parent_id].burned is False
+    assert graph.nodes[weak_parent_id].burned is True
+    assert graph.nodes[child_id].burned is True
 
 
 def test_a_node_whose_children_all_burn_becomes_expandable_again():
@@ -817,10 +1402,12 @@ def test_balance_weight_shifts_which_node_expand_top_pressure_picks():
 
     backward_leaf = graph._alloc_id()
     graph.nodes[backward_leaf] = FluxNode(
-        id=backward_leaf, tokens=[99], direction=Direction.BACKWARD, parent_id=graph.anchor_id,
-        depth=1, local_evidence=0.0, pressure=0.9,
+        id=backward_leaf, tokens=[99], direction=Direction.BACKWARD, parent_id=None,
+        children_ids=[graph.anchor_id], depth=1, level=-1, center_id=graph.anchor_id,
+        local_evidence=0.0, pressure=0.9,
     )
-    graph.nodes[graph.anchor_id].children_ids.append(backward_leaf)
+    graph.nodes[graph.anchor_id].parent_ids.append(backward_leaf)
+    graph.nodes[graph.anchor_id].parent_id = backward_leaf
 
     candidates = graph._expandable_nodes()
     assert {forward_leaf, backward_leaf} <= {n.id for n in candidates}
@@ -944,14 +1531,14 @@ def test_expand_backward_normalizes_by_suffix_length_not_raw_sum():
     short_graph = FluxGraph(model, backpath, TopKPolicy(), ops, config=config)
     short_graph.seed([0])
     short_graph._expand_backward(short_graph.anchor_id)
-    short_child = short_graph.nodes[short_graph.anchor_id].children_ids[0]
-    assert math.isclose(short_graph.nodes[short_child].local_evidence, expected_per_token, rel_tol=1e-4)
+    short_parent = short_graph.nodes[short_graph.anchor_id].parent_ids[0]
+    assert math.isclose(short_graph.nodes[short_parent].local_evidence, expected_per_token, rel_tol=1e-4)
 
     long_graph = FluxGraph(model, backpath, TopKPolicy(), ops, config=config)
     long_graph.seed([0, 1, 2, 3, 4])
     long_graph._expand_backward(long_graph.anchor_id)
-    long_child = long_graph.nodes[long_graph.anchor_id].children_ids[0]
-    assert math.isclose(long_graph.nodes[long_child].local_evidence, expected_per_token, rel_tol=1e-4)
+    long_parent = long_graph.nodes[long_graph.anchor_id].parent_ids[0]
+    assert math.isclose(long_graph.nodes[long_parent].local_evidence, expected_per_token, rel_tol=1e-4)
 
 
 def _cycle_table_textured(vocab=VOCAB, peak=10.0):
@@ -980,23 +1567,23 @@ def test_expand_batch_matches_expand_backward_for_a_single_backward_node():
     g_old = FluxGraph(model, backpath, TopKPolicy(), ops, config=config)
     g_old.seed([0, 1])
     g_old.spawn_first_children()
-    bwd_old = next(c for c in g_old.nodes[g_old.anchor_id].children_ids
+    bwd_old = next(c for c in g_old.nodes[g_old.anchor_id].parent_ids
                    if g_old.nodes[c].direction is Direction.BACKWARD)
     g_old._expand_backward(bwd_old)
     old_result = sorted(
         (g_old.nodes[c].tokens[0], round(g_old.nodes[c].local_evidence, 6))
-        for c in g_old.nodes[bwd_old].children_ids
+        for c in g_old.nodes[bwd_old].parent_ids
     )
 
     g_new = FluxGraph(model, backpath, TopKPolicy(), ops, config=config)
     g_new.seed([0, 1])
     g_new.spawn_first_children()
-    bwd_new = next(c for c in g_new.nodes[g_new.anchor_id].children_ids
+    bwd_new = next(c for c in g_new.nodes[g_new.anchor_id].parent_ids
                    if g_new.nodes[c].direction is Direction.BACKWARD)
     g_new._expand_batch([g_new.nodes[bwd_new]])
     new_result = sorted(
         (g_new.nodes[c].tokens[0], round(g_new.nodes[c].local_evidence, 6))
-        for c in g_new.nodes[bwd_new].children_ids
+        for c in g_new.nodes[bwd_new].parent_ids
     )
 
     assert old_result == new_result
@@ -1050,16 +1637,16 @@ def test_expand_batch_handles_forward_and_backward_together_in_one_call():
     graph.spawn_first_children()
     fwd = next(c for c in graph.nodes[graph.anchor_id].children_ids
                if graph.nodes[c].direction is Direction.FORWARD)
-    bwd = next(c for c in graph.nodes[graph.anchor_id].children_ids
+    bwd = next(c for c in graph.nodes[graph.anchor_id].parent_ids
                if graph.nodes[c].direction is Direction.BACKWARD)
 
     graph._expand_batch([graph.nodes[fwd], graph.nodes[bwd]])
 
     assert len(graph.nodes[fwd].children_ids) == config.branch_factor
-    assert len(graph.nodes[bwd].children_ids) == config.branch_factor
+    assert len(graph.nodes[bwd].parent_ids) == config.branch_factor
     for c in graph.nodes[fwd].children_ids:
         assert graph.nodes[c].direction is Direction.FORWARD
-    for c in graph.nodes[bwd].children_ids:
+    for c in graph.nodes[bwd].parent_ids:
         assert graph.nodes[c].direction is Direction.BACKWARD
 
 
@@ -1080,12 +1667,12 @@ def test_expand_batch_chunking_matches_unchunked_for_backward_candidates():
         graph = FluxGraph(model, backpath, TopKPolicy(), ops, config=config)
         graph.seed([0, 1])
         graph.spawn_first_children()
-        bwd = next(c for c in graph.nodes[graph.anchor_id].children_ids
+        bwd = next(c for c in graph.nodes[graph.anchor_id].parent_ids
                    if graph.nodes[c].direction is Direction.BACKWARD)
         graph._expand_batch([graph.nodes[bwd]])
         return sorted(
             (graph.nodes[c].tokens[0], round(graph.nodes[c].local_evidence, 6))
-            for c in graph.nodes[bwd].children_ids
+            for c in graph.nodes[bwd].parent_ids
         )
 
     assert run(chunk_size=2048) == run(chunk_size=1)
@@ -1447,6 +2034,43 @@ def test_auxin_disabled_by_default_is_a_true_noop():
     assert graph._effective_branch_factor(graph.nodes[leaf_id]) == graph.config.branch_factor
 
 
+def test_auxin_uses_centerward_geometry_for_parentless_backward_tips():
+    """Regression for the radar's ``KeyError(None)`` on its first tick.
+
+    A backward-farthest node has no causal parent by definition. Auxin's
+    radial lineage must therefore reach centerward through its causal
+    child rather than indexing the legacy primary parent.
+    """
+    graph = _build_graph(branch_factor=2)
+    graph.config.auxin_suppression = 0.05
+    anchor_id = graph.seed([0])
+    graph.spawn_first_children()
+    backward_tips = [
+        graph.nodes[parent_id] for parent_id in graph.nodes[anchor_id].parent_ids
+    ]
+    assert backward_tips
+    assert all(node.parent_id is None for node in backward_tips)
+
+    graph._digest()
+    graph._diffuse_auxin()
+
+    assert all(graph._centerward_neighbors(node.id) == [anchor_id] for node in backward_tips)
+    assert all(math.isfinite(node.auxin_level) for node in backward_tips)
+
+
+def test_first_fluid_tick_with_auxin_and_bidirectional_seed_does_not_null_lookup():
+    graph = _build_graph(branch_factor=2, compute_budget=2)
+    graph.config.auxin_suppression = 0.05
+    graph.config.graph_auditor_enabled = True
+    graph.seed([0])
+    graph.spawn_first_children()
+
+    graph.tick()
+
+    assert graph.tick_count == 1
+    assert graph.nodes[graph.anchor_id].burned is False
+
+
 def test_auxin_suppresses_a_weak_branch_more_than_its_strong_sibling():
     # A strong, near-certain tip should barely suppress itself (real apical
     # dominance doesn't stunt the leader shoot), while its weak sibling
@@ -1510,6 +2134,7 @@ def test_height_is_signed_depth_by_direction():
 
     bwd_id = _add_hand_node(graph, anchor_id, 2, -0.5, 3)
     graph.nodes[bwd_id].direction = Direction.BACKWARD
+    graph.nodes[bwd_id].level = -3
     assert graph.nodes[bwd_id].height == -3.0
 
 
@@ -1691,29 +2316,78 @@ def test_expand_top_pressure_nodes_reseeds_anchor_after_a_total_stall():
     graph.spawn_first_children()
     for child_id in list(graph.nodes[anchor_id].children_ids):
         graph._burn(child_id)
+    for parent_id in list(graph.nodes[anchor_id].parent_ids):
+        graph._burn(parent_id)
     assert graph._live_children(anchor_id) == []
+    assert graph._live_parents(anchor_id) == []
 
     graph._expand_top_pressure_nodes()
 
     live_children = graph._live_children(anchor_id)
-    assert live_children
-    directions = {graph.nodes[c].direction for c in live_children}
-    assert Direction.FORWARD in directions
-    assert Direction.BACKWARD in directions
+    live_parents = graph._live_parents(anchor_id)
+    assert live_children and live_parents
+    assert {graph.nodes[c].direction for c in live_children} == {Direction.FORWARD}
+    assert {graph.nodes[p].direction for p in live_parents} == {Direction.BACKWARD}
 
 
-def test_expand_top_pressure_nodes_does_not_reseed_when_anchor_still_has_children():
+def test_anchor_urgently_regrows_a_missing_backward_circulatory_side():
     graph = _build_graph(branch_factor=2)
     anchor_id = graph.seed([0])
     graph.spawn_first_children()
-    before = set(graph.nodes[anchor_id].children_ids)
-    assert before  # spawn_first_children already gave it real children
+    for parent_id in list(graph.nodes[anchor_id].parent_ids):
+        graph._burn(parent_id)
+    forward_ids_before = {
+        n.id for n in graph.nodes.values()
+        if not n.burned and n.direction is Direction.FORWARD
+    }
+    assert graph._live_children(anchor_id)
+    assert graph._live_parents(anchor_id) == []
 
     graph._expand_top_pressure_nodes()
 
-    # The anchor's *own* direct children set is untouched by an ordinary
-    # tick -- new growth happens further out, not by re-seeding the root.
-    assert set(graph.nodes[anchor_id].children_ids) == before
+    assert graph._live_parents(anchor_id)
+    assert {
+        n.id for n in graph.nodes.values()
+        if not n.burned and n.direction is Direction.FORWARD
+    } == forward_ids_before
+
+
+def test_anchor_urgently_regrows_a_missing_forward_circulatory_side():
+    graph = _build_graph(branch_factor=2)
+    anchor_id = graph.seed([0])
+    graph.spawn_first_children()
+    for child_id in list(graph.nodes[anchor_id].children_ids):
+        graph._burn(child_id)
+    backward_ids_before = {
+        n.id for n in graph.nodes.values()
+        if not n.burned and n.direction is Direction.BACKWARD
+    }
+    assert graph._live_parents(anchor_id)
+    assert graph._live_children(anchor_id) == []
+
+    graph._expand_top_pressure_nodes()
+
+    assert graph._live_children(anchor_id)
+    assert {
+        n.id for n in graph.nodes.values()
+        if not n.burned and n.direction is Direction.BACKWARD
+    } == backward_ids_before
+
+
+def test_expand_top_pressure_nodes_does_not_reseed_when_both_anchor_sides_are_intact():
+    graph = _build_graph(branch_factor=2)
+    anchor_id = graph.seed([0])
+    graph.spawn_first_children()
+    children_before = set(graph.nodes[anchor_id].children_ids)
+    parents_before = set(graph.nodes[anchor_id].parent_ids)
+    assert children_before and parents_before
+
+    graph._expand_top_pressure_nodes()
+
+    # The anchor's direct connections are untouched by an ordinary tick;
+    # new growth happens farther out, not by re-seeding either side.
+    assert set(graph.nodes[anchor_id].children_ids) == children_before
+    assert set(graph.nodes[anchor_id].parent_ids) == parents_before
 
 
 def test_return_conductance_scale_default_matches_edge_conductance_exactly():
@@ -1905,14 +2579,15 @@ def _add_node(graph, parent_id, tok_id, evidence, depth, direction=Direction.FOR
     cum = parent.cumulative_evidence + evidence
     graph.nodes[nid] = FluxNode(
         id=nid, tokens=[tok_id], direction=direction, parent_id=parent_id,
-        depth=depth, local_evidence=evidence, pressure=pressure,
+        depth=depth, level=depth if direction is Direction.FORWARD else -depth,
+        center_id=parent.center_id, local_evidence=evidence, pressure=pressure,
         cumulative_evidence=cum, rollup_mean=cum / depth if depth else 0.0,
     )
     parent.children_ids.append(nid)
     return nid
 
 
-def test_reroot_simple_one_hop_flips_pointers_and_direction():
+def test_reroot_simple_one_hop_moves_focus_without_reversing_edge():
     graph = _build_graph()
     anchor_id = graph.seed([99])
     f1_id = _add_node(graph, anchor_id, 1, -0.1, 1, direction=Direction.FORWARD, pressure=2.0)
@@ -1922,22 +2597,22 @@ def test_reroot_simple_one_hop_flips_pointers_and_direction():
     assert graph.anchor_id == f1_id
     f1 = graph.nodes[f1_id]
     assert f1.direction is None
-    assert f1.parent_id is None
+    assert f1.parent_id == anchor_id
     assert f1.depth == 0
     assert f1.local_evidence == 0.0
     assert f1.tokens == []
     assert graph.anchor_tokens == [1]
 
     old_anchor = graph.nodes[anchor_id]
-    assert old_anchor.parent_id == f1_id
+    assert old_anchor.parent_id is None
     assert old_anchor.direction is Direction.BACKWARD
     assert old_anchor.depth == 1
     assert old_anchor.tokens == [99]
-    assert anchor_id in f1.children_ids
-    assert f1_id not in old_anchor.children_ids
+    assert f1_id in old_anchor.children_ids
+    assert anchor_id not in f1.children_ids
 
 
-def test_reroot_multi_hop_flips_the_whole_path():
+def test_reroot_multi_hop_rebases_levels_without_reversing_the_path():
     graph = _build_graph()
     anchor_id = graph.seed([99])
     f1_id = _add_node(graph, anchor_id, 1, -0.1, 1, direction=Direction.FORWARD, pressure=1.0)
@@ -1948,22 +2623,22 @@ def test_reroot_multi_hop_flips_the_whole_path():
 
     assert graph.anchor_id == f3_id
     f3 = graph.nodes[f3_id]
-    assert f3.parent_id is None and f3.direction is None and f3.depth == 0
+    assert f3.parent_id == f2_id and f3.direction is None and f3.depth == 0
 
     f2 = graph.nodes[f2_id]
-    assert f2.parent_id == f3_id and f2.direction is Direction.BACKWARD and f2.depth == 1
+    assert f2.parent_id == f1_id and f2.direction is Direction.BACKWARD and f2.depth == 1
 
     f1 = graph.nodes[f1_id]
-    assert f1.parent_id == f2_id and f1.direction is Direction.BACKWARD and f1.depth == 2
+    assert f1.parent_id == anchor_id and f1.direction is Direction.BACKWARD and f1.depth == 2
 
     old_anchor = graph.nodes[anchor_id]
-    assert old_anchor.parent_id == f1_id and old_anchor.direction is Direction.BACKWARD
+    assert old_anchor.parent_id is None and old_anchor.direction is Direction.BACKWARD
     assert old_anchor.depth == 3
     assert old_anchor.tokens == [99]
 
-    assert f2_id in f3.children_ids
-    assert f1_id in f2.children_ids
-    assert anchor_id in f1.children_ids
+    assert f1_id in old_anchor.children_ids
+    assert f2_id in f1.children_ids
+    assert f3_id in f2.children_ids
 
 
 def test_reroot_keeps_orthogonal_sibling_at_intermediate_ancestor_fully_live():
@@ -1975,38 +2650,229 @@ def test_reroot_keeps_orthogonal_sibling_at_intermediate_ancestor_fully_live():
 
     graph._reroot(f2_id)
 
-    # f2b is untouched: still attached under f1, still its own original
-    # tokens/direction, still a normal live node -- nothing is detached,
-    # reset, or removed from the graph by re-rooting.
+    # f2b stays attached under f1. Since it is one causal step forward of
+    # f1 just like the new focus f2, it occupies the same seed layer.
     assert f2b_id in graph.nodes[f1_id].children_ids
     f2b = graph.nodes[f2b_id]
     assert f2b.parent_id == f1_id
-    assert f2b.direction is Direction.FORWARD
+    assert f2b.direction is None
     assert f2b.tokens == [20]
     assert f2b_id in graph.nodes
 
     assert f2b_id in graph.orthogonal_node_ids()
 
 
-def test_reroot_old_anchor_opposite_direction_children_stay_attached_not_orthogonal():
+def test_restore_rebases_stale_leaf_levels_with_their_backward_ancestor():
+    source = _build_graph()
+    anchor_id = source.seed([99])
+    f1_id = _add_node(
+        source, anchor_id, 1, -0.1, 1,
+        direction=Direction.FORWARD, pressure=1.0,
+    )
+    leaf_id = _add_node(
+        source, f1_id, 20, -0.1, 2,
+        direction=Direction.FORWARD, pressure=0.5,
+    )
+    f2_id = _add_node(
+        source, f1_id, 2, -0.1, 2,
+        direction=Direction.FORWARD, pressure=1.0,
+    )
+    f3_id = _add_node(
+        source, f2_id, 3, -0.1, 3,
+        direction=Direction.FORWARD, pressure=3.0,
+    )
+    source._reroot(f3_id)
+
+    # A stale save can contain the pre-reroot display coordinates even
+    # though causal ownership is already the current legal topology.
+    source.nodes[f1_id].level = 1
+    source.nodes[f1_id].depth = 1
+    source.nodes[f1_id].direction = Direction.FORWARD
+    source.nodes[leaf_id].level = 2
+    source.nodes[leaf_id].depth = 2
+    source.nodes[leaf_id].direction = Direction.FORWARD
+
+    restored = _build_graph()
+    restored.restore_state(
+        source.nodes, f3_id, source.anchor_tokens, source.tick_count,
+        anchor_local_evidence=source.anchor_local_evidence,
+    )
+
+    assert restored.nodes[f1_id].level == -2
+    assert restored.nodes[f1_id].direction is Direction.BACKWARD
+    assert restored.nodes[leaf_id].level == -1
+    assert restored.nodes[leaf_id].depth == 1
+    assert restored.nodes[leaf_id].direction is Direction.BACKWARD
+    assert (f1_id, leaf_id) in restored.edges
+
+
+def test_restore_rejects_contradictory_causal_levels_without_pruning_an_edge():
+    source = _build_graph()
+    anchor_id = source.seed([99])
+    first_id = _add_node(
+        source, anchor_id, 1, -0.1, 1,
+        direction=Direction.FORWARD, pressure=1.0,
+    )
+    second_id = _add_node(
+        source, first_id, 2, -0.1, 2,
+        direction=Direction.FORWARD, pressure=1.0,
+    )
+    # This direct shortcut says second is simultaneously one and two causal
+    # hops from the seed. Current _connect cannot create it; emulate a
+    # damaged legacy save and require restoration to reject it wholesale.
+    source.nodes[anchor_id].children_ids.append(second_id)
+    source.nodes[second_id].parent_ids.append(anchor_id)
+
+    restored = _build_graph()
+    try:
+        restored.restore_state(
+            source.nodes, anchor_id, [99], source.tick_count,
+        )
+        assert False, "expected contradictory saved topology to be rejected"
+    except ValueError as error:
+        assert "inconsistent causal levels" in str(error)
+
+    assert second_id in source.nodes[anchor_id].children_ids
+    assert anchor_id in source.nodes[second_id].parent_ids
+
+
+def test_restore_rebuilds_backward_pipes_and_audits_words_in_reading_order():
+    source = _build_graph()
+    anchor_id = source.seed([0])
+    source._attach_backward_parents(anchor_id, [-0.1], [[10]])
+    near_id = source.nodes[anchor_id].parent_ids[-1]
+    source._attach_backward_parents(near_id, [-0.2], [[20]])
+    far_id = source.nodes[near_id].parent_ids[-1]
+
+    restored = _build_graph()
+    restored.restore_state(
+        source.nodes, anchor_id, [0], source.tick_count,
+    )
+    restored._run_graph_auditor()
+
+    assert restored.edges[(far_id, near_id)].formation == "prefix_beam"
+    assert restored.edges[(near_id, anchor_id)].formation == "prefix_beam"
+    assert restored.traversals[(far_id, anchor_id)].node_ids == [
+        far_id, near_id, anchor_id,
+    ]
+    tokens, direction = restored.path_tokens(far_id)
+    assert direction is Direction.BACKWARD
+    assert tokens == [20, 10]
+
+
+def test_soft_traversal_physiology_learns_structures_and_subedge_archetype():
+    graph = _build_graph(branch_factor=2)
+    graph.config.physiology_learning_enabled = True
+    graph.config.physiology_learning_rate = 0.2
+    graph.config.physiology_resource_cost = 0.1
+    graph.config.physiology_initial_opening = 0.6
+    graph.seed([0])
+    graph.spawn_first_children()
+    graph._run_graph_auditor()
+    graph._ensure_physiology_parameters()
+    before = {
+        key: float(parameter.detach())
+        for key, parameter in graph.physiology_parameters.items()
+    }
+
+    graph._learn_physiology()
+
+    after = {
+        key: float(parameter.detach())
+        for key, parameter in graph.physiology_parameters.items()
+    }
+    assert {"edge", "node", "heart", "archetype"} <= {
+        key.split(":")[0] for key in before
+    }
+    assert not any(key.startswith("traversal:") for key in before)
+    changed = {
+        key for key in before
+        if after[key] != before[key]
+    }
+    assert any(key.startswith("archetype:subedge:") for key in changed)
+    assert any(not key.startswith("archetype:") for key in changed)
+    assert any(
+        key.startswith("archetype:subedge:")
+        and not key.endswith(":bias")
+        and after[key] != 0.0
+        for key in after
+    )
+    assert graph.physiology_steps == 1
+    assert graph.physiology_last_loss is not None
+    assert graph.physiology_best_traversal is not None
+    state = graph.physiology_state()
+    assert state["parameter_count"] == len(before)
+    assert state["archetype_parameter_count"] == 16
+
+
+def test_physiology_logits_round_trip_with_fluid_state():
+    graph = _build_graph(branch_factor=1)
+    graph.config.physiology_learning_enabled = True
+    graph.seed([0])
+    graph.spawn_first_children()
+    graph._run_graph_auditor()
+    graph._learn_physiology()
+    state = graph.export_fluid_state()
+    expected = {
+        key: float(parameter.detach())
+        for key, parameter in graph.physiology_parameters.items()
+    }
+
+    restored = _build_graph(branch_factor=1)
+    restored.config.physiology_learning_enabled = True
+    restored.seed([0])
+    restored.import_fluid_state(state)
+
+    assert {
+        key: float(parameter.detach())
+        for key, parameter in restored.physiology_parameters.items()
+    } == expected
+    assert restored.physiology_steps == graph.physiology_steps
+    assert restored.physiology_best_traversal == graph.physiology_best_traversal
+
+
+def test_pytorch_model_wrapper_can_enable_gradient_tracked_forwards():
+    class TinyModel(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.embedding = torch.nn.Embedding(5, 3)
+            self.projection = torch.nn.Linear(3, 5)
+
+        def forward(self, input_ids, attention_mask, **kwargs):
+            return {"logits": self.projection(self.embedding(input_ids))}
+
+    wrapper = PyTorchModelWrapper(TinyModel())
+    tokens = torch.tensor([[1, 2]])
+    mask = torch.ones_like(tokens)
+    assert not wrapper.forward(tokens, mask)["logits"].requires_grad
+
+    wrapper.set_gradient_tracking(True)
+    logits = wrapper.forward(tokens, mask)["logits"]
+
+    assert logits.requires_grad
+    assert logits.grad_fn is not None
+
+
+def test_reroot_preserves_global_backward_to_forward_ownership_on_both_sides():
     graph = _build_graph()
     anchor_id = graph.seed([99])
     f1_id = _add_node(graph, anchor_id, 1, -0.1, 1, direction=Direction.FORWARD, pressure=3.0)
     f2_id = _add_node(graph, anchor_id, 2, -0.1, 1, direction=Direction.FORWARD, pressure=0.5)
-    b1_id = _add_node(graph, anchor_id, 3, -0.1, 1, direction=Direction.BACKWARD, pressure=0.5)
+    graph._attach_backward_parents(anchor_id, [-0.1], [[3]])
+    b1_id = graph.nodes[anchor_id].parent_ids[-1]
 
     graph._reroot(f1_id)
 
     orthogonal = graph.orthogonal_node_ids()
     assert f2_id in orthogonal
-    assert b1_id not in orthogonal
+    assert b1_id in orthogonal
 
     b1 = graph.nodes[b1_id]
-    assert b1.parent_id == anchor_id
+    assert b1.parent_id is None
     assert b1.direction is Direction.BACKWARD
     assert b1.depth == 2  # anchor shifted to depth 1, b1 one further
     old_anchor = graph.nodes[anchor_id]
-    assert b1_id in old_anchor.children_ids
+    assert b1_id in old_anchor.parent_ids
     assert f2_id in old_anchor.children_ids  # still attached, just orthogonal now
 
 
@@ -2047,6 +2913,36 @@ def test_orthogonal_network_roots_empty_when_nothing_orthogonal():
 
     assert graph.orthogonal_network_roots() == {}
 
+
+def test_orthogonal_network_roots_reuses_supplied_orthogonal_set():
+    graph = _build_graph()
+    anchor_id = graph.seed([99])
+    f1_id = _add_node(
+        graph,
+        anchor_id,
+        1,
+        -0.1,
+        1,
+        direction=Direction.FORWARD,
+        pressure=1.0,
+    )
+    branch_id = _add_node(
+        graph,
+        f1_id,
+        10,
+        -0.1,
+        2,
+        direction=Direction.BACKWARD,
+        pressure=1.0,
+    )
+    orthogonal = graph.orthogonal_node_ids()
+
+    def fail_on_second_scan():
+        raise AssertionError("orthogonal nodes were scanned twice")
+
+    graph.orthogonal_node_ids = fail_on_second_scan
+
+    assert graph.orthogonal_network_roots(orthogonal)[branch_id] == branch_id
 
 def test_reroot_demoted_anchor_becomes_vulnerable_to_starvation():
     graph = _build_graph()
@@ -2187,9 +3083,12 @@ def test_path_tokens_multi_hop_backward_reads_furthest_from_anchor_first():
     """
     graph = _build_graph()
     anchor_id = graph.seed([0])
-    b1 = _add_node(graph, anchor_id, 10, -0.1, 1, direction=Direction.BACKWARD, pressure=1.0)
-    b2 = _add_node(graph, b1, 20, -0.1, 2, direction=Direction.BACKWARD, pressure=1.0)
-    b3 = _add_node(graph, b2, 30, -0.1, 3, direction=Direction.BACKWARD, pressure=1.0)
+    graph._attach_backward_parents(anchor_id, [-0.1], [[10]])
+    b1 = graph.nodes[anchor_id].parent_ids[-1]
+    graph._attach_backward_parents(b1, [-0.1], [[20]])
+    b2 = graph.nodes[b1].parent_ids[-1]
+    graph._attach_backward_parents(b2, [-0.1], [[30]])
+    b3 = graph.nodes[b2].parent_ids[-1]
 
     tokens, direction = graph.path_tokens(b3)
     assert direction is Direction.BACKWARD
@@ -2199,8 +3098,10 @@ def test_path_tokens_multi_hop_backward_reads_furthest_from_anchor_first():
 def test_full_sequence_reads_correctly_with_multi_hop_backward_and_forward():
     graph = _build_graph()
     anchor_id = graph.seed([0])
-    b1 = _add_node(graph, anchor_id, 10, -0.1, 1, direction=Direction.BACKWARD, pressure=1.0)
-    b2 = _add_node(graph, b1, 20, -0.1, 2, direction=Direction.BACKWARD, pressure=1.0)
+    graph._attach_backward_parents(anchor_id, [-0.1], [[10]])
+    b1 = graph.nodes[anchor_id].parent_ids[-1]
+    graph._attach_backward_parents(b1, [-0.1], [[20]])
+    b2 = graph.nodes[b1].parent_ids[-1]
     f1 = _add_node(graph, anchor_id, 40, -0.1, 1, direction=Direction.FORWARD, pressure=1.0)
     f2 = _add_node(graph, f1, 50, -0.1, 2, direction=Direction.FORWARD, pressure=1.0)
 

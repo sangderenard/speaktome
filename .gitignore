@@ -19,3 +19,5 @@ AGENTS/tools/bin/fzf
 AGENTS/tools/bin/rg
 AGENTS/tools/bin/*.exe
 asciioscilliscope/a.out
+# Local flux-radar runtime state (autosaved settings + live session progress)
+speaktome/flux_radar_state.json

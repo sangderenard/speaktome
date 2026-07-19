@@ -51,10 +51,15 @@ pure display question, not a reason to remove it from the graph.
 from __future__ import annotations
 
 import math
+import time
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from tensors import AbstractTensor
+try:
+    import torch
+except ModuleNotFoundError:  # pragma: no cover - optional tensor backend
+    torch = None  # type: ignore
 from .choice_policy import ChoicePolicy
 from .implicit_backpath import ImplicitBackpathScorer
 from .model_abstraction import AbstractModelWrapper
@@ -150,7 +155,7 @@ class SubEdge:
     open at its own two endpoints (the owning Traversal's start_id and
     end_id) and closed everywhere else it merely passes through.
     """
-    traversal_key: Tuple[int, int]  # (start_id, end_id) of the owning Traversal
+    traversal_key: Tuple[int, ...]  # endpoint pair, or full path when endpoints have >1 causal route
     direction: str  # "forward" | "reverse"
     constriction: float = 1.0
 
@@ -159,13 +164,13 @@ class SubEdge:
 
         Closed everywhere except its own two endpoints.
         """
-        return node_id in self.traversal_key
+        return node_id in (self.traversal_key[0], self.traversal_key[-1])
 
 
 @dataclass
 class Edge:
     """One connection between two nodes, as a real object -- not just a
-    parent_id/children_ids pointer pair with conductance recomputed from
+    parent_ids/children_ids pointer pair with conductance recomputed from
     scratch on demand.
 
     forward/reverse are two independent Channels (see Channel) -- this is
@@ -206,6 +211,16 @@ class Edge:
     seed_id_at_formation: int
     created_tick: int
     subedges: List[SubEdge] = field(default_factory=list)
+    # Last tick's fluid flow through this pipe: signed net volume that
+    # crossed it (+ = from_id -> to_id, i.e. parent -> child), and the
+    # pressure drop across it. Reset and re-accumulated each fluid phase
+    # (see FluxGraph._reset_edge_flow / _record_edge_flow); the same fluid
+    # passes every cross-section of a pipe, so every edge on a traversal's
+    # path records that traversal's whole flow. Display-only.
+    flow: float = 0.0
+    pressure_drop: float = 0.0
+    # Signed material flow: ``solvent`` is water; every other key is one ion.
+    component_flows: Dict[str, float] = field(default_factory=dict)
 
 
 @dataclass
@@ -351,9 +366,148 @@ HEART_SCRIPTS: Dict[str, List[HeartPhase]] = {
 }
 
 
+@dataclass
+class IonReservoir:
+    """A seed heart's directional ion store.
+
+    The design storage is one ion unit per token represented by the seed.
+    Storage volume is elastic: it begins at that design size and grows
+    whenever the held mixture requires more room. The ion gate is
+    bidirectional. Its finite per-tick throughput is the fraction
+    ``opening_coverage * exchange_probability`` of the correction needed
+    at the current boundary; there is no unrelated absolute flow cap.
+
+    Concentration limits come from the moving population mean plus/minus
+    one population standard deviation. The semipermeable membrane moves
+    solvent only, while the ion gate moves only ``ion_name``.
+    """
+
+    ion_name: str
+    design_storage: float
+    ion_amount: float = 0.0
+    solvent: float = 0.0
+    opening_coverage: float = 1.0
+    exchange_probability: float = 1.0
+    membrane_permeability: float = 1.0
+    window_size: int = 2
+    concentration_window: List[float] = field(default_factory=list)
+
+    @property
+    def mixture_volume(self) -> float:
+        return self.ion_amount + self.solvent
+
+    @property
+    def storage_volume(self) -> float:
+        return max(self.design_storage, self.mixture_volume)
+
+    @property
+    def concentration(self) -> float:
+        volume = self.mixture_volume
+        return self.ion_amount / volume if volume > 0.0 else 0.0
+
+    @property
+    def fullness(self) -> float:
+        volume = self.storage_volume
+        return self.mixture_volume / volume if volume > 0.0 else 0.0
+
+    def observe(self, concentration: float) -> None:
+        self.concentration_window.append(max(0.0, min(1.0, float(concentration))))
+        if len(self.concentration_window) > self.window_size:
+            del self.concentration_window[: len(self.concentration_window) - self.window_size]
+
+    def concentration_band(self) -> Tuple[float, float, float]:
+        samples = self.concentration_window or [self.concentration]
+        mean = sum(samples) / len(samples)
+        variance = sum((value - mean) ** 2 for value in samples) / len(samples)
+        sigma = math.sqrt(variance)
+        return max(0.0, mean - sigma), mean, min(1.0, mean + sigma)
+
+    def exchange_with(self, chamber: Dict[str, float]) -> None:
+        """Skim/supply one chamber, then exchange solvent through the membrane."""
+        volume = sum(chamber.values())
+        chamber_ions = chamber.get(self.ion_name, 0.0)
+        chamber_concentration = chamber_ions / volume if volume > 0.0 else 0.0
+        low, target, high = self.concentration_band()
+        gate = max(0.0, min(1.0, self.opening_coverage * self.exchange_probability))
+
+        # The same gate skims excess ions or supplies deficient chambers.
+        # An empty new reservoir begins with a zero band, so the first
+        # matching chamber supply is excess and establishes its history.
+        if volume > 0.0 and target > 0.0:
+            chamber_concentration = chamber_ions / volume
+            if chamber_concentration > high:
+                correction = (
+                    (chamber_ions - target * volume) / (1.0 - target)
+                    if target < 1.0 else 0.0
+                )
+                moved = min(chamber_ions, correction * gate)
+                chamber[self.ion_name] = chamber_ions - moved
+                self.ion_amount += moved
+            elif chamber_concentration < low and self.ion_amount > 0.0:
+                correction = (
+                    (target * volume - chamber_ions) / (1.0 - target)
+                    if target < 1.0 else self.ion_amount
+                )
+                moved = min(self.ion_amount, correction * gate)
+                chamber[self.ion_name] = chamber_ions + moved
+                self.ion_amount -= moved
+        elif volume > 0.0 and chamber_ions > 0.0:
+            moved = chamber_ions * gate
+            chamber[self.ion_name] = chamber_ions - moved
+            self.ion_amount += moved
+
+        # Solvent crosses separately. It expands the physical mixture toward
+        # the concentration window's mean without carrying ions through the
+        # semipermeable membrane.
+        membrane = max(0.0, min(1.0, self.membrane_permeability))
+        if target > 0.0 and membrane > 0.0:
+            desired_solvent = max(0.0, self.ion_amount / target - self.ion_amount)
+            solvent_delta = desired_solvent - self.solvent
+            if solvent_delta > 0.0:
+                moved = min(chamber.get("solvent", 0.0), solvent_delta * membrane)
+                chamber["solvent"] = chamber.get("solvent", 0.0) - moved
+                self.solvent += moved
+            elif solvent_delta < 0.0:
+                moved = min(self.solvent, -solvent_delta * membrane)
+                self.solvent -= moved
+                chamber["solvent"] = chamber.get("solvent", 0.0) + moved
+        self.observe(self.concentration)
+
+    def drain(self) -> Dict[str, float]:
+        mixture: Dict[str, float] = {}
+        if self.ion_amount:
+            mixture[self.ion_name] = self.ion_amount
+        if self.solvent:
+            mixture["solvent"] = self.solvent
+        self.ion_amount = 0.0
+        self.solvent = 0.0
+        return mixture
+
+
+@dataclass
+class MaterialFactory:
+    """A generic synthesis/circulatory role a node may service.
+
+    Nothing assigns factories automatically. A caller declares the input
+    recipe, output recipe, throughput, and which fluid domain carries the
+    reaction. ``medium`` is ``"circulatory"``, ``"csf"``, or ``"both"``.
+    The special output name ``"auxin"`` feeds the node's auxin source;
+    every other output remains dissolved in the working mixture.
+    """
+
+    name: str
+    inputs: Dict[str, float] = field(default_factory=dict)
+    outputs: Dict[str, float] = field(default_factory=dict)
+    waste_outputs: Dict[str, float] = field(default_factory=dict)
+    medium: str = "circulatory"
+    throughput: float = 1.0
+    enabled: bool = True
+
+
 class Heart:
     """The anchor's pump, made explicit: per-slice chambers, a nexus
-    valve matrix, a scripted beat, and an attachment API.
+    valve matrix, seed ion reservoirs, a scripted beat, and an attachment
+    API.
 
     Chambers are keyed "<slice>|in" / "<slice>|out" and hold real
     mixture dicts (same "solvent"-plus-soluble-names form the rest of
@@ -361,6 +515,12 @@ class Heart:
     system allowed to hold volume that belongs to no node; the anchor
     node itself still never holds anything. Chambers appear lazily as
     slices appear and simply sit empty when their slice dies.
+
+    While its pump node is a seed, the heart also owns one reservoir for
+    each directional slice. Reservoirs skim and supply the chambers
+    through independently parameterized ion gates and adjust solvent
+    through a semipermeable membrane. Losing seed ownership full-pumps
+    those stores into the corresponding out-chambers.
 
     The script is a list of HeartPhases advanced one per tick (beat),
     wrapping -- rhythm is data, not code. set_script installs a named
@@ -371,10 +531,13 @@ class Heart:
 
     def __init__(self) -> None:
         self.chambers: Dict[str, Dict[str, float]] = {}
+        self.seed_owner_id: Optional[int] = None
+        self.reservoirs: Dict[str, IonReservoir] = {}
         self.script_name = "crossover"
         self.script: List[HeartPhase] = list(HEART_SCRIPTS["crossover"])
         self.phase_index = 0
         self.hooks: List[HeartHook] = []
+        self.valve_modulator: Optional[Callable[[str, str, float], float]] = None
 
     # -- configuration API ------------------------------------------------
     def set_script(self, script: Any) -> None:
@@ -402,6 +565,49 @@ class Heart:
         """Copy of every chamber's current contents, for inspection."""
         return {key: dict(mix) for key, mix in self.chambers.items()}
 
+    def configure_seed_reservoirs(
+        self,
+        owner_id: int,
+        ion_names: List[str],
+        design_storage: float,
+        initially_full: bool,
+        opening_coverage: float,
+        exchange_probability: float,
+        membrane_permeability: float,
+        window_size: int,
+    ) -> None:
+        """Attach token-scaled directional stores to the current seed."""
+        if self.seed_owner_id == owner_id and set(self.reservoirs) == set(ion_names):
+            return
+        self.seed_owner_id = owner_id
+        self.reservoirs = {
+            ion_name: IonReservoir(
+                ion_name=ion_name,
+                design_storage=design_storage,
+                ion_amount=design_storage if initially_full else 0.0,
+                opening_coverage=opening_coverage,
+                exchange_probability=exchange_probability,
+                membrane_permeability=membrane_permeability,
+                window_size=max(1, window_size),
+                concentration_window=[1.0] if initially_full else [],
+            )
+            for ion_name in ion_names
+        }
+
+    def exchange_seed_reservoirs(self) -> None:
+        """Run every reservoir gate against both matching heart chambers."""
+        for ion_name, reservoir in self.reservoirs.items():
+            for stage in ("in", "out"):
+                reservoir.exchange_with(self.chamber(ion_name, stage))
+
+    def release_seed_reservoirs(self) -> None:
+        """Full-pump every store into its matching supply chamber."""
+        for ion_name, reservoir in self.reservoirs.items():
+            out = self.chamber(ion_name, "out")
+            for name, amount in reservoir.drain().items():
+                out[name] = out.get(name, 0.0) + amount
+        self.seed_owner_id = None
+
     # -- internals --------------------------------------------------------
     def chamber(self, slice_name: str, stage: str) -> Dict[str, float]:
         return self.chambers.setdefault(f"{slice_name}|{stage}", {})
@@ -423,10 +629,19 @@ class Heart:
         in_slices = [k[: -len("|in")] for k in self.chambers if k.endswith("|in")]
         out_slices = [k[: -len("|out")] for k in self.chambers if k.endswith("|out")]
         if phase.valves == "crossover":
-            return {(s, _flip_slice(s)): 1.0 for s in in_slices if _flip_slice(s) in out_slices}
-        if phase.valves == "all":
-            return {(i, o): 1.0 for i in in_slices for o in out_slices}
-        return dict(phase.valves)
+            valves = {(s, _flip_slice(s)): 1.0 for s in in_slices if _flip_slice(s) in out_slices}
+        elif phase.valves == "all":
+            valves = {(i, o): 1.0 for i in in_slices for o in out_slices}
+        else:
+            valves = dict(phase.valves)
+        if self.valve_modulator is not None:
+            valves = {
+                (in_slice, out_slice): self.valve_modulator(
+                    in_slice, out_slice, throttle
+                )
+                for (in_slice, out_slice), throttle in valves.items()
+            }
+        return valves
 
     def _resolve_contractions(self, phase: HeartPhase) -> Dict[str, float]:
         if phase.contractions == "all":
@@ -509,7 +724,37 @@ class FluxNode:
     parent_id: Optional[int]
     depth: int
     local_evidence: float  # mean log-prob of this word's tokens given its context at creation
+    # Canonical causal ownership. A backward beam creates parents and a
+    # forward beam creates children, so branching through the seed layer is
+    # a DAG: one node may have several simultaneous parents. parent_id is
+    # retained as the primary/legacy path for callers that need one path;
+    # topology and the auditor use this complete list.
+    parent_ids: List[int] = field(default_factory=list)
     children_ids: List[int] = field(default_factory=list)
+    # Signed position on the one global reading axis:
+    # backward-farthest < ... < seed layer (0) < ... < forward-farthest.
+    # Parent ownership always points from the lower level to the higher
+    # level. depth remains abs(level) for existing radial consumers.
+    level: Optional[int] = None
+    # Nutrient stress accumulates rather than becoming an instant topology
+    # override. A forward-side cell lacking backward ions raises backward
+    # (parent-growing) interest; a backward-side cell lacking forward ions
+    # raises forward (child-growing) interest.
+    backward_growth_interest: float = 0.0
+    forward_growth_interest: float = 0.0
+    # Which seed-layer causal focus this node currently belongs to. A node
+    # created at level 0 becomes its own center; ordinary growth inherits
+    # the source node's center.
+    center_id: Optional[int] = None
+    # World-facing shell. hull_permeability gates all passive exchange;
+    # a named pore can further throttle one material without changing the
+    # hull. Missing pore entries mean fully open for that material.
+    hull_permeability: float = 1.0
+    pore_permeabilities: Dict[str, float] = field(default_factory=dict)
+    # Optional, declarative service roles. Nodes have no factory by
+    # default; later synthesis/circulatory specialization is data.
+    factories: List[MaterialFactory] = field(default_factory=list)
+    factory_auxin: float = 0.0
     pressure: float = 0.0
     # What SubEdges actually move in and out of -- separate from pressure.
     # Not a single scalar: an inventory of individually-named solubles
@@ -548,6 +793,19 @@ class FluxNode:
     # tip doesn't inhibit itself, only lateral buds elsewhere on the plant.
     auxin_level: float = 0.0
 
+    def __post_init__(self) -> None:
+        if self.parent_id is not None and self.parent_id not in self.parent_ids:
+            self.parent_ids.insert(0, self.parent_id)
+        if self.parent_id is None and self.parent_ids:
+            self.parent_id = self.parent_ids[0]
+        if self.level is None:
+            if self.direction is Direction.BACKWARD:
+                self.level = -self.depth
+            elif self.direction is Direction.FORWARD:
+                self.level = self.depth
+            else:
+                self.level = 0
+
     @property
     def local_value(self) -> float:
         """exp(local_evidence): 1.0 for the anchor, in (0, 1] for real tokens."""
@@ -578,11 +836,7 @@ class FluxNode:
         _update_pressures) read, so "what it looks like" and "what it costs"
         stay the same number instead of two things that happen to agree.
         """
-        if self.direction is Direction.FORWARD:
-            return float(self.depth)
-        if self.direction is Direction.BACKWARD:
-            return float(-self.depth)
-        return 0.0
+        return float(self.level or 0)
 
 
 @dataclass
@@ -642,7 +896,15 @@ class FluxGraphConfig:
     backward_hot_loop_depth: Optional[int] = None
     forward_budget_per_tick: Optional[int] = None
     backward_budget_per_tick: Optional[int] = None
-    # Per-direction candidate selection. "topk" (default): exactly
+    # Nutrient-driven cross-growth has its own shapes, independent of the
+    # ordinary forward/backward beam controls above. A sprout is forward
+    # growth launched from backward tissue; an air root is backward growth
+    # launched from forward tissue. Defaults commit one candidate for one
+    # round, preventing model beam width from silently becoming heart count.
+    sprout_branch_factor: int = 1
+    sprout_hot_loop_depth: int = 1
+    air_root_branch_factor: int = 1
+    air_root_hot_loop_depth: int = 1    # Per-direction candidate selection. "topk" (default): exactly
     # branch_factor (or its per-direction override) highest-probability
     # candidates, a fixed count regardless of how the distribution is
     # actually shaped. "topp": nucleus sampling -- keep however many of
@@ -867,6 +1129,51 @@ class FluxGraphConfig:
     # defaults.
     scalar_fields: Dict[str, Callable[[float], float]] = field(default_factory=lambda: {"humidity": uniform_field})
     slice_scalar_fields: Dict[str, Dict[str, Callable[[float], float]]] = field(default_factory=dict)
+    # Seed-layer environmental exchange. Forward-side chamber solutes leak
+    # into the shared background through the level-zero interface. The
+    # forward ions needed by roots then cross a second, less-permeable soil
+    # boundary before backward cells can take them up through their hulls
+    # and named pores.
+    level_zero_background_permeability: float = 0.1
+    soil_forward_ion_permeability: float = 0.025
+    root_soil_uptake_permeability: float = 1.0
+    # Named beat preset every region's Heart runs (see HEART_SCRIPTS):
+    # "crossover" (default) or "total_mix". Applied to each heart as it's
+    # created; individual hearts can still be re-scripted at runtime via
+    # graph.hearts[region].set_script.
+    heart_script: str = "crossover"
+    # Seed-heart reservoir boundaries. Both directional ion gates start
+    # completely open, matching the near-instant boundary transport model;
+    # their product is still a finite 0..1 fraction of the required
+    # concentration correction per tick. The membrane moves solvent only.
+    seed_ion_gate_opening_coverage: float = 1.0
+    seed_ion_exchange_probability: float = 1.0
+    seed_reservoir_membrane_permeability: float = 1.0
+    # Material scarcity is continuous rather than binary. A node's need is
+    # the fractional shortfall below this required opposite-ion concentration.
+    growth_target_ion_concentration: float = 0.1
+    # Every cousin heart shares this one graph-global CSF bath. These active
+    # defaults make that link real without instant mixing; lymph returns a
+    # smaller fraction to the active seed's heart each tick.
+    csf_link_rate: float = 0.05
+    lymph_return_rate: float = 0.02
+    # One conserved rhizome belongs to the single active seed. It pumps
+    # non-solvent material out of global CSF, then exudes a slower fraction
+    # into soil as salts available for root uptake.
+    rhizome_csf_pump_rate: float = 0.1
+    rhizome_soil_exudation_rate: float = 0.01
+    # Differentiable physiology. The graph's structural decisions remain
+    # discrete, but every continuous valve/pore is a sigmoid-constrained
+    # torch parameter when the active AbstractTensor backend is PyTorch.
+    # A tick rewards the gates supporting the currently best audited
+    # traversal and charges every open gate a small resource cost, so the
+    # optimum is selective living circulation rather than "everything open".
+    physiology_learning_enabled: bool = False
+    physiology_learning_rate: float = 0.05
+    physiology_resource_cost: float = 0.1
+    physiology_initial_opening: float = 0.8
+    physiology_traversal_temperature: float = 0.5
+    physiology_track_model_gradients: bool = False
 
 
 class FluxGraph:
@@ -893,24 +1200,47 @@ class FluxGraph:
         # call already reads it fresh, so this flag only prevents
         # redundant fallback attempts, not anything functional.
         self._cpu_fallback_active = False
-        # The anchor's pump, explicit and scriptable -- see Heart. Owns
-        # per-slice chamber contents between ticks; _pump_anchor feeds it
-        # intake and outflow routes each beat.
-        self.heart = Heart()
+        # One Heart per region (see Heart) -- "main" beats at the anchor,
+        # each "net:<root>" cousin network beats at its own root. Parallel,
+        # mostly silent toward each other (probability chains are region-
+        # locked, see _run_graph_auditor), created lazily by _heart_for as
+        # regions appear. Keyed by region string.
+        self.hearts: Dict[str, Heart] = {}
+        # The CSF bath: one graph-level mixture every pipe sits in. Hearts
+        # exchange with it (the csf_link hook) rather than with each other
+        # directly; burned nodes and dissolved networks spill into it;
+        # it drains slowly home to the seed heart (lymph return). Dormant
+        # until its throttles are dialed above 0 (see FluxGraphConfig).
+        self.bath: Dict[str, float] = {}
+        # Environmental mixtures outside circulation. Forward material
+        # crosses level-zero into background; root-needed forward ions
+        # cross again, more slowly, into soil.
+        self.background: Dict[str, float] = {}
+        self.soil: Dict[str, float] = {}
+        self.rhizome: Dict[str, float] = {}
+        self.rhizome_owner_id: Optional[int] = None
+        # Stable named logits for every continuous valve and pore. Keeping
+        # ownership here rather than on mutable dataclasses makes parameters
+        # easy to optimize, persist, and enumerate even as topology grows.
+        self.physiology_parameters: Dict[str, Any] = {}
+        self.physiology_last_loss: Optional[float] = None
+        self.physiology_best_traversal: Optional[Tuple[int, ...]] = None
+        self.physiology_best_score: Optional[float] = None
+        self.physiology_steps: int = 0
+        self.physiology_error: Optional[str] = None
 
         self.nodes: Dict[int, FluxNode] = {}
         # Phase 1 edge scaffold (see Edge's own docstring) -- keyed by
-        # (parent_id, child_id) at creation time, which never changes even
-        # if a later re-root flips which end reads as "parent" in the live
-        # tree; populated once per node in _attach_children, and never
-        # read by any pressure/expansion/starvation code today.
+        # (parent_id, child_id) at creation time. Re-rooting moves the focus
+        # but never reverses this intrinsic causal ownership.
         self.edges: Dict[Tuple[int, int], Edge] = {}
         # Every causal path (ancestor, descendant) that's been enumerated
         # and scored so far -- see Traversal's own docstring and
         # FluxGraph._run_graph_auditor, the only thing that populates
-        # this. Keyed by (start_id, end_id) exactly like self.edges, so
-        # "has this specific path already been run" is a direct lookup.
-        self.traversals: Dict[Tuple[int, int], Traversal] = {}
+        # this. Normally keyed by (start_id, end_id); when a DAG contains
+        # more than one route between the same endpoints, the full node
+        # path is the key so those routes remain distinct.
+        self.traversals: Dict[Tuple[int, ...], Traversal] = {}
         # Hyperedges bundling self.edges by region pair -- see MetaEdge's
         # own docstring. Rebuilt on demand by meta_edges(), not kept
         # continuously current -- there's no tick-loop consumer of these
@@ -936,6 +1266,15 @@ class FluxGraph:
         self.anchor_local_evidence: float = 0.0
         self.tick_count = 0
         self._next_id = 0
+        # Lightweight, aggregate progress is intentionally separate from
+        # published_snapshot. The latter must remain a complete graph image;
+        # this object may change during a tick and contains no mutable graph
+        # structures, so a server can poll it without seeing torn topology.
+        self.tick_status: Dict[str, Any] = {}
+        self._tick_started_at: Optional[float] = None
+        self._status_phase: Optional[str] = None
+        self._status_phase_started_at: Optional[float] = None
+        self._status_callback: Optional[Callable[[Dict[str, Any]], None]] = None
         # A complete, self-consistent snapshot published wholesale at the
         # end of seed()/spawn_first_children()/tick() -- never touched
         # mid-mutation. An external reader (FluxGraphVisualizer) just reads
@@ -959,6 +1298,566 @@ class FluxGraph:
         # once. Keyed by id(trie) rather than the trie object itself since
         # WordTrie isn't hashable.
         self._trie_gates: Dict[int, TrieGate] = {}
+
+    def set_status_callback(
+        self, callback: Optional[Callable[[Dict[str, Any]], None]]
+    ) -> None:
+        """Receive aggregate progress updates while a tick is in flight."""
+        self._status_callback = callback
+
+    def _emit_status(
+        self,
+        phase: str,
+        detail: str = "",
+        current: Optional[int] = None,
+        total: Optional[int] = None,
+        **extra: Any,
+    ) -> None:
+        now = time.monotonic()
+        if phase != self._status_phase:
+            self._status_phase = phase
+            self._status_phase_started_at = now
+        started = self._tick_started_at
+        phase_started = self._status_phase_started_at
+        status: Dict[str, Any] = {
+            "tick": self.tick_count,
+            "phase": phase,
+            "detail": detail,
+            "current": current,
+            "total": total,
+            "live_nodes": sum(1 for node in self.nodes.values() if not node.burned),
+            "elapsed_seconds": round(now - started, 3) if started is not None else 0.0,
+            "phase_elapsed_seconds": (
+                round(now - phase_started, 3)
+                if phase_started is not None else 0.0
+            ),
+        }
+        status.update(extra)
+        self.tick_status = status
+        callback = self._status_callback
+        if callback is not None:
+            try:
+                callback(dict(status))
+            except Exception:
+                # Observability must never be able to stop graph growth.
+                pass
+
+    # ------------------------------------------------------------------
+    # Differentiable valve and pore physiology
+    # ------------------------------------------------------------------
+    @staticmethod
+    def _gate_logit(opening: float) -> float:
+        opening = max(1e-4, min(1.0 - 1e-4, float(opening)))
+        return math.log(opening / (1.0 - opening))
+
+    def _physiology_parameter(self, key: str, initial: Optional[float] = None):
+        """Return one stable torch logit, creating it lazily."""
+        parameter = self.physiology_parameters.get(key)
+        if parameter is not None:
+            return parameter
+        if torch is None:
+            return None
+        opening = (
+            self.config.physiology_initial_opening
+            if initial is None else float(initial)
+        )
+        parameter = torch.nn.Parameter(
+            torch.tensor(
+                self._gate_logit(opening),
+                dtype=torch.float32,
+                device=self.device,
+            )
+        )
+        self.physiology_parameters[key] = parameter
+        return parameter
+
+    def _gate_tensor(self, key: str, initial: Optional[float] = None):
+        parameter = self._physiology_parameter(key, initial)
+        return torch.sigmoid(parameter) if parameter is not None else None
+
+    def _gate_value(self, key: str, initial: Optional[float] = None) -> float:
+        if not self.config.physiology_learning_enabled:
+            return 1.0
+        opening = self._gate_tensor(key, initial)
+        return float(opening.detach().item()) if opening is not None else 1.0
+
+    @staticmethod
+    def _traversal_gate_prefix(traversal_key: Tuple[int, ...]) -> str:
+        return "traversal:" + ",".join(str(value) for value in traversal_key)
+
+    def _subedge_gate_key(self, sub: SubEdge) -> str:
+        return f"{self._traversal_gate_prefix(sub.traversal_key)}:{sub.direction}"
+
+    _SUBEDGE_ARCHETYPE_FEATURES = (
+        "bias",
+        "pressure_drive",
+        "source_water_fraction",
+        "destination_water_fraction",
+        "volume_drive",
+        "source_osmotic_fraction",
+        "destination_osmotic_fraction",
+        "path_quality",
+    )
+
+    @classmethod
+    def _subedge_archetype_key(cls, direction: str, feature: str) -> str:
+        return f"archetype:subedge:{direction}:{feature}"
+
+    def _ensure_subedge_archetype(self) -> None:
+        """Create one shared state-response model for each flow direction.
+
+        Old saves can contain thousands of path-specific traversal logits.
+        Their mean opening seeds the two archetype biases once, after which
+        those dormant path parameters are discarded.
+        """
+        if torch is None or not self.config.physiology_learning_enabled:
+            return
+        legacy = {
+            key: parameter
+            for key, parameter in self.physiology_parameters.items()
+            if key.startswith("traversal:")
+        }
+        for direction in ("forward", "reverse"):
+            direction_legacy = [
+                float(torch.sigmoid(parameter).detach().item())
+                for key, parameter in legacy.items()
+                if key.endswith(f":{direction}")
+            ]
+            initial = (
+                sum(direction_legacy) / len(direction_legacy)
+                if direction_legacy
+                else self.config.physiology_initial_opening
+            )
+            for feature in self._SUBEDGE_ARCHETYPE_FEATURES:
+                key = self._subedge_archetype_key(direction, feature)
+                if key in self.physiology_parameters:
+                    continue
+                if feature == "bias":
+                    self._physiology_parameter(key, initial)
+                else:
+                    self.physiology_parameters[key] = torch.nn.Parameter(
+                        torch.zeros(
+                            (), dtype=torch.float32, device=self.device
+                        )
+                    )
+        for key in legacy:
+            del self.physiology_parameters[key]
+
+    def _subedge_archetype_openings(
+        self,
+        start_pressure,
+        end_pressure,
+        start_volume,
+        end_volume,
+        start_solvent,
+        end_solvent,
+        path_score,
+    ):
+        """Return [traversal, forward/reverse] state-conditioned openings."""
+        if torch is None:
+            return None
+        self._ensure_subedge_archetype()
+        eps = 1e-12
+        start_water = start_solvent / start_volume.clamp_min(eps)
+        end_water = end_solvent / end_volume.clamp_min(eps)
+        start_osmotic = (start_volume - start_solvent).clamp_min(0.0) / (
+            start_volume.clamp_min(eps)
+        )
+        end_osmotic = (end_volume - end_solvent).clamp_min(0.0) / (
+            end_volume.clamp_min(eps)
+        )
+        quality = torch.exp(path_score).clamp(0.0, 1.0)
+        ones = torch.ones_like(start_volume)
+        forward_features = torch.stack(
+            (
+                ones,
+                torch.tanh(start_pressure - end_pressure),
+                start_water,
+                end_water,
+                torch.tanh(start_volume - end_volume),
+                start_osmotic,
+                end_osmotic,
+                quality,
+            ),
+            dim=1,
+        )
+        reverse_features = torch.stack(
+            (
+                ones,
+                torch.tanh(end_pressure - start_pressure),
+                end_water,
+                start_water,
+                torch.tanh(end_volume - start_volume),
+                end_osmotic,
+                start_osmotic,
+                quality,
+            ),
+            dim=1,
+        )
+        weights = torch.stack(
+            [
+                torch.stack(
+                    [
+                        self.physiology_parameters[
+                            self._subedge_archetype_key(direction, feature)
+                        ]
+                        for feature in self._SUBEDGE_ARCHETYPE_FEATURES
+                    ]
+                )
+                for direction in ("forward", "reverse")
+            ]
+        )
+        logits = torch.stack(
+            (
+                (forward_features * weights[0]).sum(dim=1),
+                (reverse_features * weights[1]).sum(dim=1),
+            ),
+            dim=1,
+        )
+        return torch.sigmoid(logits)
+
+    @staticmethod
+    def _edge_gate_key(parent_id: int, child_id: int, direction: str) -> str:
+        return f"edge:{parent_id}:{child_id}:{direction}"
+
+    @staticmethod
+    def _node_hull_gate_key(node_id: int) -> str:
+        return f"node:{node_id}:hull"
+
+    @staticmethod
+    def _node_pore_gate_key(node_id: int, material: str) -> str:
+        return f"node:{node_id}:pore:{material}"
+
+    def _learned_subedge_opening(self, sub: SubEdge) -> float:
+        if not self.config.physiology_learning_enabled or torch is None:
+            return max(0.0, min(1.0, float(sub.constriction)))
+        traversal = self.traversals.get(sub.traversal_key)
+        if traversal is None:
+            return max(0.0, min(1.0, float(sub.constriction)))
+        start = self.nodes.get(traversal.start_id)
+        end = self.nodes.get(traversal.end_id)
+        if start is None or end is None:
+            return max(0.0, min(1.0, float(sub.constriction)))
+        dtype = torch.float32
+        device = self.device
+        openings = self._subedge_archetype_openings(
+            torch.tensor([start.pressure], dtype=dtype, device=device),
+            torch.tensor([end.pressure], dtype=dtype, device=device),
+            torch.tensor([start.volume], dtype=dtype, device=device),
+            torch.tensor([end.volume], dtype=dtype, device=device),
+            torch.tensor([start.solvent], dtype=dtype, device=device),
+            torch.tensor([end.solvent], dtype=dtype, device=device),
+            torch.tensor([traversal.mean_score], dtype=dtype, device=device),
+        )
+        column = 0 if sub.direction == "forward" else 1
+        opening = float(openings[0, column].detach().item())
+        return max(0.0, min(1.0, float(sub.constriction) * opening))
+
+    def _learned_node_permeability(self, node: FluxNode, material: str) -> float:
+        hull = max(0.0, min(1.0, float(node.hull_permeability)))
+        pore = max(
+            0.0,
+            min(1.0, float(node.pore_permeabilities.get(material, 1.0))),
+        )
+        return (
+            hull
+            * pore
+            * self._gate_value(self._node_hull_gate_key(node.id))
+            * self._gate_value(self._node_pore_gate_key(node.id, material))
+        )
+
+    def _heart_valve_modulator(
+        self, region: str, in_slice: str, out_slice: str, throttle: float
+    ) -> float:
+        key = f"heart:{region}:valve:{in_slice}->{out_slice}"
+        return max(0.0, min(1.0, float(throttle) * self._gate_value(key)))
+
+    def _bind_heart_learning(self, region: str, heart: Heart) -> None:
+        heart.valve_modulator = (
+            lambda in_slice, out_slice, throttle, region=region:
+            self._heart_valve_modulator(
+                region, in_slice, out_slice, throttle
+            )
+        )
+
+    def _apply_reservoir_learning(self) -> None:
+        if not self.config.physiology_learning_enabled:
+            return
+        for region, heart in self.hearts.items():
+            for name, reservoir in heart.reservoirs.items():
+                reservoir.opening_coverage = self._gate_value(
+                    f"heart:{region}:reservoir:{name}:coverage"
+                )
+                reservoir.exchange_probability = self._gate_value(
+                    f"heart:{region}:reservoir:{name}:exchange"
+                )
+                reservoir.membrane_permeability = self._gate_value(
+                    f"heart:{region}:reservoir:{name}:membrane"
+                )
+
+    def _ensure_physiology_parameters(self) -> None:
+        if not self.config.physiology_learning_enabled or torch is None:
+            return
+        self._ensure_subedge_archetype()
+        network_roots = self.orthogonal_network_roots()
+        for (parent_id, child_id), edge in self.edges.items():
+            if self.nodes[parent_id].burned or self.nodes[child_id].burned:
+                continue
+            self._physiology_parameter(
+                self._edge_gate_key(parent_id, child_id, "forward")
+            )
+            self._physiology_parameter(
+                self._edge_gate_key(parent_id, child_id, "reverse")
+            )
+        for node_id, node in self.nodes.items():
+            if node.burned:
+                continue
+            self._physiology_parameter(self._node_hull_gate_key(node_id))
+            materials = {"solvent", *node.solubles.keys()}
+            slices = self._node_slice(node_id, node, network_roots)
+            if slices is not None:
+                materials.update(slices)
+            for material in materials:
+                self._physiology_parameter(
+                    self._node_pore_gate_key(node_id, material)
+                )
+        for region, heart in self.hearts.items():
+            self._bind_heart_learning(region, heart)
+            if heart.script:
+                phase = heart.script[heart.phase_index % len(heart.script)]
+                for in_slice, out_slice in heart._resolve_valves(phase):
+                    self._physiology_parameter(
+                        f"heart:{region}:valve:{in_slice}->{out_slice}"
+                    )
+            for name in heart.reservoirs:
+                for gate_name in ("coverage", "exchange", "membrane"):
+                    self._physiology_parameter(
+                        f"heart:{region}:reservoir:{name}:{gate_name}"
+                    )
+
+    def _learn_physiology(self) -> None:
+        """Diffuse score-weighted reward over every audited traversal."""
+        if not self.config.physiology_learning_enabled:
+            return
+        if torch is None:
+            self.physiology_error = "PyTorch is unavailable"
+            return
+        live_traversals = [
+            (traversal_key, traversal)
+            for traversal_key, traversal in self.traversals.items()
+            if all(
+                node_id in self.nodes and not self.nodes[node_id].burned
+                for node_id in traversal.node_ids
+            )
+        ]
+        if not live_traversals:
+            return
+        self._ensure_physiology_parameters()
+        if not self.physiology_parameters:
+            return
+
+        best_key, best = max(
+            live_traversals, key=lambda item: item[1].mean_score
+        )
+        heart_support = {
+            key for key in self.physiology_parameters
+            if key.startswith("heart:main:")
+        }
+        pore_keys_by_node: Dict[int, List[str]] = {}
+        for key in self.physiology_parameters:
+            if not key.startswith("node:") or ":pore:" not in key:
+                continue
+            try:
+                node_id = int(key.split(":", 2)[1])
+            except (ValueError, IndexError):
+                continue
+            pore_keys_by_node.setdefault(node_id, []).append(key)
+
+        for parameter in self.physiology_parameters.values():
+            parameter.grad = None
+        structural_keys = [
+            key
+            for key in self.physiology_parameters
+            if not key.startswith("archetype:")
+        ]
+        structural_openings = torch.stack(
+            [
+                torch.sigmoid(self.physiology_parameters[key])
+                for key in structural_keys
+            ]
+        ) if structural_keys else None
+        score_tensor = torch.tensor(
+            [
+                float(traversal.mean_score)
+                for _, traversal in live_traversals
+            ],
+            dtype=torch.float32,
+            device=self.device,
+        )
+        temperature = max(
+            1e-4, float(self.config.physiology_traversal_temperature)
+        )
+        traversal_weights = torch.softmax(
+            score_tensor / temperature, dim=0
+        )
+        starts = [self.nodes[traversal.start_id] for _, traversal in live_traversals]
+        ends = [self.nodes[traversal.end_id] for _, traversal in live_traversals]
+        archetype_openings = self._subedge_archetype_openings(
+            torch.tensor(
+                [node.pressure for node in starts],
+                dtype=torch.float32,
+                device=self.device,
+            ),
+            torch.tensor(
+                [node.pressure for node in ends],
+                dtype=torch.float32,
+                device=self.device,
+            ),
+            torch.tensor(
+                [node.volume for node in starts],
+                dtype=torch.float32,
+                device=self.device,
+            ),
+            torch.tensor(
+                [node.volume for node in ends],
+                dtype=torch.float32,
+                device=self.device,
+            ),
+            torch.tensor(
+                [node.solvent for node in starts],
+                dtype=torch.float32,
+                device=self.device,
+            ),
+            torch.tensor(
+                [node.solvent for node in ends],
+                dtype=torch.float32,
+                device=self.device,
+            ),
+            score_tensor,
+        )
+        expected_route_opening = (
+            traversal_weights * archetype_openings.mean(dim=1)
+        ).sum()
+
+        detached_weights = traversal_weights.detach().cpu().tolist()
+        gate_coefficients: Dict[str, float] = {}
+        for weight, (traversal_key, traversal) in zip(
+            detached_weights, live_traversals
+        ):
+            supporting = set(heart_support)
+            for parent_id, child_id in zip(
+                traversal.node_ids, traversal.node_ids[1:]
+            ):
+                supporting.add(
+                    self._edge_gate_key(parent_id, child_id, "forward")
+                )
+                supporting.add(
+                    self._edge_gate_key(parent_id, child_id, "reverse")
+                )
+            for node_id in traversal.node_ids:
+                supporting.add(self._node_hull_gate_key(node_id))
+                supporting.update(pore_keys_by_node.get(node_id, ()))
+            supporting = {
+                key for key in supporting
+                if key in self.physiology_parameters
+            }
+            if supporting:
+                share = float(weight) / len(supporting)
+                for key in supporting:
+                    gate_coefficients[key] = (
+                        gate_coefficients.get(key, 0.0) + share
+                    )
+        expected_structural_opening = (
+            torch.stack(
+                [
+                    torch.sigmoid(self.physiology_parameters[key])
+                    * coefficient
+                    for key, coefficient in gate_coefficients.items()
+                ]
+            ).sum()
+            if gate_coefficients
+            else expected_route_opening.new_zeros(())
+        )
+        expected_survival = (
+            0.5 * expected_route_opening
+            + 0.5 * expected_structural_opening
+        )
+        resource_opening = archetype_openings.mean()
+        if structural_openings is not None:
+            resource_opening = (
+                resource_opening + structural_openings.mean()
+            ) * 0.5
+        loss = (
+            -expected_survival
+            + max(0.0, float(self.config.physiology_resource_cost))
+            * resource_opening
+        )
+        loss.backward()
+        learning_rate = max(0.0, float(self.config.physiology_learning_rate))
+        with torch.no_grad():
+            for parameter in self.physiology_parameters.values():
+                if parameter.grad is None:
+                    continue
+                parameter.add_(parameter.grad, alpha=-learning_rate)
+                parameter.clamp_(-9.0, 9.0)
+
+        self.physiology_last_loss = float(loss.detach().item())
+        self.physiology_best_traversal = tuple(best.node_ids)
+        self.physiology_best_score = float(best.mean_score)
+        self.physiology_steps += 1
+        self.physiology_error = None
+
+    def physiology_state(self) -> Dict[str, Any]:
+        if self.config.physiology_learning_enabled:
+            self._ensure_subedge_archetype()
+        openings = {
+            key: float(torch.sigmoid(parameter).detach().item())
+            for key, parameter in self.physiology_parameters.items()
+            if not key.startswith("archetype:")
+        } if torch is not None else {}
+        archetype_coefficients = {
+            key: float(parameter.detach().item())
+            for key, parameter in self.physiology_parameters.items()
+            if key.startswith("archetype:")
+        } if torch is not None else {}
+        by_kind: Dict[str, List[float]] = {}
+        for key, opening in openings.items():
+            by_kind.setdefault(key.split(":", 1)[0], []).append(opening)
+        values = list(openings.values())
+        return {
+            "enabled": self.config.physiology_learning_enabled,
+            "parameter_count": len(self.physiology_parameters),
+            "archetype_parameter_count": len(archetype_coefficients),
+            "archetypes": {
+                "subedge": {
+                    "parameter_count": len(archetype_coefficients),
+                    "coefficient_l1_mean": (
+                        sum(abs(value) for value in archetype_coefficients.values())
+                        / len(archetype_coefficients)
+                        if archetype_coefficients else None
+                    ),
+                }
+            },
+            "opening_mean": sum(values) / len(values) if values else None,
+            "opening_min": min(values) if values else None,
+            "opening_max": max(values) if values else None,
+            "by_kind": {
+                kind: {
+                    "count": len(kind_values),
+                    "mean": sum(kind_values) / len(kind_values),
+                }
+                for kind, kind_values in by_kind.items()
+            },
+            "loss": self.physiology_last_loss,
+            "best_traversal": list(self.physiology_best_traversal)
+            if self.physiology_best_traversal is not None else None,
+            "best_score": self.physiology_best_score,
+            "steps": self.physiology_steps,
+            "error": self.physiology_error,
+            "model_gradient_tracking": bool(
+                self.config.physiology_track_model_gradients
+            ),
+        }
 
     def _get_word_trie_gate(self, trie: WordTrie) -> TrieGate:
         key = id(trie)
@@ -986,12 +1885,16 @@ class FluxGraph:
             direction=None,
             parent_id=None,
             depth=0,
+            level=0,
+            center_id=node_id,
             local_evidence=0.0,
             pressure=1.0 + self.config.found_bonus,
             created_tick=0,
             expanded=True,  # the anchor doesn't get "expanded" itself
         )
         self.anchor_id = node_id
+        self.rhizome_owner_id = node_id
+        self._configure_seed_heart("main", node_id, initially_full=True)
         self._publish_snapshot()
         return node_id
 
@@ -1021,11 +1924,76 @@ class FluxGraph:
         """
         self.nodes = nodes
         self.anchor_id = anchor_id
+        self.rhizome_owner_id = anchor_id
+        for node in self.nodes.values():
+            if node.center_id is None:
+                node.center_id = anchor_id
         self.anchor_tokens = list(anchor_tokens)
         self.anchor_local_evidence = anchor_local_evidence
         self.tick_count = tick_count
         self._next_id = max(nodes.keys()) + 1 if nodes else 0
+        # Saved level/direction/depth fields are display metadata derived
+        # from the current anchor, not topology.  In particular, a save
+        # produced before the signed-level reroot fixes can contain a legal
+        # causal graph with stale forward leaves after their ancestor moved
+        # backward.  Never trust those cached coordinates: derive them from
+        # the causal graph exactly as a live reroot does.  Contradictory
+        # topology raises in _recompute_depths_from; no edge is silently
+        # pruned to make a damaged save look plausible.
+        self._recompute_depths_from(anchor_id)
+        self._restore_edges_from_topology()
         self._publish_snapshot()
+
+    def _restore_edges_from_topology(self) -> None:
+        """Rehydrate physical Edges for every live saved causal adjacency.
+
+        Node persistence stores canonical parent/child ownership, while
+        Edge objects contain runtime channels, subedges, and flow state.
+        Older saves did not persist Edge objects themselves.  Reconstructing
+        them is therefore mandatory: otherwise the auditor can enumerate a
+        visually connected path but fluid and pressure have no physical pipe
+        to travel through.
+
+        IDs are allocated monotonically.  For postfix growth the child is the
+        newly allocated endpoint; for prefix growth the parent is.  That lets
+        us recover formation direction without consulting saved display
+        direction, which may legitimately change after rerooting.
+        """
+        self.edges.clear()
+        self.traversals.clear()
+        for parent_id, parent in self.nodes.items():
+            if parent.burned:
+                continue
+            for child_id in parent.children_ids:
+                child = self.nodes.get(child_id)
+                if child is None or child.burned:
+                    continue
+                if parent_id not in child.parent_ids:
+                    raise ValueError(
+                        f"saved causal edge {parent_id}->{child_id} is not reciprocal"
+                    )
+                parent_level = int(parent.level or 0)
+                child_level = int(child.level or 0)
+                if child_level != parent_level + 1:
+                    raise ValueError(
+                        f"saved causal edge {parent_id}->{child_id} must advance one "
+                        f"signed level ({parent_level}->{child_level})"
+                    )
+                prefix = parent_id > child_id
+                grown_node = parent if prefix else child
+                formation = "prefix_beam" if prefix else "postfix_beam"
+                base = grown_node.local_value
+                self.edges[(parent_id, child_id)] = Edge(
+                    from_id=parent_id,
+                    to_id=child_id,
+                    forward=Channel(conductance=base),
+                    reverse=Channel(
+                        conductance=base * self.config.return_conductance_scale
+                    ),
+                    formation=formation,
+                    seed_id_at_formation=self.anchor_id,
+                    created_tick=max(parent.created_tick, child.created_tick),
+                )
 
     def absorb_external_physics(self, domain: str, payload: Dict[str, Any]) -> None:
         """The one door another physics domain publishes through.
@@ -1039,6 +2007,108 @@ class FluxGraph:
         payload or the new complete one, never a torn mix.
         """
         self.external_physics[domain] = payload
+
+    def export_fluid_state(self) -> Dict[str, Any]:
+        """The graph-level fluid state that lives outside individual nodes
+        -- the CSF bath and every region heart's chambers, reservoirs,
+        script, and phase -- for persistence. Node-local fluid
+        (solvent/solubles) rides along with each node's own serialization,
+        not here."""
+        return {
+            "bath": dict(self.bath),
+            "background": dict(self.background),
+            "soil": dict(self.soil),
+            "rhizome": dict(self.rhizome),
+            "rhizome_owner_id": self.rhizome_owner_id,
+            "physiology": {
+                "logits": {
+                    key: float(parameter.detach().item())
+                    for key, parameter in self.physiology_parameters.items()
+                },
+                "loss": self.physiology_last_loss,
+                "best_traversal": list(self.physiology_best_traversal)
+                if self.physiology_best_traversal is not None else None,
+                "best_score": self.physiology_best_score,
+                "steps": self.physiology_steps,
+            },
+            "hearts": {
+                region: {
+                    "chambers": {k: dict(v) for k, v in heart.chambers.items()},
+                    "seed_owner_id": heart.seed_owner_id,
+                    "reservoirs": {
+                        name: {
+                            "ion_name": reservoir.ion_name,
+                            "design_storage": reservoir.design_storage,
+                            "ion_amount": reservoir.ion_amount,
+                            "solvent": reservoir.solvent,
+                            "opening_coverage": reservoir.opening_coverage,
+                            "exchange_probability": reservoir.exchange_probability,
+                            "membrane_permeability": reservoir.membrane_permeability,
+                            "window_size": reservoir.window_size,
+                            "concentration_window": list(reservoir.concentration_window),
+                        }
+                        for name, reservoir in heart.reservoirs.items()
+                    },
+                    "script_name": heart.script_name,
+                    "phase_index": heart.phase_index,
+                }
+                for region, heart in self.hearts.items()
+            },
+        }
+
+    def import_fluid_state(self, state: Dict[str, Any]) -> None:
+        """Restore export_fluid_state output. A heart resumed here gets
+        its saved chambers/phase; its script comes from the saved name
+        (custom phase lists aren't round-tripped -- they fall back to the
+        configured script, since a phase list can hold arbitrary code)."""
+        self.bath = dict(state.get("bath", {}))
+        self.background = dict(state.get("background", {}))
+        self.soil = dict(state.get("soil", {}))
+        self.rhizome = dict(state.get("rhizome", {}))
+        self.rhizome_owner_id = self.anchor_id
+        for region, hstate in state.get("hearts", {}).items():
+            heart = self._heart_for(region)
+            heart.chambers = {k: dict(v) for k, v in hstate.get("chambers", {}).items()}
+            heart.seed_owner_id = hstate.get("seed_owner_id")
+            heart.reservoirs = {
+                name: IonReservoir(
+                    ion_name=rstate.get("ion_name", name),
+                    design_storage=float(rstate.get("design_storage", 0.0)),
+                    ion_amount=float(rstate.get("ion_amount", 0.0)),
+                    solvent=float(rstate.get("solvent", 0.0)),
+                    opening_coverage=float(rstate.get("opening_coverage", 1.0)),
+                    exchange_probability=float(rstate.get("exchange_probability", 1.0)),
+                    membrane_permeability=float(rstate.get("membrane_permeability", 1.0)),
+                    window_size=max(1, int(rstate.get("window_size", 1))),
+                    concentration_window=list(rstate.get("concentration_window", [])),
+                )
+                for name, rstate in hstate.get("reservoirs", {}).items()
+            }
+            name = hstate.get("script_name", self.config.heart_script)
+            if name in HEART_SCRIPTS:
+                heart.set_script(name)
+            heart.phase_index = hstate.get("phase_index", 0)
+        physiology = state.get("physiology", {})
+        if torch is not None:
+            self.physiology_parameters = {
+                key: torch.nn.Parameter(
+                    torch.tensor(
+                        float(value), dtype=torch.float32, device=self.device
+                    )
+                )
+                for key, value in physiology.get("logits", {}).items()
+            }
+        self.physiology_last_loss = physiology.get("loss")
+        best_traversal = physiology.get("best_traversal")
+        self.physiology_best_traversal = (
+            tuple(int(value) for value in best_traversal)
+            if best_traversal is not None else None
+        )
+        self.physiology_best_score = physiology.get("best_score")
+        self.physiology_steps = int(physiology.get("steps", 0))
+        # Old saves may contain hearts attached to display roots away from
+        # level zero. Reconcile ownership immediately on restore.
+        self._reap_dead_hearts(set(self._region_pump_nodes()))
 
     def _alloc_id(self) -> int:
         node_id = self._next_id
@@ -1063,12 +2133,101 @@ class FluxGraph:
     def _live_children(self, node_id: int) -> List[int]:
         return [c for c in self.nodes[node_id].children_ids if not self.nodes[c].burned]
 
+    def _live_parents(self, node_id: int) -> List[int]:
+        return [p for p in self.nodes[node_id].parent_ids if p in self.nodes and not self.nodes[p].burned]
+
     def _neighbors(self, node_id: int) -> List[int]:
+        return list(dict.fromkeys(self._live_parents(node_id) + self._live_children(node_id)))
+
+    def _outward_neighbors(self, node_id: int) -> List[int]:
+        """Live neighbors farther from this node's current seed layer.
+
+        This is radial growth geometry, deliberately separate from causal
+        ownership: backward nodes grow outward through causal parents,
+        forward nodes through causal children, and a center has both sides.
+        """
         node = self.nodes[node_id]
-        neighbors = list(self._live_children(node_id))
-        if node.parent_id is not None and not self.nodes[node.parent_id].burned:
-            neighbors.append(node.parent_id)
-        return neighbors
+        if (node.level or 0) < 0:
+            candidates = self._live_parents(node_id)
+        elif (node.level or 0) > 0:
+            candidates = self._live_children(node_id)
+        else:
+            candidates = self._neighbors(node_id)
+        return [
+            neighbor_id for neighbor_id in candidates
+            if abs(self.nodes[neighbor_id].level or 0) > abs(node.level or 0)
+        ]
+
+    def _centerward_neighbors(self, node_id: int) -> List[int]:
+        """Live neighbors closer to a seed-layer center."""
+        node = self.nodes[node_id]
+        if (node.level or 0) < 0:
+            candidates = self._live_children(node_id)
+        elif (node.level or 0) > 0:
+            candidates = self._live_parents(node_id)
+        else:
+            return []
+        return [
+            neighbor_id for neighbor_id in candidates
+            if abs(self.nodes[neighbor_id].level or 0) < abs(node.level or 0)
+        ]
+
+    @staticmethod
+    def _direction_for_level(level: int) -> Optional[Direction]:
+        if level < 0:
+            return Direction.BACKWARD
+        if level > 0:
+            return Direction.FORWARD
+        return None
+
+    def _connect(self, parent_id: int, child_id: int) -> None:
+        """Install one causal edge under the global backward->forward rule."""
+        parent = self.nodes[parent_id]
+        child = self.nodes[child_id]
+        parent_level = int(parent.level or 0)
+        child_level = int(child.level or 0)
+        if child_level != parent_level + 1:
+            raise ValueError(
+                f"causal edge {parent_id}->{child_id} must advance one signed level "
+                f"({parent_level}->{child_level})"
+            )
+        if child_id not in parent.children_ids:
+            parent.children_ids.append(child_id)
+        if parent_id not in child.parent_ids:
+            child.parent_ids.append(parent_id)
+        if child.parent_id is None:
+            child.parent_id = parent_id
+
+    def _path_to_center(self, node_id: int) -> List[int]:
+        """One best-effort monotone path from node to its seed-layer center.
+
+        The graph may have several causal parents. This helper is only for
+        legacy single-sequence scoring/display callers; the auditor walks
+        every causal route. It follows the primary available monotone edge
+        toward level 0 and returns node..center inclusive.
+        """
+        path = [node_id]
+        seen = {node_id}
+        cur_id = node_id
+        while self.nodes[cur_id].level != 0:
+            cur = self.nodes[cur_id]
+            candidates = (
+                self._live_children(cur_id) if (cur.level or 0) < 0
+                else self._live_parents(cur_id)
+            )
+            candidates = [
+                nid for nid in candidates
+                if abs(self.nodes[nid].level or 0) < abs(cur.level or 0)
+            ]
+            if not candidates:
+                break
+            next_id = max(candidates, key=lambda nid: self.nodes[nid].path_mean)
+            if next_id in seen:
+                break
+            seen.add(next_id)
+            path.append(next_id)
+            cur_id = next_id
+        return path
 
     def path_tokens(self, node_id: int) -> Tuple[List[int], Optional[Direction]]:
         """Tokens hung between the anchor and ``node_id``, in left-to-right reading order, plus that side's direction.
@@ -1088,15 +2247,13 @@ class FluxGraph:
         *order of spans* flips, never a span's own internal token order,
         or a multi-token word would get its own tokens scrambled.
         """
-        spans: List[List[int]] = []
         direction = self.nodes[node_id].direction
-        cur = node_id
-        while cur != self.anchor_id:
-            node = self.nodes[cur]
-            spans.append(node.tokens)
-            cur = node.parent_id
-        if direction is not Direction.BACKWARD:
-            spans.reverse()
+        path = self._path_to_center(node_id)
+        if path and self.nodes[path[-1]].level == 0:
+            path = path[:-1]
+        if direction is Direction.FORWARD:
+            path.reverse()
+        spans = [self.nodes[nid].tokens for nid in path]
         tokens = [t for span in spans for t in span]
         return tokens, direction
 
@@ -1130,8 +2287,11 @@ class FluxGraph:
                 continue
             if direction is None and node_id == self.anchor_id:
                 continue
-            if self._live_children(node_id):
-                continue  # only consider leaves
+            if node.direction is Direction.BACKWARD:
+                if self._live_parents(node_id):
+                    continue
+            elif self._live_children(node_id):
+                continue
             if node.path_mean > best_mean:
                 best_mean = node.path_mean
                 best_id = node_id
@@ -1154,11 +2314,14 @@ class FluxGraph:
         total = 0.0
         count = 0
         for leaf in (fwd_leaf, bwd_leaf):
-            cur = leaf
-            while cur is not None and cur != self.anchor_id:
-                total += self.nodes[cur].local_evidence
+            if leaf is None:
+                continue
+            path = self._path_to_center(leaf)
+            for nid in path:
+                if self.nodes[nid].level == 0:
+                    continue
+                total += self.nodes[nid].local_evidence
                 count += 1
-                cur = self.nodes[cur].parent_id
         mean_score = total / count if count > 0 else 0.0
         return tokens, mean_score
 
@@ -1168,19 +2331,48 @@ class FluxGraph:
     def tick(self) -> None:
         """Advance one discrete step."""
         self.tick_count += 1
+        self._tick_started_at = time.monotonic()
+        self._emit_status("settling", "relaxing circuit", 0, self.config.max_relaxation_iterations)
         self._settle_circuit()
+        self._emit_status("rerooting", "checking causal focus")
         self._maybe_reroot()
+        self._emit_status("digesting", "rolling up path quality")
         self._digest()
+        self._emit_status("auxin", "diffusing growth signals")
         self._diffuse_auxin()
+        if self.config.graph_auditor_enabled:
+            # Local missing-ion stress requests an opposite-direction root sprout.
+            self._emit_status("nutrients", "reading local sprout demand")
+            self._update_nutrient_growth_interest()
+        self._emit_status("expanding", "selecting growth fronts")
         self._expand_top_pressure_nodes()
+        self._emit_status("starvation", "reaping disconnected or starved tissue")
         self._starve_and_burn()
         if self.config.graph_auditor_enabled:
+            self._emit_status("auditing", "enumerating causal paths")
             self._run_graph_auditor()
+            self._emit_status(
+                "learning", "diffusing traversal reward through valves and pores"
+            )
+            self._learn_physiology()
+            self._apply_reservoir_learning()
+            self._emit_status("humidity", "exchanging solvent and dissolved ions")
             self._exchange_humidity()
+            self._emit_status("rings", "ingesting boundary supplies")
             self._ingest_from_rings()
+            self._emit_status("transport", "moving fluid through traversals")
             self._transport_subedges()
-            self._pump_anchor()
+            self._emit_status("pumping", "beating regional hearts")
+            self._pump_hearts()
+            self._emit_status("soil", "permeating the level-zero interface")
+            self._permeate_background_into_soil()
+            self._absorb_soil_by_roots()
+            self._emit_status("factories", "running node synthesis")
+            self._run_node_factories()
+            self._emit_status("nutrients", "reconciling local sprout demand")
+            self._update_nutrient_growth_interest(accumulate=False)
         self._publish_snapshot()
+        self._emit_status("complete", "tick snapshot published", 1, 1)
 
     # ------------------------------------------------------------------
     # Re-rooting: the anchor itself can be displaced by a higher-pressure node
@@ -1251,69 +2443,32 @@ class FluxGraph:
         return best_id
 
     def _reroot(self, new_root_id: int) -> None:
-        """Re-root the tree at ``new_root_id``.
+        """Move the causal focus without reversing causal ownership.
 
-        Walks from ``new_root_id`` up to the current anchor, reversing
-        parent/child pointers and flipping direction along that path --
-        what was "toward the old anchor" from the new root's own original
-        side is now the new root's *opposite* direction. Every other node
-        in the graph -- including branches whose direction no longer
-        lines up with this new orientation -- is left exactly where it
-        is: nothing is detached, extracted, or reset except the two nodes
-        actually changing anchor status (new_root promoted, old anchor
-        demoted). The graph stays one connected tree, and every node
-        stays fully live and eligible to become anchor itself later (see
-        _maybe_reroot's scan over all of self.nodes). Which nodes no
-        longer read as a clean two-hemisphere forward/backward layout is
-        a pure display question -- see orthogonal_node_ids -- not
-        something this method needs to compute or care about.
+        Parent->child always means backward->forward. Changing which point
+        is the probability manifold's current center can rebase signed
+        levels and display directions, but it cannot reverse an Edge.
         """
         old_anchor_id = self.anchor_id
         if new_root_id == old_anchor_id:
             return
         old_anchor_tokens = self.anchor_tokens
         old_anchor_local_evidence = self.anchor_local_evidence
-
-        new_root = self.nodes[new_root_id]
-        original_direction = new_root.direction
-        flipped_direction = (
-            Direction.BACKWARD if original_direction is Direction.FORWARD else Direction.FORWARD
-        )
-
-        # Walk the path from new_root up to the old anchor, before any
-        # pointer gets mutated.
-        path: List[int] = [new_root_id]
-        cur = new_root_id
-        while cur != old_anchor_id:
-            cur = self.nodes[cur].parent_id
-            path.append(cur)
-
-        # Reverse parent/child pointers along path[0..-1] -> path[-1].
-        for i in range(len(path) - 1):
-            cur_id, next_id = path[i], path[i + 1]
-            cur_node, next_node = self.nodes[cur_id], self.nodes[next_id]
-            if cur_id in next_node.children_ids:
-                next_node.children_ids.remove(cur_id)
-            cur_node.children_ids.append(next_id)
-            next_node.parent_id = cur_id
-
-        # Flip direction for every reversed-path node (all but the new
-        # root itself, which becomes direction=None as the anchor).
-        for node_id in path[1:]:
-            self.nodes[node_id].direction = flipped_direction
-
-        # Promote new_root to anchor. The demoted old anchor never had its
-        # own single-edge token span (it *was* the fixed seed, not
-        # something grown) -- without this, the entire original seed text
-        # would silently vanish from any path that walks through it now
-        # that it's an ordinary node. Its captured former anchor_tokens
-        # becomes that node's own (multi-token, same as any word-growth
-        # span) edge content.
+        # The old seed heart does not travel with the focus. Re-rooting
+        # dumps every chamber and reservoir into the shared CSF bath.
+        self._spill_heart_to_csf("main")
         self.nodes[old_anchor_id].tokens = old_anchor_tokens
         self.nodes[old_anchor_id].local_evidence = old_anchor_local_evidence
+        new_root = self.nodes[new_root_id]
         self.anchor_tokens, self.anchor_local_evidence = self._reset_to_anchor_invariants(new_root)
         self.anchor_id = new_root_id
+        self.rhizome_owner_id = new_root_id
+        new_root.center_id = new_root_id
         self._recompute_depths_from(new_root_id)
+        # Signed levels changed: immediately purge any distributed heart
+        # whose owner is no longer on the new level-zero seed tier.
+        self._reap_dead_hearts(set(self._region_pump_nodes()))
+        self._configure_seed_heart("main", new_root_id, initially_full=False)
 
     def _reset_to_anchor_invariants(self, node: FluxNode) -> Tuple[List[int], float]:
         """Match seed()'s anchor construction, in place, for a node that's becoming the anchor.
@@ -1339,8 +2494,8 @@ class FluxGraph:
         captured_local_evidence = node.local_evidence
         node.tokens = []
         node.direction = None
-        node.parent_id = None
         node.depth = 0
+        node.level = 0
         node.local_evidence = 0.0
         node.cumulative_evidence = 0.0
         node.low_pressure_ticks = 0
@@ -1348,26 +2503,47 @@ class FluxGraph:
         return captured_tokens, captured_local_evidence
 
     def _recompute_depths_from(self, root_id: int) -> None:
-        """BFS from ``root_id``, fixing depth/cumulative_evidence for the whole tree.
-
-        Needed after re-rooting: both quantities are defined relative to
-        whichever node is being treated as the anchor, and re-rooting
-        shifts that anchor. The graph is always one connected tree (see
-        _reroot), so a single BFS from the new anchor reaches every node,
-        including branches now orthogonal to the new orientation.
-        """
-        root = self.nodes[root_id]
-        root.depth = 0
-        root.cumulative_evidence = 0.0
-        stack = [root_id]
-        while stack:
-            cur_id = stack.pop()
-            cur = self.nodes[cur_id]
-            for child_id in cur.children_ids:
-                child = self.nodes[child_id]
-                child.depth = cur.depth + 1
-                child.cumulative_evidence = cur.cumulative_evidence + child.local_evidence
-                stack.append(child_id)
+        """Rebase signed levels around a new focus without changing edges."""
+        levels = {root_id: 0}
+        queue = [root_id]
+        while queue:
+            cur_id = queue.pop(0)
+            cur_level = levels[cur_id]
+            for parent_id in self._live_parents(cur_id):
+                proposed = cur_level - 1
+                if parent_id not in levels:
+                    levels[parent_id] = proposed
+                    queue.append(parent_id)
+                elif levels[parent_id] != proposed:
+                    raise ValueError(
+                        f"inconsistent causal levels at edge {parent_id}->{cur_id}: "
+                        f"{levels[parent_id]} versus required {proposed}"
+                    )
+            for child_id in self._live_children(cur_id):
+                proposed = cur_level + 1
+                if child_id not in levels:
+                    levels[child_id] = proposed
+                    queue.append(child_id)
+                elif levels[child_id] != proposed:
+                    raise ValueError(
+                        f"inconsistent causal levels at edge {cur_id}->{child_id}: "
+                        f"{levels[child_id]} versus required {proposed}"
+                    )
+        unreachable = [
+            node_id for node_id, node in self.nodes.items()
+            if not node.burned and node_id not in levels
+        ]
+        if unreachable:
+            raise ValueError(
+                "live saved topology is disconnected from the active seed: "
+                + ", ".join(str(node_id) for node_id in sorted(unreachable))
+            )
+        for node_id, level in levels.items():
+            node = self.nodes[node_id]
+            node.level = level
+            node.depth = abs(level)
+            node.direction = self._direction_for_level(level)
+        self.nodes[root_id].cumulative_evidence = 0.0
 
     def orthogonal_node_ids(self) -> "set[int]":
         """Node ids whose direction lineage no longer aligns with the current anchor.
@@ -1384,20 +2560,38 @@ class FluxGraph:
         whole subtree is orthogonal too, since direction never changes
         again below that point.
         """
-        orthogonal: set = set()
+        explicit_cousins = {
+            nid for nid, node in self.nodes.items()
+            if not node.burned
+            and node.center_id is not None
+            and node.center_id != self.anchor_id
+        }
+        orthogonal: set = set(explicit_cousins)
         anchor = self.nodes[self.anchor_id]
-        stack = list(anchor.children_ids)
+        stack = self._neighbors(anchor.id)
+        visited = {anchor.id}
         while stack:
             node_id = stack.pop()
+            if node_id in visited or self.nodes[node_id].burned:
+                continue
+            visited.add(node_id)
             node = self.nodes[node_id]
-            for child_id in node.children_ids:
-                child = self.nodes[child_id]
-                if node_id in orthogonal or child.direction != node.direction:
-                    orthogonal.add(child_id)
-                stack.append(child_id)
+            for neighbor_id in self._neighbors(node_id):
+                if neighbor_id in visited:
+                    continue
+                neighbor = self.nodes[neighbor_id]
+                if node_id in orthogonal or (
+                    node.direction is not None
+                    and neighbor.direction is not None
+                    and neighbor.direction != node.direction
+                ):
+                    orthogonal.add(neighbor_id)
+                stack.append(neighbor_id)
         return orthogonal
 
-    def orthogonal_network_roots(self) -> Dict[int, int]:
+    def orthogonal_network_roots(
+        self, orthogonal: Optional["set[int]"] = None
+    ) -> Dict[int, int]:
         """Maps every orthogonal node to the id of the node its "network" is rooted at.
 
         A network's root is the shallowest node in one contiguous
@@ -1413,9 +2607,20 @@ class FluxGraph:
         and stable for this since it's only recomputed on re-root, never
         mid-scan.
         """
-        orthogonal = self.orthogonal_node_ids()
+        explicit = {
+            nid: node.center_id
+            for nid, node in self.nodes.items()
+            if not node.burned
+            and node.center_id is not None
+            and node.center_id != self.anchor_id
+        }
+        if orthogonal is None:
+            orthogonal = self.orthogonal_node_ids()
         roots: Dict[int, int] = {}
         for node_id in sorted(orthogonal, key=lambda nid: self.nodes[nid].depth):
+            if node_id in explicit:
+                roots[node_id] = explicit[node_id]
+                continue
             parent_id = self.nodes[node_id].parent_id
             roots[node_id] = roots.get(parent_id, node_id)
         return roots
@@ -1472,9 +2677,18 @@ class FluxGraph:
         still has to earn its own support rather than inheriting the
         anchor's perfect certainty for free.
         """
-        node = self.nodes[node_id]
-        if neighbor_id == node.parent_id:
-            return node.local_value
+        key = (
+            (neighbor_id, node_id)
+            if neighbor_id in self.nodes[node_id].parent_ids
+            else (node_id, neighbor_id)
+        )
+        edge = self.edges.get(key)
+        if edge is not None:
+            token_node_id = edge.from_id if edge.formation == "prefix_beam" else edge.to_id
+            return self.nodes[token_node_id].local_value
+        # Compatibility for hand-built test graphs that predate Edge.
+        if neighbor_id in self.nodes[node_id].parent_ids:
+            return self.nodes[node_id].local_value
         return self.nodes[neighbor_id].local_value
 
     def _directional_conductance(self, node_id: int, neighbor_id: int) -> float:
@@ -1489,9 +2703,20 @@ class FluxGraph:
         every edge identical, matching pre-circulatory behavior exactly.
         """
         base = self._edge_conductance(node_id, neighbor_id)
-        if neighbor_id == self.nodes[node_id].parent_id:
-            return base
-        return base * self.config.return_conductance_scale
+        parent_id, child_id = (
+            (neighbor_id, node_id)
+            if neighbor_id in self.nodes[node_id].parent_ids
+            else (node_id, neighbor_id)
+        )
+        if neighbor_id in self.nodes[node_id].parent_ids:
+            valve = self._gate_value(
+                self._edge_gate_key(parent_id, child_id, "forward")
+            )
+            return base * valve
+        valve = self._gate_value(
+            self._edge_gate_key(parent_id, child_id, "reverse")
+        )
+        return base * self.config.return_conductance_scale * valve
 
     def _shared_token_intrinsic(self) -> Dict[int, float]:
         """Nodes sharing the exact same token span divide their intrinsic claim
@@ -1666,8 +2891,153 @@ class FluxGraph:
         shared_intrinsic = self._shared_token_intrinsic()
         forward_reach = self._direction_reach(Direction.FORWARD)
         backward_reach = self._direction_reach(Direction.BACKWARD)
+        if torch is not None:
+            live_nodes = [node for node in self.nodes.values() if not node.burned]
+            if not live_nodes:
+                return 0
+            node_index = {
+                node.id: index for index, node in enumerate(live_nodes)
+            }
+            receiving: List[int] = []
+            supplying: List[int] = []
+            conductance_values: List[float] = []
+            for node in live_nodes:
+                for neighbor_id in self._neighbors(node.id):
+                    neighbor_index = node_index.get(neighbor_id)
+                    if neighbor_index is None:
+                        continue
+                    receiving.append(node_index[node.id])
+                    supplying.append(neighbor_index)
+                    conductance_values.append(
+                        self._directional_conductance(node.id, neighbor_id)
+                    )
+
+            device = self.device
+            dtype = torch.float64
+            pressure = torch.tensor(
+                [float(node.pressure) for node in live_nodes],
+                dtype=dtype,
+                device=device,
+            )
+            intrinsic = torch.tensor(
+                [
+                    float(
+                        shared_intrinsic.get(
+                            node.id, node.local_value + cfg.found_bonus
+                        )
+                    )
+                    for node in live_nodes
+                ],
+                dtype=dtype,
+                device=device,
+            )
+            static_adjustment = torch.tensor(
+                [
+                    (
+                        (
+                            cfg.balance_weight
+                            * max(
+                                0.0,
+                                (
+                                    backward_reach - forward_reach
+                                    if node.direction is Direction.FORWARD
+                                    else forward_reach - backward_reach
+                                ),
+                            )
+                            if cfg.balance_weight
+                            and node.direction is not None
+                            else 0.0
+                        )
+                        - cfg.head_pressure_coefficient * abs(node.height)
+                    )
+                    for node in live_nodes
+                ],
+                dtype=dtype,
+                device=device,
+            )
+            population_cost = 0.0
+            if cfg.population_target and len(live_nodes) > cfg.population_target:
+                population_cost = (
+                    len(live_nodes) - cfg.population_target
+                ) / cfg.population_target
+            fixed = torch.tensor(
+                [
+                    node.id == self.anchor_id and not cfg.anchor_can_decay
+                    for node in live_nodes
+                ],
+                dtype=torch.bool,
+                device=device,
+            )
+            if receiving:
+                receiving_idx = torch.tensor(
+                    receiving, dtype=torch.long, device=device
+                )
+                supplying_idx = torch.tensor(
+                    supplying, dtype=torch.long, device=device
+                )
+                conductance = torch.tensor(
+                    conductance_values, dtype=dtype, device=device
+                )
+                conductance_sum = torch.zeros(
+                    len(live_nodes), dtype=dtype, device=device
+                )
+                conductance_sum.index_add_(0, receiving_idx, conductance)
+            else:
+                receiving_idx = supplying_idx = torch.empty(
+                    0, dtype=torch.long, device=device
+                )
+                conductance = torch.empty(0, dtype=dtype, device=device)
+                conductance_sum = torch.zeros(
+                    len(live_nodes), dtype=dtype, device=device
+                )
+
+            for i in range(cfg.max_relaxation_iterations):
+                weighted_sum = torch.zeros_like(pressure)
+                if receiving:
+                    weighted_sum.index_add_(
+                        0,
+                        receiving_idx,
+                        conductance
+                        * pressure.index_select(0, supplying_idx),
+                    )
+                inflow = weighted_sum / (1.0 + conductance_sum)
+                candidate = torch.clamp_min(
+                    intrinsic
+                    + cfg.damping * inflow
+                    + static_adjustment
+                    - cfg.decay_rate * pressure
+                    - population_cost,
+                    0.0,
+                )
+                new_pressure = torch.where(fixed, pressure, candidate)
+                delta = float(
+                    torch.max(torch.abs(new_pressure - pressure)).item()
+                )
+                pressure = new_pressure
+                self._emit_status(
+                    "settling",
+                    f"pressure delta {delta:.3g}",
+                    i + 1,
+                    cfg.max_relaxation_iterations,
+                )
+                if delta < cfg.relaxation_tolerance:
+                    rows = pressure.detach().cpu().tolist()
+                    for node, value in zip(live_nodes, rows):
+                        node.pressure = value
+                    return i + 1
+            rows = pressure.detach().cpu().tolist()
+            for node, value in zip(live_nodes, rows):
+                node.pressure = value
+            return cfg.max_relaxation_iterations
+
         for i in range(cfg.max_relaxation_iterations):
             delta = self._update_pressures(shared_intrinsic, forward_reach, backward_reach)
+            self._emit_status(
+                "settling",
+                f"pressure delta {delta:.3g}",
+                i + 1,
+                cfg.max_relaxation_iterations,
+            )
             if delta < cfg.relaxation_tolerance:
                 return i + 1
         return cfg.max_relaxation_iterations
@@ -1685,12 +3055,18 @@ class FluxGraph:
         """
         live_nodes = [n for n in self.nodes.values() if not n.burned and n.id != self.anchor_id]
         for node in sorted(live_nodes, key=lambda n: n.depth, reverse=True):
-            child_rollups = [self.nodes[c].rollup_mean for c in self._live_children(node.id)]
-            node.rollup_mean = max([node.path_mean] + child_rollups)
+            outward_rollups = [
+                self.nodes[neighbor_id].rollup_mean
+                for neighbor_id in self._outward_neighbors(node.id)
+            ]
+            node.rollup_mean = max([node.path_mean] + outward_rollups)
 
         anchor = self.nodes[self.anchor_id]
-        child_rollups = [self.nodes[c].rollup_mean for c in self._live_children(self.anchor_id)]
-        anchor.rollup_mean = max(child_rollups) if child_rollups else 0.0
+        outward_rollups = [
+            self.nodes[neighbor_id].rollup_mean
+            for neighbor_id in self._outward_neighbors(self.anchor_id)
+        ]
+        anchor.rollup_mean = max(outward_rollups) if outward_rollups else 0.0
 
     def _diffuse_auxin(self) -> None:
         """Apical-dominance-style suppression: a strong tip dampens branching elsewhere.
@@ -1713,20 +3089,32 @@ class FluxGraph:
         live_nodes = [n for n in self.nodes.values() if not n.burned and n.id != self.anchor_id]
 
         for node in sorted(live_nodes, key=lambda n: n.depth, reverse=True):
-            live_children = self._live_children(node.id)
-            own_source = math.exp(node.path_mean) if not live_children else 0.0
-            child_best = max((self.nodes[c].subtree_auxin for c in live_children), default=0.0)
-            node.subtree_auxin = max(own_source, child_best * cfg.auxin_decay)
+            outward = self._outward_neighbors(node.id)
+            own_source = (
+                math.exp(node.path_mean) if not outward else 0.0
+            ) + max(0.0, node.factory_auxin)
+            outward_best = max(
+                (self.nodes[nid].subtree_auxin for nid in outward), default=0.0
+            )
+            node.subtree_auxin = max(own_source, outward_best * cfg.auxin_decay)
 
         for node in sorted(live_nodes, key=lambda n: n.depth):
-            parent_id = node.parent_id
-            siblings = [
-                c for c in self.nodes[parent_id].children_ids
-                if c != node.id and not self.nodes[c].burned
-            ]
+            centerward = self._centerward_neighbors(node.id)
+            siblings = {
+                sibling_id
+                for centerward_id in centerward
+                for sibling_id in self._outward_neighbors(centerward_id)
+                if sibling_id != node.id
+            }
             siblings_best = max((self.nodes[s].subtree_auxin for s in siblings), default=0.0)
-            parent_ambient = 0.0 if parent_id == self.anchor_id else self.nodes[parent_id].auxin_level
-            node.auxin_level = cfg.auxin_decay * max(siblings_best, parent_ambient)
+            centerward_ambient = max(
+                (
+                    0.0 if nid == self.anchor_id else self.nodes[nid].auxin_level
+                    for nid in centerward
+                ),
+                default=0.0,
+            )
+            node.auxin_level = cfg.auxin_decay * max(siblings_best, centerward_ambient)
 
     def _direction_branch_factor(self, direction: Optional[Direction]) -> int:
         cfg = self.config
@@ -1833,8 +3221,14 @@ class FluxGraph:
         (_direction_reach) rather than per-candidate.
         """
         cfg = self.config
-        parent = self.nodes[node.parent_id] if node.parent_id is not None else None
-        neighborhood_bonus = cfg.rollup_weight * math.exp(parent.rollup_mean) if parent is not None else 0.0
+        centerward = self._centerward_neighbors(node.id)
+        neighborhood_rollup = max(
+            (self.nodes[nid].rollup_mean for nid in centerward), default=None
+        )
+        neighborhood_bonus = (
+            cfg.rollup_weight * math.exp(neighborhood_rollup)
+            if neighborhood_rollup is not None else 0.0
+        )
         wait = max(0, self.tick_count - node.created_tick)
         exploration_bonus = cfg.exploration_constant * math.sqrt(wait)
         balance_bonus = 0.0
@@ -1847,16 +3241,50 @@ class FluxGraph:
         return node.pressure + neighborhood_bonus + exploration_bonus + balance_bonus
 
     def _expandable_nodes(self) -> List[FluxNode]:
-        # Eligibility is "currently a leaf" (no live children right now),
-        # not "has never been expanded" -- a node whose children all
-        # burned off must be able to try again, or it becomes a permanent
-        # dead end that can win best_path() forever without ever being
-        # able to grow past it.
+        # Forward tips have no live children farther forward. Backward tips
+        # have no live parents farther backward. Ownership follows the one
+        # global backward->forward axis, not radial distance from a center.
         return [
             n for n in self.nodes.values()
-            if not n.burned and n.id != self.anchor_id and not self._live_children(n.id)
+            if not n.burned
+            and n.direction is not None
+            and (
+                (n.direction is Direction.FORWARD and not self._live_children(n.id))
+                or (n.direction is Direction.BACKWARD and not self._live_parents(n.id))
+            )
         ]
 
+    def _update_nutrient_growth_interest(self, accumulate: bool = True) -> None:
+        """Accumulate cross-growth interest from continuous ion scarcity.
+
+        Each node measures the concentration of its required opposite-side
+        ion against ``growth_target_ion_concentration``. Its fractional
+        shortfall (0..1), not a binary present/absent flag, is the demand
+        added to sprout or air-root priority. Adequate supply clears demand.
+        """
+        target = max(1e-12, float(self.config.growth_target_ion_concentration))
+        network_roots = self.orthogonal_network_roots()
+        for nid, node in self.nodes.items():
+            if node.burned or node.direction is None:
+                continue
+            slices = self._node_slice(nid, node, network_roots)
+            if slices is None:
+                continue
+            _, needed_ion = slices
+            concentration = (
+                node.solubles.get(needed_ion, 0.0) / node.volume
+                if node.volume > 0.0 else 0.0
+            )
+            scarcity = max(0.0, min(1.0, (target - concentration) / target))
+            interest_name = (
+                "backward_growth_interest"
+                if node.direction is Direction.FORWARD
+                else "forward_growth_interest"
+            )
+            if scarcity <= 0.0:
+                setattr(node, interest_name, 0.0)
+            elif accumulate:
+                setattr(node, interest_name, getattr(node, interest_name) + scarcity)
     def _expand_top_pressure_nodes(self) -> None:
         """Pick this tick's compute-budget candidates, split fairly by direction.
 
@@ -1888,22 +3316,21 @@ class FluxGraph:
         forward and backward no longer share a single batched model call
         per hot-loop round the way a single mixed batch used to.
 
-        If the anchor itself currently has zero live children -- every
-        forward and backward node has starved away and burned, leaving
-        only the anchor standing -- this is a hard stall, not just a slow
-        tick: _expandable_nodes() never includes the anchor (it isn't a
-        normal forward/backward node -- no direction, so _expand_batch has
-        nothing to score it with), so with nothing else live either, the
-        candidate pools below would both come back empty every single
-        tick from here on, forever. The anchor doesn't get to just sit
-        there once it's the only thing left -- it re-seeds both directions
-        fresh, the same bootstrap spawn_first_children() used originally,
-        so growth actually resumes instead of the graph going silently and
-        permanently dead.
+        The anchor's two direct causal connections are its circulatory
+        sides: live parents attach the backward side and live children
+        attach the forward side. A missing side preempts ordinary frontier
+        competition and is grown immediately. This covers both a total
+        stall and the more urgent partial failure where one side remains
+        healthy enough to keep winning the normal compute competition while
+        the other side is absent.
         """
-        if not self._live_children(self.anchor_id):
-            self._expand_forward(self.anchor_id)
-            self._expand_backward(self.anchor_id)
+        missing_forward_side = not self._live_children(self.anchor_id)
+        missing_backward_side = not self._live_parents(self.anchor_id)
+        if missing_forward_side or missing_backward_side:
+            if missing_forward_side:
+                self._expand_forward(self.anchor_id)
+            if missing_backward_side:
+                self._expand_backward(self.anchor_id)
             return
 
         forward_reach = self._direction_reach(Direction.FORWARD)
@@ -1912,14 +3339,44 @@ class FluxGraph:
         def priority(n: FluxNode) -> float:
             return self._expansion_priority(n, forward_reach, backward_reach)
 
-        forward_pool = sorted(
-            (n for n in self._expandable_nodes() if n.direction is Direction.FORWARD),
-            key=priority, reverse=True,
+        # (node, nutrient-driven): ordinary tips continue away from the
+        # center; nutrient stress contributes a competing center-seeking
+        # action in the opposite growth direction. Both spend the same
+        # finite compute budget. Any tissue can launch the cross-growth it
+        # needs; sprout/air-root width and depth determine its committed shape.
+        expandable = self._expandable_nodes()
+        forward_pool = [
+            (n, False) for n in expandable if n.direction is Direction.FORWARD
+        ]
+        backward_pool = [
+            (n, False) for n in expandable if n.direction is Direction.BACKWARD
+        ]
+        forward_pool.extend(
+            (n, True) for n in self.nodes.values()
+            if not n.burned
+            and n.direction is Direction.BACKWARD
+            and n.forward_growth_interest > 0.0
         )
-        backward_pool = sorted(
-            (n for n in self._expandable_nodes() if n.direction is Direction.BACKWARD),
-            key=priority, reverse=True,
+        backward_pool.extend(
+            (n, True) for n in self.nodes.values()
+            if not n.burned
+            and n.direction is Direction.FORWARD
+            and n.backward_growth_interest > 0.0
         )
+
+        def action_priority(action) -> float:
+            node, nutrient_driven = action
+            stress = 0.0
+            if nutrient_driven:
+                stress = (
+                    node.forward_growth_interest
+                    if node.direction is Direction.BACKWARD
+                    else node.backward_growth_interest
+                )
+            return priority(node) + stress
+
+        forward_pool.sort(key=action_priority, reverse=True)
+        backward_pool.sort(key=action_priority, reverse=True)
 
         cfg = self.config
         explicit_budgets = cfg.forward_budget_per_tick is not None or cfg.backward_budget_per_tick is not None
@@ -1938,19 +3395,76 @@ class FluxGraph:
             if leftover_budget > 0:
                 remaining = sorted(
                     forward_pool[forward_floor:] + backward_pool[backward_floor:],
-                    key=priority, reverse=True,
+                    key=action_priority, reverse=True,
                 )
-                for n in remaining[:leftover_budget]:
-                    if n.direction is Direction.FORWARD:
-                        forward_selected.append(n)
+                for action in remaining[:leftover_budget]:
+                    node, nutrient_driven = action
+                    growth_direction = (
+                        Direction.FORWARD
+                        if (not nutrient_driven and node.direction is Direction.FORWARD)
+                        or (nutrient_driven and node.direction is Direction.BACKWARD)
+                        else Direction.BACKWARD
+                    )
+                    if growth_direction is Direction.FORWARD:
+                        forward_selected.append(action)
                     else:
-                        backward_selected.append(n)
+                        backward_selected.append(action)
 
         if forward_selected:
-            self._expand_batch_hot_loop(forward_selected, self._direction_hot_loop_depth(Direction.FORWARD))
+            ordinary = [n for n, nutrient in forward_selected if not nutrient]
+            stressed = [n for n, nutrient in forward_selected if nutrient]
+            if ordinary:
+                self._expand_batch_hot_loop(
+                    ordinary, self._direction_hot_loop_depth(Direction.FORWARD)
+                )
+            for node in stressed:
+                self._expand_nutrient_hot_loop(node, Direction.FORWARD)
         if backward_selected:
-            self._expand_batch_hot_loop(backward_selected, self._direction_hot_loop_depth(Direction.BACKWARD))
+            ordinary = [n for n, nutrient in backward_selected if not nutrient]
+            stressed = [n for n, nutrient in backward_selected if nutrient]
+            if ordinary:
+                self._expand_batch_hot_loop(
+                    ordinary, self._direction_hot_loop_depth(Direction.BACKWARD)
+                )
+            for node in stressed:
+                self._expand_nutrient_hot_loop(node, Direction.BACKWARD)
 
+    def _expand_nutrient_hot_loop(
+        self, source: FluxNode, growth_direction: Direction
+    ) -> None:
+        """Grow one configured sprout or air root from any needy node.
+
+        Forward cross-growth from backward tissue is a sprout; backward
+        cross-growth from forward tissue is an air root. Their width/depth
+        controls are deliberately separate from ordinary forward/backward
+        beam controls. Every round grows from exactly the nodes committed by
+        the previous round, so width**depth is explicit configuration rather
+        than an accidental multiplication by the model's ordinary beam.
+        """
+        if growth_direction is Direction.FORWARD:
+            width = max(1, int(self.config.sprout_branch_factor))
+            depth = max(1, int(self.config.sprout_hot_loop_depth))
+        else:
+            width = max(1, int(self.config.air_root_branch_factor))
+            depth = max(1, int(self.config.air_root_hot_loop_depth))
+
+        frontier = [source]
+        for _ in range(depth):
+            next_frontier = []
+            for node in frontier:
+                first_new_id = self._next_id
+                if growth_direction is Direction.FORWARD:
+                    self._expand_forward(node.id, branch_limit=width)
+                else:
+                    self._expand_backward(node.id, branch_limit=width)
+                next_frontier.extend(
+                    self.nodes[node_id]
+                    for node_id in range(first_new_id, self._next_id)
+                    if node_id in self.nodes and not self.nodes[node_id].burned
+                )
+            frontier = next_frontier
+            if not frontier:
+                break
     def _expand_batch_hot_loop(self, nodes: List[FluxNode], depth: int) -> None:
         """Run _expand_batch repeatedly, feeding each round's brand-new
         children back in as the next round's targets -- a real, honest
@@ -1983,9 +3497,17 @@ class FluxGraph:
         """
         cfg = self.config
         frontier = nodes
-        for _ in range(max(1, depth)):
+        rounds = max(1, depth)
+        for round_index in range(rounds):
             if not frontier:
                 return
+            self._emit_status(
+                "expanding",
+                f"hot-loop round {round_index + 1}; {len(frontier)} growth fronts",
+                round_index + 1,
+                rounds,
+                frontier_nodes=len(frontier),
+            )
             for node in frontier:
                 node.expanded = True
             before = set(self.nodes.keys())
@@ -2019,38 +3541,115 @@ class FluxGraph:
                 self._burn(node_id)
 
     def _burn(self, node_id: int) -> None:
-        """Burn ``node_id`` and, if it had any, its whole live subtree.
+        """Burn one node, then reap every live component cut off from seed.
 
-        A burned internal node's live children can't be left dangling:
-        _update_pressures excludes burned nodes from ``previous`` entirely,
-        so a descendant whose parent just burned would lose its only
-        conduit back to the anchor's pressure network on the very next
-        sweep, and path_tokens/best_leaf would still be free to walk into
-        a node no longer actually connected to anything live. Cascading
-        the burn is the coherent version of "a starved branch withers" --
-        the whole thing goes at once, not just its current tip -- rather
-        than leaving orphaned nodes alive-but-disconnected until each one
-        separately starves its own way down to a leaf over further ticks.
+        Connectivity is undirected here on purpose. Causal ownership always
+        runs backward->forward, but heart access runs through the physical
+        graph in either direction. A causal-child cascade therefore reaped
+        the correct side of a forward branch while leaving farther-back
+        causal parents orphaned on a backward branch. Reachability from the
+        active seed is the direction-independent definition we actually need.
         """
-        stack = [node_id]
-        newly_burned: List[int] = []
-        while stack:
-            cur_id = stack.pop()
+        if node_id not in self.nodes or self.nodes[node_id].burned:
+            return
+
+        def detach(cur_id: int) -> None:
             cur = self.nodes[cur_id]
-            if cur.burned:
-                continue
+            for parent_id in list(cur.parent_ids):
+                parent = self.nodes.get(parent_id)
+                if parent is not None and cur_id in parent.children_ids:
+                    parent.children_ids.remove(cur_id)
+            for child_id in list(cur.children_ids):
+                child = self.nodes.get(child_id)
+                if child is None:
+                    continue
+                child.parent_ids = [pid for pid in child.parent_ids if pid != cur_id]
+                if child.parent_id == cur_id:
+                    child.parent_id = child.parent_ids[0] if child.parent_ids else None
+            cur.parent_ids = []
+            cur.parent_id = None
+            cur.children_ids = []
+
+        def mark_burned(cur_id: int) -> None:
+            cur = self.nodes[cur_id]
             cur.burned = True
-            newly_burned.append(cur_id)
+            if cur.solvent:
+                self.bath["solvent"] = self.bath.get("solvent", 0.0) + cur.solvent
+                cur.solvent = 0.0
+            for name, amount in cur.solubles.items():
+                if amount:
+                    self.bath[name] = self.bath.get(name, 0.0) + amount
+            cur.solubles = {}
             if self.config.verbose:
                 print(f"  [burn] node {cur_id} (tokens={cur.tokens}, dir={cur.direction}) starved out")
-            stack.extend(self._live_children(cur_id))
-        node = self.nodes[node_id]
-        if node.parent_id is not None:
-            parent = self.nodes[node.parent_id]
-            if node_id in parent.children_ids:
-                parent.children_ids.remove(node_id)
-        if newly_burned:
-            self._prune_traversals_touching(newly_burned)
+            detach(cur_id)
+
+        mark_burned(node_id)
+
+        reachable: "set[int]" = set()
+        if (
+            self.anchor_id in self.nodes
+            and not self.nodes[self.anchor_id].burned
+        ):
+            stack = [self.anchor_id]
+            while stack:
+                cur_id = stack.pop()
+                if cur_id in reachable:
+                    continue
+                reachable.add(cur_id)
+                stack.extend(
+                    neighbor_id for neighbor_id in self._neighbors(cur_id)
+                    if neighbor_id not in reachable
+                )
+
+        orphaned = [
+            nid for nid, node in self.nodes.items()
+            if not node.burned and nid not in reachable
+        ]
+        for orphan_id in orphaned:
+            mark_burned(orphan_id)
+
+        newly_burned = [node_id] + orphaned
+        self._prune_traversals_touching(newly_burned)
+        burned_set = set(newly_burned)
+        for edge_key in [
+            key for key in self.edges
+            if key[0] in burned_set or key[1] in burned_set
+        ]:
+            self.edges.pop(edge_key, None)
+        self._rehome_nodes_from_dead_centers(burned_set)
+
+    def _rehome_nodes_from_dead_centers(self, burned_ids: "set[int]") -> None:
+        """Attach surviving nodes from a dead center to a reachable live center."""
+        affected = [
+            node for node in self.nodes.values()
+            if not node.burned and node.center_id in burned_ids
+        ]
+        if not affected:
+            return
+        live_centers = {
+            nid for nid, node in self.nodes.items()
+            if not node.burned
+            and (nid == self.anchor_id or node.center_id == nid)
+        }
+        if not live_centers:
+            return
+        for node in affected:
+            queue = [node.id]
+            seen = {node.id}
+            replacement = None
+            while queue and replacement is None:
+                next_queue: List[int] = []
+                for cur_id in queue:
+                    if cur_id in live_centers:
+                        replacement = cur_id
+                        break
+                    for neighbor_id in self._neighbors(cur_id):
+                        if neighbor_id not in seen:
+                            seen.add(neighbor_id)
+                            next_queue.append(neighbor_id)
+                queue = next_queue
+            node.center_id = replacement if replacement is not None else self.anchor_id
 
     def _prune_traversals_touching(self, burned_ids: List[int]) -> None:
         """Drop every cached Traversal whose start or end just burned.
@@ -2070,17 +3669,24 @@ class FluxGraph:
         nodes" instead of "cumulative pairs across the whole session."
         """
         burned_set = set(burned_ids)
-        dead_keys = {key for key in self.traversals if key[0] in burned_set or key[1] in burned_set}
+        dead_keys = {
+            key for key, traversal in self.traversals.items()
+            if any(nid in burned_set for nid in traversal.node_ids)
+        }
+        self._drop_traversals(dead_keys)
+
+    def _drop_traversals(self, dead_keys: "set[Tuple[int, ...]]") -> None:
+        """Remove a set of traversals and strip their SubEdges from every
+        real Edge's hull. Each traversal's own two SubEdges (see
+        _record_traversal) sit in every Edge along its old path -- same
+        unbounded-growth risk as self.traversals itself, so they go too."""
+        if not dead_keys:
+            return
         for key in dead_keys:
-            del self.traversals[key]
-        # Each of those traversals' own two SubEdges (see _record_traversal)
-        # are sitting in every real Edge's subedges list along its old
-        # path -- same unbounded-growth risk as self.traversals itself,
-        # so they go too.
-        if dead_keys:
-            for edge in self.edges.values():
-                if edge.subedges:
-                    edge.subedges = [s for s in edge.subedges if s.traversal_key not in dead_keys]
+            self.traversals.pop(key, None)
+        for edge in self.edges.values():
+            if edge.subedges:
+                edge.subedges = [s for s in edge.subedges if s.traversal_key not in dead_keys]
 
     def evaluator(self) -> Dict[Tuple[int, int], Traversal]:
         """Every causal path recorded so far -- see Traversal's own
@@ -2138,13 +3744,31 @@ class FluxGraph:
         a second OOM after the fallback already ran) is a genuine error
         and propagates.
         """
+        set_tracking = getattr(
+            self.model_wrapper, "set_gradient_tracking", None
+        )
+        previous_tracking = getattr(
+            self.model_wrapper, "track_gradients", False
+        )
+
+        def invoke():
+            if callable(set_tracking):
+                set_tracking(
+                    self.config.physiology_track_model_gradients
+                )
+            try:
+                return fn()
+            finally:
+                if callable(set_tracking):
+                    set_tracking(previous_tracking)
+
         try:
-            return fn()
+            return invoke()
         except RuntimeError as e:
             if not _is_oom_error(e):
                 raise
             self._fallback_to_cpu()
-            return fn()
+            return invoke()
 
     def _repeated_ngram_tokens(self, context: List[int], side: str) -> set:
         """Token ids that would recreate an n-gram already present in ``context``.
@@ -2294,7 +3918,16 @@ class FluxGraph:
 
         vocab_size = self.backward_scorer.tokenizer.vocab_size
         all_row_lens = [len(r) for r in rows]
-        for start, end in self._plan_expand_chunks(all_row_lens, vocab_size):
+        chunks = self._plan_expand_chunks(all_row_lens, vocab_size)
+        for chunk_index, (start, end) in enumerate(chunks):
+            self._emit_status(
+                "model_inference",
+                f"scoring rows {start + 1}-{end} of {len(rows)}",
+                chunk_index + 1,
+                len(chunks),
+                rows_complete=start,
+                rows_total=len(rows),
+            )
             chunk_rows = rows[start:end]
             chunk_kind = row_kind[start:end]
             chunk_node = row_node[start:end]
@@ -2369,7 +4002,7 @@ class FluxGraph:
             # unmodified original showed that call makes no measurable
             # difference to a real OOM this workload can hit at large
             # candidate-pool/context sizes.
-            del logits, log_probs, outputs, batch_tokens, attention_mask
+            del logits, log_probs, outputs, batch_tokens
 
         poetic = self.config.poetic_attractor
         word_trie = self.config.word_trie
@@ -2570,7 +4203,7 @@ class FluxGraph:
 
             # See implicit_backpath.py's _score_batch for why this
             # deliberately skips torch.cuda.empty_cache().
-            del logits, log_probs, outputs, batch_tokens, attention_mask
+            del logits, log_probs, outputs, batch_tokens
 
             new_beams.sort(key=lambda b: b["sum"] / len(b["tokens"]), reverse=True)
             beams = new_beams[:branch_factor]
@@ -2792,7 +4425,9 @@ class FluxGraph:
         self.nodes[self.anchor_id].expanded = True
         self._publish_snapshot()
 
-    def _expand_forward(self, node_id: int) -> None:
+    def _expand_forward(
+        self, node_id: int, branch_limit: Optional[int] = None
+    ) -> None:
         prefix_tokens, _ = self.path_tokens(node_id)
         full = self._context_window(self.anchor_tokens + prefix_tokens)
 
@@ -2812,11 +4447,18 @@ class FluxGraph:
         if blocked:
             last_logits[0, list(blocked)] = float("-inf")
 
-        scores, indices = self.choice_policy.choose(last_logits, k=self._direction_branch_factor(Direction.FORWARD))
+        branch_factor = (
+            self._direction_branch_factor(Direction.FORWARD)
+            if branch_limit is None
+            else max(1, int(branch_limit))
+        )
+        scores, indices = self.choice_policy.choose(last_logits, k=branch_factor)
         spans = [[i] for i in indices.tolist()[0]]
         self._attach_children(node_id, Direction.FORWARD, scores.tolist()[0], spans)
 
-    def _expand_backward(self, node_id: int) -> None:
+    def _expand_backward(
+        self, node_id: int, branch_limit: Optional[int] = None
+    ) -> None:
         prefix_tokens, _ = self.path_tokens(node_id)  # tokens between anchor and node_id
         fwd_leaf = self.best_leaf(Direction.FORWARD)
         fwd_tokens = self.path_tokens(fwd_leaf)[0] if fwd_leaf is not None else []
@@ -2853,68 +4495,114 @@ class FluxGraph:
         # so backward nodes are judged on the same scale as forward ones
         # instead of getting mechanically starved as the graph grows.
         raw_scores = raw_scores / max(len(suffix), 1)
-        top_scores, top_idx = AbstractTensor.topk(raw_scores, k=self._direction_branch_factor(Direction.BACKWARD), dim=0)
+        branch_factor = (
+            self._direction_branch_factor(Direction.BACKWARD)
+            if branch_limit is None
+            else max(1, int(branch_limit))
+        )
+        top_scores, top_idx = AbstractTensor.topk(
+            raw_scores, k=branch_factor, dim=0
+        )
         candidate_spans = [[int(pool[i].item())] for i in top_idx.tolist()]
         self._attach_children(node_id, Direction.BACKWARD, top_scores.tolist(), candidate_spans)
 
     def _attach_children(
         self, parent_id: int, direction: Direction, scores: List[float], token_spans: List[List[int]]
     ) -> None:
-        parent = self.nodes[parent_id]
+        """Attach model growth under the one global causal ownership rule.
+
+        Forward growth creates children. Backward growth creates parents;
+        the historical method name remains as a compatibility entry point
+        for callers while the topology no longer mislabels prefix growth.
+        """
+        if direction is Direction.BACKWARD:
+            self._attach_backward_parents(parent_id, scores, token_spans)
+        else:
+            self._attach_forward_children(parent_id, scores, token_spans)
+
+    def _growth_pressure(self, token_key: Tuple[int, ...], score: float, live_token_spans) -> float:
         cfg = self.config
-        # Every node created here that shares a token span with one
-        # already live elsewhere in the graph spawns with zero pressure
-        # instead of the usual found_bonus+exp(score) claim -- its
-        # "volume" is already occupied. Seeded from what's live *before*
-        # this batch, then grown as siblings are added, so two duplicate
-        # candidates attached in the very same call also see each other,
-        # not just pre-existing nodes. Ongoing division by group size
-        # (see _update_pressures) is what keeps weakening every instance
-        # as redundancy grows beyond this one tick's formation.
-        live_token_spans = None
-        if cfg.shared_token_pressure_enabled:
-            live_token_spans = {tuple(n.tokens) for n in self.nodes.values() if not n.burned and n.tokens}
+        if live_token_spans is not None and token_key in live_token_spans:
+            return 0.0
+        return cfg.found_bonus + math.exp(float(score))
+
+    def _live_token_spans(self):
+        if not self.config.shared_token_pressure_enabled:
+            return None
+        return {tuple(n.tokens) for n in self.nodes.values() if not n.burned and n.tokens}
+
+    def _new_growth_node(
+        self,
+        source: FluxNode,
+        level: int,
+        score: float,
+        tokens: List[int],
+        live_token_spans,
+    ) -> FluxNode:
+        node_id = self._alloc_id()
+        token_key = tuple(int(t) for t in tokens)
+        direction = self._direction_for_level(level)
+        center_id = node_id if level == 0 else source.center_id
+        cumulative = source.cumulative_evidence + float(score)
+        depth = abs(level)
+        node = FluxNode(
+            id=node_id,
+            tokens=list(token_key),
+            direction=direction,
+            parent_id=None,
+            parent_ids=[],
+            depth=depth,
+            level=level,
+            center_id=center_id,
+            local_evidence=float(score),
+            pressure=self._growth_pressure(token_key, score, live_token_spans),
+            created_tick=self.tick_count,
+            cumulative_evidence=cumulative,
+            rollup_mean=cumulative / max(depth, 1),
+        )
+        self.nodes[node_id] = node
+        if level == 0 and node_id != self.anchor_id:
+            self._configure_seed_heart(f"net:{node_id}", node_id, initially_full=False)
+        if live_token_spans is not None:
+            live_token_spans.add(token_key)
+        return node
+
+    def _record_growth_edge(
+        self, parent_id: int, child_id: int, grown_node: FluxNode, formation: str
+    ) -> None:
+        self._connect(parent_id, child_id)
+        base = grown_node.local_value
+        self.edges[(parent_id, child_id)] = Edge(
+            from_id=parent_id,
+            to_id=child_id,
+            forward=Channel(conductance=base),
+            reverse=Channel(conductance=base * self.config.return_conductance_scale),
+            formation=formation,
+            seed_id_at_formation=self.anchor_id,
+            created_tick=self.tick_count,
+        )
+
+    def _attach_forward_children(
+        self, source_id: int, scores: List[float], token_spans: List[List[int]]
+    ) -> None:
+        source = self.nodes[source_id]
+        live_token_spans = self._live_token_spans()
         for score, tokens in zip(scores, token_spans):
-            child_id = self._alloc_id()
-            cumulative = parent.cumulative_evidence + float(score)
-            new_depth = parent.depth + 1
-            token_key = tuple(int(t) for t in tokens)
-            if live_token_spans is not None and token_key in live_token_spans:
-                pressure = 0.0
-            else:
-                pressure = cfg.found_bonus + math.exp(float(score))
-            self.nodes[child_id] = FluxNode(
-                id=child_id,
-                tokens=list(token_key),
-                direction=direction,
-                parent_id=parent_id,
-                depth=new_depth,
-                local_evidence=float(score),
-                pressure=pressure,
-                created_tick=self.tick_count,
-                cumulative_evidence=cumulative,
-                rollup_mean=cumulative / new_depth,
+            child = self._new_growth_node(
+                source, int(source.level or 0) + 1, score, tokens, live_token_spans
             )
-            parent.children_ids.append(child_id)
-            if live_token_spans is not None:
-                live_token_spans.add(token_key)
-            # Phase 1 edge scaffold -- see Edge's own docstring. forward/
-            # reverse conductance mirror _directional_conductance exactly
-            # (so return_conductance_scale's real delivery/return
-            # asymmetry shows up here too, not just the symmetric base
-            # _edge_conductance value), captured once at creation as a
-            # real object; formation/seed_id_at_formation are permanent,
-            # independent of anything a later re-root does to this node's
-            # own .direction/.depth.
-            self.edges[(parent_id, child_id)] = Edge(
-                from_id=parent_id,
-                to_id=child_id,
-                forward=Channel(conductance=self._directional_conductance(child_id, parent_id)),
-                reverse=Channel(conductance=self._directional_conductance(parent_id, child_id)),
-                formation="postfix_beam" if direction is Direction.FORWARD else "prefix_beam",
-                seed_id_at_formation=self.anchor_id,
-                created_tick=self.tick_count,
+            self._record_growth_edge(source_id, child.id, child, "postfix_beam")
+
+    def _attach_backward_parents(
+        self, source_id: int, scores: List[float], token_spans: List[List[int]]
+    ) -> None:
+        source = self.nodes[source_id]
+        live_token_spans = self._live_token_spans()
+        for score, tokens in zip(scores, token_spans):
+            parent = self._new_growth_node(
+                source, int(source.level or 0) - 1, score, tokens, live_token_spans
             )
+            self._record_growth_edge(parent.id, source_id, parent, "prefix_beam")
 
     def _run_graph_auditor(self) -> None:
         """Enumerate every causal path among currently-live nodes -- every
@@ -2937,18 +4625,40 @@ class FluxGraph:
         evidence along its real path. Real new scoring only ever happens
         when a node is first created (_attach_children) -- this is pure
         bookkeeping on top of that, not a second scoring pass.
+
+        Goes everywhere: the walk up follows the whole real parent chain
+        regardless of region. Traversals may span a cousin boundary, and
+        that's deliberately allowed -- a cousin heart cross-linking into
+        another region is something the system is meant to be robust to,
+        not something the auditor forbids. Every heart simply works on
+        whatever supply actually reaches its own pump node.
         """
         live_ids = [nid for nid, n in self.nodes.items() if not n.burned]
         live_set = set(live_ids)
-        for end_id in live_ids:
-            cur_id = self.nodes[end_id].parent_id
-            while cur_id is not None and cur_id in live_set:
-                key = (cur_id, end_id)
-                if key not in self.traversals:
-                    self._record_traversal(cur_id, end_id)
-                cur_id = self.nodes[cur_id].parent_id
+        total = len(live_ids)
+        for end_index, end_id in enumerate(live_ids):
+            if end_index == 0 or end_index + 1 == total or end_index % max(1, total // 25) == 0:
+                self._emit_status(
+                    "auditing",
+                    f"{len(self.traversals)} traversals recorded",
+                    end_index + 1,
+                    total,
+                    traversals=len(self.traversals),
+                )
+            # Stack entries are paths in reverse causal order: end..ancestor.
+            stack = [([end_id], parent_id) for parent_id in self._live_parents(end_id)]
+            while stack:
+                reverse_path, cur_id = stack.pop()
+                if cur_id not in live_set or cur_id in reverse_path:
+                    continue
+                extended = reverse_path + [cur_id]
+                node_ids = list(reversed(extended))
+                self._record_traversal_path(node_ids)
+                for parent_id in self._live_parents(cur_id):
+                    stack.append((extended, parent_id))
 
     def _record_traversal(self, start_id: int, end_id: int) -> None:
+        """Compatibility helper: record the primary causal route."""
         node_ids: List[int] = []
         cur_id = end_id
         while cur_id != start_id:
@@ -2956,23 +4666,39 @@ class FluxGraph:
             cur_id = self.nodes[cur_id].parent_id
         node_ids.append(start_id)
         node_ids.reverse()  # start -> end, tree order along the real chain
+        self._record_traversal_path(node_ids)
 
-        start = self.nodes[start_id]
-        end = self.nodes[end_id]
-        hops = end.depth - start.depth
-        mean_score = (end.cumulative_evidence - start.cumulative_evidence) / hops if hops else 0.0
+    def _record_traversal_path(self, node_ids: List[int]) -> None:
+        start_id, end_id = node_ids[0], node_ids[-1]
+        endpoint_key: Tuple[int, ...] = (start_id, end_id)
+        existing = self.traversals.get(endpoint_key)
+        if existing is not None and existing.node_ids == node_ids:
+            return
+        key = endpoint_key if existing is None else tuple(node_ids)
+        if key in self.traversals:
+            return
+
+        scores = []
+        for a, b in zip(node_ids, node_ids[1:]):
+            edge = self.edges.get((a, b))
+            if edge is None:
+                scores.append(self.nodes[b].local_evidence)
+            else:
+                token_id = a if edge.formation == "prefix_beam" else b
+                scores.append(self.nodes[token_id].local_evidence)
+        mean_score = sum(scores) / len(scores) if scores else 0.0
 
         # Every Traversal adds two SubEdges -- one going one way, one
         # going the other -- held by every real Edge its path crosses.
-        forward_sub = SubEdge(traversal_key=(start_id, end_id), direction="forward")
-        reverse_sub = SubEdge(traversal_key=(start_id, end_id), direction="reverse")
+        forward_sub = SubEdge(traversal_key=key, direction="forward")
+        reverse_sub = SubEdge(traversal_key=key, direction="reverse")
         for a, b in zip(node_ids, node_ids[1:]):
             edge = self.edges.get((a, b))
             if edge is not None:
                 edge.subedges.append(forward_sub)
                 edge.subedges.append(reverse_sub)
 
-        self.traversals[(start_id, end_id)] = Traversal(
+        self.traversals[key] = Traversal(
             start_id=start_id,
             end_id=end_id,
             node_ids=node_ids,
@@ -3020,7 +4746,9 @@ class FluxGraph:
         """
         pressure_diff = src.pressure - dst.pressure
         volume_diff = src.volume - dst.volume
-        return sub.constriction * max(0.0, pressure_diff + volume_diff)
+        return self._learned_subedge_opening(sub) * max(
+            0.0, pressure_diff + volume_diff
+        )
 
     def _drain_mixture(self, node: FluxNode, amount: float) -> Dict[str, float]:
         """Remove ``amount`` of solution from node and return the removed
@@ -3057,11 +4785,13 @@ class FluxGraph:
             else:
                 node.solubles[name] = node.solubles.get(name, 0.0) + amount
 
-    def _move_volume(self, src: FluxNode, dst: FluxNode, amount: float) -> None:
+    def _move_volume(self, src: FluxNode, dst: FluxNode, amount: float) -> Dict[str, float]:
         """Move ``amount`` of solution from src to dst -- solvent and
         solubles together, in their current proportions; transport
         carries the mixture, it doesn't convert anything."""
-        self._deposit_mixture(dst, self._drain_mixture(src, amount))
+        mixture = self._drain_mixture(src, amount)
+        self._deposit_mixture(dst, mixture)
+        return mixture
 
     def _node_slice(self, nid: int, node: FluxNode, network_roots: Dict[int, int]) -> Optional[Tuple[str, str]]:
         """(own slice, opposite slice) for a node -- "<group>:<direction>"
@@ -3086,22 +4816,14 @@ class FluxGraph:
         return float(fn(radius)) if fn is not None else 0.0
 
     def _exchange_humidity(self) -> None:
-        """Every node's default-on exchange with its slice's ambient
-        humidity field: humidity outside, solvent once transformed inside
-        the node. Exchange follows the differential between the ambient
-        humidity at the node's own radius and the solvent it already
-        holds, scaled by the node's own humidity_exchange openness --
-        intake when the air is wetter than the node, outward (back to the
-        field, which is ambient and doesn't accumulate) when the node is
-        wetter than the air.
+        """Exchange solvent and dissolved ambient materials through pores.
 
-        Dissolved solubles add real osmotic pull: concentration (the
-        solutes' share of the node's total volume, 0..1 -- same scale as
-        humidity, so no arbitrary coefficient) enters the differential on
-        the intake side, exactly the way solutes lower water potential in
-        the physical version. A solute-rich node draws harder on ambient
-        humidity and equilibrates wetter than ambient; a solute-free node
-        equalizes to ambient exactly as before.
+        ``humidity`` remains the ambient water amount. Every other scalar
+        field in the slice is a dissolved ambient material. Their total
+        osmoles lower ambient water activity; node-local osmoles increase
+        its solvent target. Material fields themselves diffuse toward
+        their ambient values through material-specific pores, so humidity
+        can carry ions rather than merely changing a scalar water term.
 
         When the heart's pressure is low (anchor pressure below
         starvation_floor, the codebase's existing definition of "low
@@ -3125,17 +4847,44 @@ class FluxGraph:
             if slices is None:
                 continue
             own_slice, _ = slices
-            root = network_roots.get(nid)
-            radius = node.depth if root is None else node.depth - self.nodes[root].depth
-            ambient = self._field_value(own_slice, "humidity", float(radius))
-            total = node.volume
-            concentration = sum(node.solubles.values()) / total if total > 0.0 else 0.0
-            flow = node.humidity_exchange * (ambient - node.solvent + concentration)
+            center_id = node.center_id if node.center_id in self.nodes else self.anchor_id
+            center_level = self.nodes[center_id].level or 0
+            radius = abs((node.level or 0) - center_level)
+            field_names = set(self.config.scalar_fields)
+            field_names.update(self.config.slice_scalar_fields.get(own_slice, {}))
+            ambient_humidity = max(
+                0.0, self._field_value(own_slice, "humidity", float(radius))
+            )
+            ambient_solutes = {
+                name: max(0.0, self._field_value(own_slice, name, float(radius)))
+                for name in field_names
+                if name != "humidity"
+            }
+            ambient_osmoles = sum(ambient_solutes.values())
+            ambient_activity = (
+                ambient_humidity / (ambient_humidity + ambient_osmoles)
+                if ambient_humidity + ambient_osmoles > 0.0 else 0.0
+            )
+            node_osmoles = sum(max(0.0, amount) for amount in node.solubles.values())
+            target_solvent = ambient_humidity + node_osmoles * ambient_activity
+            shell = self._learned_node_permeability(node, "solvent")
+            flow = node.humidity_exchange * shell * (target_solvent - node.solvent)
             if heart_low:
                 flow = max(0.0, flow)
             elif heart_high:
                 flow = min(0.0, flow)
-            node.solvent += flow
+            node.solvent = max(0.0, node.solvent + flow)
+
+            for name, ambient_amount in ambient_solutes.items():
+                permeability = self._learned_node_permeability(node, name)
+                delta = (
+                    node.humidity_exchange
+                    * permeability
+                    * (ambient_amount - node.solubles.get(name, 0.0))
+                )
+                node.solubles[name] = max(
+                    0.0, node.solubles.get(name, 0.0) + delta
+                )
 
     def _ingest_from_rings(self) -> None:
         """Ring dispensing: each pie slice's ring hands its own unique
@@ -3178,7 +4927,7 @@ class FluxGraph:
             node.solubles[opposite_name] = opposite_held - amount
             node.solubles[own_name] = node.solubles.get(own_name, 0.0) + amount
 
-    def _transport_subedges(self) -> None:
+    def _transport_subedges_scalar(self) -> None:
         """One pass of volume transport through every traversal's subedges.
 
         Iterates traversals, not edges: a subedge is only open at its own
@@ -3188,49 +4937,784 @@ class FluxGraph:
         not the right iteration path, and walking it would see each
         subedge once per real edge it crosses instead of once overall.
 
-        Skips any subedge open at the anchor -- those are the four-chamber
-        pump's job (_pump_anchor), not ordinary node-to-node transport;
-        the anchor's own volume is never touched by a regular subedge.
+        Skips any traversal that touches a region's pump node (the anchor
+        or a cousin network's root) -- those are that region heart's job
+        (_pump_hearts), not ordinary node-to-node transport; a pump node's
+        own volume is never touched by a regular subedge.
         """
-        anchor_id = self.anchor_id
-        for traversal in self.traversals.values():
+        self._reset_edge_flow()
+        network_roots = self.orthogonal_network_roots()
+        pump_ids = set(self._region_pump_nodes(network_roots).values())
+        traversals = list(self.traversals.values())
+        total = len(traversals)
+        for traversal_index, traversal in enumerate(traversals):
+            if traversal_index == 0 or traversal_index + 1 == total or traversal_index % max(1, total // 25) == 0:
+                self._emit_status(
+                    "transport",
+                    "moving traversal fluid",
+                    traversal_index + 1,
+                    total,
+                )
             start_id, end_id = traversal.start_id, traversal.end_id
-            if anchor_id in (start_id, end_id):
+            if start_id in pump_ids or end_id in pump_ids:
                 continue
             start = self.nodes.get(start_id)
             end = self.nodes.get(end_id)
             if start is None or end is None or start.burned or end.burned:
                 continue
+            # Named ions diffuse down their own concentration gradients in
+            # addition to riding whatever bulk solution pressure moves. Plan
+            # both directions from one pre-transfer snapshot so two ions can
+            # counterflow without sequential-order oscillation.
+            osmotic_forward, osmotic_reverse = self._osmotic_ion_transfer(
+                start, end, traversal.subedges
+            )
+            if osmotic_forward:
+                self._record_edge_flow(
+                    traversal.node_ids,
+                    downward=True,
+                    amount=0.0,
+                    mixture=osmotic_forward,
+                )
+            if osmotic_reverse:
+                self._record_edge_flow(
+                    traversal.node_ids,
+                    downward=False,
+                    amount=0.0,
+                    mixture=osmotic_reverse,
+                )
             for sub in traversal.subedges:
                 if not (sub.is_open_at(start_id) and sub.is_open_at(end_id)):
                     continue
                 src, dst = (start, end) if sub.direction == "forward" else (end, start)
                 flow = self._subedge_flow_amount(sub, src, dst)
                 if flow > 0.0:
-                    self._move_volume(src, dst, flow)
+                    mixture = self._move_volume(src, dst, flow)
+                    # Same fluid crosses every edge on the path: stamp each
+                    # one, signed + when flow runs parent->child (start is
+                    # the shallower endpoint, so a forward subedge whose src
+                    # is start pushes downward).
+                    self._record_edge_flow(
+                        traversal.node_ids, downward=(src is start), amount=flow, mixture=mixture
+                    )
 
-    def _pump_anchor(self) -> None:
-        """One beat of the heart (see Heart): sort every anchor-open
-        subedge into its slice's in- or out-chamber routes, measure all
-        intake from the same pre-beat snapshot, land it in the
-        in-chambers, then let the current script phase's valves,
-        contractions, and osmotic rebalancing decide what actually moves
-        and where it exits. The anchor node's own solubles are never
-        touched -- the heart's chambers hold, the anchor doesn't.
+    def _transport_subedges(self) -> None:
+        """Move all non-pump traversal fluid in two batched tensor passes.
+
+        Ion diffusion is planned from one endpoint snapshot and reduced by
+        source node/species before it is applied.  Bulk solution transport is
+        then planned from the post-osmosis snapshot and reduced by source
+        node.  The reductions prevent the many overlapping traversals from
+        overdrawing a shared endpoint without making transport depend on
+        Python traversal order.
+
+        Python is used only to marshal the graph's sparse dictionaries into a
+        dense node/component matrix and to publish the reduced result back to
+        the object model.  Pressure/volume differences, per-ion equilibrium,
+        availability limiting, mixture movement, and path-flow accumulation
+        are tensor operations.
         """
-        anchor_id = self.anchor_id
+        if torch is None:
+            self._transport_subedges_scalar()
+            return
+
+        self._reset_edge_flow()
         network_roots = self.orthogonal_network_roots()
+        pump_ids = set(self._region_pump_nodes(network_roots).values())
+        live_nodes = [node for node in self.nodes.values() if not node.burned]
+        node_index = {node.id: index for index, node in enumerate(live_nodes)}
+        edge_items = list(self.edges.items())
+        edge_index = {key: index for index, (key, _) in enumerate(edge_items)}
+        component_names = ["solvent"] + sorted(
+            {
+                name
+                for node in live_nodes
+                for name, amount in node.solubles.items()
+                if amount != 0.0
+            }
+        )
+        component_index = {
+            name: index for index, name in enumerate(component_names)
+        }
+
+        starts: List[int] = []
+        ends: List[int] = []
+        forward_constrictions: List[float] = []
+        reverse_constrictions: List[float] = []
+        path_edge_indices: List[int] = []
+        path_traversal_indices: List[int] = []
+        accepted_traversals: List[Traversal] = []
+        traversals = list(self.traversals.values())
+        total = len(traversals)
+        for traversal_index, traversal in enumerate(traversals):
+            if (
+                traversal_index == 0
+                or traversal_index + 1 == total
+                or traversal_index % max(1, total // 25) == 0
+            ):
+                self._emit_status(
+                    "transport",
+                    "indexing traversal transport",
+                    traversal_index + 1,
+                    total,
+                )
+            start_id, end_id = traversal.start_id, traversal.end_id
+            if (
+                start_id in pump_ids
+                or end_id in pump_ids
+                or start_id not in node_index
+                or end_id not in node_index
+            ):
+                continue
+            constrictions = {
+                sub.direction: max(0.0, min(1.0, float(sub.constriction)))
+                for sub in traversal.subedges
+                if sub.is_open_at(start_id) and sub.is_open_at(end_id)
+            }
+            if not constrictions:
+                continue
+            batch_index = len(accepted_traversals)
+            accepted_traversals.append(traversal)
+            starts.append(node_index[start_id])
+            ends.append(node_index[end_id])
+            forward_constrictions.append(
+                constrictions.get("forward", 0.0)
+            )
+            reverse_constrictions.append(
+                constrictions.get("reverse", 0.0)
+            )
+            for a, b in zip(traversal.node_ids, traversal.node_ids[1:]):
+                physical_index = edge_index.get((a, b))
+                if physical_index is not None:
+                    path_edge_indices.append(physical_index)
+                    path_traversal_indices.append(batch_index)
+
+        if not accepted_traversals:
+            return
+
+        device = self.device
+        dtype = torch.float32
+        value_rows = []
+        for node in live_nodes:
+            row = [0.0] * len(component_names)
+            row[0] = max(0.0, float(node.solvent))
+            for name, amount in node.solubles.items():
+                column = component_index.get(name)
+                if column is not None:
+                    row[column] = max(0.0, float(amount))
+            value_rows.append(row)
+        values = torch.tensor(value_rows, dtype=dtype, device=device)
+        pressures = torch.tensor(
+            [float(node.pressure) for node in live_nodes],
+            dtype=dtype,
+            device=device,
+        )
+        start_idx = torch.tensor(starts, dtype=torch.long, device=device)
+        end_idx = torch.tensor(ends, dtype=torch.long, device=device)
+        constriction = torch.stack(
+            (
+                torch.tensor(
+                    forward_constrictions, dtype=dtype, device=device
+                ),
+                torch.tensor(
+                    reverse_constrictions, dtype=dtype, device=device
+                ),
+            ),
+            dim=1,
+        )
+        if self.config.physiology_learning_enabled:
+            start_snapshot = values.index_select(0, start_idx)
+            end_snapshot = values.index_select(0, end_idx)
+            archetype_opening = self._subedge_archetype_openings(
+                pressures.index_select(0, start_idx),
+                pressures.index_select(0, end_idx),
+                start_snapshot.sum(dim=1),
+                end_snapshot.sum(dim=1),
+                start_snapshot[:, 0],
+                end_snapshot[:, 0],
+                torch.tensor(
+                    [
+                        traversal.mean_score
+                        for traversal in accepted_traversals
+                    ],
+                    dtype=dtype,
+                    device=device,
+                ),
+            ).detach()
+            gate = constriction * archetype_opening
+        else:
+            gate = constriction
+        forward_gate = gate[:, 0]
+        reverse_gate = gate[:, 1]
+
+        self._emit_status(
+            "transport",
+            "diffusing ions in one tensor batch",
+            1,
+            3,
+        )
+        component_flow = torch.zeros(
+            (len(accepted_traversals), len(component_names)),
+            dtype=dtype,
+            device=device,
+        )
+        if len(component_names) > 1:
+            start_values = values.index_select(0, start_idx)
+            end_values = values.index_select(0, end_idx)
+            start_volume = start_values.sum(dim=1, keepdim=True)
+            end_volume = end_values.sum(dim=1, keepdim=True)
+            total_volume = start_volume + end_volume
+            solute_total = start_values[:, 1:] + end_values[:, 1:]
+            safe_total = total_volume.clamp_min(1e-12)
+            start_target = solute_total * (start_volume / safe_total)
+            excess = start_values[:, 1:] - start_target
+            valid_volume = total_volume > 0.0
+            raw_osmotic = torch.where(
+                excess > 0.0,
+                excess * forward_gate[:, None],
+                (-excess) * reverse_gate[:, None],
+            ) * valid_volume
+            osmotic_source = torch.where(
+                excess > 0.0, start_idx[:, None], end_idx[:, None]
+            ).expand_as(raw_osmotic)
+            osmotic_destination = torch.where(
+                excess > 0.0, end_idx[:, None], start_idx[:, None]
+            ).expand_as(raw_osmotic)
+
+            source_demand = torch.zeros(
+                (len(live_nodes), len(component_names) - 1),
+                dtype=dtype,
+                device=device,
+            )
+            source_demand.scatter_add_(0, osmotic_source, raw_osmotic)
+            available_solutes = values[:, 1:]
+            source_scale = torch.where(
+                source_demand > 0.0,
+                torch.minimum(
+                    torch.ones_like(source_demand),
+                    available_solutes / source_demand.clamp_min(1e-12),
+                ),
+                torch.ones_like(source_demand),
+            )
+            osmotic_moved = raw_osmotic * torch.gather(
+                source_scale, 0, osmotic_source
+            )
+            osmotic_delta = torch.zeros_like(available_solutes)
+            osmotic_delta.scatter_add_(0, osmotic_source, -osmotic_moved)
+            osmotic_delta.scatter_add_(
+                0, osmotic_destination, osmotic_moved
+            )
+            values[:, 1:] += osmotic_delta
+            component_flow[:, 1:] += torch.where(
+                excess > 0.0, osmotic_moved, -osmotic_moved
+            )
+
+        self._emit_status(
+            "transport",
+            "moving bulk solution in one tensor batch",
+            2,
+            3,
+        )
+        start_values = values.index_select(0, start_idx)
+        end_values = values.index_select(0, end_idx)
+        start_volume = start_values.sum(dim=1)
+        end_volume = end_values.sum(dim=1)
+        drive = (
+            pressures.index_select(0, start_idx)
+            - pressures.index_select(0, end_idx)
+            + start_volume
+            - end_volume
+        )
+        forward = drive >= 0.0
+        bulk_source = torch.where(forward, start_idx, end_idx)
+        bulk_destination = torch.where(forward, end_idx, start_idx)
+        bulk_gate = torch.where(forward, forward_gate, reverse_gate)
+        raw_bulk = drive.abs() * bulk_gate
+        source_bulk_demand = torch.zeros(
+            len(live_nodes), dtype=dtype, device=device
+        )
+        source_bulk_demand.index_add_(0, bulk_source, raw_bulk)
+        node_volume = values.sum(dim=1)
+        bulk_scale = torch.where(
+            source_bulk_demand > 0.0,
+            torch.minimum(
+                torch.ones_like(source_bulk_demand),
+                node_volume / source_bulk_demand.clamp_min(1e-12),
+            ),
+            torch.ones_like(source_bulk_demand),
+        )
+        bulk_moved = raw_bulk * bulk_scale.index_select(0, bulk_source)
+        source_values = values.index_select(0, bulk_source)
+        source_volume = source_values.sum(dim=1, keepdim=True)
+        mixture = (
+            source_values
+            / source_volume.clamp_min(1e-12)
+            * bulk_moved[:, None]
+        )
+        mixture *= source_volume > 0.0
+        values.index_add_(0, bulk_source, -mixture)
+        values.index_add_(0, bulk_destination, mixture)
+        direction_sign = torch.where(
+            forward,
+            torch.ones_like(bulk_moved),
+            -torch.ones_like(bulk_moved),
+        )
+        signed_bulk = bulk_moved * direction_sign
+        component_flow += mixture * direction_sign[:, None]
+
+        self._emit_status(
+            "transport",
+            "reducing traversal flow onto physical pipes",
+            3,
+            3,
+        )
+        edge_flow = torch.zeros(len(edge_items), dtype=dtype, device=device)
+        edge_components = torch.zeros(
+            (len(edge_items), len(component_names)),
+            dtype=dtype,
+            device=device,
+        )
+        if path_edge_indices:
+            physical_idx = torch.tensor(
+                path_edge_indices, dtype=torch.long, device=device
+            )
+            traversal_idx = torch.tensor(
+                path_traversal_indices, dtype=torch.long, device=device
+            )
+            edge_flow.index_add_(
+                0, physical_idx, signed_bulk.index_select(0, traversal_idx)
+            )
+            edge_components.index_add_(
+                0,
+                physical_idx,
+                component_flow.index_select(0, traversal_idx),
+            )
+
+        node_rows = values.clamp_min(0.0).detach().cpu().tolist()
+        for node, row in zip(live_nodes, node_rows):
+            node.solvent = row[0]
+            node.solubles = {
+                name: row[column]
+                for column, name in enumerate(component_names[1:], start=1)
+                if row[column] != 0.0
+            }
+        edge_flow_rows = edge_flow.detach().cpu().tolist()
+        edge_component_rows = edge_components.detach().cpu().tolist()
+        for (_, edge), flow, row in zip(
+            edge_items, edge_flow_rows, edge_component_rows
+        ):
+            edge.flow = flow
+            edge.component_flows = {
+                name: row[column]
+                for column, name in enumerate(component_names)
+                if row[column] != 0.0
+            }
+
+    def _osmotic_ion_transfer(
+        self,
+        start: FluxNode,
+        end: FluxNode,
+        subedges: List[SubEdge],
+    ) -> Tuple[Dict[str, float], Dict[str, float]]:
+        """Diffuse every named ion independently between two pipe endpoints.
+
+        Concentrations and target amounts are computed from one snapshot of
+        both endpoint mixtures. The forward/reverse subedge constrictions
+        gate their corresponding direction, while solvent is excluded: it
+        continues to move only as bulk current. Returned mixtures contain
+        component-only flow telemetry for the real edges along the traversal.
+        """
+        start_volume = start.volume
+        end_volume = end.volume
+        total_volume = start_volume + end_volume
+        if total_volume <= 0.0:
+            return {}, {}
+
+        constriction = {
+            sub.direction: self._learned_subedge_opening(sub)
+            for sub in subedges
+            if sub.is_open_at(start.id) and sub.is_open_at(end.id)
+        }
+        forward_gate = constriction.get("forward", 0.0)
+        reverse_gate = constriction.get("reverse", 0.0)
+        forward: Dict[str, float] = {}
+        reverse: Dict[str, float] = {}
+        plans = []
+        for name in set(start.solubles) | set(end.solubles):
+            start_amount = max(0.0, start.solubles.get(name, 0.0))
+            end_amount = max(0.0, end.solubles.get(name, 0.0))
+            target_concentration = (start_amount + end_amount) / total_volume
+            start_target = target_concentration * start_volume
+            if start_amount > start_target and forward_gate > 0.0:
+                moved = min(start_amount, (start_amount - start_target) * forward_gate)
+                if moved > 0.0:
+                    plans.append((name, moved, start, end, forward))
+            elif start_amount < start_target and reverse_gate > 0.0:
+                moved = min(end_amount, (start_target - start_amount) * reverse_gate)
+                if moved > 0.0:
+                    plans.append((name, moved, end, start, reverse))
+
+        for name, moved, source, destination, telemetry in plans:
+            source.solubles[name] = source.solubles.get(name, 0.0) - moved
+            destination.solubles[name] = destination.solubles.get(name, 0.0) + moved
+            telemetry[name] = telemetry.get(name, 0.0) + moved
+        return forward, reverse
+    def _reset_edge_flow(self) -> None:
+        """Zero every edge's flow at the start of the fluid phase, and
+        refresh its pressure drop from the current endpoint pressures --
+        so a pipe with no flow this tick still shows an honest gradient."""
+        for (a, b), edge in self.edges.items():
+            edge.flow = 0.0
+            edge.component_flows.clear()
+            na, nb = self.nodes.get(a), self.nodes.get(b)
+            edge.pressure_drop = (na.pressure - nb.pressure) if na and nb else 0.0
+
+    def _record_edge_flow(
+        self, node_ids: List[int], downward: bool, amount: float,
+        mixture: Optional[Dict[str, float]] = None,
+    ) -> None:
+        """Accumulate signed flow onto every real edge along a path.
+        node_ids is shallow->deep tree order, so consecutive (a, b) is
+        (parent, child) and the stored edge key is (a, b). + means
+        parent->child."""
+        signed = amount if downward else -amount
+        for a, b in zip(node_ids, node_ids[1:]):
+            edge = self.edges.get((a, b))
+            if edge is not None:
+                edge.flow += signed
+                for name, component_amount in (mixture or {}).items():
+                    edge.component_flows[name] = edge.component_flows.get(name, 0.0) + (
+                        component_amount if downward else -component_amount
+                    )
+
+    @staticmethod
+    def _is_forward_ion(name: str) -> bool:
+        return name.endswith(":forward")
+
+    def _permeate_heart_forward_to_background(
+        self, heart: Heart
+    ) -> None:
+        """Exchange forward level-zero chamber solutes with background.
+
+        The interface is permeable in both directions. Forward chambers can
+        seed the environment, while material already outside always retains
+        a route back into live circulation instead of becoming a one-way
+        orphan store.
+        """
+        rate = max(0.0, min(1.0, self.config.level_zero_background_permeability))
+        if rate <= 0.0:
+            return
+        for key, mixture in heart.chambers.items():
+            slice_name = key.rsplit("|", 1)[0]
+            if not slice_name.endswith(":forward"):
+                continue
+            for name in set(mixture) | set(self.background):
+                if name == "solvent":
+                    continue
+                delta = rate * (
+                    mixture.get(name, 0.0) - self.background.get(name, 0.0)
+                )
+                if delta > 0.0:
+                    moved = min(delta, mixture.get(name, 0.0))
+                    mixture[name] = mixture.get(name, 0.0) - moved
+                    self.background[name] = self.background.get(name, 0.0) + moved
+                elif delta < 0.0:
+                    moved = min(-delta, self.background.get(name, 0.0))
+                    self.background[name] = self.background.get(name, 0.0) - moved
+                    mixture[name] = mixture.get(name, 0.0) + moved
+
+    def _permeate_background_into_soil(self) -> None:
+        """Move root-needed forward ions across the reduced soil boundary."""
+        rate = max(0.0, min(1.0, self.config.soil_forward_ion_permeability))
+        if rate <= 0.0:
+            return
+        for name, amount in list(self.background.items()):
+            if not self._is_forward_ion(name) or amount <= 0.0:
+                continue
+            moved = amount * rate
+            self.background[name] = amount - moved
+            self.soil[name] = self.soil.get(name, 0.0) + moved
+
+    def _absorb_soil_by_roots(self) -> None:
+        """Let backward cells passively take their required forward ion."""
+        base_rate = max(0.0, min(1.0, self.config.root_soil_uptake_permeability))
+        if base_rate <= 0.0 or not self.soil:
+            return
+        network_roots = self.orthogonal_network_roots()
+        roots_by_ion: Dict[str, List[Tuple[FluxNode, float]]] = {}
+        for nid, node in self.nodes.items():
+            if node.burned or node.direction is not Direction.BACKWARD:
+                continue
+            slices = self._node_slice(nid, node, network_roots)
+            if slices is None:
+                continue
+            _, needed_ion = slices
+            permeability = self._learned_node_permeability(
+                node, needed_ion
+            )
+            if permeability > 0.0:
+                roots_by_ion.setdefault(needed_ion, []).append((node, permeability))
+
+        for ion_name, roots in roots_by_ion.items():
+            available = self.soil.get(ion_name, 0.0)
+            total_weight = sum(weight for _, weight in roots)
+            if available <= 0.0 or total_weight <= 0.0:
+                continue
+            moved = available * base_rate
+            self.soil[ion_name] = available - moved
+            for node, weight in roots:
+                share = moved * weight / total_weight
+                node.solubles[ion_name] = node.solubles.get(ion_name, 0.0) + share
+
+    @staticmethod
+    def _run_factory_reaction(
+        node: FluxNode,
+        factory: MaterialFactory,
+        mixture: Dict[str, float],
+        throughput: float,
+        waste_sink: Optional[Dict[str, float]] = None,
+    ) -> float:
+        """Run up to ``throughput`` recipe batches in one fluid mixture."""
+        requirements = {
+            name: amount for name, amount in factory.inputs.items() if amount > 0.0
+        }
+        if not requirements or throughput <= 0.0:
+            return 0.0
+        batches = throughput
+        for name, required in requirements.items():
+            available = mixture.get(name, 0.0)
+            batches = min(batches, available / required)
+        if batches <= 0.0:
+            return 0.0
+        for name, required in requirements.items():
+            mixture[name] = mixture.get(name, 0.0) - required * batches
+        for name, produced in factory.outputs.items():
+            amount = produced * batches
+            if name == "auxin":
+                node.factory_auxin += amount
+            else:
+                mixture[name] = mixture.get(name, 0.0) + amount
+        if waste_sink is not None:
+            for name, produced in factory.waste_outputs.items():
+                amount = produced * batches
+                if amount:
+                    waste_sink[name] = waste_sink.get(name, 0.0) + amount
+        return batches
+
+    def _run_node_factories(self) -> None:
+        """Execute configured node roles against circulation and/or CSF."""
+        for node in self.nodes.values():
+            node.factory_auxin = 0.0
+            if node.burned:
+                continue
+            circulation = dict(node.solubles)
+            circulation["solvent"] = node.solvent
+            changed_circulation = False
+            for factory in node.factories:
+                if not factory.enabled or factory.throughput <= 0.0:
+                    continue
+                medium = factory.medium.lower()
+                remaining = factory.throughput
+                if medium in ("circulatory", "both"):
+                    used = self._run_factory_reaction(
+                        node, factory, circulation, remaining, self.bath
+                    )
+                    remaining -= used
+                    changed_circulation = changed_circulation or used > 0.0
+                if medium in ("csf", "both") and remaining > 0.0:
+                    self._run_factory_reaction(
+                        node, factory, self.bath, remaining, self.bath
+                    )
+                elif medium not in ("circulatory", "csf", "both"):
+                    raise ValueError(
+                        f"factory {factory.name!r} has unknown medium {factory.medium!r}"
+                    )
+            if changed_circulation:
+                node.solvent = circulation.pop("solvent", 0.0)
+                node.solubles = {
+                    name: amount for name, amount in circulation.items() if amount
+                }
+
+    def _heart_for(self, region: str) -> Heart:
+        """The Heart for a region, created lazily the first time its
+        network appears. Each new heart gets the configured beat script
+        and the csf_link hook -- the first real consumer of the Heart
+        attachment API: a post-beat, total-scope hook exchanging every
+        chamber with the graph's CSF bath at csf_link_rate, so hearts
+        connect to one another *through* the shared bath rather than
+        directly."""
+        heart = self.hearts.get(region)
+        if heart is None:
+            heart = Heart()
+            heart.set_script(self.config.heart_script)
+            heart.attach("csf_link", when="post", scope="total", fn=self._csf_link_hook)
+            self.hearts[region] = heart
+        self._bind_heart_learning(region, heart)
+        return heart
+
+    def _configure_seed_heart(
+        self, region: str, pump_id: int, initially_full: bool
+    ) -> Heart:
+        """Make ``pump_id`` the owner of one region's seed reservoirs.
+
+        Storage and the moving-window length both follow the represented
+        token count. The original anchor's represented tokens live in
+        anchor_tokens while it is a seed; cousin seeds retain their own
+        token span until promoted.
+        """
+        heart = self._heart_for(region)
+        if heart.seed_owner_id is not None and heart.seed_owner_id != pump_id:
+            self._spill_heart_to_csf(region)
+            heart = self._heart_for(region)
+        represented_tokens = (
+            self.anchor_tokens
+            if pump_id == self.anchor_id
+            else self.nodes[pump_id].tokens
+        )
+        token_count = max(1, len(represented_tokens))
+        heart.configure_seed_reservoirs(
+            owner_id=pump_id,
+            ion_names=[f"{region}:forward", f"{region}:backward"],
+            design_storage=float(token_count),
+            initially_full=initially_full,
+            opening_coverage=self.config.seed_ion_gate_opening_coverage,
+            exchange_probability=self.config.seed_ion_exchange_probability,
+            membrane_permeability=self.config.seed_reservoir_membrane_permeability,
+            window_size=token_count,
+        )
+        return heart
+
+    def _csf_link_hook(self, chambers: Dict[str, Dict[str, float]]) -> None:
+        """Exchange every chamber's contents with the CSF bath toward
+        equalizing concentration, throttled by config.csf_link_rate.
+        Dormant (a no-op) while the rate is 0."""
+        rate = self.config.csf_link_rate
+        if rate <= 0.0:
+            return
+        for mix in chambers.values():
+            names = set(mix) | set(self.bath)
+            for name in names:
+                delta = rate * (mix.get(name, 0.0) - self.bath.get(name, 0.0))
+                if delta == 0.0:
+                    continue
+                mix[name] = mix.get(name, 0.0) - delta
+                self.bath[name] = self.bath.get(name, 0.0) + delta
+
+    def _pump_csf_to_rhizome(self) -> None:
+        """Let only the active seed clean global CSF into one rhizome.
+
+        Cousin hearts all exchange with ``bath`` through their CSF hooks,
+        but none owns or duplicates this store. Re-rooting only updates
+        ``rhizome_owner_id``; every stored amount remains conserved.
+        """
+        self.rhizome_owner_id = self.anchor_id
+        if "main" not in self.hearts or self.hearts["main"].seed_owner_id != self.anchor_id:
+            return
+        rate = max(0.0, min(1.0, self.config.rhizome_csf_pump_rate))
+        if rate <= 0.0:
+            return
+        for name, amount in list(self.bath.items()):
+            if name == "solvent" or amount <= 0.0:
+                continue
+            moved = amount * rate
+            self.bath[name] = amount - moved
+            self.rhizome[name] = self.rhizome.get(name, 0.0) + moved
+
+    def _exude_rhizome_to_soil(self) -> None:
+        """Exude stored non-solvent material as conserved soil salts."""
+        if self.rhizome_owner_id != self.anchor_id:
+            return
+        rate = max(0.0, min(1.0, self.config.rhizome_soil_exudation_rate))
+        if rate <= 0.0:
+            return
+        for name, amount in list(self.rhizome.items()):
+            if amount <= 0.0:
+                continue
+            moved = amount * rate
+            self.rhizome[name] = amount - moved
+            self.soil[name] = self.soil.get(name, 0.0) + moved
+    def _region_pump_nodes(self, network_roots: Optional[Dict[int, int]] = None) -> Dict[str, int]:
+        """Heart pumps exist only on the current seed tier (signed level 0).
+
+        ``network_roots`` is accepted for compatibility with older callers,
+        but orthogonal display roots are not heart owners: they may occur at
+        any radius. The anchor owns ``main``; every other live level-zero
+        seed owns exactly ``net:<id>``.
+        """
+        pumps: Dict[str, int] = {"main": self.anchor_id}
+        for node_id, node in self.nodes.items():
+            if node.burned or node_id == self.anchor_id or int(node.level or 0) != 0:
+                continue
+            pumps[f"net:{node_id}"] = node_id
+        return pumps
+    def _pump_hearts(self) -> None:
+        """Beat every region's heart (see Heart), each at its own pump
+        node -- the anchor for main, each cousin network's root for its
+        own. Region-locked traversals mean a heart only ever sees its own
+        network's supply. Lymph return runs first (bath -> seed heart's
+        in-chambers), then each region beats independently."""
+        network_roots = self.orthogonal_network_roots()
+        pumps = self._region_pump_nodes(network_roots)
+        self._reap_dead_hearts(set(pumps))
+        self._lymph_return()
+        for region, pump_id in pumps.items():
+            self._pump_region(region, pump_id, network_roots)
+        self._pump_csf_to_rhizome()
+        self._exude_rhizome_to_soil()
+
+    def _spill_heart_to_csf(self, region: str) -> None:
+        """Remove one heart and conserve all chamber/store contents in CSF."""
+        heart = self.hearts.pop(region, None)
+        if heart is None:
+            return
+        for mixture in heart.chambers.values():
+            for name, amount in mixture.items():
+                if amount:
+                    self.bath[name] = self.bath.get(name, 0.0) + amount
+        for reservoir in heart.reservoirs.values():
+            for name, amount in reservoir.drain().items():
+                if amount:
+                    self.bath[name] = self.bath.get(name, 0.0) + amount
+
+    def _reap_dead_hearts(self, live_regions: "set[str]") -> None:
+        """Spill hearts that no longer belong to a live level-zero seed.
+
+        Region survival alone is insufficient: after re-rooting a stale
+        heart key can remain while its owner has moved off the seed tier.
+        """
+        dead_regions = []
+        for region, heart in self.hearts.items():
+            owner_id = heart.seed_owner_id
+            owner = self.nodes.get(owner_id) if owner_id is not None else None
+            owner_is_seed = (
+                owner is not None and not owner.burned and int(owner.level or 0) == 0
+            )
+            owner_matches_region = (
+                (region == "main" and owner_id == self.anchor_id)
+                or (region != "main" and region == f"net:{owner_id}")
+            )
+            if region not in live_regions or not owner_is_seed or not owner_matches_region:
+                dead_regions.append(region)
+        for region in dead_regions:
+            self._spill_heart_to_csf(region)
+    def _pump_region(self, region: str, pump_id: int, network_roots: Dict[int, int]) -> None:
+        """One region's heart beat: sort every pump-node-open subedge into
+        its slice's in/out chamber routes, measure intake from one pre-
+        beat snapshot, land it, then run the script phase (valves,
+        reservoir exchange, contractions, osmotic rebalance, squeeze).
+        The pump node's own solubles are never touched -- chambers and
+        reservoirs hold supply, the node doesn't."""
         inflow_routes: Dict[str, List[Tuple[SubEdge, FluxNode]]] = {}
         outflow_routes: Dict[str, List[Tuple[SubEdge, FluxNode]]] = {}
         for traversal in self.traversals.values():
             start_id, end_id = traversal.start_id, traversal.end_id
-            if anchor_id not in (start_id, end_id):
+            if pump_id not in (start_id, end_id):
                 continue
             for sub in traversal.subedges:
-                if not sub.is_open_at(anchor_id):
+                if not sub.is_open_at(pump_id):
                     continue
                 src_id, dst_id = (start_id, end_id) if sub.direction == "forward" else (end_id, start_id)
-                is_inflow = dst_id == anchor_id
+                is_inflow = dst_id == pump_id
                 far_id = src_id if is_inflow else dst_id
                 far = self.nodes.get(far_id)
                 if far is None or far.burned:
@@ -3238,19 +5722,17 @@ class FluxGraph:
                 slices = self._node_slice(far_id, far, network_roots)
                 if slices is None:
                     continue
-                slice_name = slices[0]
                 routes = inflow_routes if is_inflow else outflow_routes
-                routes.setdefault(slice_name, []).append((sub, far))
+                routes.setdefault(slices[0], []).append((sub, far))
 
-        anchor = self.nodes[anchor_id]
-        heart = self.heart
+        if not inflow_routes and not outflow_routes and region not in self.hearts:
+            return  # nothing to pump and no heart yet -- don't materialize one
 
-        # All intake measured from the same pre-beat snapshot before any
-        # of it is drained -- the chambers act in one beat, not as
-        # sequential transfers that would see each other's deliveries as
-        # fresh differentials and immediately pump them straight back.
+        pump = self.nodes[pump_id]
+        heart = self._configure_seed_heart(region, pump_id, initially_full=False)
+
         intake_plans = {
-            slice_name: self._chamber_intake_plan(routes, anchor)
+            slice_name: self._chamber_intake_plan(routes, pump)
             for slice_name, routes in inflow_routes.items()
         }
         for slice_name, plan in intake_plans.items():
@@ -3263,20 +5745,46 @@ class FluxGraph:
 
         phase = heart.script[heart.phase_index % len(heart.script)] if heart.script else None
         heart._run_hooks("pre")
+        heart.exchange_seed_reservoirs()
+        self._permeate_heart_forward_to_background(heart)
         if phase is not None:
             valves = heart._resolve_valves(phase)
             contractions = heart._resolve_contractions(phase)
             heart._osmotic_rebalance(valves)
             heart._squeeze_in_chambers(valves, contractions)
-            self._squeeze_out_chambers(phase, contractions, outflow_routes)
+            self._squeeze_out_chambers(phase, contractions, outflow_routes, heart)
             heart.phase_index = (heart.phase_index + 1) % max(len(heart.script), 1)
         heart._run_hooks("post")
+
+    def _lymph_return(self) -> None:
+        """Drain a fraction of the CSF bath home into the seed heart's
+        in-chambers -- lymph returning to the brain. Split evenly across
+        the main heart's in-chambers; dormant while lymph_return_rate is
+        0 or the main heart hasn't formed yet."""
+        rate = self.config.lymph_return_rate
+        if rate <= 0.0 or not self.bath:
+            return
+        heart = self.hearts.get("main")
+        if heart is None:
+            return
+        in_keys = [k for k in heart.chambers if k.endswith("|in")]
+        if not in_keys:
+            return
+        share = 1.0 / len(in_keys)
+        for name, amount in list(self.bath.items()):
+            drained = amount * rate
+            if drained == 0.0:
+                continue
+            self.bath[name] = amount - drained
+            for key in in_keys:
+                heart.chambers[key][name] = heart.chambers[key].get(name, 0.0) + drained * share
 
     def _squeeze_out_chambers(
         self,
         phase: HeartPhase,
         contractions: Dict[str, float],
         outflow_routes: Dict[str, List[Tuple["SubEdge", FluxNode]]],
+        heart: "Heart",
     ) -> None:
         """Contracting out-chambers expel to the network: their own
         slice's outflow subedges (exit_scope "own"), or every outflow
@@ -3291,13 +5799,15 @@ class FluxGraph:
             if not key.endswith("|out") or fraction <= 0.0:
                 continue
             out_slice = key[: -len("|out")]
-            mix = self.heart.chambers.get(key)
+            mix = heart.chambers.get(key)
             if not mix:
                 continue
             routes = all_routes if phase.exit_scope == "all" else outflow_routes.get(out_slice, [])
             if not routes:
                 continue
-            total_constriction = sum(sub.constriction for sub, _ in routes)
+            total_constriction = sum(
+                self._learned_subedge_opening(sub) for sub, _ in routes
+            )
             if total_constriction <= 0.0:
                 continue
             expelled: Dict[str, float] = {}
@@ -3310,7 +5820,10 @@ class FluxGraph:
             if not expelled:
                 continue
             for sub, far in routes:
-                self._deposit_mixture(far, expelled, scale=sub.constriction / total_constriction)
+                opening = self._learned_subedge_opening(sub)
+                self._deposit_mixture(
+                    far, expelled, scale=opening / total_constriction
+                )
 
     def _chamber_intake_plan(
         self, inflow: List[Tuple["SubEdge", FluxNode]], anchor: FluxNode

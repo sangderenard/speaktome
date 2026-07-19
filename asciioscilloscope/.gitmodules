@@ -1,0 +1,17 @@
+# Auto-generated .gitmodules
+[submodule "asciioscilloscope/third_party/eigen"]
+	update = none
+[submodule "asciioscilloscope/third_party/libigl"]
+	update = none
+[submodule "asciioscilloscope/third_party/imgui"]
+	update = none
+[submodule "asciioscilloscope/third_party/glfw"]
+	update = none
+[submodule "asciioscilloscope/third_party/glad"]
+	update = none
+[submodule "asciioscilloscope/third_party/stb"]
+	update = none
+[submodule "asciioscilloscope/third_party/tinydnn"]
+	update = none
+[submodule "asciioscilloscope/third_party/onnxruntime"]
+	update = none

@@ -27,3 +27,7 @@ Run ``python -m AGENTS.tools.headers.run_header_checks`` to automatically repair
 validate and test file headers across the repository.
 
 For the design ethos underpinning our C++ simulations, consult `CRT_Vector_Manifesto.md`.
+
+For where the beam search stack is headed (parallel forward/backward beams,
+independent batched/threaded workers, "wide truth" region estimation), consult
+`VISION_FORWARD_BACKWARD_DIFFUSION.md`.
