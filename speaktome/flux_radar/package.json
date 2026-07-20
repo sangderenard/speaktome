@@ -1,0 +1,18 @@
+{
+  "name": "speaktome-flux-radar-webgl",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "vite build --config vite.config.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "three": "0.185.1"
+  },
+  "devDependencies": {
+    "@types/three": "0.185.0",
+    "@types/node": "24.10.1",
+    "typescript": "5.9.3",
+    "vite": "8.1.5"
+  }
+}

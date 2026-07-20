@@ -80,6 +80,22 @@ h1{
 .fg-readout .val{ font-size:14px; color:var(--readout); }
 .fg-readout .path{ font-size:14px; color:var(--ink-bright); flex:1; min-width:200px; }
 .fg-stage{ width:100%; background: var(--panel-bg-dark); border:0.5px solid var(--grid); border-radius:8px; overflow:hidden; position:relative; }
+.fg-webgl{
+  position:absolute; inset:0; z-index:0; width:100%; height:100%;
+  display:block; pointer-events:none;
+}
+#fgSvg{ position:relative; z-index:1; }
+.fg-webgl-active .fg-edge,
+.fg-webgl-active .fg-pressure,
+.fg-webgl-active .fg-material-flow,
+.fg-webgl-active .fg-layer-fluid circle{
+  opacity:0 !important;
+}
+.fg-webgl-active .fg-layer-nodes circle{
+  fill:transparent !important;
+  stroke:transparent !important;
+  opacity:0.001 !important;
+}
 .fg-node-label{ font-size:9px; fill: var(--ink); pointer-events:none; }
 .fg-heart-hud{
   position:absolute; top:10px; right:10px; z-index:4;
@@ -236,6 +252,7 @@ h1{
           <select id="fFwdSelectionMode">
             <option value="topk">topk</option>
             <option value="topp">topp (nucleus)</option>
+            <option value="stddev">stddev (stratified)</option>
           </select>
         </div>
         <div class="fg-field">
@@ -247,6 +264,7 @@ h1{
           <select id="fBwdSelectionMode">
             <option value="topk">topk</option>
             <option value="topp">topp (nucleus)</option>
+            <option value="stddev">stddev (stratified)</option>
           </select>
         </div>
         <div class="fg-field">
@@ -336,17 +354,8 @@ h1{
       </div>
     </div>
     <div class="fg-section">
-      <div class="fg-section-title">physics</div>
+      <div class="fg-section-title">growth selection &amp; physical survival</div>
       <div class="fg-form">
-        <div class="fg-field">
-          <label for="fFoundBonus">found bonus</label>
-          <input type="number" id="fFoundBonus" value="0.05" min="0" max="5" step="0.01" />
-        </div>
-        <div class="fg-field">
-          <label for="fDamping">damping</label>
-          <input type="range" id="fDamping" min="0" max="1" step="0.05" value="0.5" />
-          <output id="fDampingOut">0.50</output>
-        </div>
         <div class="fg-field">
           <label for="fStarvationFloor">starvation floor</label>
           <input type="number" id="fStarvationFloor" value="0.08" min="0" max="5" step="0.01" />
@@ -360,24 +369,12 @@ h1{
           <input type="number" id="fBurnAfterTicks" value="3" min="1" max="50" />
         </div>
         <div class="fg-field">
-          <label for="fMaxRelaxIter">max relaxation iterations</label>
-          <input type="number" id="fMaxRelaxIter" value="25" min="1" max="500" />
-        </div>
-        <div class="fg-field">
-          <label for="fRelaxTolerance">relaxation tolerance</label>
-          <input type="number" id="fRelaxTolerance" value="0.0001" min="0" step="0.0001" />
-        </div>
-        <div class="fg-field">
           <label for="fRollupWeight">rollup weight</label>
           <input type="number" id="fRollupWeight" value="0.3" min="0" max="5" step="0.05" />
         </div>
         <div class="fg-field">
           <label for="fExplorationConstant">exploration constant</label>
           <input type="number" id="fExplorationConstant" value="0.05" min="0" max="5" step="0.01" />
-        </div>
-        <div class="fg-field">
-          <label for="fHeadPressure">head pressure coefficient</label>
-          <input type="number" id="fHeadPressure" value="0" min="0" max="5" step="0.01" />
         </div>
         <div class="fg-field">
           <label for="fBalanceWeight" title="Corrects forward/backward asymmetry: whichever side's frontier is behind the other gets an expansion-priority boost proportional to the gap. 0 disables it.">balance weight</label>
@@ -387,27 +384,11 @@ h1{
     </div>
 
     <div class="fg-section">
-      <div class="fg-section-title">decay &amp; population</div>
+      <div class="fg-section-title">anchor survival</div>
       <div class="fg-form">
         <div class="fg-field">
           <label for="fAnchorDecay">anchor can decay</label>
           <input type="checkbox" id="fAnchorDecay" />
-        </div>
-        <div class="fg-field">
-          <label for="fDecayRate">decay rate (0=off)</label>
-          <input type="number" id="fDecayRate" value="0" min="0" max="1" step="0.01" />
-        </div>
-        <div class="fg-field">
-          <label for="fPopulationTarget">population target (0=off)</label>
-          <input type="number" id="fPopulationTarget" value="0" min="0" max="5000" />
-        </div>
-        <div class="fg-field">
-          <label for="fSharedTokenPressure">shared token pressure</label>
-          <input type="checkbox" id="fSharedTokenPressure" checked />
-        </div>
-        <div class="fg-field">
-          <label for="fReturnConductance" title="First step toward directional edges: scales how much a child's own pressure reports back to its parent (the 'return' leg). Delivery (parent to child) is always unscaled. 1.0 = symmetric, today's behavior; below 1.0, growth still gets full support flowing outward but success no longer automatically inflates its whole ancestry just by existing.">return conductance scale</label>
-          <input type="number" id="fReturnConductance" value="1" min="0" max="2" step="0.05" />
         </div>
       </div>
     </div>
@@ -473,6 +454,56 @@ h1{
     </div>
 
     <div class="fg-section">
+      <div class="fg-section-title">development and habitat</div>
+      <div class="fg-form">
+        <div class="fg-field">
+          <label for="fCommitmentGain">commitment gain</label>
+          <input type="number" id="fCommitmentGain" value="1" min="0" max="10" step="0.05" />
+        </div>
+        <div class="fg-field">
+          <label for="fCommitmentRetention">commitment retention</label>
+          <input type="number" id="fCommitmentRetention" value="0.85" min="0" max="1" step="0.01" />
+        </div>
+        <div class="fg-field">
+          <label for="fCommitmentThreshold">committed threshold</label>
+          <input type="number" id="fCommitmentThreshold" value="3" min="0" max="100" step="0.1" />
+        </div>
+        <div class="fg-field">
+          <label for="fHabitatIonAmount">new habitat ions / side</label>
+          <input type="number" id="fHabitatIonAmount" value="4" min="0" max="1000" step="0.25" />
+        </div>
+        <div class="fg-field">
+          <label for="fRingUptake">ring uptake rate</label>
+          <input type="number" id="fRingUptake" value="1" min="0" max="1" step="0.05" />
+        </div>
+        <div class="fg-field">
+          <label for="fMaturityGain">branch hardening gain</label>
+          <input type="number" id="fMaturityGain" value="0.1" min="0" max="1" step="0.01" />
+        </div>
+        <div class="fg-field">
+          <label for="fMaturityBonus">mature conductance bonus</label>
+          <input type="number" id="fMaturityBonus" value="1" min="0" max="10" step="0.1" />
+        </div>
+        <div class="fg-field">
+          <label for="fFluidSubsteps">visible fluid substeps</label>
+          <input type="number" id="fFluidSubsteps" value="8" min="1" max="100" step="1" />
+        </div>
+        <div class="fg-field">
+          <label for="fBulkConductance">bulk current speed</label>
+          <input type="number" id="fBulkConductance" value="0.35" min="0" max="10" step="0.01" />
+        </div>
+        <div class="fg-field">
+          <label for="fIonDiffusion" title="Independent of bulk current: ions can disperse down concentration gradients while net water current is zero.">ion dispersion speed</label>
+          <input type="number" id="fIonDiffusion" value="0.6" min="0" max="10" step="0.01" />
+        </div>
+        <div class="fg-field">
+          <label for="fOsmoticPressure">osmotic pressure scale</label>
+          <input type="number" id="fOsmoticPressure" value="0.25" min="0" max="10" step="0.01" />
+        </div>
+      </div>
+    </div>
+
+    <div class="fg-section">
       <div class="fg-section-title">live mode</div>
       <div class="fg-form">
         <div class="fg-field">
@@ -503,6 +534,7 @@ h1{
   </div>
 
   <div class="fg-stage">
+    <canvas class="fg-webgl" id="fgWebGL" aria-label="WebGL2 vascular renderer"></canvas>
     <svg id="fgSvg" viewBox="0 0 900 560" style="width:100%; display:block;"></svg>
     <div class="fg-heart-hud" id="fgHeartHud">
       <div class="fg-heart-hud-title" id="fgHeartHudTitle">heart array</div>
@@ -551,13 +583,18 @@ h1{
     <span><span class="sw" style="background:var(--anchor)"></span>anchor</span>
     <span>node size = pressure &middot; node brightness = score &middot; ring = generation depth</span>
     <span>colored wedges = re-rooted sibling/cousin networks &middot; wedge width = share of that side's live pressure</span>
-    <span>edge color = avg causal-path quality through that edge (red low &rarr; green high) &middot; edge width = how many traversals use it, recomputed every tick</span>
+    <span>edge color = avg causal-path quality &middot; edge width = traversal use plus slow material-flow hardening</span>
     <span><span class="sw" style="background:hsl(200,85%,68%)"></span>blue dashes = water &middot; separately colored dashes = individual ions</span>
     <span id="fgIonLegend">active ions: none</span>
     <span>dash direction/speed = material transport &middot; red halo = pressure drop &middot; pressure length factor = pipe housing expansion &middot; inner fill = node volume</span>
   </div>
 </div>
 
+<script type="module">
+import { FluxWebGLRenderer } from "/static/webgl/webgl_renderer.js";
+window.FluxWebGLRenderer = FluxWebGLRenderer;
+window.dispatchEvent(new Event("flux-webgl-ready"));
+</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
 <script>
 (function(){
@@ -572,11 +609,11 @@ let currentRingRadii = [0]; // index d -> pixel radius for display_radius d, see
 const bathLayer = svg.append('g');   // faint full-stage wash: the CSF everything sits in
 const wedgeLayer = svg.append('g');
 const guideLayer = svg.append('g');
-const edgeLayer = svg.append('g');
+const edgeLayer = svg.append('g').attr('class', 'fg-layer-edges');
 const flowLayer = svg.append('g');   // blue marching dashes: bulk water
 const ionFlowLayer = svg.append('g'); // one independently colored lane per dissolved ion
-const nodeLayer = svg.append('g');
-const fluidLayer = svg.append('g');  // inner liquid-level fill inside each node
+const nodeLayer = svg.append('g').attr('class', 'fg-layer-nodes');
+const fluidLayer = svg.append('g').attr('class', 'fg-layer-fluid');  // inner liquid-level fill inside each node
 const heartLayer = svg.append('g');  // four-lobe pump glyphs at each region's pump node
 const labelLayer = svg.append('g');
 
@@ -588,12 +625,33 @@ let currentReservoirs = {}; // region -> ion name -> storage telemetry
 let currentBath = {};    // soluble name -> amount
 let currentRhizome = {}; // single active-seed-owned ion/waste store
 let currentRhizomeOwner = null;
+let currentHabitat = {};
+let currentHabitatId = null;
+let currentHabitatPhrase = '';
+let currentMovementCount = 0;
 let currentPhysiology = {};
+let currentTubeState = [];
 let currentLinks = [];    // every causal parent->child connection in the active snapshot
 let currentPressureData = [], currentWaterData = [], currentIonData = [];
 let currentFluidData = [], currentLabelData = [];
 let currentMaxEdgeCount = 1, currentMaxDrop = 1e-4, currentMaxWater = 1e-5, currentMaxIon = 1e-5, currentMaxVolume = 1e-6;
 let basePipeLength = 58;
+let webglRenderer = null;
+
+function initializeWebGLRenderer(){
+  if (webglRenderer || !window.FluxWebGLRenderer) return;
+  try {
+    webglRenderer = new window.FluxWebGLRenderer(
+      document.getElementById('fgWebGL')
+    );
+    window.fluxWebGLRenderer = webglRenderer;
+    document.querySelector('.fg-stage').classList.add('fg-webgl-active');
+  } catch (error) {
+    console.warn('WebGL2 renderer unavailable; retaining SVG fallback', error);
+  }
+}
+window.addEventListener('flux-webgl-ready', initializeWebGLRenderer);
+initializeWebGLRenderer();
 let pressureLengthFactor = 12;
 let flowPhase = 0;       // advances every frame so dashes march
 function isAnchor(n){ return n.is_anchor === true; }
@@ -673,6 +731,12 @@ function renderHeartHud(){
   globalNode.appendChild(globalHead);
   addHudRow(globalNode, 'CSF / lymph', chamberHudValue(currentBath), 'one graph-global bath shared by every cousin heart');
   addHudRow(globalNode, 'rhizome', chamberHudValue(currentRhizome), 'single store owned by the active seed');
+  addHudRow(
+    globalNode,
+    `habitat ${currentHabitatId == null ? '—' : currentHabitatId}`,
+    chamberHudValue(currentHabitat),
+    `“${currentHabitatPhrase}” · finite seed-relative ring inventory · ${currentMovementCount} seed movements`
+  );
   const physiologySummary = currentPhysiology.enabled
     ? `${currentPhysiology.parameter_count || 0} gates · step ${currentPhysiology.steps || 0} · loss ${Number(currentPhysiology.loss || 0).toFixed(5)} · score ${Number(currentPhysiology.best_score || 0).toFixed(4)}`
     : 'disabled';
@@ -869,21 +933,22 @@ function updateRingElasticity(nodesArr){
 const MIN_ARC_PER_NODE = 16;
 
 function computeRingRadii(liveNodes, wedgeLayout, maxDepth){
-  const countAt = new Map(); // "wedgeKey:depth" -> live node count sharing that ring band
+  const requiredArcAt = new Map(); // "wedgeKey:depth" -> physical arc length occupied by node bodies
   for (const n of liveNodes){
     if (isCenter(n)) continue;
     const d = n.display_radius != null ? n.display_radius : n.depth;
     const key = wedgeKey(n) + ':' + d;
-    countAt.set(key, (countAt.get(key) || 0) + 1);
+    const bodyArc = Math.max(MIN_ARC_PER_NODE, 2 * pressureRadius(n.pressure) + 6);
+    requiredArcAt.set(key, (requiredArcAt.get(key) || 0) + bodyArc);
   }
   const radii = [0];
   for (let d = 1; d <= Math.max(1, maxDepth); d++){
     let required = 0;
     for (const [wk, w] of wedgeLayout){
-      const count = countAt.get(wk + ':' + d) || 0;
-      if (count <= 1) continue; // one node never needs elbow room
+      const occupiedArc = requiredArcAt.get(wk + ':' + d) || 0;
+      if (occupiedArc <= 0) continue;
       const angularWidth = Math.max(0.02, w.end - w.start);
-      required = Math.max(required, (count * MIN_ARC_PER_NODE) / angularWidth);
+      required = Math.max(required, occupiedArc / angularWidth);
     }
     radii.push(Math.max(radii[d - 1] + RING_SPACING, required));
   }
@@ -1085,6 +1150,25 @@ function drawWedgeGuides(layout, rOuter){
     .attr('text-anchor', 'middle')
     .attr('fill', d => d.color)
     .text(d => d.text);
+
+  const dividerData = [];
+  for (const dirSuffix of ['forward', 'backward']){
+    for (let i = 1; i < currentGroupOrder.length; i++){
+      const angle = rayAngles.get(dirSuffix + ':' + i);
+      if (angle == null) continue;
+      dividerData.push({
+        key: dirSuffix + ':' + i,
+        x2: CX + rOuter * Math.cos(angle),
+        y2: CY + rOuter * Math.sin(angle),
+      });
+    }
+  }
+  wedgeLayer.selectAll('line.fg-divider').data(dividerData, d => d.key).join('line')
+    .attr('class', 'fg-divider')
+    .attr('x1', CX).attr('y1', CY)
+    .attr('x2', d => d.x2).attr('y2', d => d.y2)
+    .attr('stroke', 'var(--ink)').attr('stroke-width', 1.35)
+    .attr('stroke-opacity', 0.68);
 }
 
 // display_radius (see snapshot_graph): depth for an ordinary node --
@@ -1116,12 +1200,10 @@ function scoreBrightness(le){ return Math.max(0.25, Math.min(1, Math.exp(le))); 
 
 let currentWedgeLayout = new Map();
 
-// Continuous regional binding plus predictive wall contact. Link/collision
-// forces may rearrange a branch inside its wedge, but every node has a
-// stable angular slot and its full circle must remain behind both rays.
-// Contact is an exchange: the node receives inward tangential impulse and
-// the shared internal ray receives the equal outward load.
-function regionBindingForce(slotStrength, wallStrength){
+// Soft angular organization inside a region. Actual membership is enforced
+// separately by enforceNetworkGeometry: links may choose where inside the
+// wedge a node settles, but they cannot negotiate which wedge or ring owns it.
+function regionBindingForce(slotStrength){
   let nodes;
   function force(alpha){
     for (const n of nodes){
@@ -1143,34 +1225,113 @@ function regionBindingForce(slotStrength, wallStrength){
       const slotImpulse = r * slotDelta * slotStrength * alpha;
       n.vx += tangentX * slotImpulse;
       n.vy += tangentY * slotImpulse;
+    }
+  }
+  force.initialize = (_nodes) => { nodes = _nodes; };
+  return force;
+}
 
-      // Predict contact using the node's angular half-width, so its visible
-      // body stays in-region rather than waiting for its center to cross.
-      const angularRadius = Math.asin(Math.min(0.95, (n.r + 2) / r));
-      let safeStart = w.start + angularRadius + 0.015;
-      let safeEnd = w.end - angularRadius - 0.015;
-      if (safeStart > safeEnd){ safeStart = safeEnd = (w.start + w.end) / 2; }
-      let wallDelta = 0, boundaryIndex = null;
-      const dirSuffix = n.data.direction === 'backward' ? 'backward' : 'forward';
-      const groupIndex = currentGroupOrder.indexOf(groupKey(n.data));
-      if (angle < safeStart){ wallDelta = safeStart - angle; boundaryIndex = groupIndex; }
-      else if (angle > safeEnd){ wallDelta = safeEnd - angle; boundaryIndex = groupIndex + 1; }
-      if (wallDelta === 0) continue;
+function angleInsideWedge(angle, wedge){
+  while (angle < wedge.start) angle += Math.PI * 2;
+  while (angle >= wedge.start + Math.PI * 2) angle -= Math.PI * 2;
+  return angle;
+}
 
-      const wallImpulse = r * wallDelta * wallStrength * (0.35 + alpha);
-      n.vx += tangentX * wallImpulse;
-      n.vy += tangentY * wallImpulse;
-
-      // Hemisphere dividers remain fixed; only genuine inter-region rays
-      // accept the equal-and-opposite reaction.
-      if (boundaryIndex > 0 && boundaryIndex < currentGroupOrder.length){
-        const pressure = Math.max(0.05, Number(n.data.pressure) || 0.05);
-        addRayLoad(dirSuffix + ':' + boundaryIndex, -wallDelta * pressure);
+// Collision among nodes sharing one physical annular sector. Nodes in
+// different sectors never collide through a divider; their reaction is with
+// the divider itself. Because ring radius is a hard coordinate, separation is
+// tangential—the one remaining movement dimension on that ring.
+function ringWedgeCollisionForce(strength){
+  let nodes;
+  function force(alpha){
+    const groups = new Map();
+    for (const node of nodes){
+      if (isCenter(node.data)) continue;
+      const depth = node.data.display_radius != null ? node.data.display_radius : node.data.depth;
+      const key = wedgeKey(node.data) + ':' + depth;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(node);
+    }
+    for (const members of groups.values()){
+      const wedge = currentWedgeLayout.get(wedgeKey(members[0].data));
+      if (!wedge) continue;
+      for (let i = 0; i < members.length; i++){
+        const a = members[i];
+        const ar = Math.max(1, a.targetR || targetRadius(a.data));
+        const aa = angleInsideWedge(Math.atan2(a.y - CY, a.x - CX), wedge);
+        for (let j = i + 1; j < members.length; j++){
+          const b = members[j];
+          const br = Math.max(1, b.targetR || targetRadius(b.data));
+          const ba = angleInsideWedge(Math.atan2(b.y - CY, b.x - CX), wedge);
+          const radius = Math.max(1, (ar + br) / 2);
+          const delta = ba - aa;
+          const minimum = (a.r + b.r + 4) / radius;
+          const overlap = minimum - Math.abs(delta);
+          if (overlap <= 0) continue;
+          const sign = delta < 0 ? -1 : 1;
+          const impulse = overlap * radius * strength * (0.4 + alpha) * 0.5;
+          const atx = -Math.sin(aa), aty = Math.cos(aa);
+          const btx = -Math.sin(ba), bty = Math.cos(ba);
+          a.vx -= atx * impulse * sign;
+          a.vy -= aty * impulse * sign;
+          b.vx += btx * impulse * sign;
+          b.vy += bty * impulse * sign;
+        }
       }
     }
   }
   force.initialize = (_nodes) => { nodes = _nodes; };
   return force;
+}
+
+// Holonomic containment applied after D3 integrates a tick. A non-center
+// node has exactly two legal coordinates: its assigned ring radius and an
+// angle between its network's two divider rays. We project illegal motion
+// back onto that manifold, remove velocity into the contacted wall, and pass
+// the equal reaction to an internal divider. Internal dividers can rotate
+// only; the two hemisphere dividers are fixed.
+function enforceNetworkGeometry(nodesArr){
+  for (const node of nodesArr){
+    if (isCenter(node.data)){
+      node.x = CX; node.y = CY;
+      node.vx = 0; node.vy = 0;
+      continue;
+    }
+    const wedge = currentWedgeLayout.get(wedgeKey(node.data));
+    if (!wedge) continue;
+    const radius = Math.max(1, node.targetR || targetRadius(node.data));
+    let angle = angleInsideWedge(
+      Math.atan2(node.y - CY, node.x - CX), wedge
+    );
+    const angularRadius = Math.asin(Math.min(0.95, (node.r + 2) / radius));
+    let safeStart = wedge.start + angularRadius + 0.01;
+    let safeEnd = wedge.end - angularRadius - 0.01;
+    if (safeStart > safeEnd) safeStart = safeEnd = wedge.mid;
+    const clamped = Math.max(safeStart, Math.min(safeEnd, angle));
+    const correction = clamped - angle;
+
+    const radialX = Math.cos(clamped), radialY = Math.sin(clamped);
+    const tangentX = -radialY, tangentY = radialX;
+    let tangentVelocity = (node.vx || 0) * tangentX + (node.vy || 0) * tangentY;
+    if ((clamped === safeStart && tangentVelocity < 0)
+        || (clamped === safeEnd && tangentVelocity > 0)){
+      tangentVelocity = 0;
+    }
+    node.vx = tangentX * tangentVelocity;
+    node.vy = tangentY * tangentVelocity;
+    node.x = CX + radius * radialX;
+    node.y = CY + radius * radialY;
+
+    if (correction !== 0){
+      const groupIndex = currentGroupOrder.indexOf(groupKey(node.data));
+      const boundaryIndex = clamped === safeStart ? groupIndex : groupIndex + 1;
+      if (boundaryIndex > 0 && boundaryIndex < currentGroupOrder.length){
+        const direction = node.data.direction === 'backward' ? 'backward' : 'forward';
+        const pressure = Math.max(0.05, Number(node.data.pressure) || 0.05);
+        addRayLoad(direction + ':' + boundaryIndex, -correction * radius * pressure);
+      }
+    }
+  }
 }
 
 // A bend in a flowing pipe experiences a straightening moment. Use the
@@ -1285,8 +1446,8 @@ let simulation = d3.forceSimulation([])
   // Every seed-layer cousin occupies the same center. Give centers zero
   // collision radius so this force does not contradict that geometry by
   // pushing them apart; ordinary non-center nodes still keep spacing.
-  .force('collide', d3.forceCollide(d => isCenter(d.data) ? 0 : d.r + 3))
-  .force('region', regionBindingForce(0.10, 0.9))
+  .force('collide', ringWedgeCollisionForce(0.92))
+  .force('region', regionBindingForce(0.10))
   .force('pipeStraighten', pipeStraighteningForce(0.32))
   .alphaDecay(0.06)
   .velocityDecay(0.55)
@@ -1384,7 +1545,12 @@ function applySnapshot(snap){
   currentBath = snap.bath || {};
   currentRhizome = snap.rhizome || {};
   currentRhizomeOwner = snap.rhizome_owner_id == null ? null : snap.rhizome_owner_id;
+  currentHabitat = snap.current_habitat || {};
+  currentHabitatId = snap.current_habitat_id == null ? null : snap.current_habitat_id;
+  currentHabitatPhrase = String(snap.current_habitat_phrase || '');
+  currentMovementCount = Number(snap.movement_count) || 0;
   currentPhysiology = snap.physiology || {};
+  currentTubeState = snap.tube_state || [];
   renderHeartHud();
 
   document.getElementById('fgTick').textContent = snap.tick;
@@ -1413,6 +1579,7 @@ function render(){
   // bow its own ray outward rather than being invisibly teleported back.
   updateRayElasticity();
   currentWedgeLayout = physicalWedgeLayoutFrom();
+  enforceNetworkGeometry(nodesArr);
   drawWedgeGuides(currentWedgeLayout, currentRingRadii[currentRingRadii.length - 1] + 20);
 
   // Ring d is the exact radius targeted by every node d edge hops from
@@ -1454,7 +1621,10 @@ function render(){
     })
     .attr('stroke-width', d => {
       const inf = d.influence;
-      return inf ? 1.5 + 7 * Math.sqrt((Number(inf.count) || 0) / currentMaxEdgeCount) : 1;
+      const maturity = inf ? Math.max(0, Math.min(1, Number(inf.maturity) || 0)) : 0;
+      return inf
+        ? (1.5 + 7 * Math.sqrt((Number(inf.count) || 0) / currentMaxEdgeCount)) * (1 + 0.5*maturity)
+        : 1;
     })
     .attr('stroke-linecap', 'round')
     .attr('opacity', d => {
@@ -1534,6 +1704,16 @@ function render(){
     .text(d => d.data.text.trim().slice(0, 14));
 
   drawBath();
+
+  if (webglRenderer){
+    webglRenderer.update({
+      width: W,
+      height: H,
+      nodes: nodesArr,
+      links: currentLinks,
+      tubes: currentTubeState,
+    });
+  }
 }
 
 // The pump node for each region: the anchor for "main", the node whose
@@ -1652,7 +1832,7 @@ function showTooltip(event, d){
     '<div><span class="k">pressure</span> ' + n.pressure.toFixed(3) + '</div>' +
     '<div><span class="k">local evidence</span> ' + n.local_evidence.toFixed(3) + '</div>' +
     '<div><span class="k">path mean</span> ' + n.path_mean.toFixed(3) + '</div>' +
-    '<div><span class="k">root demand</span> backward ' + (n.backward_growth_interest || 0).toFixed(2) +
+    '<div><span class="k">growth commitment</span> backward ' + (n.backward_growth_interest || 0).toFixed(2) +
       ', forward ' + (n.forward_growth_interest || 0).toFixed(2) + '</div>' +
     '<div><span class="k">volume</span> ' + (n.volume != null ? n.volume.toFixed(3) : '0') +
       ' (solvent ' + (n.solvent != null ? n.solvent.toFixed(2) : '0') + ')</div>' +
@@ -1799,22 +1979,13 @@ const FIELD_SPECS = [
   ['fMaxSubwordSteps', 'max_subword_steps', 'number'],
   ['fExpandChunk', 'expand_batch_chunk_size', 'number'],
   ['fMaxExpandElements', 'max_expand_elements', 'number'],
-  ['fFoundBonus', 'found_bonus', 'number'],
-  ['fDamping', 'damping', 'number'],
   ['fStarvationFloor', 'starvation_floor', 'number'],
   ['fOverpressureCeiling', 'overpressure_ceiling', 'number'],
   ['fBurnAfterTicks', 'burn_after_ticks', 'number'],
-  ['fMaxRelaxIter', 'max_relaxation_iterations', 'number'],
-  ['fRelaxTolerance', 'relaxation_tolerance', 'number'],
   ['fRollupWeight', 'rollup_weight', 'number'],
   ['fExplorationConstant', 'exploration_constant', 'number'],
-  ['fHeadPressure', 'head_pressure_coefficient', 'number'],
   ['fBalanceWeight', 'balance_weight', 'number'],
   ['fAnchorDecay', 'anchor_can_decay', 'checkbox'],
-  ['fDecayRate', 'decay_rate', 'number'],
-  ['fPopulationTarget', 'population_target', 'number'],
-  ['fSharedTokenPressure', 'shared_token_pressure_enabled', 'checkbox'],
-  ['fReturnConductance', 'return_conductance_scale', 'number'],
   ['fDictionaryEnabled', 'dictionary_enabled', 'checkbox'],
   ['fDictionarySize', 'dictionary_size', 'number'],
   ['fMinWordLen', 'min_word_len', 'number'],
@@ -1825,6 +1996,17 @@ const FIELD_SPECS = [
   ['fPoeticShortlist', 'poetic_shortlist_k', 'number'],
   ['fAuxinSuppression', 'auxin_suppression', 'number'],
   ['fAuxinDecay', 'auxin_decay', 'number'],
+  ['fCommitmentGain', 'growth_commitment_gain', 'number'],
+  ['fCommitmentRetention', 'growth_commitment_retention', 'number'],
+  ['fCommitmentThreshold', 'growth_commitment_threshold', 'number'],
+  ['fHabitatIonAmount', 'habitat_ring_ion_amount', 'number'],
+  ['fRingUptake', 'ring_uptake_rate', 'number'],
+  ['fMaturityGain', 'branch_maturity_gain', 'number'],
+  ['fMaturityBonus', 'branch_maturity_conductance_bonus', 'number'],
+  ['fFluidSubsteps', 'fluid_solver_substeps', 'number'],
+  ['fBulkConductance', 'fluid_bulk_conductance', 'number'],
+  ['fIonDiffusion', 'fluid_diffusion_conductance', 'number'],
+  ['fOsmoticPressure', 'fluid_osmotic_pressure', 'number'],
 ];
 // [input id, output id, decimals] -- range inputs whose paired <output>
 // needs refreshing both on user drag (via the 'input' event) and
@@ -1834,7 +2016,6 @@ const SLIDER_OUTPUTS = [
   ['fAlpha', 'fAlphaOut', 2],
   ['fBeta', 'fBetaOut', 1],
   ['fPoeticScale', 'fPoeticScaleOut', 1],
-  ['fDamping', 'fDampingOut', 2],
   ['fAuxinDecay', 'fAuxinDecayOut', 2],
 ];
 
@@ -1927,9 +2108,12 @@ function startRunProgressPolling(engineLabel){
       const work = Number.isFinite(mid.current) && Number.isFinite(mid.total) && mid.total > 0
         ? ` ${mid.current}/${mid.total}` : '';
       const detail = mid.detail ? ` — ${mid.detail}` : '';
+      const phaseSeconds = Number.isFinite(+mid.phase_elapsed_seconds)
+        ? ` · phase ${(+mid.phase_elapsed_seconds).toFixed(1)}s` : '';
       loadingTextEl.textContent =
         `running ${engineLabel} — tick ${mid.tick}/${progress.total_ticks} — ` +
-        `${mid.phase}${work}${detail} — ${mid.live_nodes} live — ${(+mid.elapsed_seconds).toFixed(1)}s`;
+        `${mid.phase}${work}${detail}${phaseSeconds} — ${mid.live_nodes} live — ` +
+        `${(+mid.elapsed_seconds).toFixed(1)}s total`;
       if (Number.isFinite(mid.current) && Number.isFinite(mid.total) && mid.total > 0){
         midTickProgressEl.max = mid.total;
         midTickProgressEl.value = mid.current;
@@ -1985,6 +2169,204 @@ let liveActive = false;
 let livePollTimer = null;
 let liveRunKey = null;
 let liveLastSnapshotTick = -1;
+let activeFluidWorkId = null;
+
+const nextAnimationFrame = () => new Promise(resolve => requestAnimationFrame(resolve));
+
+async function solveFluidWork(work){
+  const values = work.values.map(row => Float64Array.from(row));
+  const initial = work.values.map(row => Float64Array.from(row));
+  const n = values.length, m = work.components.length;
+  const src = work.arcs.source, dst = work.arcs.destination;
+  const geometry = work.arcs.conductance;
+  const arcCount = src.length;
+  const p = work.parameters;
+  const arcBulk = new Float64Array(arcCount);
+  const arcComponents = Array.from({length: arcCount}, () => new Float64Array(m));
+  const tubeByKey = new Map(currentTubeState.map(tube => [
+    tube.traversal.join(',') + ':' + tube.direction,
+    tube,
+  ]));
+
+  for (let step = 0; step < p.substeps; step++){
+    const volume = new Float64Array(n);
+    const pressure = new Float64Array(n);
+    for (let i = 0; i < n; i++){
+      let total = 0, solute = 0;
+      for (let c = 0; c < m; c++) total += values[i][c];
+      for (let c = 1; c < m; c++) solute += values[i][c];
+      volume[i] = total;
+      pressure[i] = (
+        values[i][0] + p.osmotic_pressure * solute / Math.max(1e-6, values[i][0])
+      ) / Math.max(1e-6, work.compliance[i]);
+    }
+    const raw = new Float64Array(arcCount);
+    const demand = new Float64Array(n);
+    for (let a = 0; a < arcCount; a++){
+      raw[a] = Math.max(0, pressure[src[a]] - pressure[dst[a]])
+        * geometry[a] * p.bulk_conductance * p.time_step;
+      demand[src[a]] += raw[a];
+    }
+    const moved = new Float64Array(arcCount);
+    const mixture = Array.from({length: arcCount}, () => new Float64Array(m));
+    for (let a = 0; a < arcCount; a++){
+      const scale = demand[src[a]] > 0
+        ? Math.min(1, volume[src[a]] / Math.max(1e-12, demand[src[a]])) : 1;
+      moved[a] = raw[a] * scale;
+      arcBulk[a] += moved[a];
+      if (volume[src[a]] > 0){
+        for (let c = 0; c < m; c++){
+          mixture[a][c] = values[src[a]][c] / volume[src[a]] * moved[a];
+        }
+      }
+    }
+    const visibleEdgeFlow = new Map();
+    for (let a = 0; a < arcCount; a++){
+      const edge = work.arcs.edge[a];
+      if (!edge) continue;
+      const key = edge[0] + ':' + edge[1];
+      visibleEdgeFlow.set(
+        key,
+        (visibleEdgeFlow.get(key) || 0) + moved[a] * work.arcs.sign[a],
+      );
+    }
+    for (let a = 0; a < arcCount; a++){
+      for (let c = 0; c < m; c++){
+        values[src[a]][c] -= mixture[a][c];
+        values[dst[a]][c] += mixture[a][c];
+        arcComponents[a][c] += mixture[a][c];
+      }
+    }
+
+    if (m > 1){
+      const postVolume = new Float64Array(n);
+      for (let i = 0; i < n; i++){
+        for (let c = 0; c < m; c++) postVolume[i] += values[i][c];
+      }
+      const diffRaw = Array.from({length: arcCount}, () => new Float64Array(m));
+      const diffDemand = Array.from({length: n}, () => new Float64Array(m));
+      for (let a = 0; a < arcCount; a++){
+        for (let c = 1; c < m; c++){
+          const gradient = values[src[a]][c] / Math.max(1e-12, postVolume[src[a]])
+            - values[dst[a]][c] / Math.max(1e-12, postVolume[dst[a]]);
+          const amount = Math.max(0, gradient) * geometry[a]
+            * p.ion_diffusion * p.time_step;
+          diffRaw[a][c] = amount;
+          diffDemand[src[a]][c] += amount;
+        }
+      }
+      for (let a = 0; a < arcCount; a++){
+        for (let c = 1; c < m; c++){
+          const demandHere = diffDemand[src[a]][c];
+          const amount = diffRaw[a][c] * (
+            demandHere > 0
+              ? Math.min(1, values[src[a]][c] / Math.max(1e-12, demandHere))
+              : 1
+          );
+          values[src[a]][c] -= amount;
+          values[dst[a]][c] += amount;
+          arcComponents[a][c] += amount;
+          const edge = work.arcs.edge[a];
+          if (edge){
+            const edgeKey = edge[0] + ':' + edge[1];
+            visibleEdgeFlow.set(
+              edgeKey,
+              (visibleEdgeFlow.get(edgeKey) || 0)
+                + amount * work.arcs.sign[a],
+            );
+          }
+        }
+      }
+    }
+    liveStatusEl.textContent =
+      `● LIVE · client relaxation ${step + 1}/${p.substeps} · ions ${p.ion_diffusion} / current ${p.bulk_conductance}`;
+    // The visible node bodies are the actual rows being relaxed. Updating
+    // them before yielding makes the animation a view of computation, not a
+    // replay fabricated after the proof has already been returned.
+    for (let i = 0; i < n; i++){
+      const descriptor = work.compartments[i];
+      if (!descriptor) continue;
+      if (descriptor.kind === 'tube'){
+        const tube = tubeByKey.get(
+          descriptor.traversal.join(',') + ':' + descriptor.direction
+        );
+        if (tube){
+          const segment = descriptor.segment;
+          const solubles = {};
+          for (let c = 1; c < m; c++){
+            if (values[i][c] > 1e-12) solubles[work.components[c]] = values[i][c];
+          }
+          tube.solvent[segment] = values[i][0];
+          tube.solubles[segment] = solubles;
+          let solute = 0;
+          for (let c = 1; c < m; c++) solute += values[i][c];
+          tube.pressures[segment] = (
+            values[i][0] + p.osmotic_pressure * solute / Math.max(1e-6, values[i][0])
+          ) / Math.max(1e-6, work.compliance[i]);
+        }
+        continue;
+      }
+      if (descriptor.kind !== 'node') continue;
+      const simNode = simNodes.get(descriptor.node_id);
+      if (!simNode) continue;
+      let total = 0, solute = 0;
+      for (let c = 0; c < m; c++) total += values[i][c];
+      for (let c = 1; c < m; c++) solute += values[i][c];
+      simNode.data.volume = total;
+      simNode.data.solvent = values[i][0];
+      simNode.data.pressure = (
+        values[i][0] + p.osmotic_pressure * solute / Math.max(1e-6, values[i][0])
+      ) / Math.max(1e-6, work.compliance[i]);
+      simNode.r = isCenter(simNode.data) ? 13 : pressureRadius(simNode.data.pressure);
+    }
+    for (const link of currentLinks){
+      const influence = link.influence || {};
+      const key = influence.from + ':' + influence.to;
+      if (visibleEdgeFlow.has(key)) influence.flow = visibleEdgeFlow.get(key);
+    }
+    midTickProgressEl.style.display = 'block';
+    midTickProgressEl.max = p.substeps;
+    midTickProgressEl.value = step + 1;
+    render();
+    await nextAnimationFrame();
+  }
+
+  let residual = 0;
+  for (let c = 0; c < m; c++){
+    let before = 0, after = 0;
+    for (let i = 0; i < n; i++){
+      before += initial[i][c];
+      after += values[i][c];
+    }
+    residual = Math.max(residual, Math.abs(before - after));
+  }
+  return {
+    work_id: work.work_id,
+    values: values.map(row => Array.from(row)),
+    arc_bulk: Array.from(arcBulk),
+    arc_components: arcComponents.map(row => Array.from(row)),
+    conservation_residual: residual,
+  };
+}
+
+async function processFluidWork(work){
+  if (!work || work.work_id === activeFluidWorkId) return;
+  activeFluidWorkId = work.work_id;
+  try {
+    const fluid_result = await solveFluidWork(work);
+    const resp = await fetch('/api/live/physics', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ domain: 'client', fluid_result }),
+    });
+    if (!resp.ok) throw new Error((await resp.json()).error || 'fluid proof rejected');
+  } catch (err) {
+    activeFluidWorkId = null;
+    throw err;
+  } finally {
+    midTickProgressEl.style.display = 'none';
+  }
+}
 
 function liveParams(){
   return {
@@ -2013,8 +2395,13 @@ function applyLiveState(state){
     const mid = state.mid_tick || {};
     const work = Number.isFinite(mid.current) && Number.isFinite(mid.total) && mid.total > 0
       ? ` ${mid.current}/${mid.total}` : '';
+    const phaseSeconds = Number.isFinite(+mid.phase_elapsed_seconds)
+      ? ` · ${(+mid.phase_elapsed_seconds).toFixed(1)}s` : '';
+    const proof = state.fluid_proof && state.fluid_proof.worker === 'client'
+      ? ` · proof ε=${Number(state.fluid_proof.conservation_residual || 0).toExponential(1)}`
+      : '';
     liveStatusEl.textContent = mid.phase
-      ? `● LIVE · ${mid.phase}${work} · ${mid.live_nodes} nodes`
+      ? `● LIVE · ${mid.phase}${work}${phaseSeconds}${proof} · ${mid.live_nodes} nodes`
       : '● LIVE';
   }
 
@@ -2060,6 +2447,7 @@ async function pollLive(){
     // silently re-show a "LIVE" badge for a session that's already gone.
     if (!liveActive) return;
     applyLiveState(state);
+    await processFluidWork(state.fluid_work);
     pushClientPhysics();
   } catch (err) {
     // Transient poll hiccup -- skip this tick rather than spamming the

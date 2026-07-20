@@ -78,6 +78,9 @@ def test_build_graph_enables_global_csf_scarcity_and_rhizome_defaults():
     assert graph.config.lymph_return_rate == 0.02
     assert graph.config.rhizome_csf_pump_rate == 0.1
     assert graph.config.rhizome_soil_exudation_rate == 0.01
+    assert graph.config.growth_commitment_threshold == 3.0
+    assert graph.config.habitat_ring_ion_amount == 4.0
+    assert graph.config.branch_maturity_gain == 0.1
     assert graph.config.physiology_learning_enabled is True
     assert graph.config.physiology_learning_rate == 0.05
     assert graph.config.physiology_resource_cost == 0.1
@@ -85,6 +88,8 @@ def test_build_graph_enables_global_csf_scarcity_and_rhizome_defaults():
     assert graph.config.physiology_traversal_temperature == 0.5
     assert graph.config.physiology_track_model_gradients is False
     assert resolved["rhizome_csf_pump_rate"] == 0.1
+    assert resolved["growth_commitment_threshold"] == 3.0
+    assert resolved["habitat_ring_ion_amount"] == 4.0
     assert resolved["physiology_learning_enabled"] is True
 
 def test_build_graph_poetic_booster_off_by_default():
@@ -183,6 +188,35 @@ def test_get_root_serves_index_html():
         httpd.shutdown()
 
 
+def test_radar_serves_bundled_threejs_webgl2_renderer():
+    bundle_path = server_mod.STATIC_DIR / "webgl" / "webgl_renderer.js"
+    source_path = server_mod.STATIC_DIR / "src" / "webgl_renderer.ts"
+    index_source = (server_mod.STATIC_DIR / "index.html").read_text(
+        encoding="utf-8"
+    )
+    assert bundle_path.is_file()
+    assert source_path.is_file()
+    assert 'id="fgWebGL"' in index_source
+    assert 'from "/static/webgl/webgl_renderer.js"' in index_source
+    assert "currentTubeState = snap.tube_state || []" in index_source
+    source = source_path.read_text(encoding="utf-8")
+    assert "new THREE.WebGLRenderer" in source
+    assert "new THREE.InstancedMesh" in source
+    assert "rebuildLumens" in source
+    assert "dominantFluid" in source
+
+    httpd, port = _start_server()
+    try:
+        with urllib.request.urlopen(
+            f"http://127.0.0.1:{port}/static/webgl/webgl_renderer.js"
+        ) as resp:
+            assert resp.status == 200
+            assert resp.headers.get_content_type() == "application/javascript"
+            assert b"FluxWebGLRenderer" in resp.read()
+    finally:
+        httpd.shutdown()
+
+
 def test_radar_uses_change_aware_hydraulic_straightening():
     """The browser layout must not kick a settled graph on every live poll."""
     index_path = server_mod.STATIC_DIR / "index.html"
@@ -199,6 +233,11 @@ def test_radar_uses_change_aware_hydraulic_straightening():
     assert "fg-water-flow" in source
     assert "fg-ion-flow" in source
     assert "regionBindingForce" in source
+    assert "ringWedgeCollisionForce" in source
+    assert "enforceNetworkGeometry" in source
+    assert ".force('collide', ringWedgeCollisionForce" in source
+    assert "node.x = CX + radius * radialX" in source
+    assert "addRayLoad(direction + ':' + boundaryIndex" in source
     assert "addRayLoad" in source
     assert "rayContainmentForce" not in source
 
@@ -243,6 +282,7 @@ def test_radar_has_snapshot_driven_heart_and_storage_hud():
     assert "const tokenString = pumpNode" in source
     assert "heartNameNode.title = tokenString" in source
     assert "currentRhizome = snap.rhizome || {}" in source
+    assert "currentHabitat = snap.current_habitat || {}" in source
     assert "currentPhysiology = snap.physiology || {}" in source
     assert "learned physiology" in source
     assert "global fluid" in source
@@ -262,14 +302,26 @@ def test_snapshot_preserves_each_reservoirs_full_ion_name():
     assert stores["main:backward"]["ion_name"] == "main:backward"
     assert snapshot["rhizome"] == {"waste:salt": 0.4}
     assert snapshot["rhizome_owner_id"] == graph.anchor_id
+    assert snapshot["current_habitat_id"] == graph.anchor_id
+    assert snapshot["current_habitat"]["main:forward"] == 4.0
+    assert snapshot["current_habitat_phrase"] == bundle.tokenizer.decode(
+        graph.habitat_signatures[graph.anchor_id]
+    )
+    assert snapshot["movement_count"] == 0
     assert snapshot["physiology"]["enabled"] is True
-    assert "parameter_count" in snapshot["physiology"]
+    assert snapshot["physiology"]["parameter_count"] == 60
+    assert snapshot["physiology"]["archetype_parameter_count"] == 60
+    assert all(
+        key.startswith("archetype:")
+        for key in graph.physiology_parameters
+    )
 
 def test_radar_exposes_separate_sprout_and_air_root_shapes():
     from pathlib import Path
 
     source = (server_mod.STATIC_DIR / "index.html").read_text(encoding="utf-8")
     server_source = Path(server_mod.__file__).read_text(encoding="utf-8")
+    assert 'value="stddev"' in source
 
     for field_id, param in (
         ("fSproutBranch", "sprout_branch_factor"),
@@ -287,6 +339,13 @@ def test_radar_exposes_separate_sprout_and_air_root_shapes():
         ("fPhysiologyInitial", "physiology_initial_opening"),
         ("fPhysiologyTemperature", "physiology_traversal_temperature"),
         ("fModelGradients", "physiology_track_model_gradients"),
+        ("fCommitmentGain", "growth_commitment_gain"),
+        ("fCommitmentRetention", "growth_commitment_retention"),
+        ("fCommitmentThreshold", "growth_commitment_threshold"),
+        ("fHabitatIonAmount", "habitat_ring_ion_amount"),
+        ("fRingUptake", "ring_uptake_rate"),
+        ("fMaturityGain", "branch_maturity_gain"),
+        ("fMaturityBonus", "branch_maturity_conductance_bonus"),
     ):
         assert f'id="{field_id}"' in source
         assert f"'{field_id}', '{param}'" in source
