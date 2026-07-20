@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "build": "vite build --config vite.config.ts",
+    "test:projection": "node tests/hypersphere_projection.test.mjs",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

@@ -191,11 +191,17 @@ def test_get_root_serves_index_html():
 def test_radar_serves_bundled_threejs_webgl2_renderer():
     bundle_path = server_mod.STATIC_DIR / "webgl" / "webgl_renderer.js"
     source_path = server_mod.STATIC_DIR / "src" / "webgl_renderer.ts"
+    projection_path = (
+        server_mod.STATIC_DIR / "src" / "hypersphere_projection.ts"
+    )
+    force_path = server_mod.STATIC_DIR / "src" / "nd_force_assembly.ts"
     index_source = (server_mod.STATIC_DIR / "index.html").read_text(
         encoding="utf-8"
     )
     assert bundle_path.is_file()
     assert source_path.is_file()
+    assert projection_path.is_file()
+    assert force_path.is_file()
     assert 'id="fgWebGL"' in index_source
     assert 'from "/static/webgl/webgl_renderer.js"' in index_source
     assert "currentTubeState = snap.tube_state || []" in index_source
@@ -204,6 +210,8 @@ def test_radar_serves_bundled_threejs_webgl2_renderer():
     assert "new THREE.InstancedMesh" in source
     assert "rebuildLumens" in source
     assert "dominantFluid" in source
+    assert "NDForceAssembly" in source
+    assert "HypersphereProjector" in source
 
     httpd, port = _start_server()
     try:
@@ -217,29 +225,24 @@ def test_radar_serves_bundled_threejs_webgl2_renderer():
         httpd.shutdown()
 
 
-def test_radar_uses_change_aware_hydraulic_straightening():
-    """The browser layout must not kick a settled graph on every live poll."""
+def test_radar_uses_nd_force_assembly_not_screen_space_physics():
+    """Biology is solved in network dimensions; S² is display-only."""
     index_path = server_mod.STATIC_DIR / "index.html"
     source = index_path.read_text(encoding="utf-8")
 
-    assert "pipeStraighteningForce" in source
-    assert "Math.abs(flow * pressureDrop)" in source
-    assert "snapshotChanged" in source
-    assert "if (snapshotChanged)" in source
-    assert "simulation.alpha(0.9).restart()" not in source
-    assert "pipeRestLength" in source
-    assert "pressureLengthFactor" in source
+    assert "NDForceAssembly" in source
+    assert "solveNDForceAssembly" in source
+    assert "latent_coordinates" in source
+    assert "window.fluxNDPhysicsFrame" in source
+    assert "window.fluxObservationFrame" in source
+    assert "domain: 'client_nd'" in source
+    assert "habitat_proximity: ndForceAssembly.habitatProximity()" in source
+    assert "force_proof: state.proof" in source
+    assert "d3.forceSimulation" not in source
+    assert "simulation.force" not in source
     assert "component_flows" in source
     assert "fg-water-flow" in source
     assert "fg-ion-flow" in source
-    assert "regionBindingForce" in source
-    assert "ringWedgeCollisionForce" in source
-    assert "enforceNetworkGeometry" in source
-    assert ".force('collide', ringWedgeCollisionForce" in source
-    assert "node.x = CX + radius * radialX" in source
-    assert "addRayLoad(direction + ':' + boundaryIndex" in source
-    assert "addRayLoad" in source
-    assert "rayContainmentForce" not in source
 
 
 def test_ring_depth_is_absolute_signed_level_for_main_and_cousin_seeds():
@@ -252,15 +255,18 @@ def test_ring_depth_is_absolute_signed_level_for_main_and_cousin_seeds():
     assert server_mod._ring_index_from_level(SimpleNamespace(level=2)) == 2
 
 
-def test_radar_uses_one_authoritative_hop_radius_and_recovery_force():
+def test_nd_force_assembly_uses_level_shells_without_screen_coordinates():
     source = (server_mod.STATIC_DIR / "index.html").read_text(encoding="utf-8")
+    force_source = (
+        server_mod.STATIC_DIR / "src" / "nd_force_assembly.ts"
+    ).read_text(encoding="utf-8")
 
-    assert "const initialRadius = targetRadius(n)" in source
-    assert "sn.targetR = targetRadius(n)" in source
-    assert "ringData = currentRingRadii.map" in source
-    assert "ringData = displayRingRadii.map" not in source
-    assert "depthRingRecoveryForce" in source
-    assert "node.x += shiftX; node.y += shiftY" in source
+    assert "sn.targetR = targetRadius(n)" not in source
+    assert "const initialRadius = targetRadius(n)" not in source
+    assert "addLocalShellForces" in force_source
+    assert "Math.abs(this.levels[node]) * 1.05" in force_source
+    assert "this.localOffset(this.networkIndices[node])" in force_source
+    assert "screen" not in force_source
     assert "selectAll('line.fg-edge')" in source
     assert ".attr('class', 'fg-edge')" in source
 

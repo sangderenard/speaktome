@@ -1,4 +1,15 @@
 import * as THREE from "three";
+export {
+  HypersphereProjector,
+  hypersphericalToCartesian,
+  type HypersphereObservationFrame,
+  type ProjectedObservationNode,
+} from "./hypersphere_projection";
+export {
+  NDForceAssembly,
+  type NDForceSnapshot,
+  type NDRelaxationProof,
+} from "./nd_force_assembly";
 
 export interface RadarNode {
   id: number;

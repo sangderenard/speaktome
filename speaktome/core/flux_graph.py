@@ -1325,7 +1325,7 @@ class FluxGraph:
         # door). Written wholesale by absorb_external_physics (one atomic
         # reference swap, same GIL reasoning as published_snapshot -- no
         # lock needed), read by whichever backend passes consume that
-        # domain's observations (see _ingest_from_rings). Latest payload
+        # domain's observations (see _ingest_from_habitat_shells). Latest payload
         # per domain wins; stale observations are simply reused until the
         # next one arrives.
         self.external_physics: Dict[str, Dict[str, Any]] = {}
@@ -2935,7 +2935,7 @@ class FluxGraph:
             self._emit_status("humidity", "exchanging solvent and dissolved ions")
             self._exchange_humidity()
             self._emit_status("rings", "ingesting boundary supplies")
-            self._ingest_from_rings()
+            self._ingest_from_habitat_shells()
             self._emit_status("pumping", "beating regional hearts")
             self._pump_hearts()
             self._emit_status("soil", "permeating the level-zero interface")
@@ -6081,16 +6081,15 @@ class FluxGraph:
             for name, amount in zip(materials, row):
                 node.solubles[name] = amount
 
-    def _ingest_from_rings(self) -> None:
-        """Conserved ring dispensing from the active seed's finite habitat.
+    def _ingest_from_habitat_shells(self) -> None:
+        """Conserved shell dispensing from the active seed's finite habitat.
 
-        Each pie slice's ring hands its own unique soluble to nearby nodes,
-        at a rate set by how close each node
-        currently sits to its ring *in the client's own interface sim*.
-        That nearness doesn't exist back here at all -- the backend has
-        no node positions -- so it arrives through the external-physics
-        exchange (absorb_external_physics, domain "client", key
-        "ring_proximity": node_id -> 0..1 with 1 = right on the ring).
+        Each network-local nD habitat shell hands its own unique soluble to
+        nearby nodes, at a rate set by distance in that network's dimensions.
+        The backend has no mechanical coordinates, so the client publishes
+        the result through the external-physics exchange (domain "client_nd",
+        key "habitat_proximity": node_id -> 0..1). The projected S² radar
+        position never participates in uptake.
         No client watching means no payload means no dispensing: ring
         ingestion is genuinely part of the gamified simulation, not a
         backend-only process wearing its name.
@@ -6100,8 +6099,8 @@ class FluxGraph:
         the node's opposite ion is untouched. This replaces the previous
         implicit transmutation of one ion identity into another.
         """
-        client = self.external_physics.get("client", {})
-        proximity: Dict[int, float] = client.get("ring_proximity") or {}
+        client = self.external_physics.get("client_nd", {})
+        proximity: Dict[int, float] = client.get("habitat_proximity") or {}
         if not proximity:
             return
         patch = self._ensure_current_habitat()

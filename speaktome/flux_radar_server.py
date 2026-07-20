@@ -1304,10 +1304,12 @@ class Handler(BaseHTTPRequestHandler):
         try:
             payload = self._read_json_body()
             domain = str(payload.pop("domain", "client"))
-            ring = payload.get("ring_proximity")
-            if isinstance(ring, dict):
+            proximity = payload.get("habitat_proximity")
+            if isinstance(proximity, dict):
                 # JSON object keys are always strings; node ids are ints.
-                payload["ring_proximity"] = {int(k): float(v) for k, v in ring.items()}
+                payload["habitat_proximity"] = {
+                    int(k): float(v) for k, v in proximity.items()
+                }
             fluid_result = payload.pop("fluid_result", None)
             if isinstance(fluid_result, dict):
                 session.submit_fluid_result(fluid_result)

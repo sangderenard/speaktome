@@ -662,7 +662,7 @@ def test_client_fluid_delegate_owns_relaxation_and_returns_conservation_proof():
     }
 
 
-def test_ring_contact_transfers_named_ion_without_transmuting_opposite_ion():
+def test_nd_habitat_shell_contact_transfers_named_ion_without_transmutation():
     graph = _build_graph(branch_factor=1)
     graph.config.habitat_ring_ion_amount = 4.0
     anchor_id = graph.seed([0])
@@ -674,10 +674,10 @@ def test_ring_contact_transfers_named_ion_without_transmuting_opposite_ion():
     patch = graph.habitats[anchor_id]
     total_before = patch["main:forward"] + node.solubles.get("main:forward", 0.0)
     graph.absorb_external_physics(
-        "client", {"ring_proximity": {node_id: 1.0}}
+        "client_nd", {"habitat_proximity": {node_id: 1.0}}
     )
 
-    graph._ingest_from_rings()
+    graph._ingest_from_habitat_shells()
 
     assert node.solubles["main:backward"] == 2.0
     assert node.solubles["main:forward"] > 0.0
