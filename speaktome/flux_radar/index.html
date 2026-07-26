@@ -69,6 +69,18 @@ h1{
 .fg-btn:hover{ background: var(--grid-dim); border-color: var(--fwd); }
 .fg-btn:disabled{ opacity:0.4; cursor:default; }
 .fg-error{ color: var(--danger); font-size:12px; margin-top:8px; display:none; }
+.fg-growth-estimate{
+  font-size:12px; margin-bottom:10px; padding:8px 12px;
+  border-radius:6px; border:0.5px solid var(--grid); background: var(--panel-bg-dark);
+}
+.fg-growth-estimate .headline{ color: var(--ink-bright); }
+.fg-growth-estimate .detail{ color: var(--ink); font-size:11px; margin-top:2px; }
+.fg-growth-estimate.tier-ok{ border-color: var(--grid); }
+.fg-growth-estimate.tier-ok .headline{ color: var(--readout); }
+.fg-growth-estimate.tier-warn{ border-color: var(--bwd-dim); }
+.fg-growth-estimate.tier-warn .headline{ color: var(--bwd); }
+.fg-growth-estimate.tier-bonkers{ border-color: var(--danger); background: rgba(255,128,128,0.08); }
+.fg-growth-estimate.tier-bonkers .headline{ color: var(--danger); font-weight:600; }
 .fg-readout{
   display:flex; align-items:baseline; gap:10px; flex-wrap:wrap;
   padding: 8px 12px; margin-bottom: 10px;
@@ -390,6 +402,14 @@ h1{
           <label for="fAnchorDecay">anchor can decay</label>
           <input type="checkbox" id="fAnchorDecay" />
         </div>
+        <div class="fg-field">
+          <label for="fRerootMargin" title="How decisively a challenger must beat the anchor's own pressure before it can displace it. 0 = any epsilon wins, the old behavior.">reroot margin</label>
+          <input type="number" id="fRerootMargin" value="0.05" min="0" max="5" step="0.01" />
+        </div>
+        <div class="fg-field">
+          <label for="fRerootCooldown" title="Minimum ticks a newly-rooted lineage gets to hold the causal center before it can be displaced again. Does not apply to the forced anchor_can_decay replacement.">reroot cooldown (ticks)</label>
+          <input type="number" id="fRerootCooldown" value="3" min="0" max="50" />
+        </div>
       </div>
     </div>
 
@@ -501,6 +521,11 @@ h1{
           <input type="number" id="fOsmoticPressure" value="0.25" min="0" max="10" step="0.01" />
         </div>
       </div>
+    </div>
+
+    <div class="fg-growth-estimate tier-ok" id="fGrowthEstimate">
+      <div class="headline" id="fGrowthEstimateHeadline"></div>
+      <div class="detail" id="fGrowthEstimateDetail"></div>
     </div>
 
     <div class="fg-section">
@@ -2044,6 +2069,8 @@ const FIELD_SPECS = [
   ['fExplorationConstant', 'exploration_constant', 'number'],
   ['fBalanceWeight', 'balance_weight', 'number'],
   ['fAnchorDecay', 'anchor_can_decay', 'checkbox'],
+  ['fRerootMargin', 'reroot_margin', 'number'],
+  ['fRerootCooldown', 'reroot_cooldown_ticks', 'number'],
   ['fDictionaryEnabled', 'dictionary_enabled', 'checkbox'],
   ['fDictionarySize', 'dictionary_size', 'number'],
   ['fMinWordLen', 'min_word_len', 'number'],
@@ -2122,7 +2149,90 @@ function applyParamsToForm(params){
     else el.value = params[key];
   }
   refreshSliderOutputs();
+  refreshGrowthEstimate();
 }
+
+// Fields whose combination determines how many new nodes a single tick
+// can create -- see estimateGrowthLoad(). Any edit to these should
+// re-run the estimate live, before the user ever hits run/go live.
+const GROWTH_ESTIMATE_FIELD_IDS = [
+  'fBudget', 'fBranch', 'fHotLoopDepth',
+  'fFwdBranch', 'fBwdBranch', 'fFwdHotLoopDepth', 'fBwdHotLoopDepth',
+  'fFwdBudget', 'fBwdBudget',
+  'fSproutBranch', 'fSproutDepth', 'fAirRootBranch', 'fAirRootDepth',
+];
+
+// Worst-case per-tick node count implied by the current form, mirroring
+// how the server actually spends one tick's compute budget (see
+// FluxGraph._expand_top_pressure_nodes / _expand_batch_hot_loop):
+// each direction picks its share of budget, and every picked candidate
+// then runs its own hot loop, injecting up to branch_factor**hot_loop_depth
+// new nodes by itself -- so the real cost is (per-direction budget) *
+// branch**depth, added across forward, backward, sprout, and air-root
+// growth. A shared knob (not a per-direction override, i.e. left at 0)
+// falls back to an even floor-split of the shared budget, exactly like
+// the server's own default-budget-split behavior.
+function estimateGrowthLoad(){
+  const val = (id) => +document.getElementById(id).value || 0;
+  const sharedBudget = val('fBudget');
+  const sharedBranch = val('fBranch');
+  const sharedDepth = val('fHotLoopDepth');
+
+  const fwdBudget = val('fFwdBudget') || Math.ceil(sharedBudget / 2);
+  const bwdBudget = val('fBwdBudget') || Math.floor(sharedBudget / 2);
+  const fwdBranch = val('fFwdBranch') || sharedBranch;
+  const bwdBranch = val('fBwdBranch') || sharedBranch;
+  const fwdDepth = val('fFwdHotLoopDepth') || sharedDepth;
+  const bwdDepth = val('fBwdHotLoopDepth') || sharedDepth;
+
+  const fwdNodes = fwdBudget * Math.pow(fwdBranch, fwdDepth);
+  const bwdNodes = bwdBudget * Math.pow(bwdBranch, bwdDepth);
+  const sproutNodes = Math.pow(val('fSproutBranch') || 1, val('fSproutDepth') || 1);
+  const airRootNodes = Math.pow(val('fAirRootBranch') || 1, val('fAirRootDepth') || 1);
+
+  return {
+    total: fwdNodes + bwdNodes + sproutNodes + airRootNodes,
+    fwdNodes, bwdNodes, sproutNodes, airRootNodes,
+    fwdBranch, fwdDepth, bwdBranch, bwdDepth,
+  };
+}
+
+const GROWTH_WARN_THRESHOLD = 500;
+const GROWTH_BONKERS_THRESHOLD = 20000;
+
+function refreshGrowthEstimate(){
+  const el = document.getElementById('fGrowthEstimate');
+  const headline = document.getElementById('fGrowthEstimateHeadline');
+  const detail = document.getElementById('fGrowthEstimateDetail');
+  const est = estimateGrowthLoad();
+  const fmt = (n) => Math.round(n).toLocaleString();
+
+  el.classList.remove('tier-ok', 'tier-warn', 'tier-bonkers');
+  if (est.total > GROWTH_BONKERS_THRESHOLD){
+    el.classList.add('tier-bonkers');
+    headline.textContent =
+      `⚠ bonkers: ~${fmt(est.total)} new nodes estimated this single tick`;
+    detail.textContent =
+      `branch**hot_loop_depth grows exponentially -- forward ${est.fwdBranch}^${est.fwdDepth}, ` +
+      `backward ${est.bwdBranch}^${est.bwdDepth}. This tick will run for a very long time (hours, ` +
+      `possibly never finishing) instead of seconds. Lower branch or hot loop depth before running live.`;
+  } else if (est.total > GROWTH_WARN_THRESHOLD){
+    el.classList.add('tier-warn');
+    headline.textContent = `~${fmt(est.total)} new nodes estimated this tick -- getting expensive`;
+    detail.textContent =
+      `forward ${est.fwdBranch}^${est.fwdDepth}, backward ${est.bwdBranch}^${est.bwdDepth}. ` +
+      `Fine to run, but watch actual tick time once live.`;
+  } else {
+    el.classList.add('tier-ok');
+    headline.textContent = `~${fmt(est.total)} new nodes estimated this tick`;
+    detail.textContent = 'normal range for one tick\'s compute budget.';
+  }
+}
+
+for (const id of GROWTH_ESTIMATE_FIELD_IDS){
+  document.getElementById(id).addEventListener('input', refreshGrowthEstimate);
+}
+refreshGrowthEstimate();
 
 async function loadEngineOptions(){
   try {
@@ -2659,12 +2769,13 @@ async function loadLastParams(){
 // On page load: restore last-used settings, then reattach to an
 // already-running live session if there is one (the server itself may
 // have resumed a saved live session on its own restart -- see
-// LiveSession.resume), otherwise kick off a one-shot run.
+// LiveSession.resume). If not, wait for the user to pick "run new
+// scenario" (fixed one-shot) or "go live" themselves -- this page no
+// longer kicks off a run on its own.
 (async function boot(){
   await loadEngineOptions();
   await loadLastParams();
-  const reattached = await tryReattachLive();
-  if (!reattached) runScenario();
+  await tryReattachLive();
 })();
 })();
 </script>

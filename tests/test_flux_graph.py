@@ -136,7 +136,12 @@ def test_seed_reservoir_gate_supplies_and_skims_ions_bidirectionally():
     assert deficient["main:forward"] > 0.0
     supplied_balance = reservoir.ion_amount
 
-    saturated = {"main:forward": 1.0}
+    # A chamber with no solvent has nothing for the ion to be dissolved in --
+    # exchange_with requires water present at the membrane to move anything
+    # across it in either direction. A small amount is enough to pass that
+    # gate without materially changing this chamber's over-concentration
+    # (still well above the reservoir's 0.5 band) that the skim below tests.
+    saturated = {"main:forward": 1.0, "solvent": 0.1}
     reservoir.exchange_with(saturated)
 
     assert saturated["main:forward"] < 1.0
@@ -239,6 +244,9 @@ def test_generic_node_factory_consumes_declared_materials_in_declared_medium():
     anchor_id = graph.seed([0])
     graph._attach_forward_children(anchor_id, [-0.1], [[1]])
     node = graph.nodes[graph.nodes[anchor_id].children_ids[-1]]
+    # A factory's medium is the water it reacts in -- no solvent, no
+    # metabolism, regardless of how much feedstock is sitting there.
+    node.solvent = 5.0
     node.solubles = {"feedstock": 2.0}
     node.factories = [
         MaterialFactory(
@@ -279,6 +287,7 @@ def test_factory_waste_dumps_into_local_interstitial_bath():
     anchor_id = graph.seed([0])
     graph._attach_forward_children(anchor_id, [-0.1], [[1]])
     node = graph.nodes[graph.nodes[anchor_id].children_ids[-1]]
+    node.solvent = 5.0
     node.solubles = {"feedstock": 2.0}
     node.factories = [
         MaterialFactory(
@@ -602,6 +611,16 @@ def test_ion_diffusion_has_an_independent_speed_from_bulk_current():
     graph.nodes[anchor_id].solvent = graph.nodes[child_id].solvent = 10.0
     graph.nodes[anchor_id].solubles["salt"] = 1.0
     graph._run_graph_auditor()
+    # Diffusion needs a real water medium along the whole path, not just at
+    # its two node endpoints -- a tube segment with zero solvent has nothing
+    # for the salt to diffuse through regardless of the concentration gap on
+    # either side of it. Bulk transport is the only mechanism that would
+    # normally deliver that water, and it's deliberately zeroed out below to
+    # isolate diffusion's own speed -- so this pipe needs to already be wet,
+    # the way it would be from prior real bulk flow in an actual run.
+    trav = graph.traversals[(anchor_id, child_id)]
+    for sub in trav.subedges:
+        sub.segment_solvent = [10.0] * len(sub.segment_solvent)
 
     graph._transport_subedges()
 
@@ -1091,7 +1110,13 @@ def test_burn_reaps_a_farther_backward_component_cut_off_from_the_seed():
 
     assert graph.nodes[connector_id].burned is True
     assert graph.nodes[far_id].burned is True
-    assert graph.bath_by_node[far_id]["stored-ion"] == 2.0
+    # far_id's own bath_by_node entry is permanently excluded from the fluid
+    # solver once it's burned -- its water is conserved to a live neighbor
+    # instead (here, by the time it's reaped, none of its neighbors are
+    # still alive, so it falls back to the anchor, same as Heart._spill_
+    # heart_to_csf's own dead-heart fallback).
+    assert "stored-ion" not in graph.bath_by_node.get(far_id, {})
+    assert graph.bath_by_node[seed_id]["stored-ion"] == 2.0
     assert all(far_id not in edge_key for edge_key in graph.edges)
     assert all(
         far_id not in traversal.node_ids
@@ -3443,6 +3468,13 @@ def test_previously_orthogonal_node_can_itself_become_the_next_anchor():
     """Displacing the root doesn't remove anything from the graph -- an
     orthogonal node is still fully live and can be re-rooted to again."""
     graph = _build_graph()
+    # This test calls _maybe_reroot() twice back-to-back with no ticks in
+    # between -- exercising reroot mechanics directly, not the cooldown/
+    # margin throttle (see FluxGraphConfig.reroot_cooldown_ticks), which
+    # would otherwise block the second reroot from a real event this soon
+    # after the first.
+    graph.config.reroot_cooldown_ticks = 0
+    graph.config.reroot_margin = 0.0
     anchor_id = graph.seed([99])
     weak_id = _add_node(graph, anchor_id, 1, -5.0, 1, direction=Direction.FORWARD, pressure=0.5)
     _add_node(graph, anchor_id, 2, -0.01, 1, direction=Direction.FORWARD, pressure=5.0)

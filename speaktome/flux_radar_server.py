@@ -282,6 +282,8 @@ class ModelBundle:
             overpressure_ceiling=float(params.get("overpressure_ceiling", 0.0)),
             burn_after_ticks=int(params.get("burn_after_ticks", 3)),
             anchor_can_decay=bool(params.get("anchor_can_decay", False)),
+            reroot_margin=float(params.get("reroot_margin", 0.05)),
+            reroot_cooldown_ticks=int(params.get("reroot_cooldown_ticks", 3)),
             compute_budget_per_tick=int(params.get("budget", 3)),
             branch_factor=int(params.get("branch", 3)),
             hot_loop_depth=int(params.get("hot_loop_depth", 1)),
@@ -419,6 +421,8 @@ class ModelBundle:
             "alpha": choice_policy.alpha,
             "beta": choice_policy.beta,
             "anchor_can_decay": config.anchor_can_decay,
+            "reroot_margin": config.reroot_margin,
+            "reroot_cooldown_ticks": config.reroot_cooldown_ticks,
             "no_repeat_ngram_size": config.no_repeat_ngram_size or 0,
             "poetic_enabled": config.poetic_attractor is not None,
             "poetic_scale": config.poetic_scale,
@@ -1255,7 +1259,11 @@ class Handler(BaseHTTPRequestHandler):
             _autosave()
             self._send_json(200, state)
         except Exception as e:  # noqa: BLE001 -- surfaced to the browser, not swallowed
-            self._send_json(500, {"error": str(e)})
+            traceback.print_exc()
+            self._send_json(500, {
+                "error": f"{type(e).__name__}: {e!r}",
+                "traceback": traceback.format_exc(),
+            })
 
     def _handle_live_stop(self) -> None:
         with _live_session_lock:

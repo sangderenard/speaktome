@@ -445,10 +445,16 @@ class IonReservoir:
         low, target, high = self.concentration_band()
         gate = max(0.0, min(1.0, self.opening_coverage * self.exchange_probability))
 
+        # The ion gate sits in the chamber's own water -- an ion cannot cross
+        # it, in either direction, unless the chamber actually has solvent to
+        # be dissolved in right now. No water at the membrane means no ion
+        # transport math at all, regardless of concentration pressure.
+        chamber_has_water = chamber.get("solvent", 0.0) > 0.0
+
         # The same gate skims excess ions or supplies deficient chambers.
         # An empty new reservoir begins with a zero band, so the first
         # matching chamber supply is excess and establishes its history.
-        if volume > 0.0 and target > 0.0:
+        if chamber_has_water and volume > 0.0 and target > 0.0:
             chamber_concentration = chamber_ions / volume
             if chamber_concentration > high:
                 correction = (
@@ -466,7 +472,7 @@ class IonReservoir:
                 moved = min(self.ion_amount, correction * gate)
                 chamber[self.ion_name] = chamber_ions + moved
                 self.ion_amount -= moved
-        elif volume > 0.0 and chamber_ions > 0.0:
+        elif chamber_has_water and volume > 0.0 and chamber_ions > 0.0:
             moved = chamber_ions * gate
             chamber[self.ion_name] = chamber_ions - moved
             self.ion_amount += moved
@@ -877,6 +883,22 @@ class FluxGraphConfig:
     # the next anchor from whatever's actually in the graph right now,
     # rather than waiting for a challenger to out-score it fairly.
     anchor_can_decay: bool = False
+    # A bare pressure inequality with zero cooldown means the causal
+    # center random-walks to whichever node has the highest *instantaneous*
+    # pressure every single tick -- a freshly grown leaf and a settling
+    # anchor (actively losing pressure to humidity/factory/bulk-transfer
+    # outflow every tick) cross constantly, never a rare event. That
+    # thrashes _reroot's own heart teardown/rebuild every tick (see
+    # _reroot's _spill_heart_to_csf) instead of letting one lineage
+    # actually get explored -- "crowds with hearts, doesn't beam search."
+    # reroot_margin requires a real, decisive win, not a coin flip;
+    # reroot_cooldown_ticks guarantees a newly-rooted lineage gets that
+    # many ticks to actually develop before it can be displaced again.
+    # Neither throttles the anchor_can_decay forced-replacement path --
+    # that one is survival (the anchor is already dead), not exploration
+    # stability, and must never be blocked by a cooldown.
+    reroot_margin: float = 0.05
+    reroot_cooldown_ticks: int = 3
     compute_budget_per_tick: int = 4
     branch_factor: int = 3
     max_context_tokens: int = 64
@@ -1293,6 +1315,11 @@ class FluxGraph:
         self.habitats: Dict[int, Dict[str, float]] = {}
         self.habitat_signatures: Dict[int, List[int]] = {}
         self.movement_count: int = 0
+        # Ticks elapsed since the last reroot -- see FluxGraphConfig.
+        # reroot_cooldown_ticks. Large (not 0) so a reroot is allowed
+        # immediately if the very first challenger check already clears
+        # the cooldown at tick 1.
+        self._ticks_since_reroot: int = 10**9
         # Stable named logits for every continuous valve and pore. Keeping
         # ownership here rather than on mutable dataclasses makes parameters
         # easy to optimize, persist, and enumerate even as topology grows.
@@ -2383,6 +2410,20 @@ class FluxGraph:
             pressure=1.0 + self.config.found_bonus,
             created_tick=0,
             expanded=True,  # the anchor doesn't get "expanded" itself
+            # The anchor sits at the center and belongs to no slice (see
+            # _node_slice), so it never receives the ordinary per-slice
+            # ambient humidity exchange every other node gets -- without
+            # its own starting reserve it would stay permanently dry and
+            # (now that growth requires water) could never sprout its
+            # first children at all. 1.0 matches uniform_field's default
+            # ambient level, i.e. "the seed starts as hydrated as the
+            # steady state everything else is drawn toward" -- not an
+            # arbitrary number. Only while the fluid layer is actually on:
+            # with it off there is no water concept in play (growth stays
+            # ungated too, see _expandable_nodes), and plain score-driven
+            # pressure derivation expects a freshly seeded graph at exactly
+            # zero physical inventory.
+            solvent=1.0 if self.config.graph_auditor_enabled else 0.0,
         )
         self.anchor_id = node_id
         self.rhizome_owner_id = node_id
@@ -2934,6 +2975,11 @@ class FluxGraph:
             self._apply_reservoir_learning()
             self._emit_status("humidity", "exchanging solvent and dissolved ions")
             self._exchange_humidity()
+            # A still-dry anchor's first children are withheld by
+            # spawn_first_children() itself; retrying here (idempotent
+            # once they exist) means they appear the same tick the anchor
+            # finally hydrates, rather than needing a separate mechanism.
+            self.spawn_first_children()
             self._emit_status("rings", "ingesting boundary supplies")
             self._ingest_from_habitat_shells()
             self._emit_status("pumping", "beating regional hearts")
@@ -3000,9 +3046,24 @@ class FluxGraph:
         support, it can't just sit there forever the way an unsupported
         leaf can't: this force-picks the current highest-pressure live node
         as the next anchor from whatever's actually in the graph right now,
-        rather than waiting for a challenger to fairly out-score it.
+        rather than waiting for a challenger to fairly out-score it. This
+        forced path is survival, not exploration stability, so it ignores
+        reroot_cooldown_ticks entirely -- a dead anchor cannot be left in
+        place just because the clock hasn't run out.
+
+        The ordinary challenger path below is gated by both
+        reroot_cooldown_ticks (a newly-rooted lineage gets that many ticks
+        before it can be displaced again) and reroot_margin (the challenger
+        must clear the anchor by more than that, not just any epsilon) --
+        without them the causal focus random-walks to whichever node has
+        the highest *instantaneous* pressure every single tick (a fresh
+        leaf and a settling anchor, which loses pressure to humidity/
+        factory/bulk-transfer outflow every tick, cross constantly), tearing
+        down and rebuilding every heart on every tick instead of letting one
+        lineage actually get explored.
         """
         anchor = self.nodes[self.anchor_id]
+        self._ticks_since_reroot += 1
 
         if self.config.anchor_can_decay:
             if anchor.pressure < self.config.starvation_floor:
@@ -3015,12 +3076,16 @@ class FluxGraph:
                     self._reroot(replacement_id)
                 return
 
+        if self._ticks_since_reroot < max(0, int(self.config.reroot_cooldown_ticks)):
+            return
+
+        margin = max(0.0, float(self.config.reroot_margin))
         challenger_id = None
         challenger_pressure = anchor.pressure
         for node_id, node in self.nodes.items():
             if node.burned or node_id == self.anchor_id:
                 continue
-            if node.pressure > challenger_pressure:
+            if node.pressure > challenger_pressure + margin:
                 challenger_pressure = node.pressure
                 challenger_id = node_id
         if challenger_id is None:
@@ -3055,13 +3120,30 @@ class FluxGraph:
         old_anchor_id = self.anchor_id
         if new_root_id == old_anchor_id:
             return
+        self._ticks_since_reroot = 0
         old_anchor_tokens = self.anchor_tokens
         old_anchor_local_evidence = self.anchor_local_evidence
         # The old seed heart does not travel with the focus. Re-rooting
         # dumps every chamber and reservoir into the shared CSF bath.
         self._spill_heart_to_csf("main")
-        self.nodes[old_anchor_id].tokens = old_anchor_tokens
-        self.nodes[old_anchor_id].local_evidence = old_anchor_local_evidence
+        old_anchor = self.nodes[old_anchor_id]
+        # A demotion is not a destruction -- old_anchor stays alive -- but
+        # material leaving a role goes through CSF/lymph in every case, no
+        # exception for "the node itself survives." Its own solvent/
+        # solubles land in its own bath_by_node entry (a live compartment,
+        # since this node isn't burned) instead of continuing to sit
+        # privately on the node the instant it stops being anchor.
+        if old_anchor.solvent or old_anchor.solubles:
+            local_bath = self.bath_by_node.setdefault(old_anchor_id, {})
+            if old_anchor.solvent:
+                local_bath["solvent"] = local_bath.get("solvent", 0.0) + old_anchor.solvent
+                old_anchor.solvent = 0.0
+            for name, amount in old_anchor.solubles.items():
+                if amount:
+                    local_bath[name] = local_bath.get(name, 0.0) + amount
+            old_anchor.solubles = {}
+        old_anchor.tokens = old_anchor_tokens
+        old_anchor.local_evidence = old_anchor_local_evidence
         new_root = self.nodes[new_root_id]
         self.anchor_tokens, self.anchor_local_evidence = self._reset_to_anchor_invariants(new_root)
         self.anchor_id = new_root_id
@@ -3980,10 +4062,21 @@ class FluxGraph:
         # Forward tips have no live children farther forward. Backward tips
         # have no live parents farther backward. Ownership follows the one
         # global backward->forward axis, not radial distance from a center.
+        #
+        # Growth is metabolic work: a node with no solvent has nothing to
+        # spend and cannot put out new tissue, no matter how much pressure
+        # it's carrying -- it simply waits at the frontier until ambient
+        # humidity exchange (see _exchange_humidity, which runs earlier
+        # this same tick) gives it some. Only enforced while the fluid
+        # layer is actually simulating water at all (graph_auditor_enabled)
+        # -- with it off there is no water concept in play, so growth stays
+        # ungated, exactly as it always has.
+        fluid_on = self.config.graph_auditor_enabled
         return [
             n for n in self.nodes.values()
             if not n.burned
             and n.direction is not None
+            and (not fluid_on or n.solvent > 0.0)
             and (
                 (n.direction is Direction.FORWARD and not self._live_children(n.id))
                 or (n.direction is Direction.BACKWARD and not self._live_parents(n.id))
@@ -4166,6 +4259,7 @@ class FluxGraph:
         healthy enough to keep winning the normal compute competition while
         the other side is absent.
         """
+        fluid_on = self.config.graph_auditor_enabled
         heart_stresses = self._heart_growth_stresses()
         if any(
             stress["missing_forward"] or stress["missing_backward"]
@@ -4173,6 +4267,11 @@ class FluxGraph:
         ):
             for stress in heart_stresses.values():
                 pump_id = stress["pump_id"]
+                pump = self.nodes[pump_id]
+                if fluid_on and pump.solvent <= 0.0:
+                    # No water at the pump means no growth from it this
+                    # tick either, same as any other node -- it just waits.
+                    continue
                 if stress["missing_forward"]:
                     # For a heart this is ordinary shoot/sprout growth, not
                     # cross-growth from an already directional cell.
@@ -4205,12 +4304,14 @@ class FluxGraph:
             if not n.burned
             and n.direction is Direction.BACKWARD
             and n.forward_growth_interest > 0.0
+            and (not fluid_on or n.solvent > 0.0)
         )
         backward_pool.extend(
             (n, True) for n in self.nodes.values()
             if not n.burned
             and n.direction is Direction.FORWARD
             and n.backward_growth_interest > 0.0
+            and (not fluid_on or n.solvent > 0.0)
         )
 
         def action_priority(action) -> float:
@@ -4446,13 +4547,36 @@ class FluxGraph:
         def mark_burned(cur_id: int) -> None:
             cur = self.nodes[cur_id]
             cur.burned = True
-            local_bath = self.bath_by_node.setdefault(cur_id, {})
-            if cur.solvent:
-                local_bath["solvent"] = local_bath.get("solvent", 0.0) + cur.solvent
-                cur.solvent = 0.0
-            for name, amount in cur.solubles.items():
-                if amount:
-                    local_bath[name] = local_bath.get(name, 0.0) + amount
+            # bath_by_node[cur_id] is permanently excluded from every future
+            # coupled fluid solve once cur_id is burned (see
+            # _solve_coupled_fluid_system's live_nodes filter) -- depositing
+            # this node's water in its own entry would conserve it on paper
+            # while actually orphaning it somewhere the pressure/flow solver
+            # can never reach again. Hand it instead to a still-living
+            # neighbor it was actually connected to, or the anchor as the
+            # guaranteed-alive fallback -- the same destination
+            # Heart._spill_heart_to_csf uses when a whole heart dies.
+            destination_id = next(
+                (
+                    neighbor_id for neighbor_id in cur.parent_ids + cur.children_ids
+                    if neighbor_id in self.nodes and not self.nodes[neighbor_id].burned
+                ),
+                None,
+            )
+            if (
+                destination_id is None
+                and self.anchor_id in self.nodes
+                and not self.nodes[self.anchor_id].burned
+            ):
+                destination_id = self.anchor_id
+            if destination_id is not None:
+                local_bath = self.bath_by_node.setdefault(destination_id, {})
+                if cur.solvent:
+                    local_bath["solvent"] = local_bath.get("solvent", 0.0) + cur.solvent
+                for name, amount in cur.solubles.items():
+                    if amount:
+                        local_bath[name] = local_bath.get(name, 0.0) + amount
+            cur.solvent = 0.0
             cur.solubles = {}
             if self.config.verbose:
                 print(f"  [burn] node {cur_id} (tokens={cur.tokens}, dir={cur.direction}) starved out")
@@ -5307,7 +5431,21 @@ class FluxGraph:
             raise ValueError(f"node {node_id} has no direction")
 
     def spawn_first_children(self) -> None:
-        """Seed one forward and one backward child directly off the anchor."""
+        """Seed one forward and one backward child directly off the anchor.
+
+        The anchor is created with zero solvent (see seed()) -- while the
+        fluid layer is on, a dry anchor has nothing to grow with yet, so
+        this is a safe no-op instead of forcing growth out of nothing.
+        Idempotent and meant to be retried every tick (see tick()) until
+        ambient humidity exchange gives the anchor some water: the
+        "already has a child on either side" check is what makes repeated
+        calls safe rather than re-growing first children over and over.
+        """
+        anchor = self.nodes[self.anchor_id]
+        if self._live_children(self.anchor_id) or self._live_parents(self.anchor_id):
+            return
+        if self.config.graph_auditor_enabled and anchor.solvent <= 0.0:
+            return
         self._expand_forward(self.anchor_id)
         self._expand_backward(self.anchor_id)
         self.nodes[self.anchor_id].expanded = True
@@ -5843,16 +5981,20 @@ class FluxGraph:
                 flow = min(0.0, flow)
             node.solvent = max(0.0, node.solvent + flow)
 
-            for name, ambient_amount in ambient_solutes.items():
-                permeability = self._learned_node_permeability(node, name)
-                delta = (
-                    node.humidity_exchange
-                    * permeability
-                    * (ambient_amount - node.solubles.get(name, 0.0))
-                )
-                node.solubles[name] = max(
-                    0.0, node.solubles.get(name, 0.0) + delta
-                )
+            # A dissolved solute cannot move ambient-ward without a solvent
+            # to be dissolved in -- a dry node holds its solutes exactly as
+            # they are, no matter how large the ambient concentration gap.
+            if node.solvent > 0.0:
+                for name, ambient_amount in ambient_solutes.items():
+                    permeability = self._learned_node_permeability(node, name)
+                    delta = (
+                        node.humidity_exchange
+                        * permeability
+                        * (ambient_amount - node.solubles.get(name, 0.0))
+                    )
+                    node.solubles[name] = max(
+                        0.0, node.solubles.get(name, 0.0) + delta
+                    )
 
     def _exchange_humidity(self) -> None:
         """Batch passive solvent and ambient-solute exchange by node/material."""
@@ -6063,10 +6205,14 @@ class FluxGraph:
             solvent_flow = solvent_flow.clamp_max(0.0)
         solvent = (solvent + solvent_flow).clamp_min(0.0)
         if materials:
+            # Same rule as the scalar path: no solvent, no solute movement --
+            # a dry node is not a medium anything can dissolve into or out of.
+            has_water = (solvent > 0.0).to(dtype)[:, None]
             material_delta = (
                 exchange_rate[:, None]
                 * permeability[:, 1:]
                 * (ambient - held[:, 1:])
+                * has_water
             )
             new_materials = (held[:, 1:] + material_delta).clamp_min(0.0)
         else:
@@ -6114,6 +6260,10 @@ class FluxGraph:
         network_roots = self.orthogonal_network_roots()
         for nid, node in self.nodes.items():
             if node.burned:
+                continue
+            # A habitat shell hands off a dissolved soluble -- there is
+            # nothing to dissolve it into at a node holding no solvent.
+            if node.solvent <= 0.0:
                 continue
             near = proximity.get(nid)
             if not near:
@@ -6460,12 +6610,21 @@ class FluxGraph:
             if values.shape[1] > 1:
                 volume = values.sum(dim=1).clamp_min(1e-12)
                 concentration = values[:, 1:] / volume[:, None]
+                # Diffusion needs a continuous water medium on both ends --
+                # a compartment holding zero solvent has nothing to dissolve
+                # a solute out of, or into, no matter the concentration gap.
+                has_water = values[:, 0] > 0.0
+                water_gate = (
+                    has_water.index_select(0, src_idx)
+                    & has_water.index_select(0, dst_idx)
+                ).to(dtype)[:, None]
                 raw_diff = (
                     torch.relu(
                         concentration.index_select(0, src_idx)
                         - concentration.index_select(0, dst_idx)
                     )
                     * (conductance * cfg.fluid_diffusion_conductance * dt)[:, None]
+                    * water_gate
                 )
                 source_matrix = src_idx[:, None].expand_as(raw_diff)
                 demand = torch.zeros_like(values[:, 1:])
@@ -7153,7 +7312,16 @@ class FluxGraph:
         return batches
 
     def _run_node_factories(self) -> None:
-        """Execute configured node roles against circulation and/or CSF."""
+        """Execute configured node roles against circulation and/or CSF.
+
+        A factory's own recipe only declares the specific inputs it
+        consumes -- most don't name "solvent" as one of them, so nothing
+        here would otherwise stop a reaction from running in a mixture
+        that happens to hold zero water. Metabolism needs a medium to
+        happen in: no water in the relevant compartment means that
+        compartment's reactions simply don't run this tick, regardless of
+        whether its other named inputs are present.
+        """
         for node in self.nodes.values():
             node.factory_auxin = 0.0
             if node.burned:
@@ -7161,19 +7329,21 @@ class FluxGraph:
             circulation = dict(node.solubles)
             circulation["solvent"] = node.solvent
             local_bath = self.bath_by_node.setdefault(node.id, {})
+            circulation_has_water = circulation.get("solvent", 0.0) > 0.0
+            bath_has_water = local_bath.get("solvent", 0.0) > 0.0
             changed_circulation = False
             for factory in node.factories:
                 if not factory.enabled or factory.throughput <= 0.0:
                     continue
                 medium = factory.medium.lower()
                 remaining = factory.throughput
-                if medium in ("circulatory", "both"):
+                if medium in ("circulatory", "both") and circulation_has_water:
                     used = self._run_factory_reaction(
                         node, factory, circulation, remaining, local_bath
                     )
                     remaining -= used
                     changed_circulation = changed_circulation or used > 0.0
-                if medium in ("csf", "both") and remaining > 0.0:
+                if medium in ("csf", "both") and remaining > 0.0 and bath_has_water:
                     self._run_factory_reaction(
                         node, factory, local_bath, remaining, local_bath
                     )
@@ -7413,26 +7583,32 @@ class FluxGraph:
 
         pump = self.nodes[pump_id]
         heart = self._configure_seed_heart(region, pump_id, initially_full=False)
-
-        intake_plans = {
-            slice_name: self._chamber_intake_plan(routes, pump)
-            for slice_name, routes in inflow_routes.items()
-        }
-        for slice_name, plan in intake_plans.items():
-            pooled = self._drain_plan(plan)
-            chamber = heart.chamber(slice_name, "in")
-            for name, amount in pooled.items():
-                chamber[name] = chamber.get(name, 0.0) + amount
         for slice_name in outflow_routes:
             heart.chamber(slice_name, "out")  # chamber exists even before anything reaches it
+        for slice_name in inflow_routes:
+            heart.chamber(slice_name, "in")  # ditto, so a brand-new slice can still pull this same beat
 
+        # Intake is the pump's inhale, not a passive equalization: the same
+        # beat-driven contraction fraction that governs how hard an
+        # out-chamber pushes into the network now governs how hard an
+        # in-chamber pulls from it (see _squeeze_out_chambers -- "when it
+        # pushes, it pushes"; this is the same mechanic in reverse). No
+        # phase this tick means no beat at all, so nothing pulls or pushes.
         phase = heart.script[heart.phase_index % len(heart.script)] if heart.script else None
+        contractions = heart._resolve_contractions(phase) if phase is not None else {}
+        for slice_name, routes in inflow_routes.items():
+            chamber = heart.chamber(slice_name, "in")
+            fraction = contractions.get(f"{slice_name}|in", 0.0)
+            plan = self._chamber_intake_plan(routes, fraction)
+            pooled = self._drain_plan(plan)
+            for name, amount in pooled.items():
+                chamber[name] = chamber.get(name, 0.0) + amount
+
         heart._run_hooks("pre")
         heart.exchange_seed_reservoirs()
         self._permeate_heart_forward_to_background(heart)
         if phase is not None:
             valves = heart._resolve_valves(phase)
-            contractions = heart._resolve_contractions(phase)
             heart._osmotic_rebalance(valves)
             heart._squeeze_in_chambers(valves, contractions)
             self._squeeze_out_chambers(phase, contractions, outflow_routes, heart)
@@ -7511,24 +7687,39 @@ class FluxGraph:
                 )
 
     def _chamber_intake_plan(
-        self, inflow: List[Tuple["SubEdge", int]], anchor: FluxNode
+        self, inflow: List[Tuple["SubEdge", int]], fraction: float
     ) -> List[Tuple[SubEdge, int, float]]:
-        """What one chamber's inflow subedges would draw this beat --
-        computed exactly like ordinary transport (anchor standing in as
-        the destination), purely read-only, so every chamber can be
-        measured from the same snapshot before anything is drained.
+        """What one chamber's inflow subedges deliver this beat: an active
+        pull, not a passive pressure/volume comparison.
+
+        ``fraction`` is this beat's in-chamber contraction (see
+        _resolve_contractions) -- the exact same number that governs how
+        hard the matching out-chamber pushes into the network this same
+        beat (_squeeze_out_chambers), applied here in reverse: the pump
+        draws that fraction of whatever is actually sitting in each open
+        segment, unconditionally. A real pump doesn't check whether its
+        supply line has "enough pressure relative to me" before it
+        inhales -- it inhales, and whatever's there comes. (An earlier
+        version compared the segment against the chamber's, then the pump
+        node's, own volume -- both were passive equalizations disguised
+        as intake, and the node comparison in particular was a bar the
+        segment could structurally never clear, since the pump node's own
+        solvent/solubles are never touched by heart transport at all.)
+        Purely read-only so every chamber can be measured from the same
+        pre-beat snapshot before anything is drained.
         """
         plan = []
+        if fraction <= 0.0:
+            return plan
+        pull = min(1.0, fraction)
         for sub, segment_index in inflow:
             segment_volume = (
                 sub.segment_solvent[segment_index]
                 + sum(sub.segment_solubles[segment_index].values())
             )
-            drive = (
-                sub.segment_pressures[segment_index] - anchor.pressure
-                + segment_volume - anchor.volume
-            )
-            amount = self._learned_subedge_opening(sub) * max(0.0, drive)
+            if segment_volume <= 0.0:
+                continue
+            amount = self._learned_subedge_opening(sub) * segment_volume * pull
             if amount > 0.0:
                 plan.append((sub, segment_index, amount))
         return plan
