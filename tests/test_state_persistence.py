@@ -84,6 +84,40 @@ def _dummy_bundle():
     return bundle
 
 
+def test_live_session_blocks_on_and_accepts_matching_client_fluid_work():
+    session = server_mod.LiveSession(
+        _dummy_bundle(),
+        {"seed": "hi", "window": 5, "interval_ms": 100000},
+    )
+    packet = {
+        "tick": 1,
+        "components": ["solvent"],
+        "values": [[1.0]],
+        "compliance": [1.0],
+        "arcs": {"source": [], "destination": [], "conductance": []},
+        "parameters": {"substeps": 1},
+    }
+    result_holder = {}
+    worker = threading.Thread(
+        target=lambda: result_holder.setdefault(
+            "result", session._delegate_fluid_work(packet)
+        )
+    )
+    worker.start()
+    deadline = time.time() + 2.0
+    while session.pending_fluid_work is None and time.time() < deadline:
+        time.sleep(0.01)
+    assert session.pending_fluid_work is not None
+    work_id = session.pending_fluid_work["work_id"]
+
+    session.submit_fluid_result({"work_id": work_id, "values": [[1.0]]})
+    worker.join(timeout=2.0)
+
+    assert not worker.is_alive()
+    assert result_holder["result"]["work_id"] == work_id
+    assert session.pending_fluid_work is None
+
+
 def test_node_to_dict_and_from_dict_roundtrip():
     node = FluxNode(
         id=7, tokens=[1, 2], direction=Direction.BACKWARD, parent_id=3, depth=2,
