@@ -29,6 +29,18 @@ runtime.
 - Added a runnable CLI and documented the Python callable/file contract.
 - Kept emitted `.f90`, `.exe`, and model files under the existing ignored
   `build/` tree.
+- Added a second native target using the established profiled C shell and
+  Win32 RGB display adapter. Its `bind(C)` Fortran kernel owns learning and
+  pixel generation while the shell owns allocation, feedback, the window, and
+  presentation.
+- Made the GUI continuous by default (`frames=0`) and stoppable by closing the
+  window. Finite frame counts remain available for tests and automation.
+- Rendered a fixed reference/oracle stick-and-ball graph beside the changing
+  affine neural graph. Active weights are colored edges, graph endpoints are
+  balls, and lower bands visualize held-out loss, exactness, and relative cost.
+- Published an explicit parameter policy in the compiled API: datasets,
+  dimensions, and reference cost are locked; weights, bias, epoch, learning
+  rate, and pruning pressure are open; learned state is fed back each frame.
 
 ## Observed native run
 
@@ -45,12 +57,24 @@ python -m pytest tests/test_native_affine_learner.py \
   tests/test_reverse_fused_program.py \
   tests/test_ssa_fortran_and_optimizing_llvm.py tests/test_fortran_fidelity.py -q
 33 passed, 1 warning in 13.89s
+
+python -m pytest tests/test_native_affine_learner.py \
+  tests/test_affine_matmul_solver.py tests/test_forward_reverse_cycle.py \
+  tests/test_reverse_fused_program.py \
+  tests/test_ssa_fortran_and_optimizing_llvm.py tests/test_fortran_fidelity.py \
+  tests/test_fortran_c_shell.py -q
+38 passed, 1 warning in 55.99s
 ```
 
 Turing commit pushed to `codex/recursive-reduction-bridge`:
 
 - `576c5e0` Add native Fortran affine learning visualizer
+- `b71bc08` Host affine learner in continuous native display
 
 ## Prompt History
 
 > can you give me a python callable using pygame that can run a visual representation of this process, running a compiled binary of the program you just made that tries to solve a system for a cheaper system, let's make it an - hell forget making the pygame python outer piece compile the whole thing in fortran and we'll point it at python files and we'll make a file that has a common algorithm, something maybe learnable but hard, something that will learn over time but might never perfect and that's a common verifiable algorithm
+
+> can you make it run with a visualization, the c shell should offer host for the fortran as a runnable if you compile it with the right parameters open and the right ones locked
+
+> oh i forgot to tell you I want it to be a little pretty and to keep going continuously, maybe showing simple stick ball graphs of the reference and the nerual model?
