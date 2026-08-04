@@ -34,6 +34,16 @@ loading mechanism.
   compute shader form one parallel frame deployment.
 - Added a CLI to inspect the document's card graph or reference-run it with
   visible GPU ACTIVE/IDLE transitions.
+- Lowered every block to explicit SSA calls and catalogued the parallel frame,
+  GLSL compute shader, and GLSL fragment shader as `SSADeploymentRegion`
+  records in the module deployment table.
+- Formalized `program-interior` display ownership. The standard HTML shell now
+  allocates and hands over its WebGL2 context/liaison without compiling a
+  display shader or creating a frame loop; the interior controller compiles
+  the dream-document fragment and must confirm `ownsDisplay: true`.
+- Added `--emit-shell` and generated a launchable HTML page. A real headless
+  Chrome/WebGL2 run rendered the interior-owned blue/orange chip surface and
+  green GPU-active lamp, proving the shader segment was compiled and drawn.
 
 ## Verification
 
@@ -59,3 +69,7 @@ WebGPU/WebGL, site bundle, HTML shell, and reversible-machine tests passed:
 ## Prompt History
 
 > so that's what i want us to build the simulator in, a new document using blocks just like that to manage the different computational arenas, we use languages we are comfortable with for each task, we make a dream document that is this simulator and we run it using the tape graph system for dividing programs and loading them that was just recently worked on, for now we could just have an indicator when the gpu is active - one big multi language program that doesn't bother with any of the difficulty of locking it just does what it wants to do and notates language changes, parallel deployment areas, shaders just deploy in place so they don't need any special notation for changing
+
+> what do you mean simulates the device deployment, like it just extracts and ignores those segments and we need to put in the actual templates? the templates should be using our shell ABI for display, which needs to be brought up to speed with said plan so they can hand over display entirely to the program interior if the program interior promises to take care of the visual work - the shell will just hand it the context
+
+> this does mean our ssa and IR need to know what a deployment is such that they can catalogue it as a dispatch plan
