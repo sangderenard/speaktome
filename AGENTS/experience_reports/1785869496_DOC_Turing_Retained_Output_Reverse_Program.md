@@ -25,7 +25,8 @@ original inputs from the incidental values required to justify the proposal.
 - Added `/build/` to Turing's `.gitignore` and removed 173 generated build files
   from Git tracking while retaining the files locally.
 - Preserved, tested, and committed concurrent reversible x86 read-head and
-  register-shader source work found in the shared checkout.
+  register-shader source work found in the shared checkout, followed by its
+  reversible machine-execution journal and multicore register display layer.
 
 Focused verification:
 
@@ -38,6 +39,12 @@ python -m pytest tests/test_reverse_fused_program.py \
 
 python -m pytest tests/test_x86_reversible_read_head.py -q
 4 passed in 1.46s
+
+python -m pytest tests/test_reversible_machine_execution.py \
+  tests/test_x86_reversible_read_head.py \
+  tests/test_machine_code_lifting_roundtrip.py \
+  tests/test_machine_turing_graph.py -q
+18 passed in 19.41s
 ```
 
 Turing commits pushed to `codex/recursive-reduction-bridge`:
@@ -45,6 +52,7 @@ Turing commits pushed to `codex/recursive-reduction-bridge`:
 - `736db47` Stop tracking generated build artifacts
 - `d9e3fee` Add retained-output reverse program capture
 - `e690c22` Add reversible x86 read-head history
+- `3e5e6fe` Add reversible machine execution journals
 
 ## Prompt History
 
