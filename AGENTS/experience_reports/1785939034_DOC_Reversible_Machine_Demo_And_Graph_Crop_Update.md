@@ -157,7 +157,7 @@ are not expected to be in Git.
 - Chrome screenshot: generated WebGL2 shell rendered successfully under
   SwiftShader; an early screenshot caught and led to correction of control-row
   layering.
-- `143 passed` in the final common shell, snapshot, system-port, segmented-tape,
+- `144 passed` in the final common shell, snapshot, system-port, segmented-tape,
   machine-block and authored-subject selection after widening the browser proof
   to three instructions; root Go tests and the guestbook validator also pass.
 
@@ -215,6 +215,11 @@ Chrome's deterministic `?recompiled-step=3` proof shows RAX at 43, RIP
 advancing from `0x140001000` to `0x14000100c`, the steps register changing from
 zero to three, and the HUD reporting three flips. Reverse returns to the
 initial snapshot.
+The final cleanup moved entry recompilation, retained-frame generation, Wasm
+bootstrap composition, subject/block asset assembly, shell ABI ports and
+runtime-manifest construction out of the example and into the reusable
+`build_machine_web_publication` compiler method. Republishing through that
+method is content-identical and resolves to the same immutable version.
 Memory/device-effect journals deliberately keep retained frames until their
 browser commit path exists; arbitrary browser-owned loading and capability
 dispatch remain incomplete.
