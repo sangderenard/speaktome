@@ -123,7 +123,7 @@ Build preview:
 
 Actual tracked/live site location (corrected after this assurance checkpoint):
 
-`C:\dev\Powershell\site\programs\reversible-binary-machine\versions\v1-528d10a4d394e4a5`
+`C:\dev\Powershell\site\programs\reversible-binary-machine\versions\v1-0c1ec36317a0c5c2`
 
 The bundle is generated, not hand-authored. It now uses the common immutable
 `turing-program-bundle-v1` publisher and root gallery scan. Its artifacts include
@@ -203,12 +203,15 @@ proof tapes, provides forward/reverse/single-step function-key controls, and
 journals typed commands into `console.input` without racing its free-spin owner.
 The root bundle now includes a provenance-bound machine-block Wasm artifact,
 packed state/guest window, WAT and dispatch plan. Chrome executed the subject's
-lowered `0x90` entry instruction and visibly reported `WASM BLOCK ·
-AUTHENTICATED` after checking the journal witness. The next continuation
-connected register-only Wasm journals to the common snapshot transport.
-Chrome's deterministic `?recompiled-step=1` proof shows RIP advancing from
-`0x140001000` to `0x140001001`, the steps register changing from zero to one,
-and the HUD reporting one flip. Reverse returns to the initial snapshot.
+lowered entry block and visibly reported `WASM BLOCK · AUTHENTICATED` after
+checking its journal witnesses. The next continuation connected register-only
+Wasm journals to the common snapshot transport. The fixture was then widened
+to `MOV RAX,42; ADD RAX,1; NOP; RET`, and the common dispatch/project/replay
+path now carries three witnesses rather than a bespoke single-NOP proof.
+Chrome's deterministic `?recompiled-step=3` proof shows RAX at 43, RIP
+advancing from `0x140001000` to `0x14000100c`, the steps register changing from
+zero to three, and the HUD reporting three flips. Reverse returns to the
+initial snapshot.
 Memory/device-effect journals deliberately keep retained frames until their
 browser commit path exists; arbitrary browser-owned loading and capability
 dispatch remain incomplete.
@@ -226,6 +229,8 @@ dispatch remain incomplete.
 > "prioritize the seams that will allow us to generate a published bundle with interactivity over absolute completion of program potential, you may have another hour, so I want you to focus on demo potential"
 
 > "keep in mind you are to make this runnable as the html shell not a bespoke page"
+
+> "yeah if you could reduce the bespoke content and fold everything into the common method that would be best"
 
 > "the is the keyboard linked to input, the user must be able to use the shell for the demo to be complete"
 
