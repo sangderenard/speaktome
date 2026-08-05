@@ -157,6 +157,9 @@ are not expected to be in Git.
 - Chrome screenshot: generated WebGL2 shell rendered successfully under
   SwiftShader; an early screenshot caught and led to correction of control-row
   layering.
+- `143 passed` in the final common shell, snapshot, system-port, segmented-tape,
+  machine-block and authored-subject selection after widening the browser proof
+  to three instructions; root Go tests and the guestbook validator also pass.
 
 ## Next-agent checklist
 
