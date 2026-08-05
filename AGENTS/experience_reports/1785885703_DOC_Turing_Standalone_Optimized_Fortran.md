@@ -25,6 +25,8 @@ requiring the compiler's runtime DLL directory on `PATH`.
 6. Removed the compiler directory from the runtime launch environment and
    tested an executable with only Windows `System32` on `PATH`.
 7. Added PE import-table regression checks for GNU runtime DLLs.
+8. Corrected the Fortran backend's equal-element-count shape conformance so
+   `reshape -> permute -> flatten` preserves Python/NumPy row-major order.
 
 ## Observed Behaviour
 
@@ -34,6 +36,9 @@ requiring the compiler's runtime DLL directory on `PATH`.
   `USER32.dll`; it imports no `libgfortran`, `libquadmath`, `libgcc_s`, or
   `libwinpthread` DLL.
 - The standalone fluid executable is 1,018,365 bytes.
+- A non-square transpose now produces `[0, 3, 1, 4, 2, 5]`, exactly matching
+  NumPy, instead of the former column-major-corrupted
+  `[0, 2, 4, 1, 3, 5]`.
 - The focused standalone/display suite passed 9 tests, and the final
   toolchain/display selection passed 4 tests.
 
@@ -56,3 +61,5 @@ reject standalone mode until their static-runtime flags are verified.
 > "this didn't get libfortran statically linked what's going on with that, don't do anything just explain it"
 
 > "can you make the fortran settings aggressively optimized and made standalone"
+
+> "okay, this is potentially pretty cool, but now there's something that seems like a stride/transpose thing? it's like the scene is chopped up in rows and columns so it's coming across pixelized in a pattern"
