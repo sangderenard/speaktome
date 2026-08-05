@@ -123,7 +123,7 @@ Build preview:
 
 Actual tracked/live site location (corrected after this assurance checkpoint):
 
-`C:\dev\Powershell\site\programs\reversible-binary-machine\versions\v1-c3ea746e025b4feb`
+`C:\dev\Powershell\site\programs\reversible-binary-machine\versions\v1-528d10a4d394e4a5`
 
 The bundle is generated, not hand-authored. It now uses the common immutable
 `turing-program-bundle-v1` publisher and root gallery scan. Its artifacts include
@@ -204,9 +204,14 @@ journals typed commands into `console.input` without racing its free-spin owner.
 The root bundle now includes a provenance-bound machine-block Wasm artifact,
 packed state/guest window, WAT and dispatch plan. Chrome executed the subject's
 lowered `0x90` entry instruction and visibly reported `WASM BLOCK ·
-AUTHENTICATED` after checking the journal witness. Static reverse UI remains a
-finite retained-state replay; arbitrary browser-owned loading, capability
-dispatch and journal commit are still incomplete.
+AUTHENTICATED` after checking the journal witness. The next continuation
+connected register-only Wasm journals to the common snapshot transport.
+Chrome's deterministic `?recompiled-step=1` proof shows RIP advancing from
+`0x140001000` to `0x140001001`, the steps register changing from zero to one,
+and the HUD reporting one flip. Reverse returns to the initial snapshot.
+Memory/device-effect journals deliberately keep retained frames until their
+browser commit path exists; arbitrary browser-owned loading and capability
+dispatch remain incomplete.
 
 ## Prompt history
 
