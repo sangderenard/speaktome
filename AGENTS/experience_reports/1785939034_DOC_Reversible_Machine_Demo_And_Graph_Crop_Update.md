@@ -123,7 +123,7 @@ Build preview:
 
 Actual tracked/live site location (corrected after this assurance checkpoint):
 
-`C:\dev\Powershell\site\programs\reversible-binary-machine\versions\v1-71a8fe88b7967fd7`
+`C:\dev\Powershell\site\programs\reversible-binary-machine\versions\v1-c3ea746e025b4feb`
 
 The bundle is generated, not hand-authored. It now uses the common immutable
 `turing-program-bundle-v1` publisher and root gallery scan. Its artifacts include
@@ -194,6 +194,19 @@ overwrite the canonical proof tape.
 
 The worktrees contained unrelated edits before this session. Commits must stage
 only the reversible-machine and documentation paths. Never reset other work.
+
+## Post-publication continuation
+
+Work continued after the original report and first publication. The native
+OpenGL viewer now consumes the shared page-occupancy channel, opens segmented
+proof tapes, provides forward/reverse/single-step function-key controls, and
+journals typed commands into `console.input` without racing its free-spin owner.
+The root bundle now includes a provenance-bound machine-block Wasm artifact,
+packed state/guest window, WAT and dispatch plan. Chrome executed the subject's
+lowered `0x90` entry instruction and visibly reported `WASM BLOCK ·
+AUTHENTICATED` after checking the journal witness. Static reverse UI remains a
+finite retained-state replay; arbitrary browser-owned loading, capability
+dispatch and journal commit are still incomplete.
 
 ## Prompt history
 
