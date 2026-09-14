@@ -1,0 +1,3 @@
+# Native dt-system acceptance continuation
+
+Use turing/docs/CONTINUATION_2026-09-14_NATIVE_DT.md for the current measured boundary. The raw proposal snapshot is repaired; one and two short outer calls pass 48/48. Both full-window executions complete 1/120 second, but strict parity is 38/48 with 169 native versus 167 eager substeps. Locate the earliest causal divergence in this current checkpoint without assuming the historical v145 trace still explains it. Preserve strict comparisons and complete the remaining coverage in PATCH_SEQUENCE_2026-09-07_ALL_19.md before claiming general native controller acceptance.
