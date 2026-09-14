@@ -228,6 +228,41 @@ and its intake whine. One module constant disables it for reference renders;
 the high voices remain present behind a 0.20 gain floor. Both focused tests
 pass, and an actual AGT1500 stereo render produced a finite 2,048-frame block.
 
+Checkpointed the complete earlier perforated learner as Turing commit
+`1a48ff23`, turbine audio as workspace commit `b9a90c4`, and this report as
+speaktome commit `effe395` before attempting the native optimizer cycle.
+`compile_perforated_adam_chunk` now owns a fixed-length changing-minibatch bank,
+combined forward/weighted-loss/ProcessGraph VJP motion, five-parameter Adam
+updates, ten persistent moment buffers, beta powers, and iteration in one LLVM
+entry. Three-minibatch parity matches an independent numerical reference; the
+focused LLVM file passes 4/4 in 60.40s. A real `442 -> 212` two-minibatch union
+smoke compiled in 27.19s and executed in 31ms. The artifact is cached with its
+optimizer ABI. This is an honest backend-cycle smoke: forward/loss/VJP are
+composed before LLVM, while Adam is still appended by the LLVM backend rather
+than linked from its existing functional AbstractTensor graph.
+
+The smoke was then promoted into the real live/headless engine trainer rather
+than left as a compiler probe. One shuffled complete-dataset bank is prepared
+once; a runtime int32 step count may cycle it for arbitrary epochs/passes
+without multiplying memory. Information dropout, per-motion dendrite masks,
+valid-row weights, normalized loss, generated VJP, gradient accumulation,
+global L2 clipping, and Adam all execute under the single LLVM entry. Gradient
+accumulators had to move from native stack allocations into caller-owned ABI
+buffers after the real `423 -> 212` engine revealed a Windows stack overflow.
+The focused test now proves accumulation 2, clipping 0.15, and trailing-group
+flush against NumPy. The actual headless LDT path compiled an 18-batch bank,
+ran 72 motions in one native call in 0.999s, and moved training loss from
+1.11127 to 0.02979. A prior 18-motion run took 0.228s and a cache-hit rerun
+took 0.224s. Live shadow replay now reuses the native entry with `steps=1`;
+compiled batch-1 inference continues to maintain the independent network
+engine state and audio-driving outputs.
+
+Final demo defaults were raised from toy settings to a solve-oriented union
+run: all profiles, 256 named samples and episodes per fuel/profile, 3,000
+random transitions, 32 true single-pass epochs, batch 64, accumulation 4
+(effective batch 256), clip 1.0, and Adam learning rate 0.002. All remain
+explicit CLI overrides.
+
 ## Next Steps
 
 None required for this request.
@@ -291,3 +326,11 @@ None required for this request.
 > is the profoundly long beginning to these anything we can cache?
 
 > okay, so, can we by default but opt-out by constant definition in the code, loudness compression on turbine whines over a certain frequency
+
+> okay let's take a turn, an honest full effort after a commit, and see if in one swoop we can get smoke
+
+> if you could make sure the code we compile uses normal clipping and gradient accumulation, they should already be options
+
+> you can stop using the smoke test and start making our system use a full llvm cycle we can just toss the step count into
+
+> can you set the default parameters to be a good thorough solve and less toy-like as you finish this up
