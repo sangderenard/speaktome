@@ -440,4 +440,172 @@ python -m src.compiler.native_voxel_fluid `
 > "attempt to address these failings and improve your adaptation, do not disable things, and consider the possibility of designing how, perhaps, you might capture all of dt system into one program, all of abstract tensors, etc. using non-single-shot capture like for classes, constructing a system of cards that can run the whole thing not just faithfully but parametrically. it would give you a chance to iron out problems that might exist with the multi card coordinator engine"
 
 > "can you now transition to a handoff document and extensive session logging in speaktome"
+## 2026-08-15 continuation: Python ensure-type idioms at repository SSA
 
+The linked managed-dt build exposed Python identity calls whose callable
+reference survived as a runtime operand (`float(callee, x)`, etc.). The
+generic correction is in `compiler/hierarchical_plan.py`: argument roles now
+remove `callee`/`definition` provenance when an identity has already become a
+graph-native operator. `float`, `int`, `bool`, and
+`AbstractTensor.tensor(x)` become typed repository `Cast` instructions; the
+latter retains `ensures_schema_type` and is an idempotent ensure-type boundary,
+not a reconstructed Python object. Variadic `min`/`max` and scalar `clamp`
+become explicit binary SSA folds. Scalar canonical tensor spellings are
+normalized to the existing SSA vocabulary.
+
+The C, LLVM, Fortran, and WebAssembly repository-SSA emitters now share the
+`Cast` contract. On the real fluid/control module, LLVM emission shortfalls
+fell from 126 to 71 and Fortran operator-emission shortfalls fell from 36 to
+zero. Focused hierarchy/link/Fortran tests pass (22 in the latest combined
+run); the forbidden long LLVM test was not run.
+
+`gfortran` compilation is still not complete. It first proved two shared call
+ABI defects: linked scalar result placeholders did not inherit the callee
+output dtype (boolean results became real), and call result slots overlapping
+wrapper inputs remained `intent(in)`. Both are corrected generically and
+covered by focused tests. The next compile exposes a separate Fortran ABI
+constraint first: specialized source symbols exceed Fortran's 63-character
+identifier limit. The emitter needs a deterministic internal symbol table
+that retains authored/export identity in API metadata while shortening native
+module identifiers. Subsequent rank/ownership diagnostics must be reevaluated
+after that parser-cascade blocker is removed.
+
+### Prompt History
+
+> "this is an idiom menaing ensure it's this type, and that type takes whatever as a constructor argument, we could solve it by providing an ssa idiom easier than hard coding machinery, unless that hard coded machinery also improved our general oop without sacrificing the ssa structure and flow the code has"
+
+## 2026-08-15 continuation: repository call-ABI identity and rank closure
+
+The ensure-type interpretation remains an ordinary repository `Cast`; no
+Python constructor runtime or target-specific OOP machinery was introduced.
+The next real-program build exposed a deeper shared SSA invariant violation in
+the whole-object linker: call-frame storage allocated before late aggregate
+projection could reuse the same integer ids as later, distinct `SSAValue`
+objects. A final target-neutral identity legalization now preserves authored
+arguments and outputs while freshening only synthetic result objects. Operands
+retain the same objects and therefore the same graph edges and schedule. On the
+44-function fluid/dt module this freshened 52 synthetic objects and reduced the
+distinct-object id-collision census from 11 to zero.
+
+Native `Call` arguments and callee parameters are now also settled as explicit
+repository-SSA equality constraints. Dynamic rank is recorded as
+`ssa_call_rank` and propagated only through real positional call edges. Dtype
+propagation respects contracted physical/program ABI formals and corrects
+linker-owned caller storage from those contracts. The rebuilt `binding-8`
+artifact has 53 native calls, zero arity mismatches, zero dynamic-rank
+mismatches, and zero dtype mismatches by repository-SSA census. This replaced
+an earlier unsafe Fortran experiment that inferred array rank from matching
+numeric ids in sibling regions; that inference was removed because ids are
+function-local and it incorrectly turned unrelated scalars into arrays.
+
+Fortran emission is still operator-complete (zero shortfalls) but gfortran has
+not yet accepted the whole module. The remaining diagnostics are downstream
+signature/publication issues: aggregate output arguments and locally inferred
+callee signatures are not yet consuming the settled repository call contract
+consistently, and mutation/inout information must be propagated through those
+same call edges. Explicit-shape dynamic-rank declarations are now available
+for contracted rank-two spans, but this is not yet a successful native build.
+Do not report it as runnable until `symbolic_fluid_control.f90` compiles and the
+state-evolution shell executes repeated frames.
+
+Latest real artifact:
+`turing/build/symbolic-fluid-direct-control-loop-binding-8`. It completed with
+no emergency clamp, about 0.495 GiB peak working set and 1.000 GiB peak private
+bytes. The focused hierarchy/link/Fortran suite passes: 92 tests. The forbidden
+long LLVM test and blanket pytest were not run.
+
+## 2026-08-15 continuation: whole control module compiles and links
+
+The real 42-function direct-control repository-SSA artifact now emits with zero
+Fortran shortfalls, compiles with `gfortran -c -O2`, and links as
+`fortran/symbolic_fluid_control.dll`. Loading that DLL resolves the exported
+outer `symbolic_fluid_control__symbolic_fluid_frame`, managed
+`run_superstep`, and inner `symbolic_fluid_advance` symbols. This is a native
+module/link milestone, not yet a claim that the enormous outer state ABI has
+been populated and stepped repeatedly.
+
+The fixes are general signature/dataflow rules: transitive extent closure,
+known-shape versus runtime-shape separation, aggregate-output identity
+deduplication, output dtype propagation, logical truthiness conversion,
+aggregate versus numeric GEP classification, explicit array versus scalar
+control constraints, mutation propagation, and exact native call coercions.
+Repeated whole-module rendering during extent closure was replaced with one
+local-signature discovery plus finite set closure; real-module Fortran
+emission fell from roughly 44 seconds (and one oscillatory timeout during
+development) to about 1.9 seconds.
+
+The approved focused suite now passes 94 tests:
+`tests/test_process_graph_function_linking.py`,
+`tests/test_precompile_to_ssa.py`, and
+`tests/test_ssa_fortran_and_optimizing_llvm.py`. The forbidden LLVM test and
+blanket pytest were not run. The next boundary is a generic ABI allocator and
+persistent-state invocation driven from the emitted API/sequence/record tables,
+followed by repeated outer-frame execution and semantic publication—not more
+Fortran operator patching.
+
+## 2026-08-15 continuation: generic CastLike and resident native execution
+
+The source idiom `_restore_type(value, ref)` is now represented by the generic
+repository-SSA instruction `CastLike(value, ref)`. Its second operand supplies
+the target dtype; it is not a call to Python, a helper-specific branch, or an
+OOP reconstruction. The Python identity table maps the exact authored helper
+to this instruction, and the C, LLVM, Fortran, and WebAssembly SSA emitters all
+accept it. A fresh `binding-10` ingestion contains seven `cast_like`
+instructions and no lowered `_restore_type` functions or branch regions.
+
+Dynamic extents are now namespaced by function identity because SSA ids are
+function-local. This removed silent cross-function extent collisions. Linker-
+owned storage is described as `workspace`, and arguments that are both initial
+state and published results are described as `inout`. Fortran emission also
+records the exact reference-passed arguments rather than reconstructing that
+property heuristically in the API. The resulting outer entry has zero
+Fortran/C passing-mode mismatches across its 148 non-extent arguments. GNU
+Fortran compilation uses unlimited free-form line length so the currently
+conservative dynamic signature remains valid while shape equivalence is still
+to be canonicalized.
+
+The whole authored fluid/control repository SSA now builds and executes as a
+standalone native program. The reusable driver is
+`turing/examples/run_symbolic_fluid_native.py`. A ten-frame 4x4 run completed
+successfully in 2,179,002 ns of reported shell time and published evolved
+resident state: height sum `16.017591076142676`, tracer sum
+`0.35668447028667349`, nonzero momentum, and `dt_next` approximately `1e-5`.
+The same native slots are retained across frame calls; this is repeated state
+evolution, not ten reinitializations.
+
+The approved compiler/linking suites now pass 96 tests, and focused checks for
+the Python identity, all four direct CastLike backend lanes, GNU policy, and
+native inout loading/publication also pass. The forbidden
+`tests/test_ssa_llvm_backend.py` and blanket pytest were not run. Remaining
+work is frame-by-frame semantic publication into the existing live display,
+whole-program execution in the C/LLVM/WASM lanes, and evidence-based reduction
+of the conservative 429-extent outer ABI via shape equivalence.
+
+### Correction after per-frame observation
+
+The native process executes repeatedly, but the earlier claim that its fluid
+state evolves across outer calls is **withdrawn**. Adding an opt-in flushed
+per-frame JSON stream showed three identical frames. Direct inspection of the
+repository SSA explains why: `symbolic_fluid_frame` returns its original state
+field arguments (`t16..t22`), while its linked `run_superstep` call consumes
+separately externalized field snapshots. The emitted Fortran leaves those
+published arguments untouched. Thus the first reported nonuniform values are
+initialized state, not proof of native evolution.
+
+The generic shell now correctly publishes the exact output parameter even
+when several ABI parameters share a `source_name`, and `--stream-frames`
+provides flushed observational events without changing SSA or physics. A
+shell-level attempt to copy same-source fields between frames was removed once
+the wrong repository output identity was proven; it would only have hidden the
+compiler defect.
+
+A minimal record-forwarding test demonstrated the underlying general issue:
+`root(state) -> child(state)` does not materialize caller field storage when
+only the child reads a field. Materializing every schema field was tried and
+immediately rejected: fresh `binding-11` ingestion exceeded five minutes and
+left its exact parent/worker processes, which were verified by their
+15:14:22/15:14:29 start window and stopped. No older process was touched. The
+broad fallback and its temporary test were removed; 14 focused
+function-linking/shell tests pass again. The correct next change is
+demand-driven record-field propagation along actual record-valued call edges,
+followed by a fresh ingestion and per-frame proof that values differ.
