@@ -263,6 +263,17 @@ random transitions, 32 true single-pass epochs, batch 64, accumulation 4
 (effective batch 256), clip 1.0, and Adam learning rate 0.002. All remain
 explicit CLI overrides.
 
+Adaptive sample-pool refresh is now default-on in both headless and live
+training. At epoch boundaries, compiled inference measures the whole growing
+training pool and the fixed held-out set. Falling training error below
+validation plus a widening gap triggers new real-simulator captures across all
+selected engine profiles. Named regime/control programs and an increasing
+random control/environment set are appended, normalized with the original ABI
+statistics, and sampled back into the same fixed-size LLVM bank without a
+recompile. A forced-trigger LDT run grew 33 -> 87 training rows after a 0.26246
+gap increase, then completed the second native epoch; training loss moved
+0.89212 -> 0.13489 and validation improved 0.73089 -> 0.64798.
+
 ## Next Steps
 
 None required for this request.
@@ -334,3 +345,5 @@ None required for this request.
 > you can stop using the smoke test and start making our system use a full llvm cycle we can just toss the step count into
 
 > can you set the default parameters to be a good thorough solve and less toy-like as you finish this up
+
+> I think we should by default also refresh the sample pool as the difference between validation and loss grows with loss trending down under the validation we should be increasing the new source programs of control and environmental events that touch on the whole engine engine
