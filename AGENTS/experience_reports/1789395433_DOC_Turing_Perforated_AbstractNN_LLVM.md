@@ -274,6 +274,27 @@ recompile. A forced-trigger LDT run grew 33 -> 87 training rows after a 0.26246
 gap increase, then completed the second native epoch; training loss moved
 0.89212 -> 0.13489 and validation improved 0.73089 -> 0.64798.
 
+## Recurrent whole-trajectory LLVM cycle
+
+Commit `ca4bfb45` adds an AbstractTensor perforated recurrent transition whose
+latent state is an explicit input/output, plus a fixed-length whole-trajectory
+graph. The ProcessGraph generator differentiates the recurrence itself; the
+native Adam wrapper cycles complete experiences, accumulates one gradient over
+the experience pool, clips it, and updates all parameters in one LLVM call.
+
+The first two-transition native attempt exposed an operand-free specialization
+failure: summing per-transition scalar losses caused the unit-seeded `bw_add`
+helper to publish output-only arguments without initializing them. The forward
+loss was finite, but raw gradients were denormal garbage and recurrent weight
+contained NaN before Adam. Accumulating elementwise squared-error tensors and
+performing one final reduction is mathematically identical and preserves an
+explicit tensor adjoint through every addition. After that change every raw
+gradient was finite. A two-experience/four-epoch native run returned losses
+0.01363855 and 0.00856959, clipped norm 0.23298344, and finite parameters.
+Focused recurrent tests passed 2 in 51.48 seconds. The user-facing real-engine
+recurrent demo remains gated until its capture-bank ABI is connected to this
+full native cycle and a full-scale held-out autonomous rollout passes.
+
 ## Next Steps
 
 None required for this request.
