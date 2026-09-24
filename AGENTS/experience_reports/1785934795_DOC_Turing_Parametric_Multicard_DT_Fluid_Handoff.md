@@ -268,7 +268,7 @@ it with the SSA loop-carried blocker.
 
 All checkpoints are ignored build artifacts under:
 
-`C:\dev\Powershell\turing\build\native-voxel-fluid-full-physics-probe\aot-checkpoint\aot-checkpoints`
+`C:\dev\Powershell\turing\artifacts\compiler_checkpoints\native-voxel-fluid-full-physics-probe\aot-checkpoint\aot-checkpoints`
 
 Keys present at handoff:
 
