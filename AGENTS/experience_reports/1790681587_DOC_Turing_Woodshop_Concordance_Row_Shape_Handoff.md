@@ -262,6 +262,14 @@ step. Verified eagerly: same state object and same span arrays across two
 steps (0.45 s). Rollback inside a round remains `copy_shallow`/`restore`.
 Note: the rebuilt turing venv needed `joblib<1.6` (1.6 dropped
 `joblib.externals.cloudpickle`, which `aot_checkpoint.py` imports).
+**Instantiation hook (user's design):** `instantiate_state(pieces, columns,
+targets=…)` in `llvm_dt_system.py` is the one place the state is made — the
+spelled `PieceState`/`advance_pieces`, the wall-cost ledger, the participant
+registry and the time-velocity record all live for the state's lifetime; a
+round only binds columns and runs; a state handed to other pieces is
+refused. Verified: one class generation, `type(state) is PieceState` every
+call, ledger windows accumulate across calls. Further hooks (pre-round,
+post-round, post-top-step) are anticipated, not built.
 
 ## Gauntlet track (examples/python_semantics_gauntlet.py, probe build/python_gauntlet_probe.py)
 
