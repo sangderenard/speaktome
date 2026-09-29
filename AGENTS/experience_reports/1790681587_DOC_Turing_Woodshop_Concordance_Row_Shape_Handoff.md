@@ -144,11 +144,20 @@ per item, per lane, with the abs/scaled/ULP report shape of
 `engine_toy/time_trials/compare_woodshop_newton.py` (whose inner-Newton
 rating already reached 0 ULP). Before any rating means anything, resolve:
 
-- **Red flag:** the emitted wrapper exposes only ~21 public buffer slots and
-  allocates hundreds of private `root_storage_*` arenas. If per-item part
-  positions and momenta live only in private arenas with no prologue copying
-  host fields in, the native step runs on zeros rather than the world's
-  state. Verify from the wrapper section of the `.c` first.
+- **Red flag — CONFIRMED (slot map `build/woodshop_outer_native/public_slots.json`,
+  module snapshot `module.pkl`, both written by the probe):** 21 public
+  slots = `dt`, `items.length`, `items.keys` (17 tokens), `items.values`
+  (a *scalar* int64 — wrong for a 17-entry keyed table), `restitution`,
+  `friction`, eleven `contacts` cells, `last_metrics` handle + presence,
+  `_newton_batch`, one `void **` pointer table. 392 of the root's 413
+  formals carry no `program_abi_field` and are private `calloc`+`memset 0`
+  arenas — among them the `float64 [3]`, `float64 [3,3]`, `int64 [17]`
+  spans that are the items' positions, rotations, momenta and masses. The
+  native step runs on an empty world. **First rating defect:** nested
+  keyed-record rows (`items` → `WorldMachine` → `parts` table,
+  `linear_momentum_kg_m_s`) never became public ABI inputs/outputs, and the
+  record relocation prologue emitted nothing. Being traced to its decision
+  point (record ABI materialization vs. the C wrapper's structural split).
 - No marshaller exists for `keyed -> record rows` (`items`) or `table`
   (`parts`) fields; `_managed_native_feeds_by_id` handles flat fields only.
 - `contacts` and `last_metrics` are `reference` storage in the probe ABI, so
