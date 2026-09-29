@@ -132,9 +132,29 @@ then failed only because array initializers spelled infinity as Python
 `inf`. That is fixed too: the emitted C compiles to an object with zero
 errors.
 
+**Native library built (09:56, same commit):**
+`build/woodshop_outer_native/woodshop_outer_physics__woodshop_physics_step.dll`
+(343 KB) links from the emitted C plus three `.ll` law pieces. Exported ABI:
+`void woodshop_outer_physics__woodshop_physics_step(void **buffers, long long *extents)`,
+fed through `CModuleArtifact.prepare_execution(feeds_by_ssa_value_id)`.
+
 **Next frontier: the correctness rating** (the user's stated step after
-clean C). Build and link the library, then compare the native Woodshop step
-against the Python Woodshop.
+clean C): compare the native step against the Python Woodshop per step,
+per item, per lane, with the abs/scaled/ULP report shape of
+`engine_toy/time_trials/compare_woodshop_newton.py` (whose inner-Newton
+rating already reached 0 ULP). Before any rating means anything, resolve:
+
+- **Red flag:** the emitted wrapper exposes only ~21 public buffer slots and
+  allocates hundreds of private `root_storage_*` arenas. If per-item part
+  positions and momenta live only in private arenas with no prologue copying
+  host fields in, the native step runs on zeros rather than the world's
+  state. Verify from the wrapper section of the `.c` first.
+- No marshaller exists for `keyed -> record rows` (`items`) or `table`
+  (`parts`) fields; `_managed_native_feeds_by_id` handles flat fields only.
+- `contacts` and `last_metrics` are `reference` storage in the probe ABI, so
+  they have no native read-back unless the ABI is extended.
+- Pickle the lowered `module` beside the DLL so slot -> field names are
+  recoverable (idiom in `compare_woodshop_newton.py --module-snapshot`).
 
 ### Superseded: the callee-return edge is a pseudo-identity
 
