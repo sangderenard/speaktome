@@ -254,6 +254,15 @@ buffers allocated once, items as views onto them. Open: where the lane-view
 descriptor lives; fate of the `enable_native_newton` hybrid; closing the
 tuple annotation gap.
 
+**First step landed (user request):** `dt_system`/`dt_system_from_graph`
+(`turing/examples/llvm_dt_system.py`) accept the caller's persistent
+`PieceState` and bind columns into its spans in place instead of building a
+fresh state per call; Woodshop passes `state=self.newton_dt_state` back each
+step. Verified eagerly: same state object and same span arrays across two
+steps (0.45 s). Rollback inside a round remains `copy_shallow`/`restore`.
+Note: the rebuilt turing venv needed `joblib<1.6` (1.6 dropped
+`joblib.externals.cloudpickle`, which `aot_checkpoint.py` imports).
+
 ## Gauntlet track (examples/python_semantics_gauntlet.py, probe build/python_gauntlet_probe.py)
 
 Twenty CPython-semantics torture cases with frozen expectations, compiled
