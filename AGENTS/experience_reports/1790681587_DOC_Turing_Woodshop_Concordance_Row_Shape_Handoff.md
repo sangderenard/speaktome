@@ -90,6 +90,51 @@ with `TURING_DEBUG_SEQUENCE_ROW_LAYOUT=1` before reasoning about logic.
 - `glsl_deployment_strategy.py`: the call-site re-proof of a returned shape
   is now recorded as a callee-return transformation edge.
 
+### Fixed: loop-continuation rewires were unrecorded morphs
+
+`loop_composer.rewire_continuation` moved a consumer's operand from a
+comprehension's materializer node to its collection `LoopResult` without
+recording anything. Consumers described before loop composition therefore
+kept their old answers. In `center_xyz`, `np.asarray([...])` stayed scalar,
+so `.mean(axis=0)` returned a scalar. Rewires are now recorded on the page
+`loop_continuation_rewire_concordance`, and every derivation below the port
+is withdrawn. Verified: inside `center_xyz`, `asarray` is now rank 2,
+dynamic, row `(3,)`, and `mean(axis=0)` is `(3,)`.
+
+### Fixed: comprehensions had no shape law before loop composition (7 -> 1)
+
+The item below turned out to be downstream of a confusion one step earlier.
+Call-site return specialization reads a copy of the callee taken **before**
+loop composition, and in that copy a list comprehension had no descriptor
+law at all; only the composed collection `LoopResult` had one. The
+comprehension node and its port now share one law (commit `5fbf693b`).
+Woodshop: `OUTER_NATIVE_EMITTED complete=False shortfalls=1`. Only the
+`argmin` shortfall in `_resolve_pair` remains.
+
+Cost: the compile took about 650 s to finish lowering, against about 330 s
+before. The large phases were ABI settlement round 2 (~199 s), the
+sequence-schema survey (~144 s), and final legalization/reconciliation
+(~163 s). This needs a phase-by-phase comparison against an earlier run,
+whose full log was overwritten, before it is accepted.
+
+### Superseded: the callee-return edge is a pseudo-identity
+
+After the rewire fix, Woodshop still emits the same 7 shortfalls. The
+`center_xyz()` call value in `_advance_newton_dt_system` took its shape
+from the callee return during the call-site fixed point, which settled
+**before** `center_xyz`'s own loop composition corrected its return. The
+caller's edge names `("return", callee)` as its source rather than the
+callee's actual returned value, so the corrected return has no edge to
+travel to the call site. It reaches the call value only at SSA enrichment,
+after the `centers` row layout was committed as `()`.
+
+Direction: in `call_result_descriptor`
+(`glsl_deployment_strategy.py`), record the edge from the callee's
+returned value identity to the return identity, so that the caller's
+call-value derivation is withdrawn and re-derived when the return changes.
+Also check what re-derives a withdrawn call value once the call-site fixed
+point has ended.
+
 ### Open, next to verify
 
 `loop_composer.add_port` copies the element's `tensor` onto every new port,
