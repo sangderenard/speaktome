@@ -156,6 +156,27 @@ rating already reached 0 ULP). Before any rating means anything, resolve:
 - Pickle the lowered `module` beside the DLL so slot -> field names are
   recoverable (idiom in `compare_woodshop_newton.py --module-snapshot`).
 
+### Gauntlet track (examples/python_semantics_gauntlet.py, probe build/python_gauntlet_probe.py)
+
+Twenty CPython-semantics torture cases with frozen expectations, compiled
+through the same entry and contracts as Woodshop. Fixed so far (each a
+compiler defect, per the rule that valid Python must compile):
+- source pursuit follows calls through a loop over a static table of
+  functions (`for case in CASES: case()`);
+- ragged literal tuples no longer crash the literal descriptor rule;
+- a module table of source functions is a static tuple of
+  `FunctionReference`s (found by declared `module.qualname` identity);
+- `functools.reduce` folds into a carried loop at binding install.
+
+Remaining rejection: the `case()` call result is unavailable. Lowering it
+as a dispatch table (runtime loop + switch over the 20 callees) is blocked
+on a design item: the compiler has **no union/variant value**, and the 20
+callees return 20 different types. User direction (2026-09-29): establish
+the SSA for unions in a type table first, then the memory/alignment model
+(aligned at small and large scale; nodus's tensor arena as reference).
+Design notes are being gathered by workers; see the memory note
+`project-union-type-design`.
+
 ### Superseded: the callee-return edge is a pseudo-identity
 
 After the rewire fix, Woodshop still emits the same 7 shortfalls. The
