@@ -281,6 +281,22 @@ Remaining per-step preparations: the contact laws (`eq_N5_6`, `eq_N5_7`)
 called per contact through the run-law wrappers — no outer instantiation
 asks them yet; their operands are per-contact scalars, a different span
 pattern than lane columns.
+**Standardized (user's rule: "auto and standardized at the llvm dt system
+level"):** `PIECE_API` (`entry, argument_names, output_names, batch,
+instantiate, __call__`; `contract` optional), `require_piece` at both entry
+doors, `instantiate_pieces` cascade at all three levels (lockstep state,
+nested `RoundPiece` adopting the parent's spans, `Subcycle` against its own
+state); the state owns its instantiated pieces so a later round never
+re-interprets the graph. Verified at all three levels; bit-identical.
+**Rule (user): nothing in Woodshop manages a dt system; a "unique" Woodshop
+characteristic was probably meant for llvm_dt_system.** Engine-side dt
+management still to move: per-step `columns` marshalling and `RoundNode`
+construction; `_newton_dt_next` continuation; `_run_law(piece, **values)`
+per-contact law calls (→ contact laws as pieces of a round over contact
+lanes; sequential-per-pair vs batched semantics to decide);
+`enable_native_newton`/`_run_native_newton` (→ the dt system's own
+`lowered_system`/`NativeSystem` path). See memory
+`feedback-woodshop-does-not-manage-dt-system`.
 
 ## Gauntlet track (examples/python_semantics_gauntlet.py, probe build/python_gauntlet_probe.py)
 
