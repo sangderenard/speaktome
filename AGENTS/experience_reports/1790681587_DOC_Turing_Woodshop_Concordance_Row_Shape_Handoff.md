@@ -156,8 +156,35 @@ rating already reached 0 ULP). Before any rating means anything, resolve:
   native step runs on an empty world. **First rating defect:** nested
   keyed-record rows (`items` → `WorldMachine` → `parts` table,
   `linear_momentum_kg_m_s`) never became public ABI inputs/outputs, and the
-  record relocation prologue emitted nothing. Being traced to its decision
-  point (record ABI materialization vs. the C wrapper's structural split).
+  record relocation prologue emitted nothing.
+  **Traced (module snapshot + code):** one defect. In
+  `materialize_parameter_record_abi`, rows of a `keyed` field with a
+  `value_record` are materialized only for `indexed_value_candidates` of
+  *this function's graph* and only for leaves with `record_field_candidates`
+  (GetAttr reads) here. The binding root only calls `world.step(...)`, so it
+  indexes nothing; the 17 `WorldMachine` rows and their nested
+  `sim.machine.parts` columns get no root ABI identity; the frame linker
+  (`_linked_caller_member`) finds no caller resident and leases callee
+  workspace (`linked_call_frame_storage`, `program_abi_*` stripped by
+  design), which the C wrapper correctly treats as private. All 392 private
+  arenas carry that lease. The nested-table branch additionally requires the
+  contract to spell `columns`; the probe declares `parts` by `row_record`
+  only, though `_record_row_sequence_columns` can derive them. Fix point is
+  the keyed branch of the binding function's materialization: rows from the
+  declaration, not from local reads.
+  **Fixed (turing commit "Own keyed-record rows at the binding function"):**
+  the binding function owns the rows from the declaration as row-pooled
+  `items[].<leaf>.column` spans; rows are a pairable RECORD field of the
+  parent on every frame; the pooled column is a member of the callee's row
+  record; fixed-shape span leaves are pooled too. Result: 37/37 callee
+  column formals bind (was 0/37), six row columns (`custody`, `slot`,
+  `pose_state`, `sim.machine.identity` `[17]`; `orientation_deg_xyz`,
+  `linear_momentum_kg_m_s` `[17,3]`) are public root inputs, `items.values`
+  is `[17]`, emission complete, library links. Still deferred and reported
+  on the book: the nested `parts` table (needs the `lengths`/`row_stride`
+  child-table layout at the declaring function) and the `edges[]`
+  reference leaves. 391 private arenas remain; their classification
+  (authored state vs compiler temporaries) is the next rating step.
 - No marshaller exists for `keyed -> record rows` (`items`) or `table`
   (`parts`) fields; `_managed_native_feeds_by_id` handles flat fields only.
 - `contacts` and `last_metrics` are `reference` storage in the probe ABI, so
