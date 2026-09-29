@@ -315,6 +315,27 @@ the step; their removal (and the pygame demo's call) awaits the user's word.
 **Still to move (row 4):** `_run_law` contact laws → pieces of a contact
 round over persistent contact lanes; the sequential-per-pair vs batched
 ordering is the open decision.
+**Decided (user):** forces are never integrated outside a force-integrator
+step; contacts are force laws INSIDE the Newton round (peers of gravity,
+before the integrators), the controller subdivides by their declared
+exchange time; no per-pair impulses, no positional teleports. Map
+(2026-09-29): contact force law exists (`eq_N11_1` penalty, clamped);
+friction as force `eq_N8_2/3` (continuous) or `eq_N5_5` (discontinuous at
+rest); stiffness published via `energy_j/power_w/dt_limit/div_inf`,
+`contract=BIND`. Missing dt-system features: two lane spaces in one state,
+gather/scatter-add across lane spaces, additive force composition (gravity
+overwrites `force_z`), pair geometry as a piece; catalogue declarations
+`k_pen`/`b_pen` (and N8/N11 absent from the markdown catalogue). Order proposed (floor first with
+`eq_N11_1`, then lane spaces) was **WITHDRAWN by the user**: nothing outside
+the honorary equations for collision, and no invented stiffness. Either real
+pure-math implementations of the top CS collision methods (at the very
+least), or -- strongly preferred -- collision structured on **force
+transfer**: the reaction force is the encountered material's response to the
+imposed deflection (beam solver for members; sediment or fluid model by the
+material's nature) -- a force mitigation system, not a collision system. The
+contact row is blocked until this is settled; a map of the existing beam
+solver, material declarations, sediment/fluid models and catalogue impact
+laws is being gathered. Memory: `feedback-collision-is-force-transfer-not-penalty`.
 
 ## Gauntlet track (examples/python_semantics_gauntlet.py, probe build/python_gauntlet_probe.py)
 
