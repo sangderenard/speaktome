@@ -117,6 +117,25 @@ sequence-schema survey (~144 s), and final legalization/reconciliation
 (~163 s). This needs a phase-by-phase comparison against an earlier run,
 whose full log was overwritten, before it is accepted.
 
+### Milestone: complete C emission (commit `0b0594e6`)
+
+The last shortfall (`argmin` in `_resolve_pair`) came from generator rows.
+`part_bounds_xyz` yields `(part, lo, hi)`, and a generator had no
+caller-visible product, so the destructured `lo_a`/`hi_a` were never
+described in the graph phase. Fixed by publishing each yield column as a
+`yield_row` transformation state on the caller's call value; destructured
+loop targets now read column k. The late SSA writer
+(`publish_projected_iterable_layouts`) now records its shape writes.
+
+Result: `OUTER_NATIVE_EMITTED complete=True shortfalls=0`. The native build
+then failed only because array initializers spelled infinity as Python
+`inf`. That is fixed too: the emitted C compiles to an object with zero
+errors.
+
+**Next frontier: the correctness rating** (the user's stated step after
+clean C). Build and link the library, then compare the native Woodshop step
+against the Python Woodshop.
+
 ### Superseded: the callee-return edge is a pseudo-identity
 
 After the rewire fix, Woodshop still emits the same 7 shortfalls. The
