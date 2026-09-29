@@ -361,6 +361,98 @@ pattern: `craft_graph` secant stiffness -> `limit_s = 2/sqrt(k/m)`;
 (over-approximate, no contact point); needs oriented-box SAT / GJK-EPA,
 contact point/patch, CCD.
 
+### Session log 2026-09-29 (evening): what landed, where the line is
+
+All hashes verified against `git log` in the named repo. No compiler
+numberings here; they are valid for one run.
+
+**turing (`C:\dev\Powershell\turing`, `main`):**
+- `e8d3c4d5` temporary diagnostics removed (`temporary_woodshop_descriptor_trace`,
+  `TURING_DEBUG_SEQUENCE_RECORD_ABI`); `shutil` imported where
+  `compile_fortran_module_c_shell` uses it. PARKED section 5 items done.
+- `bc34adba` `llvm_dt_system`: rollback is the system's declared choice.
+  `rollback` and `rollback_threshold_multiplier` are declared scalar fields
+  in `dt_system_contract`; `dt_system_over` reads them directly;
+  `RoundPiece.__call__` passes its plan's rollback. `residual` metric added;
+  telemetry 9 -> 10 slots. Residual default still the user's.
+- `81ce8292` dtype/layout authority `src/transmogrifier/dtype_layout.py`:
+  one declaration of every dtype's size, alignment and lane spelling;
+  replaces 11 of 12 per-backend dtype tables; alignment declared for the
+  first time; equivalence check 2628 checks / 0 failures. This is UNION
+  design step 1, landed without touching questions U1-U5. Follow-up in
+  progress: `fortran_c_shell._NUMPY_DTYPES` is the twelfth table.
+- `abd7f803` + `7891d0fa`, from another session, merged fast-forward:
+  `tools/compiler_probes/probe_row_handle_record_parameter.py` (seconds-long
+  repro of the frame-linker failure below);
+  `src/transmogrifier/ctypes_layout.py` (reads size/alignment/offsets off
+  live `ctypes.Structure`/`Union`); `SSAStructDescriptor`/`SSAUnionDescriptor`
+  with `struct_table`/`union_table` on `IRModule` (plain dicts, not yet
+  book-backed, nothing produces or consumes them);
+  `tools/compiler_probes/probe_union_torture.py` (fails at lowering until a
+  frontend exists).
+
+**root repo (`C:\dev\Powershell`, `nogodsnomasters`):**
+- `735d051` Woodshop: the native run inside the Python program removed
+  (`enable_native_newton`/`_run_native_newton` and the pygame demo's call).
+  Closes the "fate of the hybrid" item above.
+- `8715038` `engine_toy/time_trials/` compare/profile scripts deleted. The
+  line is the whole compiled program, so the correctness harness must be
+  rewritten against the whole program; every pointer in this doc to
+  `compare_woodshop_newton.py` (abs/scaled/ULP shape, `--module-snapshot`
+  idiom) is stale. PARKED section 2's pointer likewise.
+- `a47e353` `engine_toy/machine_materials.py`: part material strings bound
+  to existing records with a declared nature; asking an `UNDECLARED`
+  material for mechanics raises. 2 strings resolve to records; 21 are
+  undeclared and await the owner's choice.
+- `077c224` N11 constraint-response stage laws `eq_N11_9..19`, LawScale
+  `constraint_response_stage`, markdown N8/N11 sections, refs R35-R40. The
+  proof compile of one stage failed: `symbolic_abstract_tensor_source`
+  passes SymPy names such as `a_{eff}` verbatim as Python identifiers;
+  Woodshop's consumer route xreplaces symbols first. Decision pending:
+  respell the laws vs consumer maps.
+- PARKED section 6 (uncommitted engine_toy) is resolved by the above.
+
+**Where the line is (whole-program Woodshop validator, after `81ce8292`):**
+reached record ABI materialization at ~520 s with zero shortfalls (dtype
+authority, rollback fields and the reduce fold all passed), then failed in
+the frame linker `_linked_caller_member` while building source-call
+records. Site: the new `_sync_newton_lanes`. A `center_xyz` argument is
+column 0 of declared field `woodshop.WorldMachine.orientation_deg_xyz` on
+one record, but the caller-side binding is to a record without that field.
+This is the class-A row-handle cause recorded above ("Unifying cause of
+class A"), at a new site. Repro in seconds:
+`tools/compiler_probes/probe_row_handle_record_parameter.py`.
+
+**Direction, UNCONFIRMED here:** another session's branch summary records a
+user direction that records become laid-out types (ctypes
+`Structure`/`Union`) rather than decomposed columns. Not confirmed in this
+session. If true, the row-handle fix is throwaway and the linker failure is
+answered by the type rows landed in `7891d0fa` once a frontend produces
+them. Do not apply the row-handle rule until the user confirms one way or
+the other.
+
+**Ballistics finding (held for the user):** the penetration model shelved
+under Poncelet (`eq_PO1_3..PO4_3`) is an empirical composite mislabelled as
+Poncelet. Its pure-math home would be a `symbolic_*` lane; the material
+record needs toughness/hardness/ductility before it can be consumed.
+
+**Held for the user's word** (mirrors PARKED section 7): catalogue detection
+engine name (then SAT + clipping stage equations); fixed-point cycle form
+(schedule value vs node kind); `residual` default; iterate-column
+declaration; union U1-U5; ballistics relocation; the 21 material bindings;
+N11 symbol spelling; laid-out-type direction confirmation.
+
+### Next
+
+1. Read the linker diagnosis lane's report (the `_linked_caller_member`
+   failure at `_sync_newton_lanes`, traced through the probe above); do not
+   patch the linker on the strength of this summary.
+2. Confirm the laid-out-type direction with the user. It decides whether
+   the row-handle rule is applied or discarded.
+3. Then the frontend path doc: how a laid-out type (ctypes
+   `Structure`/`Union`) enters the compiler and produces `struct_table`/
+   `union_table` rows the linker can consume.
+
 ## Gauntlet track (examples/python_semantics_gauntlet.py, probe build/python_gauntlet_probe.py)
 
 Twenty CPython-semantics torture cases with frozen expectations, compiled
