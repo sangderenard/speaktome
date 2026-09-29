@@ -270,6 +270,17 @@ round only binds columns and runs; a state handed to other pieces is
 refused. Verified: one class generation, `type(state) is PieceState` every
 call, ledger windows accumulate across calls. Further hooks (pre-round,
 post-round, post-top-step) are anticipated, not built.
+**Pieces get the hook too (user's design: instantiation cascades):**
+`LLVMPiece.instantiate(columns)` prepares the artifact's ABI once against
+the spans it will be handed every round (inputs alias; a copy is refused;
+binding is runtime-only and dropped from pickles), and `instantiate_state`
+asks every participant with the hook to instantiate. Verified: the three
+Newton pieces prepare once, zero per step (was 3 per substep); inputs share
+memory with the state spans; five hooked steps bit-identical to per-call.
+Remaining per-step preparations: the contact laws (`eq_N5_6`, `eq_N5_7`)
+called per contact through the run-law wrappers — no outer instantiation
+asks them yet; their operands are per-contact scalars, a different span
+pattern than lane columns.
 
 ## Gauntlet track (examples/python_semantics_gauntlet.py, probe build/python_gauntlet_probe.py)
 
