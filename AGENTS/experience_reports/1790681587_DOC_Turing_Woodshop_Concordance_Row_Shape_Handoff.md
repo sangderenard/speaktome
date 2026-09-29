@@ -185,6 +185,32 @@ rating already reached 0 ULP). Before any rating means anything, resolve:
   child-table layout at the declaring function) and the `edges[]`
   reference leaves. 391 private arenas remain; their classification
   (authored state vs compiler temporaries) is the next rating step.
+  **Classified (module snapshot, every lease chased to its origin):**
+  A = authored state still private: **74** — `parts` table columns (33, one
+  private copy per call path), `orientation_deg_xyz` per-call sequence view
+  (28, never stored to: `euler_matrix_deg` reads zeros), the
+  `linear_momentum_kg_m_s` row span at parameter-record sites (5: `_momentum`,
+  `_set_momentum`, `_resolve_*`; the public `[17,3]` column is passed but
+  never sliced), the `_world_items` `custody`/`mass_kg` predicate cells (4:
+  zero-fed → filter false → the contact loop never runs), `edges` (4).
+  B = correct compiler temporaries: **302** (155 local-sequence
+  length/capacity/status/column cells, 60 law-kernel and rotation scratch
+  cells, 53 frame scratch, 34 dead lease tails). C = unclear: 15.
+  **Unifying cause of class A:** a record *parameter* whose declared type is
+  the `value_record` of a keyed field (`WorldMachine` → `items`) is a row
+  handle, but it is materialized as a flat record with its own per-call
+  fields; and a handle-typed value flowing through a local sequence
+  (`world_items`) has no record descriptor, so pairing fails and the callee
+  is leased. Fix: treat such a parameter as the row handle (pooled branches
+  with `row_handle_id = parameter id`), and pair a handle-typed value with
+  the keyed field's declared row record (`program_abi_keyed_row_record`).
+  **Separate, critical finding:** `woodshop_newton_gravity/momentum/position`
+  have zero callers; `dt_system_from_graph`, `newton_dt_state`,
+  `_newton_dt_pieces`, `_newton_dt_next` appear nowhere. The compiled step
+  fills the Newton `columns` and writes momentum/position back but performs
+  **no Newton advance**. Whether the dt round is meant to be compiled in or
+  supplied by the separately compiled native Newton system
+  (`_run_native_newton`) is a contract/architecture decision for the user.
 - No marshaller exists for `keyed -> record rows` (`items`) or `table`
   (`parts`) fields; `_managed_native_feeds_by_id` handles flat fields only.
 - `contacts` and `last_metrics` are `reference` storage in the probe ABI, so
