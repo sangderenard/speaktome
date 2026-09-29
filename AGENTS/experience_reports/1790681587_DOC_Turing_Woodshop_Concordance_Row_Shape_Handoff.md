@@ -297,6 +297,24 @@ lanes; sequential-per-pair vs batched semantics to decide);
 `enable_native_newton`/`_run_native_newton` (→ the dt system's own
 `lowered_system`/`NativeSystem` path). See memory
 `feedback-woodshop-does-not-manage-dt-system`.
+**Moved (user: rows 1–3 yes):** `llvm_dt_system.instantiate_system(root,
+columns)` interprets the graph once and makes the state once, carrying the
+controller, targets, dx, schedule, scope, default window and the
+continuation `dt_next`; `advance_round(state, window)` runs one round.
+Woodshop now instantiates once, syncs its items into the lane spans in
+place (interim, until items are views), asks for the window, reads back;
+no per-step columns/RoundNode/controller, no `_newton_dt_next`, no branch
+on a native system. Verified: graph once, state once, zero Newton
+preparations per step, five steps bit-identical to the pre-rewrite
+reference. **User on the lowered system:** no runtime choice between native
+and eager inside a Python program and no native window driven from
+Python; a Python program is Python pieces, a native program is the whole
+thing compiled, and the compiler's job there is linking existing modules.
+`enable_native_newton`/`_run_native_newton` remain in the file, unused by
+the step; their removal (and the pygame demo's call) awaits the user's word.
+**Still to move (row 4):** `_run_law` contact laws → pieces of a contact
+round over persistent contact lanes; the sequential-per-pair vs batched
+ordering is the open decision.
 
 ## Gauntlet track (examples/python_semantics_gauntlet.py, probe build/python_gauntlet_probe.py)
 
