@@ -141,3 +141,37 @@ patch the merge check.
 - `.venv` lacks PyYAML; probes run with the system Python 3.11.
 - Root repo (`nogodsnomasters`) and speaktome are clean apart from this
   report.
+
+## Second checkpoint (later on 2026-09-30): steps 2-3 landed
+
+Committed in turing (local, not pushed): declarations module `ca79244b`,
+design correction `7bde183c`, REVISE-rule change `90fc38b0` (a different
+set of derived cells is a cause), and steps 2-3 in one commit (see its
+message for the full list). Vocabulary for steps 2-3 lives in
+`src/compiler/concordance_declarations.py` (objects, no strings).
+
+State: annotated-scalar and struct-intake probes pass; audit first lines
+identical on all six cases; unsourced counts baseline +2..+21 (residual =
+`new_node` callers with no source, the next worklist). Lane C's final
+audit run and its new probe `tools/compiler_probes/probe_branch_written_field.py`
+were still running at commit time -- run them first next session and fix
+on top if either fails.
+
+Findings to act on next:
+- Lane B's section-7 scratch programs fail the full-native contract with
+  unaccounted formals at `ca79244b` too: pre-existing, the class of defect
+  steps 2-3 feed; the linker does not yet consume field-state cells.
+- The single-exit rewrite upstream of the reducer turns two returns into one
+  `return name`, so a record receiver is not a return-slot value; the field's
+  state at the exit is the MERGED cell on the exit phi (plan 70 section 2.3
+  assumed per-return sites).
+- After a loop that wrote a field, the post-loop cursor is Unresolved
+  (LOOP_EXIT_FIELD_STATE_UNMERGED); a later read gets no after_write ordering
+  operand. Held for the user with the loop-merge question.
+- Not on the book yet: `lexical_read_binding` (undeclared page, 24 raw rows
+  per case), `identity_transition` (so `_set_operands` NOVEL posts are not
+  yet possible), `selected_class_identities`.
+- Test to update per plan 60 E13: `test_process_graph_function_linking.py::
+  test_callable_dataclass_field_preserves_function_identity` expects history
+  `(0,)` and two rows (ingestion + canonical).
+- Scratch worktree `Temp\wtb2` now at `ca79244b`; remove when done.
