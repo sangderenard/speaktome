@@ -302,3 +302,14 @@ are described in this report if lost.
 - Still running: step 4 (planner + the dropped-arm fix), step 5 (control
   builder), step 9 plan. Their continuation notes appear at the paths listed
   above when they finish.
+- Step 9 plan committed (turing `901a758d`, `100_plan_step9_...md`): Part A
+  graphs as views (operand edges = identity_transition Append rows through
+  `_set_operands` as the ONE edge writer; ~24 hand-written edge writers to
+  route; CONTROL_BLOCK/PLACEMENT/PROGRAM/SSA_BLOCK pages), Part B emission
+  layer (EMISSION_UNIT/FUNCTION/ARTIFACT per backend). Top risk: backends run
+  after `end_identity_book` and must use `identity_book(module)`, never
+  `current_identity_book()` (mints a detached book silently). Needs step 5's
+  identity_transition and step 6's SSA value identity first.
+- RECONCILE before step 6 executes: plan 80's `ssa_value` page (step 5,
+  fresh_value mints) and plan 90's `SSA_VALUE_IDENTITY` (step 6) are the SAME
+  page; step 6 must adopt step 5's declaration, not add a second.
