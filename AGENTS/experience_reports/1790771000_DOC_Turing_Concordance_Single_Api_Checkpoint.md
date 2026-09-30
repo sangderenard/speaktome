@@ -150,12 +150,24 @@ set of derived cells is a cause), and steps 2-3 in one commit (see its
 message for the full list). Vocabulary for steps 2-3 lives in
 `src/compiler/concordance_declarations.py` (objects, no strings).
 
-State: annotated-scalar and struct-intake probes pass; audit first lines
-identical on all six cases; unsourced counts baseline +2..+21 (residual =
-`new_node` callers with no source, the next worklist). Lane C's final
-audit run and its new probe `tools/compiler_probes/probe_branch_written_field.py`
-were still running at commit time -- run them first next session and fix
-on top if either fails.
+State: annotated-scalar, struct-intake and the new
+`tools/compiler_probes/probe_branch_written_field.py` probes pass (the last
+prints field schema -> OBSERVED/WRITTEN/MERGED cells -> exit state -> SSA
+field versions with their edges); all six audit cases lower; first lines
+identical except the generic `[unsourced-fact]` group counts; unsourced
+counts baseline +2..+21 (residual = `new_node` callers with no source, the
+next worklist). Lane C reported after the commit: its edits are in
+`12a14051`.
+
+Lane C's two "not as spelled" items: the twelve return-version Reasons are
+DORMANT until a return-merge-Phi identity cell exists (step 6, S18: selection
+rows read `attributes["identity_cell"]`, absent today); the record-return
+Cast is not yet minted NOVEL (no declared page carries a VALUE_ID for it; the
+selection row records the conversion). Two more pre-existing defects it
+surfaced: a function returning a tuple with a record is rejected by the
+execution contract, and an `if` arm holding only a scalar field write is
+dropped so its Store lands unguarded (the honesty path now reports it as
+ARM_VERSION_MISSING).
 
 Findings to act on next:
 - Lane B's section-7 scratch programs fail the full-native contract with
