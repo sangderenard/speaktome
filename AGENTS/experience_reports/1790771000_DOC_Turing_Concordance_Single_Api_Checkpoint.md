@@ -187,3 +187,48 @@ Findings to act on next:
   test_callable_dataclass_field_preserves_function_identity` expects history
   `(0,)` and two rows (ingestion + canonical).
 - Scratch worktree `Temp\wtb2` now at `ca79244b`; remove when done.
+
+## Third checkpoint (2026-09-30, later): plans 4-8, two diagnoses, six decisions held
+
+turing commits since the second checkpoint (local, not pushed): `2acc155b`
+shape re-resolutions derive from their edge (controller: cells with a
+DERIVED edge 38% -> 53%; plan 60 E13 test edited, not run); `74b8b219`
+plans 80 (steps 4-5) and 90 (steps 6-8) + `probe_scalar_write_only_arm.py`;
+`65d62903` `probe_record_in_tuple_return.py`. The user's other session
+committed `658daed6`, `5c48c89a` (viewer: --drift, oscillator audit case,
+mass toggle) and `42b99e87` (AbstractTensor comparisons) on main in between.
+
+Record completeness (measure_completeness.py in the session scratchpad;
+re-create from its description if lost): per case, every cell is edged,
+minted or tagged (silent = 0); cells with a DERIVED edge 23-53%; unsourced
+55-68%; 100-125 pages written, 20-24 declared; MINTED SSA ids with a mint
+record: 0 (steps 5-7). Api adoption (static, src outside the book module):
+48 post sites vs 107 raw-primitive writes vs 130 mint sites.
+
+Two pre-existing miscompiles diagnosed to their pass, repro probes committed,
+NOT fixed (the user decides):
+- Dropped scalar-write arm: `_ordinary_conditional_control_programs` counts
+  its retention reasons before scanning the reducer's field-state merge
+  phis, so `if c: m.f = x` (arm = one field write) gets no ConditionalBlock
+  and the write is appended to the enclosing arm; before steps 2-3 the Store
+  landed unguarded, now the control builder refuses
+  (carried-field-arm-missing). Fix: the merge phi (source_conditional_id ==
+  this conditional, field_state_arms) is a retention reason.
+- Guarded tuple return: `_normalize_top_level_guard_returns.result_assignment`
+  assigns the whole tuple to one single-exit name; arms bind aggregates with
+  no SSA producer; the merge is promoted to an unnamed formal. Fix: split per
+  lane as `_normalize_direct_tail_recursion.ExitReturnRewriter` does.
+
+Six decisions HELD for the user (recommendations in the chat log and plans):
+plan 80 -- per-copy scope for forked callee specializations (recommended);
+refuse silent snapshots for name-carried arms (recommended). plan 90 --
+CELL_SET rows for many-source posts (recommended); record, not raise, on
+argument_binding's storage-from-absence (recommended); RESIDENT_CHOSEN_BY_ORDER
+recorded as its own reason (recommended); latch closes only when both generic
+findings are zero on all seven audit cases and the audit tool exits on them
+(recommended). Also open from earlier: loop-exit field-state merge.
+
+Next: user's word on the six; then execute plans 80/90 with function-level
+ownership splits (steps 6 and 7 both live in fortran_c_shell.py); the raw-only
+page inventory (`75_...md`, lane still running at this checkpoint) gives the
+declaration blocks.
