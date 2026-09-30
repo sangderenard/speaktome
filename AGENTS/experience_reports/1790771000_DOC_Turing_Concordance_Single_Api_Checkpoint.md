@@ -232,3 +232,55 @@ Next: user's word on the six; then execute plans 80/90 with function-level
 ownership splits (steps 6 and 7 both live in fortran_c_shell.py); the raw-only
 page inventory (`75_...md`, lane still running at this checkpoint) gives the
 declaration blocks.
+
+## Fourth checkpoint (2026-09-30, model switch imminent): lanes in flight
+
+Decided by the user (design section 7, commit `4249738b`): every callee copy
+is its own specialization variant with its own scope, always (the fold that
+made `rollback` a constant was HONEST: the source omitted the argument, so
+under the contract it was the default); the scope ladder is correct -- an
+arm the book records as not writing takes the entered version; refuse
+`ARM_VERSION_MISSING` only when the book records a version the builder
+cannot find. Plan 90's four decisions remain recommendations (checkpoint 3).
+
+Concept the user stated (to carry forward): the concordance is the ENTIRE
+description of the compilation -- its input is the IR graphs (process graph,
+control graph), its output is the emitted language. Today the graphs are
+pinned at the node level (`ingestion_value`/`canonical_value` cells from
+`source_span` roots) but graph EDGES and control BLOCKS are only partly on
+the book, and NO edge exists from an SSA value to the text a backend emits.
+Step 9 (plan `100_...`, lane running) makes the graphs views of the book and
+adds an `emission` layer, so a C token diffuses back to its source span in
+the globe viewer.
+
+Lanes running at this checkpoint (each was told to write its own
+continuation note; look for these files, committed or untracked):
+- Step 4 planner (plan 80 part A) -> `docs/concordance_census/CONTINUATION_step4_planner.md`.
+  Owns glsl_deployment_strategy, hierarchical_plan, loop_composer,
+  transformation_priority, shell_reference_tables, process_graph_function_linking,
+  reducer `fork_read_scope`; declarations in the "Step 4" section of
+  concordance_declarations.py; carries the fix for the dropped scalar-write
+  arm (`probe_scalar_write_only_arm.py` must pass).
+- Step 5 control builder (plan 80 part B) -> `CONTINUATION_step5_control_builder.md`.
+  Owns precompile_to_ssa, ssa_call_input_adapters, ir_identities, reducer
+  `_set_operands` body; "Step 5" declarations section; `cell_set` page for
+  many-source posts; MINTED ids gain mint records.
+- Guarded tuple return fix -> `CONTINUATION_guard_tuple_return_fix.md`.
+  Owns only `_normalize_top_level_guard_returns` in fortran_c_shell.py;
+  `probe_record_in_tuple_return.py` must pass.
+- Raw-only page inventory -> `75_raw_only_pages_inventory.md` (with a
+  Continuation section).
+- Step 9 plan -> `100_plan_step9_graph_input_and_emission_output.md` (with
+  a Continuation section).
+
+Gate for committing any lane's work: `probe_annotated_scalar_parameter`,
+`probe_struct_intake`, `probe_branch_written_field` (+ the lane's probe)
+pass; `tools/audit_identity_concordance.py` seven first lines identical to
+baseline (view 0, toplevel 1, energy 0, controller 1, controller_untyped 5,
+mapping 0, oscillator 0 findings); report the `unsourced:` counts and the
+measurement script's DERIVED percentage before/after. Commit each lane
+separately; never `git add -A`; do not push unless told.
+
+Scratch: `Temp\wtb2` worktree at `ca79244b` (baseline for steps 2-3);
+session scratchpad scripts (`measure_completeness.py`, `check_post_api.py`)
+are described in this report if lost.
