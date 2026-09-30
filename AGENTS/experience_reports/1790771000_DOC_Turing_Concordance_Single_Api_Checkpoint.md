@@ -284,3 +284,21 @@ separately; never `git add -A`; do not push unless told.
 Scratch: `Temp\wtb2` worktree at `ca79244b` (baseline for steps 2-3);
 session scratchpad scripts (`measure_completeness.py`, `check_post_api.py`)
 are described in this report if lost.
+
+### Landed after checkpoint 4 (budget restored, lanes continued)
+
+- Inventory committed (turing `93d46bda`): 148 raw-only page names; per
+  owner step 4 = 28 pages, step 5 = 18, step 6 = 17, step 7 = 27, step 8 =
+  12, unowned 21 (tensor_ssa_lowering, ssa_call_input_adapters,
+  ir_identities, ssa_self_check, sequence-contract helpers, fcs shape seam),
+  steps 1-3 remainder 25. Eleven pages embed a process id in their scope
+  (`id(caller.G)`; the `name@control:<id>` scope minted in
+  `lower_control_sections_to_ssa`) -- the step 5 lane was told to book-mint
+  that scope and re-key them. DRAFT declare_page blocks in section 10.
+- Guarded tuple return FIXED (turing `a9555bd5`): the guard rewrite splits
+  tuple returns per lane like the tail-recursion rewriter; receipt gains
+  result_names/tuple_result_arity; repro probe passes; native correctness
+  14/14; audit first lines unchanged.
+- Still running: step 4 (planner + the dropped-arm fix), step 5 (control
+  builder), step 9 plan. Their continuation notes appear at the paths listed
+  above when they finish.
