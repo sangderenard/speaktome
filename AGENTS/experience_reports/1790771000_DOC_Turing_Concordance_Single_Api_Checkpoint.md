@@ -74,7 +74,16 @@ forwarding-edge fix, the frontend path trace.
    natively; audit identical. Baseline proved it is NOT the cause of the
    dt-system failure below.
 
-### In flight when the limit hit
+### Landed after the report was first written
+
+- **Viewer committed** (turing, `tools/view_identity_concordance.py`, first time
+  tracked): real edges via the read api, `--diffuse`/key D diffusion mode,
+  `--infer-edges auto|on|off`, HUD. With the latch OPEN 153/162 mapping rows
+  are raw-tagged unsourced, so diffusion over real edges is nearly empty until
+  steps 2-3 land; heuristic inference stays on by default until the latch
+  closes. Shots under turing/shots/ (scratch).
+
+### In flight when the limit hit (now resolved above)
 
 - **Viewer lane** (Fable) extending `tools/view_identity_concordance.py`
   (UNTRACKED local file; the pygame/OpenGL globe): real DERIVED/MINT/
