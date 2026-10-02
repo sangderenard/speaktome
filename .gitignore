@@ -9,7 +9,8 @@ build/
 .vs/
 .vscode/
 node_modules/
-todo/*.stub.md
+# stubfinder output, regenerated (and wiped) on every run
+todo/generated/
 nonuploading-resources/
 # Agent toolkit binaries
 AGENTS/tools/bin/busybox
