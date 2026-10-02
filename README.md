@@ -22,6 +22,8 @@ Testing conventions, including the distinction between `tests/` and `testing/`, 
 
 ## Design context
 
+**Research thesis:** [`SPEAK_TO_ME_PROBABILITY_GEOMETRY.md`](SPEAK_TO_ME_PROBABILITY_GEOMETRY.md) frames Speak to Me as an instrument for sampling and navigating the conditional-probability geometry of an autoregressive model — entropy, top-logit margins, Jensen–Shannon behavioral distance, reconvergence, Fisher sensitivity, and provenance-typed forward/backward edges — and separates literature-supported results from project hypotheses.
+
 For the C++ simulation ethos, read [`CRT_Vector_Manifesto.md`](CRT_Vector_Manifesto.md). For the beam-search direction—parallel forward/backward beams, independent batched/threaded workers, and “wide truth” region estimation—read [`VISION_FORWARD_BACKWARD_DIFFUSION.md`](VISION_FORWARD_BACKWARD_DIFFUSION.md).
 
 ## Legacy tooling
