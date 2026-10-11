@@ -1,5 +1,42 @@
 # Bounded graph work integrated with the real compiler
 
+2026-10-11 N4 EMISSION FOLLOW-UP (patch34 sequence_phi_span_cast_extents.patch):
+Observed N4 first-five negative list: four replacement helper i64 Phis fed
+by i32 zero constants, plus a planned-region span Cast without runtime extent
+origin. Tiny exact replacement helper reproduced the width refusal before
+editing; lower_sequence_replace now mints zero/one as int64, matching its
+existing index/backedge/length cells. Status remains its existing int contract.
+Native C and LLVM replacement tests include alias/nonalias, repeated calls,
+empty/excess/negative length, corrupt source capacity and preserved failure contents.
+
+Separate tiny nested-call span Cast reproduced the exact missing-extents
+message. LLVM's existing origin walk now follows the exact same-rank numeric
+Cast SSA operand edge, preserving precision-specific origins. Cast-only regions
+join existing %extents propagation. No fabricated size or single-element fallback.
+Native tests cover rank1/2/3, nested call depth1/2 and positive/negative2**40;
+an actually unbound extent still refuses. 18 targeted cases passed34.92s;
+combined UI/telemetry/sequence/merge/span/adjacent LLVM gate135 passed41.20s,
+zero failures/skips. Cffi deprecation remains unsuppressed.
+
+Untouched C:/dev/tg-base comparison: same sequence index/seed width mismatch
+exists, but its old pointer-Phi emitter never validates pointee widths and
+reports no replacement shortfall. Current gate exposes that latent SSA contract
+defect. The separate span Cast repro DOES refuse on untouched baseline too.
+This is not a claim the entire user's N4 program now emits successfully:
+no saved SSA survived in profile_rules_4_llvm_3kkhydfy and no agent N4 rerun.
+Next user-run should add --save-ssa; exception lists only first5 shortfalls.
+Actual N4 graph-work receipt remains worker_threads0/admission_limit1 and
+source_and_ssa_pagedFalse;2,203,705 book cells RAM/0 pages spilled. Those
+architectural concerns are not solved by the display or these native repairs.
+
+Both fixes installed in canonical live, benchmark and repair copies;1975
+Python/contract files compared, only preserved repair N4 diagnostic hooks differ.
+Storage-effects assets refreshed/load-only verified for final source:
+live e18005a989ae4399ef836f1ede43c0e3, benchmark d786ca7bc17cd9f79de4a614ea340d51,
+repair fc187adb43eeb801700c4eff2c855f06;1690 rows/188 functions/0 structural
+findings and0 unposted IDs,1116 unsourced facts OPEN in each.
+
+
 2026-10-11 ONE-OWNER TERMINAL DISPLAY (patch33 compiler_live_display.patch):
 Auto uses installed Rich14.3.3 Live; optional progress_renderer=auto/rich/tqdm
 or TURING_COMPILE_RENDERER. No dependency installed; no Rich import headless.
@@ -89,6 +126,12 @@ optional; the original Python copier and faster serial route remain available.
 **Title:** Coordinated dispatch residency, native workers and publication
 
 ## Overview
+
+Latest user evidence: pasted N4 log at
+C:/Users/alber/.codex/attachments/4684b2ab-2ada-4af4-b09e-9c9b2d562005/Pasted text.txt.
+Its final error begins (verbatim):
+
+> ValueError: artifact has shortfalls: step_3__step_with_dt_control_used__specialized_b1717615e68e__ssa_sequence_586_replace_65: Phi: phi 2305843010213713288 physical element i64 disagrees with incoming ((2305843010213713279, 'i32'),);
 
 Terminal-display prompt (verbatim):
 
