@@ -22,6 +22,10 @@
 - The operator cancelled the Windows iPhone/Sideloadly installation path on
   2026-10-24 and will use a Mac with Xcode. Do not resume Windows SDK download,
   Apple authentication, or sideload setup unless it is requested explicitly.
+- GitHub Actions run `40093986493` completed the unsigned iPhoneOS link and
+  Metal validation with Xcode 16.4 / iPhoneOS SDK 18.5. Do not repeat this
+  build frontier; the remaining iOS work is signing, provisioning, TestFlight
+  or direct-device delivery, and physical-device behavior.
 - Attach an ARM64 Vulkan Android phone, run
   `examples/mobile_reference_app/android/install_android.ps1`, inspect
   `adb logcat -s TuringMobile`, exercise touch/rotation/background-resume, and

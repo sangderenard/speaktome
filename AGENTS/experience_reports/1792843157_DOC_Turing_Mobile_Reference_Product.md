@@ -161,3 +161,26 @@ compiler tooling. The staged installers remain ignored build inputs only. The
 operator will use a Mac with Xcode for final SDK linking, signing,
 provisioning, and device installation; no Windows sideload tooling is part of
 the continuation.
+
+## GitHub macOS iPhoneOS link receipt
+
+Turing commit `8fb85e7b` added `.github/workflows/ios-mobile-reference.yml`
+and was pushed to `origin/main`. GitHub Actions run `40093986493` completed
+successfully in 1m15s on `macos-15`. It ran the focused compiler/mobile tests,
+emitted the Turing `ios-arm64` object, linked the Objective-C++ host against
+the real iPhoneOS SDK, assembled the unsigned IPA, validated both Mach-O
+products and the bundle plist, compiled both generated Metal sources, and
+uploaded the product.
+
+Observed runner/toolchain receipt:
+
+- Xcode 16.4, build 16F6
+- iPhoneOS SDK 18.5
+- artifact `turing-mobile-ios-unsigned`, GitHub artifact id `12559184637`
+- downloaded IPA size 15,120 bytes
+- IPA SHA-256 `281bf91ca299824cfc39716cdb46220513492c12c4ca7e48438f2cd47957781c`
+- run: `https://github.com/sangderenard/Turing/actions/runs/40093986493`
+
+This closes the compiler, shader, SDK-link, bundle, and unsigned-package
+frontier without a local Mac. Apple signing, provisioning, and delivery to a
+physical iPhone remain the only iOS deployment stages not exercised.
