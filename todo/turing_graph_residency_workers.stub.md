@@ -1,5 +1,20 @@
 # Turing: extend bounded dispatch work to source/SSA ownership units
 
+2026-10-12 CURRENT LIVE STORAGE CHECKPOINT:
+Read canonical Turing TEST_BASELINE_AND_HAZARDS.md opening update and the
+1791561850 guestbook report. Physical container descriptors are paged and Python
+headers weakly cached, not a second concordance. Disk-backed reachability sweep
+now runs at existing dead-stage/owned compile cleanup;42 storage/regulation tests
+pass including fresh source/Python-oracle LLVM execution. Two-tile stress gate
+took304.58s; do not claim speedup. Conservative128MiB decoded-byte budget is not
+a whole-process bound. Tile-directory/opaque-leaf and scratch/export/native ABI
+floors remain open. The user's all35/full-run stop is STILL IN FORCE.
+Next: repair dependency_levels conditional arms63/21 and34/11 at canonical
+loop-exit/conditional carry writers. Body Load definitions do not dominate exits;
+the same failure was verified on untouched tg-parity-base. Preserve dominance
+and existing book identities. Then bound physical indexes/opaque and pass buffers
+and prove actual source payload exceeds declared headroom before any full run.
+
 2026-10-11 FRESH N4 SOURCE COMPILE VERIFIED:
 User requested: "Nothing is useful to us if you fix it in ir, that is never okay, so please verify the source compile works"
 Ran canonical source38c2da32 through unchanged public source compiler:

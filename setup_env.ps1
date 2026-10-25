@@ -11,10 +11,7 @@ $env:ENV_SETUP_BOX = "`n$(Get-Content $env_box_file -Raw)`n"
 
 # Ensure required build backend is available
 try {
-    python - <<'PY' 2>$null
-import importlib.util, sys
-sys.exit(0 if importlib.util.find_spec("poetry.core.masonry.api") else 1)
-PY
+    python -c 'import importlib.util, sys; sys.exit(0 if importlib.util.find_spec("poetry.core.masonry.api") else 1)' 2>$null
     if ($LASTEXITCODE -ne 0) {
         Write-Host "[INFO] poetry-core missing; installing to enable editable builds"
         python -m pip install -q --user 'poetry-core>=1.5.0'
@@ -68,11 +65,11 @@ if (-not $Codebases) {
     # Let dev_group_menu handle interactive selection
 }
 $menuArgs = @()
-if ($Codebases) { $menuArgs += '-Codebases'; $menuArgs += ($Codebases -join ',') }
+if ($Codebases) { $menuArgs += '-codebases'; $menuArgs += ($Codebases -join ',') }
 if ($Groups) {
     foreach ($g in $Groups) {
         if ($g -and $g.Trim().Length -gt 0) {
-            $menuArgs += '-Groups'
+            $menuArgs += '-groups'
             $menuArgs += $g
         }
     }
