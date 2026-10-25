@@ -18,6 +18,7 @@ try:
     import json
     import os
     import re
+    import shutil
     import subprocess
     import sys
     import threading
@@ -233,6 +234,9 @@ def install_selections(
     env = os.environ.copy()
     env.setdefault("PYTHONPATH", str(ROOT))
     env.setdefault("PIP_NO_BUILD_ISOLATION", "1")
+    pip_base = [pip_cmd]
+    if pip_cmd == "pip" and shutil.which(pip_cmd) is None:
+        pip_base = [sys.executable, "-m", "pip"]
 
     # Gather all selected group names across codebases
     selected_groups: set[str] = set()
@@ -246,21 +250,23 @@ def install_selections(
     else:
         base_cmd += ["--without", "cpu-torch", "--without", "gpu-torch"]
 
-    subprocess.run(base_cmd, check=False, env=env)
+    if shutil.which("poetry") is not None:
+        subprocess.run(base_cmd, check=False, env=env)
 
     # Install torch groups separately so failures don't stop other packages
     for grp in (g for g in selected_groups if g in {"cpu-torch", "gpu-torch"}):
-        subprocess.run(["poetry", "install", "--sync", "--no-interaction", "--with", grp], check=False, env=env)
+        if shutil.which("poetry") is not None:
+            subprocess.run(["poetry", "install", "--sync", "--no-interaction", "--with", grp], check=False, env=env)
 
     # Install codebases and extra pip packages
     for cb, groups in selections.items():
         cb_path = CODEBASE_PATHS.get(cb, ROOT / cb)
         if cb_path.is_dir():
-            subprocess.run([pip_cmd, "install", "--no-build-isolation", "-e", str(cb_path)], check=False, env=env)
+            subprocess.run([*pip_base, "install", "--no-build-isolation", "-e", str(cb_path)], check=False, env=env)
         for grp, pkgs in groups.items():
             if grp not in {"cpu-torch", "gpu-torch"}:
                 for pkg in pkgs:
-                    subprocess.run([pip_cmd, "install", pkg], check=False, env=env)
+                    subprocess.run([*pip_base, "install", pkg], check=False, env=env)
 
 
 def interactive_menu_selection() -> tuple[list[str], dict[str, dict[str, list[str]]]]:
@@ -380,6 +386,8 @@ def _normalize_args(args: list[str] | None) -> list[str]:
 
 
 def main(argv: list[str] | None = None) -> None:  # pragma: no cover - CLI
+    if argv is None:
+        argv = sys.argv[1:]
     argv = _normalize_args(argv)
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(

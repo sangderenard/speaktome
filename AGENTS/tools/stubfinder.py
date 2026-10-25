@@ -4,7 +4,9 @@
 Recursively searches the provided directories for comments containing
 ``STUB:`` in the standard format defined by
 ``AGENTS/CODING_STANDARDS.md``. Each discovered block is written to the
-``todo`` directory so agents can track outstanding work.
+``todo/generated`` directory so agents can track outstanding work. That
+directory belongs to this tool alone: hand-written ``todo/*.stub.md``
+files live one level up and are never touched here.
 """
 
 from __future__ import annotations
@@ -33,7 +35,7 @@ STUB_START_REGEX = re.compile(r"^\s*#\s+##########\s+STUB:\s+(?P<name>.+?)\s+###
 # Match the terminating line consisting solely of '# ' followed by many '#'.
 STUB_END_REGEX = re.compile(r"^\s*#\s+#{60,}\s*$")
 
-DEFAULT_OUTPUT = Path("todo")
+DEFAULT_OUTPUT = Path("todo") / "generated"
 
 
 def extract_stubs(path: Path) -> list[tuple[int, list[str]]]:
@@ -112,7 +114,7 @@ def print_stub(path: Path, lineno: int, block: list[str]) -> None:
 
 def write_stub_files(stubs: list[tuple[Path, int, list[str]]], output: Path) -> None:
     """Write stub blocks to ``output`` directory, one file per stub."""
-    output.mkdir(exist_ok=True)
+    output.mkdir(parents=True, exist_ok=True)
     for existing in output.glob("*.stub.md"):
         existing.unlink()
     for file, lineno, block in stubs:

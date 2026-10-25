@@ -5,6 +5,11 @@ for the beam search stack in this repository, before they start "optimizing"
 it into something narrower. Read this before touching `speaktome/core/beam_search.py`,
 `speaktome/core/lookahead_controller.py`, or `tensors/abstraction.py`.
 
+> The research program this machinery serves — what "wide truth" is measured
+> as (entropy, margin, Jensen–Shannon behavioral distance, reconvergence) and
+> how forward and backward edges must keep separate provenance — is in
+> [`SPEAK_TO_ME_PROBABILITY_GEOMETRY.md`](SPEAK_TO_ME_PROBABILITY_GEOMETRY.md).
+
 ## The existing building blocks
 
 The current code already gives us the primitives we need:

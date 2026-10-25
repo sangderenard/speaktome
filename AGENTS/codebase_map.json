@@ -104,7 +104,11 @@
   },
   "tools": {
     "path": "AGENTS/tools",
-    "groups": {}
+    "groups": {
+      "openrgb-sdk": [
+        "openrgb-python>=0.3.7,<0.4"
+      ]
+    }
   },
   "wheelhouse": {
     "path": "wheelhouse",

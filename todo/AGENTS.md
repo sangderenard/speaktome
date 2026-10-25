@@ -4,12 +4,16 @@ This directory holds open work items and prototypes. When you write an experienc
 
 ## Stub Tracking
 
-`AGENTS/tools/stubfinder.py` scans the codebase for `STUB:` blocks and writes
-each one here as an individual `.stub.md` file. The filename is based on the
-source path and starting line number.
+Hand-written stubs (experience-report "Next Steps", handoffs) go directly in
+`todo/` and are tracked by Git like any other file.
 
-Running the tool first deletes existing `.stub.md` files, ensuring results stay
-current rather than piling up. The developer setup scripts invoke this utility
+`AGENTS/tools/stubfinder.py` scans the codebase for `STUB:` blocks and writes
+each one to `todo/generated/` as an individual `.stub.md` file. The filename is
+based on the source path and starting line number.
+
+Running the tool first deletes the existing `.stub.md` files in
+`todo/generated/`, ensuring results stay current rather than piling up. That
+folder is ignored by Git; never put hand-written stubs there. The developer setup scripts invoke this utility
 automatically so stubs are captured at startup.
 
 Agents may implement a stub by creating a new file with the same basename but a
