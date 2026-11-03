@@ -1,5 +1,6 @@
 """Tests for speaktome.core.flux_graph."""
 
+import copy
 import math
 
 import torch
@@ -83,6 +84,7 @@ def test_seed_creates_anchor():
 
 def test_tick_publishes_aggregate_mid_tick_status_without_graph_objects():
     graph = _build_graph(branch_factor=1, compute_budget=1)
+    graph.config.graph_auditor_enabled = True
     graph.seed([0])
     graph.spawn_first_children()
     statuses = []
@@ -91,14 +93,16 @@ def test_tick_publishes_aggregate_mid_tick_status_without_graph_objects():
     graph.tick()
 
     phases = [status["phase"] for status in statuses]
-    assert phases[0] == "settling"
-    assert "model_inference" in phases
+    assert phases[0] == "auditing"
+    assert "settling" in phases
+    assert "expanding" in phases
     assert "auditing" in phases
     assert phases[-1] == "complete"
     assert statuses[-1]["tick"] == 1
     assert statuses[-1]["current"] == statuses[-1]["total"] == 1
     assert statuses[-1]["live_nodes"] > 0
     assert statuses[-1]["elapsed_seconds"] >= 0
+    assert statuses[-1]["phase_elapsed_seconds"] >= 0
     assert all("nodes" not in status and "edges" not in status for status in statuses)
 
 
@@ -132,7 +136,12 @@ def test_seed_reservoir_gate_supplies_and_skims_ions_bidirectionally():
     assert deficient["main:forward"] > 0.0
     supplied_balance = reservoir.ion_amount
 
-    saturated = {"main:forward": 1.0}
+    # A chamber with no solvent has nothing for the ion to be dissolved in --
+    # exchange_with requires water present at the membrane to move anything
+    # across it in either direction. A small amount is enough to pass that
+    # gate without materially changing this chamber's over-concentration
+    # (still well above the reservoir's 0.5 band) that the skim below tests.
+    saturated = {"main:forward": 1.0, "solvent": 0.1}
     reservoir.exchange_with(saturated)
 
     assert saturated["main:forward"] < 1.0
@@ -155,10 +164,11 @@ def test_seed_displacement_dumps_all_old_heart_contents_to_csf():
     assert heart.chambers == {}
     assert all(reservoir.ion_amount == 0.0 for reservoir in heart.reservoirs.values())
     assert all(reservoir.design_storage == 1.0 for reservoir in heart.reservoirs.values())
-    assert graph.bath["main:forward"] == 3.0
-    assert graph.bath["main:backward"] == 3.0
-    assert graph.bath["solvent"] == 2.0
-    assert graph.bath["salt"] == 0.5
+    old_local_bath = graph.bath_by_node[old_anchor_id]
+    assert old_local_bath["main:forward"] == 3.0
+    assert old_local_bath["main:backward"] == 3.0
+    assert old_local_bath["solvent"] == 2.0
+    assert old_local_bath["salt"] == 0.5
 
 
 def test_off_seed_tier_heart_is_spilled_and_removed():
@@ -175,8 +185,8 @@ def test_off_seed_tier_heart_is_spilled_and_removed():
 
     assert pumps == {"main": seed_id}
     assert f"net:{forward_id}" not in graph.hearts
-    assert graph.bath["solvent"] == 1.25
-    assert graph.bath[f"net:{forward_id}:forward"] == 0.75
+    assert graph.bath_by_node[forward_id]["solvent"] == 1.25
+    assert graph.bath_by_node[forward_id][f"net:{forward_id}:forward"] == 0.75
 
 def test_seed_reservoir_state_round_trips_with_fluid_persistence():
     graph = _build_graph()
@@ -188,6 +198,8 @@ def test_seed_reservoir_state_round_trips_with_fluid_persistence():
     graph.background["main:forward"] = 0.3
     graph.soil["main:forward"] = 0.1
     graph.rhizome["waste:salt"] = 0.4
+    graph.habitats[graph.anchor_id]["main:forward"] = 1.5
+    graph.movement_count = 2
 
     state = graph.export_fluid_state()
     restored = _build_graph()
@@ -203,6 +215,28 @@ def test_seed_reservoir_state_round_trips_with_fluid_persistence():
     assert restored.soil == {"main:forward": 0.1}
     assert restored.rhizome == {"waste:salt": 0.4}
     assert restored.rhizome_owner_id == restored.anchor_id
+    assert restored.habitats[restored.anchor_id]["main:forward"] == 1.5
+    assert restored.movement_count == 2
+
+
+def test_branch_maturity_round_trips_with_reconstructed_edges():
+    graph = _build_graph(branch_factor=1)
+    anchor_id = graph.seed([0])
+    graph._attach_forward_children(anchor_id, [-0.1], [[1]])
+    child_id = graph.nodes[anchor_id].children_ids[-1]
+    graph.edges[(anchor_id, child_id)].maturity = 0.7
+    state = graph.export_fluid_state()
+    restored = _build_graph(branch_factor=1)
+
+    restored.restore_state(
+        copy.deepcopy(graph.nodes),
+        anchor_id,
+        graph.anchor_tokens,
+        graph.tick_count,
+    )
+    restored.import_fluid_state(state)
+
+    assert math.isclose(restored.edges[(anchor_id, child_id)].maturity, 0.7)
 
 
 def test_generic_node_factory_consumes_declared_materials_in_declared_medium():
@@ -210,6 +244,9 @@ def test_generic_node_factory_consumes_declared_materials_in_declared_medium():
     anchor_id = graph.seed([0])
     graph._attach_forward_children(anchor_id, [-0.1], [[1]])
     node = graph.nodes[graph.nodes[anchor_id].children_ids[-1]]
+    # A factory's medium is the water it reacts in -- no solvent, no
+    # metabolism, regardless of how much feedstock is sitting there.
+    node.solvent = 5.0
     node.solubles = {"feedstock": 2.0}
     node.factories = [
         MaterialFactory(
@@ -245,11 +282,12 @@ def test_material_scarcity_drives_fractional_growth_interest():
     assert node.backward_growth_interest == 0.0
 
 
-def test_factory_waste_dumps_into_global_csf():
+def test_factory_waste_dumps_into_local_interstitial_bath():
     graph = _build_graph(branch_factor=1)
     anchor_id = graph.seed([0])
     graph._attach_forward_children(anchor_id, [-0.1], [[1]])
     node = graph.nodes[graph.nodes[anchor_id].children_ids[-1]]
+    node.solvent = 5.0
     node.solubles = {"feedstock": 2.0}
     node.factories = [
         MaterialFactory(
@@ -264,10 +302,10 @@ def test_factory_waste_dumps_into_global_csf():
     graph._run_node_factories()
 
     assert node.solubles["useful"] == 1.0
-    assert graph.bath["waste:salt"] == 0.5
+    assert graph.bath_by_node[node.id]["waste:salt"] == 0.5
 
 
-def test_all_cousin_hearts_share_one_global_csf_bath():
+def test_cousin_hearts_exchange_with_their_own_spatial_bath_localities():
     graph = _build_graph(branch_factor=1)
     graph.config.csf_link_rate = 0.5
     anchor_id = graph.seed([0])
@@ -284,8 +322,8 @@ def test_all_cousin_hearts_share_one_global_csf_bath():
     main._run_hooks("post")
     cousin._run_hooks("post")
 
-    assert graph.bath["main:forward"] > 0.0
-    assert graph.bath[f"{cousin_region}:backward"] > 0.0
+    assert graph.bath_by_node[anchor_id]["main:forward"] > 0.0
+    assert graph.bath_by_node[cousin_id][f"{cousin_region}:backward"] > 0.0
 
 
 def test_active_seed_owns_one_conserved_rhizome_and_exudes_soil_salts():
@@ -299,7 +337,10 @@ def test_active_seed_owns_one_conserved_rhizome_and_exudes_soil_salts():
     graph._exude_rhizome_to_soil()
 
     assert graph.rhizome_owner_id == anchor_id
-    assert graph.bath == {"solvent": 2.0, "main:forward": 5.0, "waste:salt": 2.0}
+    assert graph.bath == {}
+    assert graph.bath_by_node[anchor_id] == {
+        "solvent": 2.0, "main:forward": 5.0, "waste:salt": 2.0
+    }
     assert graph.rhizome == {"main:forward": 4.0, "waste:salt": 1.6}
     assert graph.soil == {"main:forward": 1.0, "waste:salt": 0.4}
     graph._attach_forward_children(anchor_id, [-0.1], [[3]])
@@ -466,8 +507,14 @@ def test_reciprocal_ion_shortage_accumulates_center_seeking_interest():
     graph.nodes[forward_id].solubles["main:backward"] = 1.0
     graph.nodes[backward_id].solubles["main:forward"] = 1.0
     graph._update_nutrient_growth_interest()
-    assert graph.nodes[forward_id].backward_growth_interest == 0.0
-    assert graph.nodes[backward_id].forward_growth_interest == 0.0
+    assert math.isclose(
+        graph.nodes[forward_id].backward_growth_interest,
+        graph.config.growth_commitment_retention,
+    )
+    assert math.isclose(
+        graph.nodes[backward_id].forward_growth_interest,
+        graph.config.growth_commitment_retention,
+    )
 
 
 def test_nutrient_reconciliation_clears_supply_without_double_counting_shortage():
@@ -506,7 +553,7 @@ def test_edge_records_water_and_each_ion_flow_separately():
     assert edge.flow == 0.0
     assert edge.component_flows == {}
 
-def test_each_named_ion_diffuses_osmotically_and_counterflows_without_bulk_current():
+def test_each_named_ion_diffuses_into_independent_counterflowing_tube_lumens():
     graph = _build_graph(branch_factor=1)
     anchor_id = graph.seed([0])
     graph._attach_forward_children(anchor_id, [-0.1], [[1]])
@@ -523,14 +570,218 @@ def test_each_named_ion_diffuses_osmotically_and_counterflows_without_bulk_curre
 
     graph._transport_subedges()
 
-    assert math.isclose(start.solubles["main:forward"], 0.5)
-    assert math.isclose(end.solubles["main:forward"], 0.5)
-    assert math.isclose(start.solubles["main:backward"], 0.5)
-    assert math.isclose(end.solubles["main:backward"], 0.5)
+    # A real tube has transit state: one solve moves ions into its lumen,
+    # rather than teleporting endpoints directly to equilibrium.
+    traversal = graph.traversals[(start_id, end_id)]
+    forward, reverse = traversal.subedges
+    assert forward.segment_solubles[0]["main:forward"] > 0.0
+    assert reverse.segment_solubles[0]["main:backward"] > 0.0
+    assert start.solubles["main:forward"] > end.solubles["main:forward"]
+    assert end.solubles["main:backward"] > start.solubles["main:backward"]
+    forward_total = sum(
+        node.solubles.get("main:forward", 0.0)
+        for node in graph.nodes.values()
+    )
+    forward_total += sum(
+        mixture.get("main:forward", 0.0)
+        for traversal_item in graph.traversals.values()
+        for sub in traversal_item.subedges
+        for mixture in sub.segment_solubles
+    )
+    forward_total += sum(
+        edge_item.hull_solubles.get("main:forward", 0.0)
+        for edge_item in graph.edges.values()
+    )
+    forward_total += sum(
+        mixture.get("main:forward", 0.0)
+        for mixture in graph.bath_by_node.values()
+    )
+    assert math.isclose(forward_total, 1.0, rel_tol=1e-9)
     edge = graph.edges[(start_id, end_id)]
-    assert math.isclose(edge.flow, 0.0)
-    assert math.isclose(edge.component_flows["main:forward"], 0.5)
-    assert math.isclose(edge.component_flows["main:backward"], -0.5)
+    assert graph.last_fluid_proof["conservation_residual"] < 1e-9
+
+
+def test_ion_diffusion_has_an_independent_speed_from_bulk_current():
+    graph = _build_graph(branch_factor=1)
+    graph.config.fluid_bulk_conductance = 0.0
+    graph.config.fluid_diffusion_conductance = 0.5
+    anchor_id = graph.seed([0])
+    graph._attach_forward_children(anchor_id, [-0.1], [[1]])
+    child_id = graph.nodes[anchor_id].children_ids[-1]
+    graph.nodes[anchor_id].solvent = graph.nodes[child_id].solvent = 10.0
+    graph.nodes[anchor_id].solubles["salt"] = 1.0
+    graph._run_graph_auditor()
+    # Diffusion needs a real water medium along the whole path, not just at
+    # its two node endpoints -- a tube segment with zero solvent has nothing
+    # for the salt to diffuse through regardless of the concentration gap on
+    # either side of it. Bulk transport is the only mechanism that would
+    # normally deliver that water, and it's deliberately zeroed out below to
+    # isolate diffusion's own speed -- so this pipe needs to already be wet,
+    # the way it would be from prior real bulk flow in an actual run.
+    trav = graph.traversals[(anchor_id, child_id)]
+    for sub in trav.subedges:
+        sub.segment_solvent = [10.0] * len(sub.segment_solvent)
+
+    graph._transport_subedges()
+
+    assert graph.nodes[child_id].solubles["salt"] > 0.0
+    assert graph.edges[(anchor_id, child_id)].flow == 0.0
+
+
+def test_audited_path_owns_ordered_persistent_segments_for_every_crossed_edge():
+    graph = _build_graph(branch_factor=1)
+    anchor_id = graph.seed([0])
+    graph._attach_forward_children(anchor_id, [-0.1], [[1]])
+    middle_id = graph.nodes[anchor_id].children_ids[-1]
+    graph._attach_forward_children(middle_id, [-0.1], [[2]])
+    end_id = graph.nodes[middle_id].children_ids[-1]
+    graph._run_graph_auditor()
+
+    traversal = graph.traversals[(anchor_id, end_id)]
+    assert traversal.subedges[0].segment_edge_keys == [
+        (anchor_id, middle_id), (middle_id, end_id)
+    ]
+    assert traversal.subedges[1].segment_edge_keys == [
+        (middle_id, end_id), (anchor_id, middle_id)
+    ]
+    assert all(sub.is_open_at(anchor_id) and sub.is_open_at(end_id)
+               and not sub.is_open_at(middle_id)
+               for sub in traversal.subedges)
+
+
+def test_client_fluid_delegate_owns_relaxation_and_returns_conservation_proof():
+    graph = _build_graph(branch_factor=1)
+    anchor_id = graph.seed([0])
+    graph._attach_forward_children(anchor_id, [-0.1], [[1]])
+    graph._run_graph_auditor()
+    seen = {}
+
+    def delegate(packet):
+        seen.update(packet)
+        return {
+            "work_id": "test-work",
+            "values": packet["values"],
+            "arc_bulk": [0.0] * len(packet["arcs"]["source"]),
+            "arc_components": [
+                [0.0] * len(packet["components"])
+                for _ in packet["arcs"]["source"]
+            ],
+        }
+
+    graph.fluid_work_delegate = delegate
+    graph._transport_subedges()
+
+    assert seen["compartments"]
+    assert graph.last_fluid_proof == {
+        "tick": graph.tick_count,
+        "worker": "client",
+        "conservation_residual": 0.0,
+        "substeps": graph.config.fluid_solver_substeps,
+        "work_id": "test-work",
+    }
+
+
+def test_nd_habitat_shell_contact_transfers_named_ion_without_transmutation():
+    graph = _build_graph(branch_factor=1)
+    graph.config.habitat_ring_ion_amount = 4.0
+    anchor_id = graph.seed([0])
+    graph._attach_forward_children(anchor_id, [-0.1], [[1]])
+    node_id = graph.nodes[anchor_id].children_ids[-1]
+    node = graph.nodes[node_id]
+    node.solvent = 9.0
+    node.solubles["main:backward"] = 2.0
+    patch = graph.habitats[anchor_id]
+    total_before = patch["main:forward"] + node.solubles.get("main:forward", 0.0)
+    graph.absorb_external_physics(
+        "client_nd", {"habitat_proximity": {node_id: 1.0}}
+    )
+
+    graph._ingest_from_habitat_shells()
+
+    assert node.solubles["main:backward"] == 2.0
+    assert node.solubles["main:forward"] > 0.0
+    assert math.isclose(
+        patch["main:forward"] + node.solubles["main:forward"],
+        total_before,
+    )
+
+
+def test_reroot_moves_to_new_finite_habitat_and_revisit_does_not_refill():
+    graph = _build_graph(branch_factor=1)
+    graph.config.habitat_ring_ion_amount = 4.0
+    first_anchor = graph.seed([0])
+    graph.habitats[first_anchor]["main:forward"] = 1.25
+    graph._attach_forward_children(first_anchor, [-0.1], [[1]])
+    second_anchor = graph.nodes[first_anchor].children_ids[-1]
+
+    graph._reroot(second_anchor)
+
+    assert graph.anchor_id == second_anchor
+    assert graph.habitats[second_anchor]["main:forward"] == 4.0
+    assert graph.movement_count == 1
+
+    graph._reroot(first_anchor)
+
+    assert graph.anchor_id == first_anchor
+    assert graph.habitats[first_anchor]["main:forward"] == 1.25
+    assert graph.movement_count == 2
+
+
+def test_growth_commitment_accumulates_diffuses_and_is_inherited():
+    graph = _build_graph(branch_factor=1)
+    graph.config.growth_commitment_gain = 1.0
+    graph.config.growth_commitment_retention = 0.5
+    graph.config.growth_commitment_diffusion = 0.25
+    graph.config.growth_commitment_inheritance = 0.5
+    graph.config.growth_commitment_after_growth = 0.25
+    anchor_id = graph.seed([0])
+    graph._attach_forward_children(anchor_id, [-0.1], [[1]])
+    inner_id = graph.nodes[anchor_id].children_ids[-1]
+    graph._attach_forward_children(inner_id, [-0.1], [[2]])
+    outer_id = graph.nodes[inner_id].children_ids[-1]
+    inner = graph.nodes[inner_id]
+    outer = graph.nodes[outer_id]
+    inner.solvent = 9.0
+    inner.solubles["main:backward"] = 1.0
+    outer.solvent = 10.0
+
+    graph._update_nutrient_growth_interest()
+    graph._update_nutrient_growth_interest()
+
+    assert inner.backward_growth_interest > 0.0
+    assert outer.backward_growth_interest > 1.0
+    source_commitment = outer.backward_growth_interest
+
+    graph._attach_backward_parents(outer_id, [-0.2], [[3]])
+
+    parent_id = max(graph.nodes[outer_id].parent_ids)
+    assert math.isclose(
+        graph.nodes[parent_id].backward_growth_interest,
+        source_commitment * graph.config.growth_commitment_inheritance,
+    )
+    assert math.isclose(
+        outer.backward_growth_interest,
+        source_commitment * graph.config.growth_commitment_after_growth,
+    )
+
+
+def test_useful_ion_flow_hardens_branch_and_raises_conductance():
+    graph = _build_graph(branch_factor=1)
+    graph.config.branch_maturity_gain = 0.5
+    graph.config.branch_maturity_retention = 1.0
+    graph.config.branch_maturity_conductance_bonus = 2.0
+    anchor_id = graph.seed([0])
+    graph._attach_forward_children(anchor_id, [-0.1], [[1]])
+    child_id = graph.nodes[anchor_id].children_ids[-1]
+    edge = graph.edges[(anchor_id, child_id)]
+    base = graph._directional_conductance(child_id, anchor_id)
+    graph._run_graph_auditor()
+    graph.traversals[(anchor_id, child_id)].subedges[0].delivered_utility = 1.0
+
+    graph._update_branch_maturity()
+
+    assert 0.0 < edge.maturity <= 1.0
+    assert graph._directional_conductance(child_id, anchor_id) > base
 
 def test_tick_one_heart_count_uses_safe_cross_growth_defaults():
     graph = _build_graph(branch_factor=VOCAB, compute_budget=2)
@@ -540,7 +791,9 @@ def test_tick_one_heart_count_uses_safe_cross_growth_defaults():
 
     graph.tick()
 
-    assert len(graph.hearts) == 1 + graph.config.compute_budget_per_tick
+    # New organs are a consequence of reconciled scarcity on a later beat;
+    # ordinary beam growth does not manufacture hearts immediately.
+    assert 1 <= len(graph.hearts) <= 1 + graph.config.compute_budget_per_tick
 
 
 def test_air_root_width_and_depth_are_separate_from_backward_beam_controls():
@@ -595,6 +848,31 @@ def test_any_needy_node_can_launch_cross_growth():
         calls.append((node.id, direction))
 
     graph._expand_nutrient_hot_loop = record_cross_growth
+
+    graph._expand_top_pressure_nodes()
+
+    assert calls == [(internal_id, Direction.BACKWARD)]
+
+
+def test_committed_growth_outranks_uncommitted_pressure_within_its_budget():
+    graph = _build_graph(branch_factor=1, compute_budget=1)
+    anchor_id = graph.seed([0])
+    graph._attach_forward_children(anchor_id, [-0.1], [[1]])
+    internal_id = graph.nodes[anchor_id].children_ids[-1]
+    graph._attach_forward_children(internal_id, [-0.1], [[2]])
+    leaf_id = graph.nodes[internal_id].children_ids[-1]
+    graph._attach_backward_parents(anchor_id, [-0.1], [[3]])
+    graph.config.forward_budget_per_tick = 0
+    graph.config.backward_budget_per_tick = 1
+    graph.config.growth_commitment_threshold = 3.0
+    graph.nodes[internal_id].backward_growth_interest = 3.0
+    graph.nodes[internal_id].pressure = 0.0
+    graph.nodes[leaf_id].backward_growth_interest = 2.99
+    graph.nodes[leaf_id].pressure = 1_000.0
+    calls = []
+    graph._expand_nutrient_hot_loop = (
+        lambda node, direction: calls.append((node.id, direction))
+    )
 
     graph._expand_top_pressure_nodes()
 
@@ -832,7 +1110,13 @@ def test_burn_reaps_a_farther_backward_component_cut_off_from_the_seed():
 
     assert graph.nodes[connector_id].burned is True
     assert graph.nodes[far_id].burned is True
-    assert graph.bath["stored-ion"] == 2.0
+    # far_id's own bath_by_node entry is permanently excluded from the fluid
+    # solver once it's burned -- its water is conserved to a live neighbor
+    # instead (here, by the time it's reaped, none of its neighbors are
+    # still alive, so it falls back to the anchor, same as Heart._spill_
+    # heart_to_csf's own dead-heart fallback).
+    assert "stored-ion" not in graph.bath_by_node.get(far_id, {})
+    assert graph.bath_by_node[seed_id]["stored-ion"] == 2.0
     assert all(far_id not in edge_key for edge_key in graph.edges)
     assert all(
         far_id not in traversal.node_ids
@@ -1069,6 +1353,32 @@ def test_starvation_burns_a_low_evidence_leaf_with_no_support():
     assert healthy_id in graph.nodes[anchor_id].children_ids
 
 
+def test_new_growth_gets_a_full_physiology_pass_before_first_survival_check():
+    graph = _build_graph()
+    graph.config.starvation_floor = 1.0
+    graph.config.burn_after_ticks = 1
+    anchor_id = graph.seed([0])
+    graph.tick_count = 7
+    graph._attach_forward_children(anchor_id, [-50.0], [[1]])
+    newborn_id = graph.nodes[anchor_id].children_ids[-1]
+    newborn = graph.nodes[newborn_id]
+
+    assert newborn.created_tick == graph.tick_count
+    assert newborn.pressure < graph.config.starvation_floor
+
+    graph._starve_and_burn()
+
+    assert newborn.burned is False
+    assert newborn.low_pressure_ticks == 0
+
+    # The normal remainder of tick 7 now gets to run. On tick 8, after
+    # pressure settlement, the node becomes eligible for its first check.
+    graph.tick_count += 1
+    graph._starve_and_burn()
+
+    assert newborn.burned is True
+
+
 def test_starved_internal_branch_burns_without_leaving_orphans():
     # Starvation applies to every non-anchor node. When an internal node
     # burns, descendants that have no other causal parent burn with it.
@@ -1147,27 +1457,14 @@ def _build_chain(graph, length, local_evidence, direction=Direction.FORWARD):
     return chain
 
 
-def test_settle_circuit_does_more_than_one_relaxation_step():
+def test_settle_circuit_uses_physical_inventory_not_score_relaxation():
     graph = _build_graph()
     graph.seed([0])
     _build_chain(graph, length=10, local_evidence=-1.0)
 
-    graph._update_pressures()
-    single_step = {nid: n.pressure for nid, n in graph.nodes.items()}
-
-    graph2 = _build_graph()
-    graph2.seed([0])
-    _build_chain(graph2, length=10, local_evidence=-1.0)
-    iterations = graph2._settle_circuit()
-
-    assert iterations > 1
-    settled = {nid: n.pressure for nid, n in graph2.nodes.items()}
-    # Settling changes the far end of the chain relative to a single sweep --
-    # multi-hop support hasn't had time to arrive after just one update.
-    assert any(
-        abs(settled[nid] - single_step[nid]) > 1e-6
-        for nid in settled if nid != graph.anchor_id
-    )
+    iterations = graph._settle_circuit()
+    assert iterations == 1
+    assert all(node.pressure == 0.0 for node in graph.nodes.values())
 
 
 def test_settle_circuit_is_a_no_op_once_already_converged():
@@ -2169,7 +2466,7 @@ def test_head_pressure_costs_forward_and_backward_equally_at_equal_distance():
     assert math.isclose(graph.nodes[fwd_id].pressure, graph.nodes[bwd_id].pressure, rel_tol=1e-9)
 
 
-def test_head_pressure_increases_with_distance_from_anchor():
+def test_topological_height_does_not_manufacture_hydraulic_pressure():
     graph = _build_graph()
     graph.config.head_pressure_coefficient = 0.05
     anchor_id = graph.seed([0])
@@ -2180,7 +2477,7 @@ def test_head_pressure_increases_with_distance_from_anchor():
     graph.nodes[far_id].direction = Direction.FORWARD
 
     graph._settle_circuit()
-    assert graph.nodes[near_id].pressure > graph.nodes[far_id].pressure
+    assert graph.nodes[near_id].pressure == graph.nodes[far_id].pressure
 
 
 def test_head_pressure_never_drives_pressure_negative():
@@ -2275,6 +2572,32 @@ def test_resolve_keep_count_topp_mode_capped_by_auxin_suppression_when_on():
     node.auxin_level = 100.0  # heavy ambient suppression -> effective_branch_factor collapses to 1
     spans = [([i], math.log(0.1)) for i in range(10)]
     assert graph._resolve_keep_count(node, spans) == graph._effective_branch_factor(node) == 1
+
+
+def test_stddev_selection_spans_score_bands_and_keeps_true_scores():
+    graph = _build_graph(branch_factor=4)
+    graph.config.forward_selection_mode = "stddev"
+    anchor_id = graph.seed([0])
+    node_id = _add_hand_node(graph, anchor_id, 1, -0.5, 1)
+    node = graph.nodes[node_id]
+    node.direction = Direction.FORWARD
+    candidates = [
+        ([index], score)
+        for index, score in enumerate(
+            [0.0, -0.1, -0.2, -1.0, -1.1, -2.0, -2.1, -3.0]
+        )
+    ]
+
+    selected = graph._select_final_candidates(
+        node,
+        "forward",
+        candidates,
+        graph._resolve_keep_count(node, candidates),
+    )
+
+    assert len(selected) == 4
+    assert len({round(score) for _, score in selected}) >= 3
+    assert all(pair in candidates for pair in selected)
 
 
 def test_expand_top_pressure_nodes_explicit_per_direction_budget_is_a_hard_cap_no_redistribution():
@@ -2390,6 +2713,49 @@ def test_expand_top_pressure_nodes_does_not_reseed_when_both_anchor_sides_are_in
     assert set(graph.nodes[anchor_id].parent_ids) == parents_before
 
 
+def test_heart_without_either_same_lineage_side_feels_both_stresses():
+    graph = _build_graph()
+    anchor_id = graph.seed([0])
+
+    stresses = graph._heart_growth_stresses()
+
+    assert stresses["main"]["missing_forward"] is True
+    assert stresses["main"]["missing_backward"] is True
+    assert graph.nodes[anchor_id].forward_growth_interest == 1.0
+    assert graph.nodes[anchor_id].backward_growth_interest == 1.0
+
+
+def test_foreign_cousin_connection_does_not_satisfy_heart_side():
+    graph = _build_graph()
+    anchor_id = graph.seed([0])
+    graph._attach_forward_children(anchor_id, [-0.2], [[1]])
+    foreign_id = graph.nodes[anchor_id].children_ids[-1]
+    graph.nodes[foreign_id].center_id = foreign_id
+
+    stress = graph._heart_growth_stresses()["main"]
+
+    assert stress["missing_forward"] is True
+    assert stress["forward_connections"] == []
+
+
+def test_heart_clears_each_stress_only_after_its_own_side_connects():
+    graph = _build_graph()
+    anchor_id = graph.seed([0])
+    graph._attach_forward_children(anchor_id, [-0.2], [[1]])
+
+    forward_only = graph._heart_growth_stresses()["main"]
+    assert forward_only["missing_forward"] is False
+    assert forward_only["missing_backward"] is True
+
+    graph._attach_backward_parents(anchor_id, [-0.2], [[2]])
+    complete = graph._heart_growth_stresses()["main"]
+
+    assert complete["missing_forward"] is False
+    assert complete["missing_backward"] is False
+    assert graph.nodes[anchor_id].forward_growth_interest == 0.0
+    assert graph.nodes[anchor_id].backward_growth_interest == 0.0
+
+
 def test_return_conductance_scale_default_matches_edge_conductance_exactly():
     graph = _build_graph()
     assert graph.config.return_conductance_scale == 1.0
@@ -2419,7 +2785,7 @@ def test_return_conductance_scale_only_dampens_the_return_leg():
     assert math.isclose(ret, graph._edge_conductance(anchor_id, child_id) * 0.25)
 
 
-def test_return_conductance_scale_dampens_how_much_a_strong_child_inflates_its_parent():
+def test_score_conductance_does_not_let_a_strong_child_inflate_parent_pressure():
     strong_child_evidence = -0.05  # near-zero evidence -> local_value close to 1.0, a strong claim
 
     full_return = _build_graph()
@@ -2442,7 +2808,7 @@ def test_return_conductance_scale_dampens_how_much_a_strong_child_inflates_its_p
     # Same weak parent, same strong child -- but with the return leg
     # dampened, the parent's settled pressure ends up lower: the child's
     # strength reports back less than it would through a symmetric edge.
-    assert full_return.nodes[weak_parent_id].pressure > damped_return.nodes[damped_weak_parent_id].pressure
+    assert full_return.nodes[weak_parent_id].pressure == damped_return.nodes[damped_weak_parent_id].pressure
 
 
 def test_inflow_is_weighted_by_conductance_not_diluted_by_raw_neighbor_count():
@@ -2524,7 +2890,7 @@ def test_balance_weight_disabled_by_default_is_a_true_noop_on_settled_pressure()
     assert math.isclose(graph.nodes[near_bwd_id].pressure, baseline.nodes[baseline_bwd_id].pressure, rel_tol=1e-9)
 
 
-def test_balance_weight_raises_settled_pressure_of_the_lagging_side():
+def test_balance_reward_does_not_manufacture_pressure_on_lagging_side():
     graph = _build_graph()
     graph.config.balance_weight = 0.1
     anchor_id = graph.seed([0])
@@ -2544,7 +2910,7 @@ def test_balance_weight_raises_settled_pressure_of_the_lagging_side():
     # Same backward node, but this time forward is way out ahead with the
     # knob on -- its settled pressure should come out higher than the
     # exact same node settled with nothing to lag behind.
-    assert graph.nodes[near_bwd_id].pressure > baseline.nodes[baseline_bwd_id].pressure
+    assert graph.nodes[near_bwd_id].pressure == baseline.nodes[baseline_bwd_id].pressure
     # The far-ahead forward node itself is already leading -- it gets no
     # gain from its own knob.
     far_baseline = _build_graph()
@@ -2599,7 +2965,7 @@ def test_reroot_simple_one_hop_moves_focus_without_reversing_edge():
     assert f1.direction is None
     assert f1.parent_id == anchor_id
     assert f1.depth == 0
-    assert f1.local_evidence == 0.0
+    assert f1.local_evidence == -0.1
     assert f1.tokens == []
     assert graph.anchor_tokens == [1]
 
@@ -2781,8 +3147,20 @@ def test_soft_traversal_physiology_learns_structures_and_subedge_archetype():
         key: float(parameter.detach())
         for key, parameter in graph.physiology_parameters.items()
     }
-    assert {"edge", "node", "heart", "archetype"} <= {
-        key.split(":")[0] for key in before
+    assert all(key.startswith("archetype:") for key in before)
+    assert {
+        "subedge:forward",
+        "subedge:reverse",
+        "edge:forward",
+        "edge:reverse",
+        "node:hull",
+        "node:pore",
+        "heart:valve",
+        "reservoir:coverage",
+        "reservoir:exchange",
+        "reservoir:membrane",
+    } <= {
+        ":".join(key.split(":")[1:-1]) for key in before
     }
     assert not any(key.startswith("traversal:") for key in before)
     changed = {
@@ -2790,7 +3168,8 @@ def test_soft_traversal_physiology_learns_structures_and_subedge_archetype():
         if after[key] != before[key]
     }
     assert any(key.startswith("archetype:subedge:") for key in changed)
-    assert any(not key.startswith("archetype:") for key in changed)
+    assert any(key.startswith("archetype:node:") for key in changed)
+    assert any(key.startswith("archetype:edge:") for key in changed)
     assert any(
         key.startswith("archetype:subedge:")
         and not key.endswith(":bias")
@@ -2802,7 +3181,7 @@ def test_soft_traversal_physiology_learns_structures_and_subedge_archetype():
     assert graph.physiology_best_traversal is not None
     state = graph.physiology_state()
     assert state["parameter_count"] == len(before)
-    assert state["archetype_parameter_count"] == 16
+    assert state["archetype_parameter_count"] == len(before)
 
 
 def test_physiology_logits_round_trip_with_fluid_state():
@@ -2829,6 +3208,71 @@ def test_physiology_logits_round_trip_with_fluid_state():
     } == expected
     assert restored.physiology_steps == graph.physiology_steps
     assert restored.physiology_best_traversal == graph.physiology_best_traversal
+
+
+def test_physiology_parameter_count_is_fixed_as_topology_grows():
+    graph = _build_graph(branch_factor=2)
+    graph.config.physiology_learning_enabled = True
+    anchor_id = graph.seed([0])
+    graph.spawn_first_children()
+    graph._run_graph_auditor()
+    graph._ensure_physiology_parameters()
+    initial_count = len(graph.physiology_parameters)
+
+    frontier = [
+        node.id
+        for node in graph.nodes.values()
+        if node.direction is Direction.FORWARD
+    ]
+    for depth in range(4):
+        next_frontier = []
+        for node_id in frontier:
+            graph._attach_forward_children(
+                node_id,
+                [-0.2, -0.3],
+                [[(depth + 1) % VOCAB], [(depth + 2) % VOCAB]],
+            )
+            next_frontier.extend(graph.nodes[node_id].children_ids[-2:])
+        frontier = next_frontier
+    graph._run_graph_auditor()
+    graph._ensure_physiology_parameters()
+
+    assert initial_count == 60
+    assert len(graph.physiology_parameters) == initial_count
+    assert not any(
+        key.startswith(("edge:", "node:", "heart:", "traversal:"))
+        for key in graph.physiology_parameters
+    )
+
+
+def test_subedge_archetype_responds_to_endpoint_water_state():
+    graph = _build_graph()
+    graph.config.physiology_learning_enabled = True
+    graph.seed([0])
+    graph._ensure_physiology_parameters()
+    with torch.no_grad():
+        graph.physiology_parameters[
+            graph._subedge_archetype_key(
+                "forward", "source_water_fraction"
+            )
+        ].fill_(4.0)
+        graph.physiology_parameters[
+            graph._subedge_archetype_key(
+                "forward", "destination_water_fraction"
+            )
+        ].fill_(-4.0)
+
+    openings = graph._subedge_archetype_openings(
+        torch.zeros(2),
+        torch.zeros(2),
+        torch.ones(2),
+        torch.ones(2),
+        torch.tensor([0.9, 0.1]),
+        torch.tensor([0.1, 0.9]),
+        torch.tensor([-0.2, -0.2]),
+    )
+
+    assert openings[0, 0] > openings[1, 0]
 
 
 def test_pytorch_model_wrapper_can_enable_gradient_tracked_forwards():
@@ -2975,7 +3419,7 @@ def test_reroot_restores_a_demoted_nodes_real_local_evidence():
     b_id = _add_node(graph, a_id, 2, -0.4, 2, direction=Direction.FORWARD, pressure=1.0)
 
     graph._reroot(b_id)  # promotes b -- its real -0.4 must be stashed
-    assert graph.nodes[b_id].local_evidence == 0.0  # zeroed while it holds anchor status
+    assert graph.nodes[b_id].local_evidence == -0.4
     assert graph.anchor_local_evidence == -0.4
 
     graph._reroot(a_id)  # demotes b -- its real -0.4 must come back
@@ -3024,6 +3468,13 @@ def test_previously_orthogonal_node_can_itself_become_the_next_anchor():
     """Displacing the root doesn't remove anything from the graph -- an
     orthogonal node is still fully live and can be re-rooted to again."""
     graph = _build_graph()
+    # This test calls _maybe_reroot() twice back-to-back with no ticks in
+    # between -- exercising reroot mechanics directly, not the cooldown/
+    # margin throttle (see FluxGraphConfig.reroot_cooldown_ticks), which
+    # would otherwise block the second reroot from a real event this soon
+    # after the first.
+    graph.config.reroot_cooldown_ticks = 0
+    graph.config.reroot_margin = 0.0
     anchor_id = graph.seed([99])
     weak_id = _add_node(graph, anchor_id, 1, -5.0, 1, direction=Direction.FORWARD, pressure=0.5)
     _add_node(graph, anchor_id, 2, -0.01, 1, direction=Direction.FORWARD, pressure=5.0)
@@ -3206,7 +3657,7 @@ def test_shared_token_intrinsic_ignores_lone_instances():
     assert solo not in overrides  # nothing to trade against -- keeps its own ordinary intrinsic
 
 
-def test_shared_token_pressure_divides_settled_pressure_by_group_size():
+def test_duplicate_score_does_not_divide_physical_pressure():
     solo = _build_graph()
     anchor_id = solo.seed([0])
     solo_leaf = _add_node(solo, anchor_id, 5, -0.1, 1, direction=Direction.FORWARD, pressure=1.0)
@@ -3219,8 +3670,8 @@ def test_shared_token_pressure_divides_settled_pressure_by_group_size():
     b = _add_node(duo, anchor_id2, 5, -0.1, 1, direction=Direction.FORWARD, pressure=1.0)
     duo._settle_circuit()
 
-    assert duo.nodes[a].pressure < solo_pressure
-    assert duo.nodes[b].pressure < solo_pressure
+    assert duo.nodes[a].pressure == solo_pressure
+    assert duo.nodes[b].pressure == solo_pressure
     assert abs(duo.nodes[a].pressure - duo.nodes[b].pressure) < 1e-9  # identical siblings, identical share
 
 
@@ -3317,7 +3768,7 @@ def test_decay_rate_zero_is_a_true_noop():
     assert graph2.nodes[leaf2].pressure == without_decay
 
 
-def test_decay_rate_lowers_the_settled_pressure_of_an_unsupported_node():
+def test_legacy_score_decay_does_not_change_physical_pressure():
     baseline = _build_graph()
     anchor_id = baseline.seed([0])
     leaf = _add_hand_node(baseline, anchor_id, 1, -0.5, 1)
@@ -3330,10 +3781,10 @@ def test_decay_rate_lowers_the_settled_pressure_of_an_unsupported_node():
     leaf2 = _add_hand_node(decaying, anchor_id2, 1, -0.5, 1)
     decaying._settle_circuit()
 
-    assert decaying.nodes[leaf2].pressure < baseline_pressure
+    assert decaying.nodes[leaf2].pressure == baseline_pressure
 
 
-def test_population_target_scales_up_decay_when_over_target():
+def test_population_target_does_not_manufacture_physical_pressure_change():
     under_target = _build_graph()
     under_target.config.decay_rate = 0.5
     under_target.config.population_target = 100  # nowhere near the live count below
@@ -3351,10 +3802,10 @@ def test_population_target_scales_up_decay_when_over_target():
     _add_hand_node(over_target, anchor_id2, 2, -0.5, 1)
     over_target._settle_circuit()
 
-    assert over_target.nodes[leaf2].pressure < under_target_pressure
+    assert over_target.nodes[leaf2].pressure == under_target_pressure
 
 
-def test_population_target_alone_drives_decay_without_decay_rate():
+def test_population_target_is_not_a_hydraulic_source_or_sink():
     """Regression test for a real bug: an earlier version gated the whole
     population_target mechanism behind decay_rate > 0 (`if cfg.decay_rate
     > 0 and cfg.population_target`), so leaving decay_rate at its default
@@ -3380,7 +3831,7 @@ def test_population_target_alone_drives_decay_without_decay_rate():
     _add_hand_node(over_target, anchor_id2, 2, -0.5, 1)
     over_target._settle_circuit()
 
-    assert over_target.nodes[leaf2].pressure < under_target_pressure
+    assert over_target.nodes[leaf2].pressure == under_target_pressure
 
 
 def test_population_target_none_leaves_decay_rate_unscaled():

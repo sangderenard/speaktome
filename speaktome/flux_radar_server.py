@@ -282,6 +282,8 @@ class ModelBundle:
             overpressure_ceiling=float(params.get("overpressure_ceiling", 0.0)),
             burn_after_ticks=int(params.get("burn_after_ticks", 3)),
             anchor_can_decay=bool(params.get("anchor_can_decay", False)),
+            reroot_margin=float(params.get("reroot_margin", 0.05)),
+            reroot_cooldown_ticks=int(params.get("reroot_cooldown_ticks", 3)),
             compute_budget_per_tick=int(params.get("budget", 3)),
             branch_factor=int(params.get("branch", 3)),
             hot_loop_depth=int(params.get("hot_loop_depth", 1)),
@@ -304,6 +306,13 @@ class ModelBundle:
             poetic_shortlist_k=int(params.get("poetic_shortlist_k", 20)),
             auxin_suppression=float(params.get("auxin_suppression", 0.0)),
             auxin_decay=float(params.get("auxin_decay", 0.6)),
+            growth_commitment_gain=float(params.get("growth_commitment_gain", 1.0)),
+            growth_commitment_retention=float(params.get("growth_commitment_retention", 0.85)),
+            growth_commitment_diffusion=float(params.get("growth_commitment_diffusion", 0.15)),
+            growth_commitment_inheritance=float(params.get("growth_commitment_inheritance", 0.5)),
+            growth_commitment_after_growth=float(params.get("growth_commitment_after_growth", 0.25)),
+            growth_commitment_threshold=float(params.get("growth_commitment_threshold", 3.0)),
+            growth_commitment_max=float(params.get("growth_commitment_max", 6.0)),
             head_pressure_coefficient=float(params.get("head_pressure_coefficient", 0.0)),
             decay_rate=float(params.get("decay_rate", 0.0)),
             population_target=population_target,
@@ -351,6 +360,23 @@ class ModelBundle:
             growth_target_ion_concentration=float(
                 params.get("growth_target_ion_concentration", 0.1)
             ),
+            habitat_ring_ion_amount=float(params.get("habitat_ring_ion_amount", 4.0)),
+            ring_uptake_rate=float(params.get("ring_uptake_rate", 1.0)),
+            branch_maturity_gain=float(params.get("branch_maturity_gain", 0.1)),
+            branch_maturity_retention=float(params.get("branch_maturity_retention", 0.995)),
+            branch_maturity_conductance_bonus=float(
+                params.get("branch_maturity_conductance_bonus", 1.0)
+            ),
+            fluid_solver_substeps=int(params.get("fluid_solver_substeps", 8)),
+            fluid_bulk_conductance=float(
+                params.get("fluid_bulk_conductance", 0.35)
+            ),
+            fluid_diffusion_conductance=float(
+                params.get("fluid_diffusion_conductance", 0.6)
+            ),
+            fluid_osmotic_pressure=float(
+                params.get("fluid_osmotic_pressure", 0.25)
+            ),
             csf_link_rate=float(params.get("csf_link_rate", 0.05)),
             lymph_return_rate=float(params.get("lymph_return_rate", 0.02)),
             rhizome_csf_pump_rate=float(params.get("rhizome_csf_pump_rate", 0.1)),
@@ -395,6 +421,8 @@ class ModelBundle:
             "alpha": choice_policy.alpha,
             "beta": choice_policy.beta,
             "anchor_can_decay": config.anchor_can_decay,
+            "reroot_margin": config.reroot_margin,
+            "reroot_cooldown_ticks": config.reroot_cooldown_ticks,
             "no_repeat_ngram_size": config.no_repeat_ngram_size or 0,
             "poetic_enabled": config.poetic_attractor is not None,
             "poetic_scale": config.poetic_scale,
@@ -415,6 +443,13 @@ class ModelBundle:
             "max_subword_steps": config.max_subword_steps,
             "auxin_suppression": config.auxin_suppression,
             "auxin_decay": config.auxin_decay,
+            "growth_commitment_gain": config.growth_commitment_gain,
+            "growth_commitment_retention": config.growth_commitment_retention,
+            "growth_commitment_diffusion": config.growth_commitment_diffusion,
+            "growth_commitment_inheritance": config.growth_commitment_inheritance,
+            "growth_commitment_after_growth": config.growth_commitment_after_growth,
+            "growth_commitment_threshold": config.growth_commitment_threshold,
+            "growth_commitment_max": config.growth_commitment_max,
             "head_pressure_coefficient": config.head_pressure_coefficient,
             "decay_rate": config.decay_rate,
             "population_target": config.population_target or 0,
@@ -444,6 +479,15 @@ class ModelBundle:
             "soil_forward_ion_permeability": config.soil_forward_ion_permeability,
             "root_soil_uptake_permeability": config.root_soil_uptake_permeability,
             "growth_target_ion_concentration": config.growth_target_ion_concentration,
+            "habitat_ring_ion_amount": config.habitat_ring_ion_amount,
+            "ring_uptake_rate": config.ring_uptake_rate,
+            "branch_maturity_gain": config.branch_maturity_gain,
+            "branch_maturity_retention": config.branch_maturity_retention,
+            "branch_maturity_conductance_bonus": config.branch_maturity_conductance_bonus,
+            "fluid_solver_substeps": config.fluid_solver_substeps,
+            "fluid_bulk_conductance": config.fluid_bulk_conductance,
+            "fluid_diffusion_conductance": config.fluid_diffusion_conductance,
+            "fluid_osmotic_pressure": config.fluid_osmotic_pressure,
             "csf_link_rate": config.csf_link_rate,
             "lymph_return_rate": config.lymph_return_rate,
             "rhizome_csf_pump_rate": config.rhizome_csf_pump_rate,
@@ -502,6 +546,9 @@ class ModelBundle:
         """
         orthogonal = graph.orthogonal_node_ids()
         network_roots = graph.orthogonal_network_roots(orthogonal)
+        node_openings = graph.node_archetype_opening_state(
+            list(graph.nodes.values())
+        )
         nodes = []
         for nid, n in graph.nodes.items():
             # A node's own tokens are empty only while it's the current
@@ -539,20 +586,26 @@ class ModelBundle:
                 "solubles": {k: round(v, 4) for k, v in n.solubles.items() if v},
                 "hull_permeability": n.hull_permeability,
                 "pore_permeabilities": dict(n.pore_permeabilities),
-                "learned_hull_opening": graph._gate_value(
-                    graph._node_hull_gate_key(nid)
-                ),
-                "learned_pore_openings": {
-                    key.split(":pore:", 1)[1]: graph._gate_value(key)
-                    for key in graph.physiology_parameters
-                    if key.startswith(f"node:{nid}:pore:")
-                },
+                "learned_hull_opening": node_openings.get(
+                    nid, {}
+                ).get("hull", 1.0),
+                "learned_pore_openings": node_openings.get(
+                    nid, {}
+                ).get("pores", {}),
                 "factory_roles": [factory.name for factory in n.factories if factory.enabled],
                 "factory_auxin": round(n.factory_auxin, 4),
                 "backward_growth_interest": round(n.backward_growth_interest, 4),
                 "forward_growth_interest": round(n.forward_growth_interest, 4),
             })
-        influence = graph.audit_edge_influence()
+        influence = graph.audit_edge_influence(
+            ensure_current=(
+                not graph.config.graph_auditor_enabled
+                or not graph.traversals
+            )
+        )
+        edge_openings = graph.edge_archetype_opening_state(
+            list(influence)
+        )
         # audit_edge_influence's key set is the live parent/child edges;
         # fold each one's fluid flow + pressure drop (see Edge) in beside
         # its quality/count so the frontend can animate direction/speed.
@@ -571,11 +624,14 @@ class ModelBundle:
                     {name: round(amount, 5) for name, amount in edge.component_flows.items() if amount}
                     if edge is not None else {}
                 ),
-                "forward_valve": graph._gate_value(
-                    graph._edge_gate_key(a, b, "forward")
-                ),
-                "reverse_valve": graph._gate_value(
-                    graph._edge_gate_key(a, b, "reverse")
+                "forward_valve": edge_openings.get((a, b), (1.0, 1.0))[0],
+                "reverse_valve": edge_openings.get((a, b), (1.0, 1.0))[1],
+                "maturity": round(edge.maturity, 5) if edge is not None else 0.0,
+                "hull_pressure": round(edge.hull_pressure, 5) if edge is not None else 0.0,
+                "hull_solvent": round(edge.hull_solvent, 5) if edge is not None else 0.0,
+                "hull_solubles": (
+                    {name: round(amount, 5) for name, amount in edge.hull_solubles.items() if amount}
+                    if edge is not None else {}
                 ),
             })
         # Per-region heart chamber contents and the shared CSF bath.
@@ -610,10 +666,45 @@ class ModelBundle:
             "hearts": hearts,
             "reservoirs": reservoirs,
             "bath": {k: round(v, 4) for k, v in graph.bath.items() if v},
+            "bath_by_node": {
+                str(node_id): {k: round(v, 5) for k, v in mixture.items() if v}
+                for node_id, mixture in graph.bath_by_node.items()
+                if mixture
+            },
+            "tube_state": [
+                {
+                    "traversal": list(traversal.node_ids),
+                    "direction": sub.direction,
+                    "edges": [list(edge_key) for edge_key in sub.segment_edge_keys],
+                    "solvent": [round(value, 5) for value in sub.segment_solvent],
+                    "solubles": [
+                        {name: round(amount, 5) for name, amount in mixture.items() if amount}
+                        for mixture in sub.segment_solubles
+                    ],
+                    "pressures": [round(value, 5) for value in sub.segment_pressures],
+                    "delivered_utility": round(sub.delivered_utility, 6),
+                }
+                for traversal in graph.traversals.values()
+                for sub in traversal.subedges
+            ],
+            "fluid_proof": graph.last_fluid_proof,
             "background": {k: round(v, 4) for k, v in graph.background.items() if v},
             "soil": {k: round(v, 4) for k, v in graph.soil.items() if v},
             "rhizome": {k: round(v, 4) for k, v in graph.rhizome.items() if v},
             "rhizome_owner_id": graph.rhizome_owner_id,
+            "current_habitat_id": graph.anchor_id,
+            "current_habitat": {
+                k: round(v, 4)
+                for k, v in graph.habitats.get(graph.anchor_id, {}).items()
+                if v
+            },
+            "current_habitat_signature": list(
+                graph.habitat_signatures.get(graph.anchor_id, [])
+            ),
+            "current_habitat_phrase": self.tokenizer.decode(
+                graph.habitat_signatures.get(graph.anchor_id, [])
+            ),
+            "movement_count": graph.movement_count,
             "physiology": graph.physiology_state(),
             "best_path": self.tokenizer.decode(tokens),
             "best_score": round(score, 4),
@@ -707,6 +798,10 @@ class LiveSession:
         self.error: Optional[str] = None
         self.mid_tick_status: Dict[str, Any] = {}
         self._state_lock = threading.RLock()
+        self._fluid_condition = threading.Condition(self._state_lock)
+        self.pending_fluid_work: Optional[Dict[str, Any]] = None
+        self._fluid_result: Optional[Dict[str, Any]] = None
+        self._fluid_work_counter = 0
         if hasattr(self.graph, "set_status_callback"):
             self.graph.set_status_callback(self._receive_tick_status)
         self._stop_event = threading.Event()
@@ -745,6 +840,10 @@ class LiveSession:
         session.error = None
         session.mid_tick_status = {}
         session._state_lock = threading.RLock()
+        session._fluid_condition = threading.Condition(session._state_lock)
+        session.pending_fluid_work = None
+        session._fluid_result = None
+        session._fluid_work_counter = 0
         if hasattr(session.graph, "set_status_callback"):
             session.graph.set_status_callback(session._receive_tick_status)
         session._stop_event = threading.Event()
@@ -778,17 +877,53 @@ class LiveSession:
 
     def start(self) -> None:
         self.graph.spawn_first_children()
+        self.graph.fluid_work_delegate = self._delegate_fluid_work
         with self._state_lock:
             self.history.append({"tick": 0, **self.bundle.snapshot_graph(self.graph)})
         self._thread.start()
 
     def start_resumed(self) -> None:
         """Like start(), but the graph is already fully grown from saved state -- just resume ticking."""
+        self.graph.fluid_work_delegate = self._delegate_fluid_work
         self._thread.start()
 
     def _receive_tick_status(self, status: Dict[str, Any]) -> None:
         with self._state_lock:
             self.mid_tick_status = dict(status)
+
+    def _delegate_fluid_work(self, packet: Dict[str, Any]) -> Dict[str, Any]:
+        """Publish a frozen relaxation job and wait for its browser result."""
+        with self._fluid_condition:
+            self._fluid_work_counter += 1
+            work_id = f"{self.tick_index + 1}:{self._fluid_work_counter}"
+            self.pending_fluid_work = {**packet, "work_id": work_id}
+            self._fluid_result = None
+            self.mid_tick_status = {
+                "phase": "client-relaxation",
+                "detail": "waiting for browser fluid proof",
+                "tick": packet.get("tick", self.tick_index + 1),
+                "current": 0,
+                "total": packet.get("parameters", {}).get("substeps", 1),
+            }
+            self._fluid_condition.notify_all()
+            while self._fluid_result is None and not self._stop_event.is_set():
+                self._fluid_condition.wait(timeout=0.5)
+            if self._fluid_result is None:
+                raise RuntimeError("client fluid relaxation stopped before completion")
+            result = self._fluid_result
+            self.pending_fluid_work = None
+            self._fluid_result = None
+            return result
+
+    def submit_fluid_result(self, result: Dict[str, Any]) -> None:
+        with self._fluid_condition:
+            pending = self.pending_fluid_work
+            if pending is None:
+                raise ValueError("there is no pending fluid work")
+            if result.get("work_id") != pending.get("work_id"):
+                raise ValueError("fluid result does not match pending work")
+            self._fluid_result = result
+            self._fluid_condition.notify_all()
 
     def _run_loop(self) -> None:
         try:
@@ -807,6 +942,8 @@ class LiveSession:
 
     def stop(self) -> None:
         self._stop_event.set()
+        with self._fluid_condition:
+            self._fluid_condition.notify_all()
         self._thread.join(timeout=5)
 
     def snapshot_state(
@@ -831,6 +968,10 @@ class LiveSession:
                 "running": self._thread.is_alive() and not self._stop_event.is_set(),
                 "error": self.error,
                 "mid_tick": dict(self.mid_tick_status),
+                "fluid_work": getattr(self, "pending_fluid_work", None),
+                "fluid_proof": getattr(
+                    getattr(self, "graph", None), "last_fluid_proof", None
+                ),
                 "history": history,
             }
 
@@ -1118,7 +1259,11 @@ class Handler(BaseHTTPRequestHandler):
             _autosave()
             self._send_json(200, state)
         except Exception as e:  # noqa: BLE001 -- surfaced to the browser, not swallowed
-            self._send_json(500, {"error": str(e)})
+            traceback.print_exc()
+            self._send_json(500, {
+                "error": f"{type(e).__name__}: {e!r}",
+                "traceback": traceback.format_exc(),
+            })
 
     def _handle_live_stop(self) -> None:
         with _live_session_lock:
@@ -1167,10 +1312,15 @@ class Handler(BaseHTTPRequestHandler):
         try:
             payload = self._read_json_body()
             domain = str(payload.pop("domain", "client"))
-            ring = payload.get("ring_proximity")
-            if isinstance(ring, dict):
+            proximity = payload.get("habitat_proximity")
+            if isinstance(proximity, dict):
                 # JSON object keys are always strings; node ids are ints.
-                payload["ring_proximity"] = {int(k): float(v) for k, v in ring.items()}
+                payload["habitat_proximity"] = {
+                    int(k): float(v) for k, v in proximity.items()
+                }
+            fluid_result = payload.pop("fluid_result", None)
+            if isinstance(fluid_result, dict):
+                session.submit_fluid_result(fluid_result)
             session.graph.absorb_external_physics(domain, payload)
             self._send_json(200, {"absorbed": domain})
         except Exception as e:  # noqa: BLE001 -- surfaced to the browser, not swallowed

@@ -7,18 +7,13 @@ committed sentence and no finalization step -- at any point you can ask
 for the current best path, but the graph keeps growing and re-scoring for
 as long as you keep ticking it.
 
-Every node gets pressure -- a live, continuously recomputed value, not an
-accumulated score. Each discrete tick recomputes every node's pressure
-from its own local evidence (how likely its token was when it was
-created) plus flux received from its neighbors, the way current flows
-through a resistor network: edges with good scores conduct flux easily,
-edges with bad scores resist it. A node's pressure is what it currently
-supports and is supported by -- not a running total. There is no blanket
-decay; a node only loses standing if it stops having good lines running
-through it (no supportive flux from neighbors, and weak local evidence of
-its own), at which point it starves and, if that persists, burns off the
-extremity. A node with a strong descendant never starves, because that
-descendant's pressure flows back to it every tick.
+Every node gets pressure -- a live physical value, never an accumulated
+language score. Each tick couples node casings, the ordered lumen segments
+of every audited path tube, larger per-edge hulls, and a spatial passive
+CSF/lymph bath. Hearts and exchangers move conserved water and named ions;
+local hydration, osmotic loading, and compliance then determine pressure.
+Model score remains a reward and reproduction signal: it can teach useful
+physiology and favor future growth, but it cannot manufacture pressure.
 
 Compute is the resource that actually grows the network: each tick, a
 bounded number of the highest-pressure not-yet-expanded nodes get spent
@@ -51,6 +46,7 @@ pure display question, not a reason to remove it from the graph.
 from __future__ import annotations
 
 import math
+import random
 import time
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional, Tuple
@@ -158,6 +154,15 @@ class SubEdge:
     traversal_key: Tuple[int, ...]  # endpoint pair, or full path when endpoints have >1 causal route
     direction: str  # "forward" | "reverse"
     constriction: float = 1.0
+    # One persistent lumen compartment per physical edge crossed.  The list
+    # is ordered in this tube's direction of travel.  A traversal therefore
+    # has two independent continuous tubes, not an endpoint-to-endpoint
+    # teleport whose result is merely painted onto the intervening edges.
+    segment_edge_keys: List[Tuple[int, int]] = field(default_factory=list)
+    segment_solvent: List[float] = field(default_factory=list)
+    segment_solubles: List[Dict[str, float]] = field(default_factory=list)
+    segment_pressures: List[float] = field(default_factory=list)
+    delivered_utility: float = 0.0
 
     def is_open_at(self, node_id: int) -> bool:
         """Whether this subedge currently allows volume transfer at node_id.
@@ -221,6 +226,16 @@ class Edge:
     pressure_drop: float = 0.0
     # Signed material flow: ``solvent`` is water; every other key is one ion.
     component_flows: Dict[str, float] = field(default_factory=dict)
+    # Slow, non-trainable developmental memory. Useful named-material flow
+    # hardens a pipe; disuse softens it. Shared physiology archetypes remain
+    # the only learned parameters, so topology growth does not grow the
+    # optimizer state.
+    maturity: float = 0.0
+    # Fluid in the larger per-edge casing around all traversal lumens.
+    # Its node valves are independent of every inner SubEdge valve.
+    hull_solvent: float = 0.0
+    hull_solubles: Dict[str, float] = field(default_factory=dict)
+    hull_pressure: float = 0.0
 
 
 @dataclass
@@ -430,10 +445,16 @@ class IonReservoir:
         low, target, high = self.concentration_band()
         gate = max(0.0, min(1.0, self.opening_coverage * self.exchange_probability))
 
+        # The ion gate sits in the chamber's own water -- an ion cannot cross
+        # it, in either direction, unless the chamber actually has solvent to
+        # be dissolved in right now. No water at the membrane means no ion
+        # transport math at all, regardless of concentration pressure.
+        chamber_has_water = chamber.get("solvent", 0.0) > 0.0
+
         # The same gate skims excess ions or supplies deficient chambers.
         # An empty new reservoir begins with a zero band, so the first
         # matching chamber supply is excess and establishes its history.
-        if volume > 0.0 and target > 0.0:
+        if chamber_has_water and volume > 0.0 and target > 0.0:
             chamber_concentration = chamber_ions / volume
             if chamber_concentration > high:
                 correction = (
@@ -451,7 +472,7 @@ class IonReservoir:
                 moved = min(self.ion_amount, correction * gate)
                 chamber[self.ion_name] = chamber_ions + moved
                 self.ion_amount -= moved
-        elif volume > 0.0 and chamber_ions > 0.0:
+        elif chamber_has_water and volume > 0.0 and chamber_ions > 0.0:
             moved = chamber_ions * gate
             chamber[self.ion_name] = chamber_ions - moved
             self.ion_amount += moved
@@ -736,10 +757,10 @@ class FluxNode:
     # Parent ownership always points from the lower level to the higher
     # level. depth remains abs(level) for existing radial consumers.
     level: Optional[int] = None
-    # Nutrient stress accumulates rather than becoming an instant topology
-    # override. A forward-side cell lacking backward ions raises backward
-    # (parent-growing) interest; a backward-side cell lacking forward ions
-    # raises forward (child-growing) interest.
+    # Direction-specific local growth commitment. Sustained opposite-ion
+    # scarcity produces it, nearby same-lineage tissue shares a little, and
+    # new growth inherits part of it. These historical names remain for save
+    # compatibility and UI continuity.
     backward_growth_interest: float = 0.0
     forward_growth_interest: float = 0.0
     # Which seed-layer causal focus this node currently belongs to. A node
@@ -862,6 +883,22 @@ class FluxGraphConfig:
     # the next anchor from whatever's actually in the graph right now,
     # rather than waiting for a challenger to out-score it fairly.
     anchor_can_decay: bool = False
+    # A bare pressure inequality with zero cooldown means the causal
+    # center random-walks to whichever node has the highest *instantaneous*
+    # pressure every single tick -- a freshly grown leaf and a settling
+    # anchor (actively losing pressure to humidity/factory/bulk-transfer
+    # outflow every tick) cross constantly, never a rare event. That
+    # thrashes _reroot's own heart teardown/rebuild every tick (see
+    # _reroot's _spill_heart_to_csf) instead of letting one lineage
+    # actually get explored -- "crowds with hearts, doesn't beam search."
+    # reroot_margin requires a real, decisive win, not a coin flip;
+    # reroot_cooldown_ticks guarantees a newly-rooted lineage gets that
+    # many ticks to actually develop before it can be displaced again.
+    # Neither throttles the anchor_can_decay forced-replacement path --
+    # that one is survival (the anchor is already dead), not exploration
+    # stability, and must never be blocked by a cooldown.
+    reroot_margin: float = 0.05
+    reroot_cooldown_ticks: int = 3
     compute_budget_per_tick: int = 4
     branch_factor: int = 3
     max_context_tokens: int = 64
@@ -904,7 +941,8 @@ class FluxGraphConfig:
     sprout_branch_factor: int = 1
     sprout_hot_loop_depth: int = 1
     air_root_branch_factor: int = 1
-    air_root_hot_loop_depth: int = 1    # Per-direction candidate selection. "topk" (default): exactly
+    air_root_hot_loop_depth: int = 1
+    # Per-direction candidate selection. "topk" (default): exactly
     # branch_factor (or its per-direction override) highest-probability
     # candidates, a fixed count regardless of how the distribution is
     # actually shaped. "topp": nucleus sampling -- keep however many of
@@ -914,7 +952,9 @@ class FluxGraphConfig:
     # an arbitrary fixed count. branch_factor is ignored in "topp" mode --
     # there's no fixed-K concept once selection is coverage-based --
     # except as an upper cap when auxin_suppression is also on, so apical
-    # dominance still means something in topp mode too.
+    # dominance still means something in topp mode too. "stddev" keeps
+    # branch_factor children but samples them across standardized score
+    # bands, preserving a representative cross-section of the distribution.
     forward_selection_mode: str = "topk"
     backward_selection_mode: str = "topk"
     forward_top_p: float = 0.9
@@ -1044,6 +1084,17 @@ class FluxGraphConfig:
     # attenuation (a distant tip suppresses as hard as an adjacent one);
     # near 0 = only immediate neighbors feel any suppression at all.
     auxin_decay: float = 0.6
+    # Positive developmental counterpart to inhibitory auxin. Remaining
+    # post-physiology scarcity produces a bounded, slowly-decaying local
+    # commitment. Above the threshold it outranks ordinary actions within
+    # that direction's existing compute budget.
+    growth_commitment_gain: float = 1.0
+    growth_commitment_retention: float = 0.85
+    growth_commitment_diffusion: float = 0.15
+    growth_commitment_inheritance: float = 0.5
+    growth_commitment_after_growth: float = 0.25
+    growth_commitment_threshold: float = 3.0
+    growth_commitment_max: float = 6.0
     # Head pressure: sustaining flow to a point further from the anchor
     # costs more than to a nearby one, modeled on real xylem transport
     # (lifting water against a taller column of it costs more head
@@ -1152,6 +1203,16 @@ class FluxGraphConfig:
     # Material scarcity is continuous rather than binary. A node's need is
     # the fractional shortfall below this required opposite-ion concentration.
     growth_target_ion_concentration: float = 0.1
+    # Finite seed-relative habitat patches. A new active seed discovers one
+    # patch containing this much of each currently-existing network-side ion;
+    # returning to an old seed returns to the same depleted patch.
+    habitat_ring_ion_amount: float = 4.0
+    ring_uptake_rate: float = 1.0
+    # Useful solute flow slowly hardens physical branches. Maturity is scalar
+    # graph state, not a per-edge learned parameter.
+    branch_maturity_gain: float = 0.1
+    branch_maturity_retention: float = 0.995
+    branch_maturity_conductance_bonus: float = 1.0
     # Every cousin heart shares this one graph-global CSF bath. These active
     # defaults make that link real without instant mixing; lymph returns a
     # smaller fraction to the active seed's heart each tick.
@@ -1174,6 +1235,22 @@ class FluxGraphConfig:
     physiology_initial_opening: float = 0.8
     physiology_traversal_temperature: float = 0.5
     physiology_track_model_gradients: bool = False
+    # Coupled fluid solver. Pressure is generated only from local hydration
+    # and ion loading (plus heart/pump transfers performed immediately before
+    # the solve); language-model score never enters this equation.
+    fluid_solver_substeps: int = 8
+    fluid_time_step: float = 0.08
+    fluid_bulk_conductance: float = 0.35
+    fluid_diffusion_conductance: float = 0.6
+    fluid_osmotic_pressure: float = 0.25
+    node_compliance: float = 1.0
+    tube_compliance: float = 0.5
+    hull_compliance: float = 2.0
+    bath_compliance: float = 4.0
+    hull_node_valve: float = 0.35
+    hull_bath_permeability: float = 0.08
+    node_bath_permeability: float = 0.04
+    bath_graph_conductance: float = 0.2
 
 
 class FluxGraph:
@@ -1212,6 +1289,18 @@ class FluxGraph:
         # it drains slowly home to the seed heart (lymph return). Dormant
         # until its throttles are dialed above 0 (see FluxGraphConfig).
         self.bath: Dict[str, float] = {}
+        # Spatial CSF/lymph/interstitial compartments. ``bath`` remains the
+        # compatibility inlet/outlet reservoir; material entering it is
+        # deposited at the active seed before each coupled solve.
+        self.bath_by_node: Dict[int, Dict[str, float]] = {}
+        self._pending_traversal_tubes: Dict[str, Any] = {}
+        # Live UI sessions may install a synchronous delegate. The solver
+        # publishes an immutable work packet and blocks here until that client
+        # returns a conservation-checked relaxation result.
+        self.fluid_work_delegate: Optional[
+            Callable[[Dict[str, Any]], Dict[str, Any]]
+        ] = None
+        self.last_fluid_proof: Optional[Dict[str, Any]] = None
         # Environmental mixtures outside circulation. Forward material
         # crosses level-zero into background; root-needed forward ions
         # cross again, more slowly, into soil.
@@ -1219,6 +1308,18 @@ class FluxGraph:
         self.soil: Dict[str, float] = {}
         self.rhizome: Dict[str, float] = {}
         self.rhizome_owner_id: Optional[int] = None
+        # Finite environmental stores indexed by seed identity. The active
+        # anchor selects the current patch; changing anchor is the organism's
+        # movement through phrase space. Patch inventories survive departure,
+        # so returning does not manufacture fresh material.
+        self.habitats: Dict[int, Dict[str, float]] = {}
+        self.habitat_signatures: Dict[int, List[int]] = {}
+        self.movement_count: int = 0
+        # Ticks elapsed since the last reroot -- see FluxGraphConfig.
+        # reroot_cooldown_ticks. Large (not 0) so a reroot is allowed
+        # immediately if the very first challenger check already clears
+        # the cooldown at tick 1.
+        self._ticks_since_reroot: int = 10**9
         # Stable named logits for every continuous valve and pore. Keeping
         # ownership here rather than on mutable dataclasses makes parameters
         # easy to optimize, persist, and enumerate even as topology grows.
@@ -1251,7 +1352,7 @@ class FluxGraph:
         # door). Written wholesale by absorb_external_physics (one atomic
         # reference swap, same GIL reasoning as published_snapshot -- no
         # lock needed), read by whichever backend passes consume that
-        # domain's observations (see _ingest_from_rings). Latest payload
+        # domain's observations (see _ingest_from_habitat_shells). Latest payload
         # per domain wins; stale observations are simply reused until the
         # next one arrives.
         self.external_physics: Dict[str, Dict[str, Any]] = {}
@@ -1398,10 +1499,126 @@ class FluxGraph:
         "destination_osmotic_fraction",
         "path_quality",
     )
+    _EDGE_ARCHETYPE_FEATURES = _SUBEDGE_ARCHETYPE_FEATURES
+    _NODE_ARCHETYPE_FEATURES = (
+        "bias",
+        "pressure",
+        "water_fraction",
+        "osmotic_fraction",
+        "material_fraction",
+        "scarcity",
+    )
+    _HEART_ARCHETYPE_FEATURES = (
+        "bias",
+        "declared_throttle",
+        "circulating_fraction",
+        "csf_fraction",
+    )
+    _RESERVOIR_ARCHETYPE_FEATURES = (
+        "bias",
+        "fullness",
+        "ion_fraction",
+        "solvent_fraction",
+    )
 
     @classmethod
     def _subedge_archetype_key(cls, direction: str, feature: str) -> str:
         return f"archetype:subedge:{direction}:{feature}"
+
+    @staticmethod
+    def _archetype_key(kind: str, feature: str) -> str:
+        return f"archetype:{kind}:{feature}"
+
+    def _ensure_linear_archetype(
+        self,
+        kind: str,
+        features: Tuple[str, ...],
+        initial: Optional[float] = None,
+    ) -> None:
+        opening = (
+            self.config.physiology_initial_opening
+            if initial is None else initial
+        )
+        for feature in features:
+            key = self._archetype_key(kind, feature)
+            if key in self.physiology_parameters:
+                continue
+            if feature == "bias":
+                self._physiology_parameter(key, opening)
+            else:
+                self.physiology_parameters[key] = torch.nn.Parameter(
+                    torch.zeros((), dtype=torch.float32, device=self.device)
+                )
+
+    def _linear_archetype_openings(
+        self, kind: str, features: Tuple[str, ...], feature_tensor
+    ):
+        weights = torch.stack(
+            [
+                self.physiology_parameters[self._archetype_key(kind, name)]
+                for name in features
+            ]
+        )
+        return torch.sigmoid(feature_tensor @ weights)
+
+    def _ensure_state_archetypes(self) -> None:
+        """Collapse old instance logits into fixed-size state archetypes."""
+        if torch is None or not self.config.physiology_learning_enabled:
+            return
+        legacy = {
+            key: parameter
+            for key, parameter in self.physiology_parameters.items()
+            if not key.startswith("archetype:")
+        }
+
+        def mean_opening(predicate) -> float:
+            values = [
+                float(torch.sigmoid(parameter).detach().item())
+                for key, parameter in legacy.items()
+                if predicate(key)
+            ]
+            return (
+                sum(values) / len(values)
+                if values else self.config.physiology_initial_opening
+            )
+
+        for direction in ("forward", "reverse"):
+            self._ensure_linear_archetype(
+                f"edge:{direction}",
+                self._EDGE_ARCHETYPE_FEATURES,
+                mean_opening(
+                    lambda key, direction=direction:
+                    key.startswith("edge:") and key.endswith(f":{direction}")
+                ),
+            )
+        self._ensure_linear_archetype(
+            "node:hull",
+            self._NODE_ARCHETYPE_FEATURES,
+            mean_opening(lambda key: key.startswith("node:") and key.endswith(":hull")),
+        )
+        self._ensure_linear_archetype(
+            "node:pore",
+            self._NODE_ARCHETYPE_FEATURES,
+            mean_opening(lambda key: key.startswith("node:") and ":pore:" in key),
+        )
+        self._ensure_linear_archetype(
+            "heart:valve",
+            self._HEART_ARCHETYPE_FEATURES,
+            mean_opening(lambda key: key.startswith("heart:") and ":valve:" in key),
+        )
+        for gate_name in ("coverage", "exchange", "membrane"):
+            self._ensure_linear_archetype(
+                f"reservoir:{gate_name}",
+                self._RESERVOIR_ARCHETYPE_FEATURES,
+                mean_opening(
+                    lambda key, gate_name=gate_name:
+                    key.startswith("heart:")
+                    and ":reservoir:" in key
+                    and key.endswith(f":{gate_name}")
+                ),
+            )
+        for key in legacy:
+            del self.physiology_parameters[key]
 
     def _ensure_subedge_archetype(self) -> None:
         """Create one shared state-response model for each flow direction.
@@ -1442,6 +1659,7 @@ class FluxGraph:
                     )
         for key in legacy:
             del self.physiology_parameters[key]
+        self._ensure_state_archetypes()
 
     def _subedge_archetype_openings(
         self,
@@ -1466,7 +1684,10 @@ class FluxGraph:
         end_osmotic = (end_volume - end_solvent).clamp_min(0.0) / (
             end_volume.clamp_min(eps)
         )
-        quality = torch.exp(path_score).clamp(0.0, 1.0)
+        # Kept as a zero-valued migration column so older saved archetype
+        # tensors remain shape-compatible. Score is a teaching/reproduction
+        # reward, never an input that opens a physical valve by itself.
+        quality = torch.zeros_like(path_score)
         ones = torch.ones_like(start_volume)
         forward_features = torch.stack(
             (
@@ -1559,18 +1780,238 @@ class FluxGraph:
             0.0,
             min(1.0, float(node.pore_permeabilities.get(material, 1.0))),
         )
-        return (
-            hull
-            * pore
-            * self._gate_value(self._node_hull_gate_key(node.id))
-            * self._gate_value(self._node_pore_gate_key(node.id, material))
+        if not self.config.physiology_learning_enabled or torch is None:
+            return hull * pore
+        self._ensure_subedge_archetype()
+        volume = max(node.volume, 1e-12)
+        water_fraction = max(0.0, node.solvent) / volume
+        osmotic_fraction = max(0.0, volume - node.solvent) / volume
+        material_fraction = max(0.0, node.solubles.get(material, 0.0)) / volume
+        features = torch.tensor(
+            [[
+                1.0,
+                math.tanh(float(node.pressure)),
+                water_fraction,
+                osmotic_fraction,
+                material_fraction,
+                1.0 - min(1.0, material_fraction),
+            ]],
+            dtype=torch.float32,
+            device=self.device,
         )
+        hull_opening = self._linear_archetype_openings(
+            "node:hull", self._NODE_ARCHETYPE_FEATURES, features
+        )[0]
+        pore_opening = self._linear_archetype_openings(
+            "node:pore", self._NODE_ARCHETYPE_FEATURES, features
+        )[0]
+        learned = float((hull_opening * pore_opening).detach().item())
+        return hull * pore * learned
+
+    def node_archetype_opening_state(
+        self, nodes: Optional[List[FluxNode]] = None
+    ) -> Dict[int, Dict[str, Any]]:
+        """Evaluate all displayed node hulls and pores in two tensor batches."""
+        selected = nodes or [
+            node for node in self.nodes.values() if not node.burned
+        ]
+        if not selected:
+            return {}
+        materials = sorted(
+            {
+                "solvent",
+                *(
+                    name
+                    for node in selected
+                    for name in (
+                        set(node.solubles) | set(node.pore_permeabilities)
+                    )
+                ),
+            }
+        )
+        if not self.config.physiology_learning_enabled or torch is None:
+            return {
+                node.id: {
+                    "hull": 1.0,
+                    "pores": {name: 1.0 for name in materials},
+                }
+                for node in selected
+            }
+        self._ensure_subedge_archetype()
+        rows = []
+        material_rows = []
+        for node in selected:
+            volume = max(node.volume, 1e-12)
+            water = max(0.0, node.solvent) / volume
+            osmotic = max(0.0, volume - node.solvent) / volume
+            pressure = math.tanh(node.pressure)
+            rows.append([
+                1.0, pressure, water, osmotic, osmotic,
+                1.0 - min(1.0, osmotic),
+            ])
+            material_rows.extend(
+                [
+                    1.0,
+                    pressure,
+                    water,
+                    osmotic,
+                    (
+                        max(0.0, node.solvent)
+                        if name == "solvent"
+                        else max(0.0, node.solubles.get(name, 0.0))
+                    ) / volume,
+                    1.0 - min(
+                        1.0,
+                        (
+                            max(0.0, node.solvent)
+                            if name == "solvent"
+                            else max(0.0, node.solubles.get(name, 0.0))
+                        ) / volume,
+                    ),
+                ]
+                for name in materials
+            )
+        hull = self._linear_archetype_openings(
+            "node:hull",
+            self._NODE_ARCHETYPE_FEATURES,
+            torch.tensor(rows, dtype=torch.float32, device=self.device),
+        ).detach().cpu().tolist()
+        pore = self._linear_archetype_openings(
+            "node:pore",
+            self._NODE_ARCHETYPE_FEATURES,
+            torch.tensor(
+                material_rows, dtype=torch.float32, device=self.device
+            ),
+        ).reshape(len(selected), len(materials)).detach().cpu().tolist()
+        return {
+            node.id: {
+                "hull": hull_value,
+                "pores": dict(zip(materials, pore_values)),
+            }
+            for node, hull_value, pore_values in zip(selected, hull, pore)
+        }
+
+    def _learned_edge_opening(
+        self, parent_id: int, child_id: int, direction: str
+    ) -> float:
+        if not self.config.physiology_learning_enabled or torch is None:
+            return 1.0
+        self._ensure_subedge_archetype()
+        start = self.nodes[parent_id]
+        end = self.nodes[child_id]
+        if direction == "reverse":
+            start, end = end, start
+        start_volume = max(start.volume, 1e-12)
+        end_volume = max(end.volume, 1e-12)
+        features = torch.tensor(
+            [[
+                1.0,
+                math.tanh(start.pressure - end.pressure),
+                max(0.0, start.solvent) / start_volume,
+                max(0.0, end.solvent) / end_volume,
+                math.tanh(start_volume - end_volume),
+                max(0.0, start_volume - start.solvent) / start_volume,
+                max(0.0, end_volume - end.solvent) / end_volume,
+                math.exp(min(0.0, end.local_evidence)),
+            ]],
+            dtype=torch.float32,
+            device=self.device,
+        )
+        return float(
+            self._linear_archetype_openings(
+                f"edge:{direction}", self._EDGE_ARCHETYPE_FEATURES, features
+            )[0].detach().item()
+        )
+
+    def edge_archetype_opening_state(
+        self, edge_keys: Optional[List[Tuple[int, int]]] = None
+    ) -> Dict[Tuple[int, int], Tuple[float, float]]:
+        """Evaluate every requested physical edge valve in two batches."""
+        keys = edge_keys or list(self.edges)
+        keys = [
+            (parent_id, child_id)
+            for parent_id, child_id in keys
+            if parent_id in self.nodes and child_id in self.nodes
+        ]
+        if not keys:
+            return {}
+        if not self.config.physiology_learning_enabled or torch is None:
+            return {key: (1.0, 1.0) for key in keys}
+        self._ensure_subedge_archetype()
+        rows = {"forward": [], "reverse": []}
+        for parent_id, child_id in keys:
+            parent = self.nodes[parent_id]
+            child = self.nodes[child_id]
+            quality = math.exp(min(0.0, child.local_evidence))
+            for direction, source, destination in (
+                ("forward", parent, child),
+                ("reverse", child, parent),
+            ):
+                source_volume = max(source.volume, 1e-12)
+                destination_volume = max(destination.volume, 1e-12)
+                rows[direction].append([
+                    1.0,
+                    math.tanh(source.pressure - destination.pressure),
+                    max(0.0, source.solvent) / source_volume,
+                    max(0.0, destination.solvent) / destination_volume,
+                    math.tanh(source_volume - destination_volume),
+                    max(0.0, source_volume - source.solvent)
+                    / source_volume,
+                    max(0.0, destination_volume - destination.solvent)
+                    / destination_volume,
+                    quality,
+                ])
+        openings = {
+            direction: self._linear_archetype_openings(
+                f"edge:{direction}",
+                self._EDGE_ARCHETYPE_FEATURES,
+                torch.tensor(
+                    direction_rows,
+                    dtype=torch.float32,
+                    device=self.device,
+                ),
+            ).detach().cpu().tolist()
+            for direction, direction_rows in rows.items()
+        }
+        return {
+            key: (
+                openings["forward"][index],
+                openings["reverse"][index],
+            )
+            for index, key in enumerate(keys)
+        }
 
     def _heart_valve_modulator(
         self, region: str, in_slice: str, out_slice: str, throttle: float
     ) -> float:
-        key = f"heart:{region}:valve:{in_slice}->{out_slice}"
-        return max(0.0, min(1.0, float(throttle) * self._gate_value(key)))
+        if not self.config.physiology_learning_enabled or torch is None:
+            return max(0.0, min(1.0, float(throttle)))
+        self._ensure_subedge_archetype()
+        heart = self.hearts.get(region)
+        circulating = (
+            sum(sum(max(0.0, value) for value in mix.values())
+                for mix in heart.chambers.values())
+            if heart is not None else 0.0
+        )
+        csf = sum(max(0.0, value) for value in self.bath.values())
+        total = circulating + csf
+        features = torch.tensor(
+            [[
+                1.0,
+                max(0.0, min(1.0, float(throttle))),
+                circulating / max(total, 1e-12),
+                csf / max(total, 1e-12),
+            ]],
+            dtype=torch.float32,
+            device=self.device,
+        )
+        opening = self._linear_archetype_openings(
+            "heart:valve", self._HEART_ARCHETYPE_FEATURES, features
+        )[0]
+        return max(
+            0.0,
+            min(1.0, float(throttle) * float(opening.detach().item())),
+        )
 
     def _bind_heart_learning(self, region: str, heart: Heart) -> None:
         heart.valve_modulator = (
@@ -1583,57 +2024,48 @@ class FluxGraph:
     def _apply_reservoir_learning(self) -> None:
         if not self.config.physiology_learning_enabled:
             return
+        self._ensure_physiology_parameters()
         for region, heart in self.hearts.items():
             for name, reservoir in heart.reservoirs.items():
-                reservoir.opening_coverage = self._gate_value(
-                    f"heart:{region}:reservoir:{name}:coverage"
+                total = max(reservoir.storage_volume, 1e-12)
+                features = torch.tensor(
+                    [[
+                        1.0,
+                        reservoir.fullness,
+                        max(0.0, reservoir.ion_amount) / total,
+                        max(0.0, reservoir.solvent) / total,
+                    ]],
+                    dtype=torch.float32,
+                    device=self.device,
                 )
-                reservoir.exchange_probability = self._gate_value(
-                    f"heart:{region}:reservoir:{name}:exchange"
+                reservoir.opening_coverage = float(
+                    self._linear_archetype_openings(
+                        "reservoir:coverage",
+                        self._RESERVOIR_ARCHETYPE_FEATURES,
+                        features,
+                    )[0].detach().item()
                 )
-                reservoir.membrane_permeability = self._gate_value(
-                    f"heart:{region}:reservoir:{name}:membrane"
+                reservoir.exchange_probability = float(
+                    self._linear_archetype_openings(
+                        "reservoir:exchange",
+                        self._RESERVOIR_ARCHETYPE_FEATURES,
+                        features,
+                    )[0].detach().item()
+                )
+                reservoir.membrane_permeability = float(
+                    self._linear_archetype_openings(
+                        "reservoir:membrane",
+                        self._RESERVOIR_ARCHETYPE_FEATURES,
+                        features,
+                    )[0].detach().item()
                 )
 
     def _ensure_physiology_parameters(self) -> None:
         if not self.config.physiology_learning_enabled or torch is None:
             return
         self._ensure_subedge_archetype()
-        network_roots = self.orthogonal_network_roots()
-        for (parent_id, child_id), edge in self.edges.items():
-            if self.nodes[parent_id].burned or self.nodes[child_id].burned:
-                continue
-            self._physiology_parameter(
-                self._edge_gate_key(parent_id, child_id, "forward")
-            )
-            self._physiology_parameter(
-                self._edge_gate_key(parent_id, child_id, "reverse")
-            )
-        for node_id, node in self.nodes.items():
-            if node.burned:
-                continue
-            self._physiology_parameter(self._node_hull_gate_key(node_id))
-            materials = {"solvent", *node.solubles.keys()}
-            slices = self._node_slice(node_id, node, network_roots)
-            if slices is not None:
-                materials.update(slices)
-            for material in materials:
-                self._physiology_parameter(
-                    self._node_pore_gate_key(node_id, material)
-                )
         for region, heart in self.hearts.items():
             self._bind_heart_learning(region, heart)
-            if heart.script:
-                phase = heart.script[heart.phase_index % len(heart.script)]
-                for in_slice, out_slice in heart._resolve_valves(phase):
-                    self._physiology_parameter(
-                        f"heart:{region}:valve:{in_slice}->{out_slice}"
-                    )
-            for name in heart.reservoirs:
-                for gate_name in ("coverage", "exchange", "membrane"):
-                    self._physiology_parameter(
-                        f"heart:{region}:reservoir:{name}:{gate_name}"
-                    )
 
     def _learn_physiology(self) -> None:
         """Diffuse score-weighted reward over every audited traversal."""
@@ -1659,33 +2091,8 @@ class FluxGraph:
         best_key, best = max(
             live_traversals, key=lambda item: item[1].mean_score
         )
-        heart_support = {
-            key for key in self.physiology_parameters
-            if key.startswith("heart:main:")
-        }
-        pore_keys_by_node: Dict[int, List[str]] = {}
-        for key in self.physiology_parameters:
-            if not key.startswith("node:") or ":pore:" not in key:
-                continue
-            try:
-                node_id = int(key.split(":", 2)[1])
-            except (ValueError, IndexError):
-                continue
-            pore_keys_by_node.setdefault(node_id, []).append(key)
-
         for parameter in self.physiology_parameters.values():
             parameter.grad = None
-        structural_keys = [
-            key
-            for key in self.physiology_parameters
-            if not key.startswith("archetype:")
-        ]
-        structural_openings = torch.stack(
-            [
-                torch.sigmoid(self.physiology_parameters[key])
-                for key in structural_keys
-            ]
-        ) if structural_keys else None
         score_tensor = torch.tensor(
             [
                 float(traversal.mean_score)
@@ -1735,58 +2142,167 @@ class FluxGraph:
             ),
             score_tensor,
         )
+        physical_utility = torch.tensor(
+            [
+                sum(sub.delivered_utility for sub in traversal.subedges)
+                for _, traversal in live_traversals
+            ],
+            dtype=torch.float32,
+            device=self.device,
+        )
+        if bool((physical_utility > 0.0).any()):
+            physical_utility = physical_utility / physical_utility.max().clamp_min(1e-12)
         expected_route_opening = (
-            traversal_weights * archetype_openings.mean(dim=1)
+            traversal_weights
+            * physical_utility
+            * archetype_openings.mean(dim=1)
         ).sum()
+        reward_terms = [expected_route_opening]
+        resource_terms = [archetype_openings.mean()]
 
-        detached_weights = traversal_weights.detach().cpu().tolist()
-        gate_coefficients: Dict[str, float] = {}
-        for weight, (traversal_key, traversal) in zip(
-            detached_weights, live_traversals
-        ):
-            supporting = set(heart_support)
-            for parent_id, child_id in zip(
-                traversal.node_ids, traversal.node_ids[1:]
+        live_edges = [
+            (parent_id, child_id)
+            for parent_id, child_id in self.edges
+            if parent_id in self.nodes
+            and child_id in self.nodes
+            and not self.nodes[parent_id].burned
+            and not self.nodes[child_id].burned
+        ]
+        if live_edges:
+            edge_quality = []
+            forward_rows = []
+            reverse_rows = []
+            for parent_id, child_id in live_edges:
+                parent = self.nodes[parent_id]
+                child = self.nodes[child_id]
+                parent_volume = max(parent.volume, 1e-12)
+                child_volume = max(child.volume, 1e-12)
+                quality = math.exp(min(0.0, child.local_evidence))
+                edge_quality.append(quality)
+                forward_rows.append([
+                    1.0,
+                    math.tanh(parent.pressure - child.pressure),
+                    max(0.0, parent.solvent) / parent_volume,
+                    max(0.0, child.solvent) / child_volume,
+                    math.tanh(parent_volume - child_volume),
+                    max(0.0, parent_volume - parent.solvent) / parent_volume,
+                    max(0.0, child_volume - child.solvent) / child_volume,
+                    quality,
+                ])
+                reverse_rows.append([
+                    1.0,
+                    math.tanh(child.pressure - parent.pressure),
+                    max(0.0, child.solvent) / child_volume,
+                    max(0.0, parent.solvent) / parent_volume,
+                    math.tanh(child_volume - parent_volume),
+                    max(0.0, child_volume - child.solvent) / child_volume,
+                    max(0.0, parent_volume - parent.solvent) / parent_volume,
+                    quality,
+                ])
+            edge_quality_tensor = torch.tensor(
+                edge_quality, dtype=torch.float32, device=self.device
+            )
+            edge_weights = torch.softmax(
+                edge_quality_tensor / temperature, dim=0
+            )
+            for direction, rows in (
+                ("forward", forward_rows),
+                ("reverse", reverse_rows),
             ):
-                supporting.add(
-                    self._edge_gate_key(parent_id, child_id, "forward")
+                opening = self._linear_archetype_openings(
+                    f"edge:{direction}",
+                    self._EDGE_ARCHETYPE_FEATURES,
+                    torch.tensor(
+                        rows, dtype=torch.float32, device=self.device
+                    ),
                 )
-                supporting.add(
-                    self._edge_gate_key(parent_id, child_id, "reverse")
+                reward_terms.append((edge_weights * opening).sum())
+                resource_terms.append(opening.mean())
+
+        live_nodes = [node for node in self.nodes.values() if not node.burned]
+        if live_nodes:
+            node_rows = []
+            node_quality = []
+            for node in live_nodes:
+                volume = max(node.volume, 1e-12)
+                water = max(0.0, node.solvent) / volume
+                osmotic = max(0.0, volume - node.solvent) / volume
+                material = osmotic
+                node_rows.append([
+                    1.0,
+                    math.tanh(node.pressure),
+                    water,
+                    osmotic,
+                    material,
+                    1.0 - min(1.0, material),
+                ])
+                node_quality.append(math.exp(min(0.0, node.local_evidence)))
+            node_features = torch.tensor(
+                node_rows, dtype=torch.float32, device=self.device
+            )
+            node_weights = torch.softmax(
+                torch.tensor(
+                    node_quality, dtype=torch.float32, device=self.device
+                ) / temperature,
+                dim=0,
+            )
+            for kind in ("node:hull", "node:pore"):
+                opening = self._linear_archetype_openings(
+                    kind, self._NODE_ARCHETYPE_FEATURES, node_features
                 )
-            for node_id in traversal.node_ids:
-                supporting.add(self._node_hull_gate_key(node_id))
-                supporting.update(pore_keys_by_node.get(node_id, ()))
-            supporting = {
-                key for key in supporting
-                if key in self.physiology_parameters
-            }
-            if supporting:
-                share = float(weight) / len(supporting)
-                for key in supporting:
-                    gate_coefficients[key] = (
-                        gate_coefficients.get(key, 0.0) + share
-                    )
-        expected_structural_opening = (
-            torch.stack(
-                [
-                    torch.sigmoid(self.physiology_parameters[key])
-                    * coefficient
-                    for key, coefficient in gate_coefficients.items()
-                ]
-            ).sum()
-            if gate_coefficients
-            else expected_route_opening.new_zeros(())
-        )
-        expected_survival = (
-            0.5 * expected_route_opening
-            + 0.5 * expected_structural_opening
-        )
-        resource_opening = archetype_openings.mean()
-        if structural_openings is not None:
-            resource_opening = (
-                resource_opening + structural_openings.mean()
-            ) * 0.5
+                reward_terms.append((node_weights * opening).sum())
+                resource_terms.append(opening.mean())
+
+        heart_rows = []
+        for heart in self.hearts.values():
+            circulating = sum(
+                sum(max(0.0, value) for value in mix.values())
+                for mix in heart.chambers.values()
+            )
+            csf = sum(max(0.0, value) for value in self.bath.values())
+            total = circulating + csf
+            heart_rows.append([
+                1.0,
+                1.0,
+                circulating / max(total, 1e-12),
+                csf / max(total, 1e-12),
+            ])
+        if heart_rows:
+            heart_opening = self._linear_archetype_openings(
+                "heart:valve",
+                self._HEART_ARCHETYPE_FEATURES,
+                torch.tensor(
+                    heart_rows, dtype=torch.float32, device=self.device
+                ),
+            )
+            reward_terms.append(heart_opening.mean())
+            resource_terms.append(heart_opening.mean())
+
+        reservoir_rows = []
+        for heart in self.hearts.values():
+            for reservoir in heart.reservoirs.values():
+                total = max(reservoir.storage_volume, 1e-12)
+                reservoir_rows.append([
+                    1.0,
+                    reservoir.fullness,
+                    max(0.0, reservoir.ion_amount) / total,
+                    max(0.0, reservoir.solvent) / total,
+                ])
+        if reservoir_rows:
+            reservoir_features = torch.tensor(
+                reservoir_rows, dtype=torch.float32, device=self.device
+            )
+            for gate_name in ("coverage", "exchange", "membrane"):
+                opening = self._linear_archetype_openings(
+                    f"reservoir:{gate_name}",
+                    self._RESERVOIR_ARCHETYPE_FEATURES,
+                    reservoir_features,
+                )
+                reward_terms.append(opening.mean())
+                resource_terms.append(opening.mean())
+
+        expected_survival = torch.stack(reward_terms).mean()
+        resource_opening = torch.stack(resource_terms).mean()
         loss = (
             -expected_survival
             + max(0.0, float(self.config.physiology_resource_cost))
@@ -1813,7 +2329,7 @@ class FluxGraph:
         openings = {
             key: float(torch.sigmoid(parameter).detach().item())
             for key, parameter in self.physiology_parameters.items()
-            if not key.startswith("archetype:")
+            if key.startswith("archetype:") and key.endswith(":bias")
         } if torch is not None else {}
         archetype_coefficients = {
             key: float(parameter.detach().item())
@@ -1822,21 +2338,24 @@ class FluxGraph:
         } if torch is not None else {}
         by_kind: Dict[str, List[float]] = {}
         for key, opening in openings.items():
-            by_kind.setdefault(key.split(":", 1)[0], []).append(opening)
+            parts = key.split(":")
+            kind = ":".join(parts[1:-1])
+            by_kind.setdefault(kind, []).append(opening)
         values = list(openings.values())
+        archetype_groups: Dict[str, int] = {}
+        for key in archetype_coefficients:
+            parts = key.split(":")
+            kind = ":".join(parts[1:-1])
+            archetype_groups[kind] = archetype_groups.get(kind, 0) + 1
         return {
             "enabled": self.config.physiology_learning_enabled,
             "parameter_count": len(self.physiology_parameters),
             "archetype_parameter_count": len(archetype_coefficients),
             "archetypes": {
-                "subedge": {
-                    "parameter_count": len(archetype_coefficients),
-                    "coefficient_l1_mean": (
-                        sum(abs(value) for value in archetype_coefficients.values())
-                        / len(archetype_coefficients)
-                        if archetype_coefficients else None
-                    ),
+                kind: {
+                    "parameter_count": count,
                 }
+                for kind, count in archetype_groups.items()
             },
             "opening_mean": sum(values) / len(values) if values else None,
             "opening_min": min(values) if values else None,
@@ -1891,10 +2410,25 @@ class FluxGraph:
             pressure=1.0 + self.config.found_bonus,
             created_tick=0,
             expanded=True,  # the anchor doesn't get "expanded" itself
+            # The anchor sits at the center and belongs to no slice (see
+            # _node_slice), so it never receives the ordinary per-slice
+            # ambient humidity exchange every other node gets -- without
+            # its own starting reserve it would stay permanently dry and
+            # (now that growth requires water) could never sprout its
+            # first children at all. 1.0 matches uniform_field's default
+            # ambient level, i.e. "the seed starts as hydrated as the
+            # steady state everything else is drawn toward" -- not an
+            # arbitrary number. Only while the fluid layer is actually on:
+            # with it off there is no water concept in play (growth stays
+            # ungated too, see _expandable_nodes), and plain score-driven
+            # pressure derivation expects a freshly seeded graph at exactly
+            # zero physical inventory.
+            solvent=1.0 if self.config.graph_auditor_enabled else 0.0,
         )
         self.anchor_id = node_id
         self.rhizome_owner_id = node_id
         self._configure_seed_heart("main", node_id, initially_full=True)
+        self._ensure_current_habitat()
         self._publish_snapshot()
         return node_id
 
@@ -2008,6 +2542,30 @@ class FluxGraph:
         """
         self.external_physics[domain] = payload
 
+    def _ensure_current_habitat(self) -> Dict[str, float]:
+        """Return the active seed's persistent finite environmental patch.
+
+        A habitat is created exactly once per seed node. Its initial named
+        ions reflect the regional hearts present when that phrase-space
+        location is first entered. Later topology can use those materials but
+        cannot make the patch refill; revisiting the seed returns to the same
+        inventory.
+        """
+        if self.anchor_id is None:
+            return {}
+        patch = self.habitats.get(self.anchor_id)
+        if patch is not None:
+            return patch
+        amount = max(0.0, float(self.config.habitat_ring_ion_amount))
+        patch = {}
+        for region in self._region_pump_nodes():
+            patch[f"{region}:forward"] = amount
+            patch[f"{region}:backward"] = amount
+        self.habitats[self.anchor_id] = patch
+        tokens, _ = self.best_path()
+        self.habitat_signatures[self.anchor_id] = list(tokens or self.anchor_tokens)
+        return patch
+
     def export_fluid_state(self) -> Dict[str, Any]:
         """The graph-level fluid state that lives outside individual nodes
         -- the CSF bath and every region heart's chambers, reservoirs,
@@ -2016,10 +2574,50 @@ class FluxGraph:
         not here."""
         return {
             "bath": dict(self.bath),
+            "bath_by_node": {
+                str(node_id): dict(mixture)
+                for node_id, mixture in self.bath_by_node.items()
+            },
             "background": dict(self.background),
             "soil": dict(self.soil),
             "rhizome": dict(self.rhizome),
             "rhizome_owner_id": self.rhizome_owner_id,
+            "habitats": {
+                str(seed_id): dict(mixture)
+                for seed_id, mixture in self.habitats.items()
+            },
+            "habitat_signatures": {
+                str(seed_id): list(tokens)
+                for seed_id, tokens in self.habitat_signatures.items()
+            },
+            "movement_count": self.movement_count,
+            "edge_maturity": {
+                f"{parent_id}:{child_id}": edge.maturity
+                for (parent_id, child_id), edge in self.edges.items()
+                if edge.maturity
+            },
+            "edge_hulls": {
+                f"{parent_id}:{child_id}": {
+                    "solvent": edge.hull_solvent,
+                    "solubles": dict(edge.hull_solubles),
+                    "pressure": edge.hull_pressure,
+                }
+                for (parent_id, child_id), edge in self.edges.items()
+                if edge.hull_solvent or edge.hull_solubles
+            },
+            "traversal_tubes": {
+                ",".join(str(part) for part in key): [
+                    {
+                        "direction": sub.direction,
+                        "edge_keys": [list(edge_key) for edge_key in sub.segment_edge_keys],
+                        "solvent": list(sub.segment_solvent),
+                        "solubles": [dict(mixture) for mixture in sub.segment_solubles],
+                        "pressures": list(sub.segment_pressures),
+                    }
+                    for sub in traversal.subedges
+                ]
+                for key, traversal in self.traversals.items()
+            },
             "physiology": {
                 "logits": {
                     key: float(parameter.detach().item())
@@ -2062,10 +2660,49 @@ class FluxGraph:
         (custom phase lists aren't round-tripped -- they fall back to the
         configured script, since a phase list can hold arbitrary code)."""
         self.bath = dict(state.get("bath", {}))
+        self.bath_by_node = {
+            int(node_id): dict(mixture)
+            for node_id, mixture in state.get("bath_by_node", {}).items()
+        }
         self.background = dict(state.get("background", {}))
         self.soil = dict(state.get("soil", {}))
         self.rhizome = dict(state.get("rhizome", {}))
         self.rhizome_owner_id = self.anchor_id
+        self.habitats = {
+            int(seed_id): dict(mixture)
+            for seed_id, mixture in state.get("habitats", {}).items()
+        }
+        self.habitat_signatures = {
+            int(seed_id): list(tokens)
+            for seed_id, tokens in state.get("habitat_signatures", {}).items()
+        }
+        self.movement_count = int(state.get("movement_count", 0))
+        self._ensure_current_habitat()
+        for key, value in state.get("edge_maturity", {}).items():
+            try:
+                parent_text, child_text = str(key).split(":", 1)
+                edge = self.edges.get((int(parent_text), int(child_text)))
+                if edge is not None:
+                    edge.maturity = max(0.0, min(1.0, float(value)))
+            except (TypeError, ValueError):
+                continue
+        for key, hstate in state.get("edge_hulls", {}).items():
+            try:
+                parent_text, child_text = str(key).split(":", 1)
+                edge = self.edges.get((int(parent_text), int(child_text)))
+                if edge is not None:
+                    edge.hull_solvent = max(0.0, float(hstate.get("solvent", 0.0)))
+                    edge.hull_solubles = {
+                        str(name): max(0.0, float(amount))
+                        for name, amount in hstate.get("solubles", {}).items()
+                    }
+                    edge.hull_pressure = max(0.0, float(hstate.get("pressure", 0.0)))
+            except (TypeError, ValueError):
+                continue
+        # Traversals are reconstructed lazily by the auditor. Restore tube
+        # inventories only for paths already present (newer loaders may audit
+        # before importing); otherwise keep the payload for that first audit.
+        self._pending_traversal_tubes = dict(state.get("traversal_tubes", {}))
         for region, hstate in state.get("hearts", {}).items():
             heart = self._heart_for(region)
             heart.chambers = {k: dict(v) for k, v in hstate.get("chambers", {}).items()}
@@ -2332,7 +2969,30 @@ class FluxGraph:
         """Advance one discrete step."""
         self.tick_count += 1
         self._tick_started_at = time.monotonic()
-        self._emit_status("settling", "relaxing circuit", 0, self.config.max_relaxation_iterations)
+        if self.config.graph_auditor_enabled:
+            self._emit_status("auditing", "materializing every causal path tube")
+            self._run_graph_auditor()
+            self._apply_reservoir_learning()
+            self._emit_status("humidity", "exchanging solvent and dissolved ions")
+            self._exchange_humidity()
+            # A still-dry anchor's first children are withheld by
+            # spawn_first_children() itself; retrying here (idempotent
+            # once they exist) means they appear the same tick the anchor
+            # finally hydrates, rather than needing a separate mechanism.
+            self.spawn_first_children()
+            self._emit_status("rings", "ingesting boundary supplies")
+            self._ingest_from_habitat_shells()
+            self._emit_status("pumping", "beating regional hearts")
+            self._pump_hearts()
+            self._emit_status("soil", "permeating the level-zero interface")
+            self._permeate_background_into_soil()
+            self._absorb_soil_by_roots()
+            self._emit_status("factories", "running node synthesis")
+            self._run_node_factories()
+        self._emit_status(
+            "settling", "relaxing coupled fluid compartments",
+            0, self.config.fluid_solver_substeps,
+        )
         self._settle_circuit()
         self._emit_status("rerooting", "checking causal focus")
         self._maybe_reroot()
@@ -2341,36 +3001,25 @@ class FluxGraph:
         self._emit_status("auxin", "diffusing growth signals")
         self._diffuse_auxin()
         if self.config.graph_auditor_enabled:
-            # Local missing-ion stress requests an opposite-direction root sprout.
-            self._emit_status("nutrients", "reading local sprout demand")
+            # Except for the boot tick, this reads the fully reconciled
+            # post-physiology state left by the preceding tick.
+            self._emit_status("nutrients", "building local growth commitment")
             self._update_nutrient_growth_interest()
         self._emit_status("expanding", "selecting growth fronts")
         self._expand_top_pressure_nodes()
         self._emit_status("starvation", "reaping disconnected or starved tissue")
         self._starve_and_burn()
         if self.config.graph_auditor_enabled:
-            self._emit_status("auditing", "enumerating causal paths")
+            # Growth can create fresh paths. Materialize their empty lumens
+            # now so the next beat sees the exact current vascular topology.
+            self._emit_status("auditing", "materializing newly grown path tubes")
             self._run_graph_auditor()
             self._emit_status(
-                "learning", "diffusing traversal reward through valves and pores"
+                "learning", "using path score as reward and reproduction signal"
             )
             self._learn_physiology()
-            self._apply_reservoir_learning()
-            self._emit_status("humidity", "exchanging solvent and dissolved ions")
-            self._exchange_humidity()
-            self._emit_status("rings", "ingesting boundary supplies")
-            self._ingest_from_rings()
-            self._emit_status("transport", "moving fluid through traversals")
-            self._transport_subedges()
-            self._emit_status("pumping", "beating regional hearts")
-            self._pump_hearts()
-            self._emit_status("soil", "permeating the level-zero interface")
-            self._permeate_background_into_soil()
-            self._absorb_soil_by_roots()
-            self._emit_status("factories", "running node synthesis")
-            self._run_node_factories()
-            self._emit_status("nutrients", "reconciling local sprout demand")
-            self._update_nutrient_growth_interest(accumulate=False)
+            self._emit_status("hardening", "maturing useful physical routes")
+            self._update_branch_maturity()
         self._publish_snapshot()
         self._emit_status("complete", "tick snapshot published", 1, 1)
 
@@ -2397,9 +3046,24 @@ class FluxGraph:
         support, it can't just sit there forever the way an unsupported
         leaf can't: this force-picks the current highest-pressure live node
         as the next anchor from whatever's actually in the graph right now,
-        rather than waiting for a challenger to fairly out-score it.
+        rather than waiting for a challenger to fairly out-score it. This
+        forced path is survival, not exploration stability, so it ignores
+        reroot_cooldown_ticks entirely -- a dead anchor cannot be left in
+        place just because the clock hasn't run out.
+
+        The ordinary challenger path below is gated by both
+        reroot_cooldown_ticks (a newly-rooted lineage gets that many ticks
+        before it can be displaced again) and reroot_margin (the challenger
+        must clear the anchor by more than that, not just any epsilon) --
+        without them the causal focus random-walks to whichever node has
+        the highest *instantaneous* pressure every single tick (a fresh
+        leaf and a settling anchor, which loses pressure to humidity/
+        factory/bulk-transfer outflow every tick, cross constantly), tearing
+        down and rebuilding every heart on every tick instead of letting one
+        lineage actually get explored.
         """
         anchor = self.nodes[self.anchor_id]
+        self._ticks_since_reroot += 1
 
         if self.config.anchor_can_decay:
             if anchor.pressure < self.config.starvation_floor:
@@ -2412,12 +3076,16 @@ class FluxGraph:
                     self._reroot(replacement_id)
                 return
 
+        if self._ticks_since_reroot < max(0, int(self.config.reroot_cooldown_ticks)):
+            return
+
+        margin = max(0.0, float(self.config.reroot_margin))
         challenger_id = None
         challenger_pressure = anchor.pressure
         for node_id, node in self.nodes.items():
             if node.burned or node_id == self.anchor_id:
                 continue
-            if node.pressure > challenger_pressure:
+            if node.pressure > challenger_pressure + margin:
                 challenger_pressure = node.pressure
                 challenger_id = node_id
         if challenger_id is None:
@@ -2452,13 +3120,30 @@ class FluxGraph:
         old_anchor_id = self.anchor_id
         if new_root_id == old_anchor_id:
             return
+        self._ticks_since_reroot = 0
         old_anchor_tokens = self.anchor_tokens
         old_anchor_local_evidence = self.anchor_local_evidence
         # The old seed heart does not travel with the focus. Re-rooting
         # dumps every chamber and reservoir into the shared CSF bath.
         self._spill_heart_to_csf("main")
-        self.nodes[old_anchor_id].tokens = old_anchor_tokens
-        self.nodes[old_anchor_id].local_evidence = old_anchor_local_evidence
+        old_anchor = self.nodes[old_anchor_id]
+        # A demotion is not a destruction -- old_anchor stays alive -- but
+        # material leaving a role goes through CSF/lymph in every case, no
+        # exception for "the node itself survives." Its own solvent/
+        # solubles land in its own bath_by_node entry (a live compartment,
+        # since this node isn't burned) instead of continuing to sit
+        # privately on the node the instant it stops being anchor.
+        if old_anchor.solvent or old_anchor.solubles:
+            local_bath = self.bath_by_node.setdefault(old_anchor_id, {})
+            if old_anchor.solvent:
+                local_bath["solvent"] = local_bath.get("solvent", 0.0) + old_anchor.solvent
+                old_anchor.solvent = 0.0
+            for name, amount in old_anchor.solubles.items():
+                if amount:
+                    local_bath[name] = local_bath.get(name, 0.0) + amount
+            old_anchor.solubles = {}
+        old_anchor.tokens = old_anchor_tokens
+        old_anchor.local_evidence = old_anchor_local_evidence
         new_root = self.nodes[new_root_id]
         self.anchor_tokens, self.anchor_local_evidence = self._reset_to_anchor_invariants(new_root)
         self.anchor_id = new_root_id
@@ -2469,6 +3154,8 @@ class FluxGraph:
         # whose owner is no longer on the new level-zero seed tier.
         self._reap_dead_hearts(set(self._region_pump_nodes()))
         self._configure_seed_heart("main", new_root_id, initially_full=False)
+        self.movement_count += 1
+        self._ensure_current_habitat()
 
     def _reset_to_anchor_invariants(self, node: FluxNode) -> Tuple[List[int], float]:
         """Match seed()'s anchor construction, in place, for a node that's becoming the anchor.
@@ -2496,8 +3183,9 @@ class FluxGraph:
         node.direction = None
         node.depth = 0
         node.level = 0
-        node.local_evidence = 0.0
-        node.cumulative_evidence = 0.0
+        # Score is a permanent reward observation. Becoming the active seed
+        # changes neither this token's reward nor the accumulated reward of
+        # its causal lineage; seed status has no hydraulic privilege.
         node.low_pressure_ticks = 0
         node.expanded = True
         return captured_tokens, captured_local_evidence
@@ -2708,15 +3396,25 @@ class FluxGraph:
             if neighbor_id in self.nodes[node_id].parent_ids
             else (node_id, neighbor_id)
         )
+        edge = self.edges.get((parent_id, child_id))
+        maturity = edge.maturity if edge is not None else 0.0
+        hardening = 1.0 + max(
+            0.0, float(self.config.branch_maturity_conductance_bonus)
+        ) * max(0.0, min(1.0, maturity))
         if neighbor_id in self.nodes[node_id].parent_ids:
-            valve = self._gate_value(
-                self._edge_gate_key(parent_id, child_id, "forward")
+            valve = self._learned_edge_opening(
+                parent_id, child_id, "forward"
             )
-            return base * valve
-        valve = self._gate_value(
-            self._edge_gate_key(parent_id, child_id, "reverse")
+            return base * valve * hardening
+        valve = self._learned_edge_opening(
+            parent_id, child_id, "reverse"
         )
-        return base * self.config.return_conductance_scale * valve
+        return (
+            base
+            * self.config.return_conductance_scale
+            * valve
+            * hardening
+        )
 
     def _shared_token_intrinsic(self) -> Dict[int, float]:
         """Nodes sharing the exact same token span divide their intrinsic claim
@@ -2763,7 +3461,7 @@ class FluxGraph:
         forward_reach: float = 0.0,
         backward_reach: float = 0.0,
     ) -> float:
-        """One relaxation sweep. Returns the largest pressure change seen.
+        """Refresh node pressure from local physical inventory only.
 
         inflow is a conductance-weighted average of neighbor pressure,
         normalized by *total conductance* -- sum(conductance_i * pressure_i)
@@ -2872,21 +3570,51 @@ class FluxGraph:
         return max_delta
 
     def _settle_circuit(self) -> int:
-        """Iterate relaxation until pressure stops moving (or the iteration cap).
+        """Settle the coupled physical fluid system.
 
-        A single sweep is a half-propagated transient, not a solved
-        circuit -- multi-hop support hasn't had a chance to arrive yet.
-        This is pure local arithmetic (no model calls), so iterating it
-        many times per tick is cheap; only the *decisions* made off of it
-        (expansion, starvation) are expensive, and those should see a
-        settled state, not a snapshot mid-flight.
-
-        Shared-token trading (_shared_token_intrinsic) and the forward/
-        backward reach gap (for balance_weight) both happen once here,
-        before the very first sweep -- structural facts about the tree
-        that the whole exterior relaxation then treats as fixed input for
-        this tick, not something recomputed sweep to sweep.
+        Pressure is an observation of hydration and named-ion loading in
+        nodes, tube lumens, edge hulls, and spatial bath compartments. Score,
+        found bonus, population heuristics, and seed identity do not create
+        pressure. They remain reward/reproduction signals used by growth.
         """
+        if self.config.graph_auditor_enabled:
+            self._run_graph_auditor()
+            self._solve_coupled_fluid_system()
+            return max(1, int(self.config.fluid_solver_substeps))
+
+        # Without the fluid topology enabled, retain current inventories but
+        # still derive node pressure from physical local state only.
+        compliance = max(1e-6, float(self.config.node_compliance))
+        for node in self.nodes.values():
+            if node.burned:
+                continue
+            node.pressure = (
+                max(0.0, node.solvent)
+                + self.config.fluid_osmotic_pressure
+                * sum(max(0.0, amount) for amount in node.solubles.values())
+                / max(1e-6, node.solvent)
+            ) / compliance
+        return 1
+
+        # Legacy score-driven resistor relaxation is intentionally unreachable
+        # below. It remains temporarily as migration context for saved knobs.
+        compliance = max(1e-6, float(self.config.node_compliance))
+        max_delta = 0.0
+        for node in self.nodes.values():
+            if node.burned:
+                continue
+            new_pressure = (
+                max(0.0, node.solvent)
+                + self.config.fluid_osmotic_pressure
+                * sum(max(0.0, amount) for amount in node.solubles.values())
+                / max(1e-6, node.solvent)
+            ) / compliance
+            max_delta = max(max_delta, abs(new_pressure - node.pressure))
+            node.pressure = new_pressure
+        return max_delta
+
+        # Legacy score-driven pressure code remains below only as migration
+        # context for old configuration names; it is intentionally unreachable.
         cfg = self.config
         shared_intrinsic = self._shared_token_intrinsic()
         forward_reach = self._direction_reach(Direction.FORWARD)
@@ -3192,6 +3920,96 @@ class FluxGraph:
             keep = min(keep, self._effective_branch_factor(node))
         return max(1, keep)
 
+    def _stddev_sample_candidates(
+        self,
+        node: FluxNode,
+        candidates: List[Tuple[List[int], float]],
+        keep: int,
+    ) -> List[Tuple[List[int], float]]:
+        """Sample score-standardized bands while preserving probability mass.
+
+        Every occupied one-standard-deviation band receives a representative
+        before remaining seats are assigned in proportion to each band's
+        model-probability mass. Sampling within a band is probability weighted
+        and without replacement. Returned scores remain the true model scores.
+        """
+        keep = min(max(0, int(keep)), len(candidates))
+        if keep == 0:
+            return []
+        scores = [float(score) for _, score in candidates]
+        mean = sum(scores) / len(scores)
+        variance = sum((score - mean) ** 2 for score in scores) / len(scores)
+        deviation = math.sqrt(variance)
+        if deviation <= 1e-12:
+            return candidates[:keep]
+
+        bands: Dict[int, List[int]] = {}
+        for index, score in enumerate(scores):
+            z_score = (score - mean) / deviation
+            # Do not let the enormous aggregate mass of individually
+            # implausible tail items dominate the representative sample.
+            if z_score < -2.0:
+                continue
+            bands.setdefault(math.floor(z_score), []).append(index)
+        if not bands:
+            bands[0] = [max(range(len(scores)), key=scores.__getitem__)]
+
+        rng = random.Random(
+            ((self.tick_count + 1) * 0x9E3779B1)
+            ^ (node.id * 0x85EBCA77)
+            ^ (1 if node.direction is Direction.FORWARD else 2)
+        )
+        remaining = {band: list(indices) for band, indices in bands.items()}
+        selected: List[int] = []
+        maximum = max(scores)
+
+        def weight(index: int) -> float:
+            return math.exp(scores[index] - maximum)
+
+        def draw_from_band(band: int) -> None:
+            indices = remaining[band]
+            weights = [weight(index) for index in indices]
+            target = rng.random() * sum(weights)
+            running = 0.0
+            chosen_at = len(indices) - 1
+            for position, item_weight in enumerate(weights):
+                running += item_weight
+                if running >= target:
+                    chosen_at = position
+                    break
+            selected.append(indices.pop(chosen_at))
+
+        band_mass = {
+            band: sum(weight(index) for index in indices)
+            for band, indices in remaining.items()
+        }
+        for band in sorted(bands, key=band_mass.get, reverse=True)[:keep]:
+            draw_from_band(band)
+
+        while len(selected) < keep:
+            live_bands = [band for band, indices in remaining.items() if indices]
+            if not live_bands:
+                break
+            masses = [
+                sum(weight(index) for index in remaining[band])
+                for band in live_bands
+            ]
+            target = rng.random() * sum(masses)
+            running = 0.0
+            chosen_band = live_bands[-1]
+            for band, mass in zip(live_bands, masses):
+                running += mass
+                if running >= target:
+                    chosen_band = band
+                    break
+            draw_from_band(chosen_band)
+
+        return sorted(
+            (candidates[index] for index in selected),
+            key=lambda pair: pair[1],
+            reverse=True,
+        )
+
     def _direction_reach(self, direction: Direction) -> float:
         """How far a direction's frontier currently extends from the anchor.
 
@@ -3244,26 +4062,96 @@ class FluxGraph:
         # Forward tips have no live children farther forward. Backward tips
         # have no live parents farther backward. Ownership follows the one
         # global backward->forward axis, not radial distance from a center.
+        #
+        # Growth is metabolic work: a node with no solvent has nothing to
+        # spend and cannot put out new tissue, no matter how much pressure
+        # it's carrying -- it simply waits at the frontier until ambient
+        # humidity exchange (see _exchange_humidity, which runs earlier
+        # this same tick) gives it some. Only enforced while the fluid
+        # layer is actually simulating water at all (graph_auditor_enabled)
+        # -- with it off there is no water concept in play, so growth stays
+        # ungated, exactly as it always has.
+        fluid_on = self.config.graph_auditor_enabled
         return [
             n for n in self.nodes.values()
             if not n.burned
             and n.direction is not None
+            and (not fluid_on or n.solvent > 0.0)
             and (
                 (n.direction is Direction.FORWARD and not self._live_children(n.id))
                 or (n.direction is Direction.BACKWARD and not self._live_parents(n.id))
             )
         ]
 
-    def _update_nutrient_growth_interest(self, accumulate: bool = True) -> None:
-        """Accumulate cross-growth interest from continuous ion scarcity.
+    def _heart_growth_stresses(self) -> Dict[str, Dict[str, Any]]:
+        """Return structural side scarcity for every seed-tier heart.
 
-        Each node measures the concentration of its required opposite-side
-        ion against ``growth_target_ion_concentration``. Its fractional
-        shortfall (0..1), not a binary present/absent flag, is the demand
-        added to sprout or air-root priority. Adequate supply clears demand.
+        A heart is connected on one side only when a direct live neighbor on
+        that side belongs to the pump's metabolic lineage. A causal edge into
+        an unrelated cousin network does not satisfy the requirement. Missing
+        forward tissue is sprout stress; missing backward tissue is root
+        stress. Seed-tier pumps have no direction of their own, so this check
+        is deliberately separate from node-local ion scarcity.
+        """
+        stresses: Dict[str, Dict[str, Any]] = {}
+        for region, pump_id in self._region_pump_nodes().items():
+            pump = self.nodes[pump_id]
+            lineage_id = (
+                pump.center_id
+                if pump.center_id is not None else pump_id
+            )
+
+            def same_lineage(node_id: int) -> bool:
+                node = self.nodes[node_id]
+                node_lineage = (
+                    node.center_id
+                    if node.center_id is not None else node.id
+                )
+                return node_lineage == lineage_id
+
+            forward_connections = [
+                child_id
+                for child_id in self._live_children(pump_id)
+                if same_lineage(child_id)
+            ]
+            backward_connections = [
+                parent_id
+                for parent_id in self._live_parents(pump_id)
+                if same_lineage(parent_id)
+            ]
+            missing_forward = not forward_connections
+            missing_backward = not backward_connections
+            pump.forward_growth_interest = (
+                1.0 if missing_forward else 0.0
+            )
+            pump.backward_growth_interest = (
+                1.0 if missing_backward else 0.0
+            )
+            stresses[region] = {
+                "pump_id": pump_id,
+                "lineage_id": lineage_id,
+                "missing_forward": missing_forward,
+                "missing_backward": missing_backward,
+                "forward_connections": forward_connections,
+                "backward_connections": backward_connections,
+            }
+        return stresses
+
+    def _update_nutrient_growth_interest(self, accumulate: bool = True) -> None:
+        """Update the local, direction-specific growth commitment field.
+
+        Each directional node produces commitment from its remaining
+        opposite-ion shortfall. Existing signal decays, while the strongest
+        signal on adjacent same-lineage, same-side tissue diffuses locally.
+        The update is simultaneous so dict iteration order cannot steer the
+        hormone field. ``accumulate=False`` remains a compatibility-only
+        reconciliation mode that clears a fully supplied site without
+        advancing developmental time.
         """
         target = max(1e-12, float(self.config.growth_target_ion_concentration))
         network_roots = self.orthogonal_network_roots()
+        scarcity_by_node: Dict[int, float] = {}
+        field_by_node: Dict[int, str] = {}
         for nid, node in self.nodes.items():
             if node.burned or node.direction is None:
                 continue
@@ -3281,10 +4169,57 @@ class FluxGraph:
                 if node.direction is Direction.FORWARD
                 else "forward_growth_interest"
             )
-            if scarcity <= 0.0:
-                setattr(node, interest_name, 0.0)
-            elif accumulate:
-                setattr(node, interest_name, getattr(node, interest_name) + scarcity)
+            scarcity_by_node[nid] = scarcity
+            field_by_node[nid] = interest_name
+
+        if not accumulate:
+            for nid, scarcity in scarcity_by_node.items():
+                if scarcity <= 0.0:
+                    setattr(self.nodes[nid], field_by_node[nid], 0.0)
+            return
+
+        retention = max(
+            0.0, min(1.0, float(self.config.growth_commitment_retention))
+        )
+        diffusion = max(
+            0.0, min(1.0, float(self.config.growth_commitment_diffusion))
+        )
+        gain = max(0.0, float(self.config.growth_commitment_gain))
+        maximum = max(
+            0.0,
+            float(
+                max(
+                    self.config.growth_commitment_max,
+                    self.config.growth_commitment_threshold,
+                )
+            ),
+        )
+        previous = {
+            nid: max(0.0, float(getattr(self.nodes[nid], field_name)))
+            for nid, field_name in field_by_node.items()
+        }
+        updated: Dict[int, float] = {}
+        for nid, scarcity in scarcity_by_node.items():
+            node = self.nodes[nid]
+            field_name = field_by_node[nid]
+            ambient = max(
+                (
+                    previous[neighbor_id]
+                    for neighbor_id in self._neighbors(nid)
+                    if neighbor_id in previous
+                    and field_by_node[neighbor_id] == field_name
+                    and self.nodes[neighbor_id].center_id == node.center_id
+                ),
+                default=0.0,
+            )
+            retained = retention * previous[nid]
+            local_spread = diffusion * max(0.0, ambient - retained)
+            updated[nid] = min(
+                maximum,
+                retained + gain * scarcity + local_spread,
+            )
+        for nid, value in updated.items():
+            setattr(self.nodes[nid], field_by_node[nid], value)
     def _expand_top_pressure_nodes(self) -> None:
         """Pick this tick's compute-budget candidates, split fairly by direction.
 
@@ -3324,13 +4259,26 @@ class FluxGraph:
         healthy enough to keep winning the normal compute competition while
         the other side is absent.
         """
-        missing_forward_side = not self._live_children(self.anchor_id)
-        missing_backward_side = not self._live_parents(self.anchor_id)
-        if missing_forward_side or missing_backward_side:
-            if missing_forward_side:
-                self._expand_forward(self.anchor_id)
-            if missing_backward_side:
-                self._expand_backward(self.anchor_id)
+        fluid_on = self.config.graph_auditor_enabled
+        heart_stresses = self._heart_growth_stresses()
+        if any(
+            stress["missing_forward"] or stress["missing_backward"]
+            for stress in heart_stresses.values()
+        ):
+            for stress in heart_stresses.values():
+                pump_id = stress["pump_id"]
+                pump = self.nodes[pump_id]
+                if fluid_on and pump.solvent <= 0.0:
+                    # No water at the pump means no growth from it this
+                    # tick either, same as any other node -- it just waits.
+                    continue
+                if stress["missing_forward"]:
+                    # For a heart this is ordinary shoot/sprout growth, not
+                    # cross-growth from an already directional cell.
+                    self._expand_forward(pump_id)
+                if stress["missing_backward"]:
+                    # An air root launched by a heart is simply its root side.
+                    self._expand_backward(pump_id)
             return
 
         forward_reach = self._direction_reach(Direction.FORWARD)
@@ -3356,12 +4304,14 @@ class FluxGraph:
             if not n.burned
             and n.direction is Direction.BACKWARD
             and n.forward_growth_interest > 0.0
+            and (not fluid_on or n.solvent > 0.0)
         )
         backward_pool.extend(
             (n, True) for n in self.nodes.values()
             if not n.burned
             and n.direction is Direction.FORWARD
             and n.backward_growth_interest > 0.0
+            and (not fluid_on or n.solvent > 0.0)
         )
 
         def action_priority(action) -> float:
@@ -3375,8 +4325,25 @@ class FluxGraph:
                 )
             return priority(node) + stress
 
-        forward_pool.sort(key=action_priority, reverse=True)
-        backward_pool.sort(key=action_priority, reverse=True)
+        threshold = max(
+            0.0, float(self.config.growth_commitment_threshold)
+        )
+
+        def action_rank(action) -> Tuple[bool, float]:
+            node, nutrient_driven = action
+            stress = (
+                node.forward_growth_interest
+                if nutrient_driven and node.direction is Direction.BACKWARD
+                else (
+                    node.backward_growth_interest
+                    if nutrient_driven
+                    else 0.0
+                )
+            )
+            return nutrient_driven and stress >= threshold, action_priority(action)
+
+        forward_pool.sort(key=action_rank, reverse=True)
+        backward_pool.sort(key=action_rank, reverse=True)
 
         cfg = self.config
         explicit_budgets = cfg.forward_budget_per_tick is not None or cfg.backward_budget_per_tick is not None
@@ -3395,7 +4362,7 @@ class FluxGraph:
             if leftover_budget > 0:
                 remaining = sorted(
                     forward_pool[forward_floor:] + backward_pool[backward_floor:],
-                    key=action_priority, reverse=True,
+                    key=action_rank, reverse=True,
                 )
                 for action in remaining[:leftover_budget]:
                     node, nutrient_driven = action
@@ -3533,6 +4500,13 @@ class FluxGraph:
         for node_id, node in self.nodes.items():
             if node.burned or node_id == self.anchor_id:
                 continue
+            # Expansion precedes starvation in tick(). A node born during
+            # this expansion has not yet reached the auditor, humidity,
+            # transport, heart, soil, or factory phases below starvation.
+            # Do not spend one of its survival strikes before it has had
+            # that first complete physiology pass.
+            if self.tick_count > 0 and node.created_tick == self.tick_count:
+                continue
             if node.pressure < cfg.starvation_floor:
                 node.low_pressure_ticks += 1
             else:
@@ -3573,12 +4547,36 @@ class FluxGraph:
         def mark_burned(cur_id: int) -> None:
             cur = self.nodes[cur_id]
             cur.burned = True
-            if cur.solvent:
-                self.bath["solvent"] = self.bath.get("solvent", 0.0) + cur.solvent
-                cur.solvent = 0.0
-            for name, amount in cur.solubles.items():
-                if amount:
-                    self.bath[name] = self.bath.get(name, 0.0) + amount
+            # bath_by_node[cur_id] is permanently excluded from every future
+            # coupled fluid solve once cur_id is burned (see
+            # _solve_coupled_fluid_system's live_nodes filter) -- depositing
+            # this node's water in its own entry would conserve it on paper
+            # while actually orphaning it somewhere the pressure/flow solver
+            # can never reach again. Hand it instead to a still-living
+            # neighbor it was actually connected to, or the anchor as the
+            # guaranteed-alive fallback -- the same destination
+            # Heart._spill_heart_to_csf uses when a whole heart dies.
+            destination_id = next(
+                (
+                    neighbor_id for neighbor_id in cur.parent_ids + cur.children_ids
+                    if neighbor_id in self.nodes and not self.nodes[neighbor_id].burned
+                ),
+                None,
+            )
+            if (
+                destination_id is None
+                and self.anchor_id in self.nodes
+                and not self.nodes[self.anchor_id].burned
+            ):
+                destination_id = self.anchor_id
+            if destination_id is not None:
+                local_bath = self.bath_by_node.setdefault(destination_id, {})
+                if cur.solvent:
+                    local_bath["solvent"] = local_bath.get("solvent", 0.0) + cur.solvent
+                for name, amount in cur.solubles.items():
+                    if amount:
+                        local_bath[name] = local_bath.get(name, 0.0) + amount
+            cur.solvent = 0.0
             cur.solubles = {}
             if self.config.verbose:
                 print(f"  [burn] node {cur_id} (tokens={cur.tokens}, dir={cur.direction}) starved out")
@@ -4015,9 +5013,10 @@ class FluxGraph:
         # rather than being capped by a narrow topk-sized fetch.
         needs_wide_shortlist = poetic is not None or word_trie is not None
         for node in nodes:
+            selection_mode = self._direction_selection_mode(node.direction)
             base_shortlist_k = (
                 self.config.top_p_shortlist_ceiling
-                if self._direction_selection_mode(node.direction) == "topp"
+                if selection_mode in {"topp", "stddev"}
                 else self._direction_branch_factor(node.direction)
             )
             if node.direction is Direction.FORWARD:
@@ -4047,7 +5046,15 @@ class FluxGraph:
                 shortlist_k = base_shortlist_k
                 if needs_wide_shortlist:
                     shortlist_k = max(shortlist_k, self.config.poetic_shortlist_k)
-                round0 = scored[:shortlist_k]
+                if selection_mode == "stddev":
+                    pre_sample = [([tid], score) for tid, score in scored]
+                    if word_trie is not None:
+                        pre_sample = self._stddev_sample_candidates(
+                            node, pre_sample, shortlist_k
+                        )
+                    round0 = [(tokens[0], score) for tokens, score in pre_sample]
+                else:
+                    round0 = scored[:shortlist_k]
                 if word_trie is not None:
                     spans = self._grow_backward_word(node, round0)
                 else:
@@ -4395,6 +5402,11 @@ class FluxGraph:
         built once from a real dictionary, not a per-candidate rerank here.
         """
         poetic = self.config.poetic_attractor
+        if (
+            self._direction_selection_mode(node.direction) == "stddev"
+            and candidates
+        ):
+            return self._stddev_sample_candidates(node, candidates, keep)
         if poetic is None or not candidates:
             return candidates[:keep]
 
@@ -4419,7 +5431,21 @@ class FluxGraph:
             raise ValueError(f"node {node_id} has no direction")
 
     def spawn_first_children(self) -> None:
-        """Seed one forward and one backward child directly off the anchor."""
+        """Seed one forward and one backward child directly off the anchor.
+
+        The anchor is created with zero solvent (see seed()) -- while the
+        fluid layer is on, a dry anchor has nothing to grow with yet, so
+        this is a safe no-op instead of forcing growth out of nothing.
+        Idempotent and meant to be retried every tick (see tick()) until
+        ambient humidity exchange gives the anchor some water: the
+        "already has a child on either side" check is what makes repeated
+        calls safe rather than re-growing first children over and over.
+        """
+        anchor = self.nodes[self.anchor_id]
+        if self._live_children(self.anchor_id) or self._live_parents(self.anchor_id):
+            return
+        if self.config.graph_auditor_enabled and anchor.solvent <= 0.0:
+            return
         self._expand_forward(self.anchor_id)
         self._expand_backward(self.anchor_id)
         self.nodes[self.anchor_id].expanded = True
@@ -4538,6 +5564,7 @@ class FluxGraph:
         score: float,
         tokens: List[int],
         live_token_spans,
+        commitment_share: float = 1.0,
     ) -> FluxNode:
         node_id = self._alloc_id()
         token_key = tuple(int(t) for t in tokens)
@@ -4560,6 +5587,18 @@ class FluxGraph:
             cumulative_evidence=cumulative,
             rollup_mean=cumulative / max(depth, 1),
         )
+        inheritance = max(
+            0.0, min(1.0, float(self.config.growth_commitment_inheritance))
+        )
+        inherited = inheritance * max(0.0, commitment_share)
+        if level > int(source.level or 0):
+            node.forward_growth_interest = (
+                max(0.0, source.forward_growth_interest) * inherited
+            )
+        elif level < int(source.level or 0):
+            node.backward_growth_interest = (
+                max(0.0, source.backward_growth_interest) * inherited
+            )
         self.nodes[node_id] = node
         if level == 0 and node_id != self.anchor_id:
             self._configure_seed_heart(f"net:{node_id}", node_id, initially_full=False)
@@ -4587,22 +5626,44 @@ class FluxGraph:
     ) -> None:
         source = self.nodes[source_id]
         live_token_spans = self._live_token_spans()
+        count = max(1, min(len(scores), len(token_spans)))
         for score, tokens in zip(scores, token_spans):
             child = self._new_growth_node(
-                source, int(source.level or 0) + 1, score, tokens, live_token_spans
+                source,
+                int(source.level or 0) + 1,
+                score,
+                tokens,
+                live_token_spans,
+                commitment_share=1.0 / count,
             )
             self._record_growth_edge(source_id, child.id, child, "postfix_beam")
+        if count and scores and token_spans:
+            source.forward_growth_interest *= max(
+                0.0,
+                min(1.0, float(self.config.growth_commitment_after_growth)),
+            )
 
     def _attach_backward_parents(
         self, source_id: int, scores: List[float], token_spans: List[List[int]]
     ) -> None:
         source = self.nodes[source_id]
         live_token_spans = self._live_token_spans()
+        count = max(1, min(len(scores), len(token_spans)))
         for score, tokens in zip(scores, token_spans):
             parent = self._new_growth_node(
-                source, int(source.level or 0) - 1, score, tokens, live_token_spans
+                source,
+                int(source.level or 0) - 1,
+                score,
+                tokens,
+                live_token_spans,
+                commitment_share=1.0 / count,
             )
             self._record_growth_edge(parent.id, source_id, parent, "prefix_beam")
+        if count and scores and token_spans:
+            source.backward_growth_interest *= max(
+                0.0,
+                min(1.0, float(self.config.growth_commitment_after_growth)),
+            )
 
     def _run_graph_auditor(self) -> None:
         """Enumerate every causal path among currently-live nodes -- every
@@ -4690,9 +5751,24 @@ class FluxGraph:
 
         # Every Traversal adds two SubEdges -- one going one way, one
         # going the other -- held by every real Edge its path crosses.
-        forward_sub = SubEdge(traversal_key=key, direction="forward")
-        reverse_sub = SubEdge(traversal_key=key, direction="reverse")
-        for a, b in zip(node_ids, node_ids[1:]):
+        edge_keys = list(zip(node_ids, node_ids[1:]))
+        forward_sub = SubEdge(
+            traversal_key=key,
+            direction="forward",
+            segment_edge_keys=list(edge_keys),
+            segment_solvent=[0.0] * len(edge_keys),
+            segment_solubles=[{} for _ in edge_keys],
+            segment_pressures=[0.0] * len(edge_keys),
+        )
+        reverse_sub = SubEdge(
+            traversal_key=key,
+            direction="reverse",
+            segment_edge_keys=list(reversed(edge_keys)),
+            segment_solvent=[0.0] * len(edge_keys),
+            segment_solubles=[{} for _ in edge_keys],
+            segment_pressures=[0.0] * len(edge_keys),
+        )
+        for a, b in edge_keys:
             edge = self.edges.get((a, b))
             if edge is not None:
                 edge.subedges.append(forward_sub)
@@ -4706,8 +5782,37 @@ class FluxGraph:
             closed_tick=self.tick_count,
             subedges=[forward_sub, reverse_sub],
         )
+        saved_tubes = self._pending_traversal_tubes.pop(
+            ",".join(str(part) for part in key), None
+        )
+        if saved_tubes:
+            by_direction = {
+                str(item.get("direction")): item for item in saved_tubes
+            }
+            for sub in (forward_sub, reverse_sub):
+                item = by_direction.get(sub.direction)
+                if not item or len(item.get("solvent", [])) != len(sub.segment_edge_keys):
+                    continue
+                sub.segment_solvent = [
+                    max(0.0, float(value)) for value in item.get("solvent", [])
+                ]
+                sub.segment_solubles = [
+                    {
+                        str(name): max(0.0, float(amount))
+                        for name, amount in mixture.items()
+                    }
+                    for mixture in item.get("solubles", [])
+                ]
+                sub.segment_pressures = [
+                    max(0.0, float(value))
+                    for value in item.get(
+                        "pressures", [0.0] * len(sub.segment_edge_keys)
+                    )
+                ]
 
-    def audit_edge_influence(self) -> Dict[Tuple[int, int], Dict[str, float]]:
+    def audit_edge_influence(
+        self, ensure_current: bool = True
+    ) -> Dict[Tuple[int, int], Dict[str, float]]:
         """Run the auditor, then integrate every traversal's own path
         quality onto each real edge (an adjacent pair in some traversal's
         node_ids) it passes through.
@@ -4724,7 +5829,8 @@ class FluxGraph:
         (total / count) separately from the *total* volume of influence
         running through it.
         """
-        self._run_graph_auditor()
+        if ensure_current:
+            self._run_graph_auditor()
         influence: Dict[Tuple[int, int], Dict[str, float]] = {}
         for traversal in self.traversals.values():
             quality = math.exp(traversal.mean_score)
@@ -4815,7 +5921,7 @@ class FluxGraph:
         fn = per_slice.get(field_name, self.config.scalar_fields.get(field_name))
         return float(fn(radius)) if fn is not None else 0.0
 
-    def _exchange_humidity(self) -> None:
+    def _exchange_humidity_scalar(self) -> None:
         """Exchange solvent and dissolved ambient materials through pores.
 
         ``humidity`` remains the ambient water amount. Every other scalar
@@ -4875,43 +5981,289 @@ class FluxGraph:
                 flow = min(0.0, flow)
             node.solvent = max(0.0, node.solvent + flow)
 
-            for name, ambient_amount in ambient_solutes.items():
-                permeability = self._learned_node_permeability(node, name)
-                delta = (
-                    node.humidity_exchange
-                    * permeability
-                    * (ambient_amount - node.solubles.get(name, 0.0))
-                )
-                node.solubles[name] = max(
-                    0.0, node.solubles.get(name, 0.0) + delta
-                )
+            # A dissolved solute cannot move ambient-ward without a solvent
+            # to be dissolved in -- a dry node holds its solutes exactly as
+            # they are, no matter how large the ambient concentration gap.
+            if node.solvent > 0.0:
+                for name, ambient_amount in ambient_solutes.items():
+                    permeability = self._learned_node_permeability(node, name)
+                    delta = (
+                        node.humidity_exchange
+                        * permeability
+                        * (ambient_amount - node.solubles.get(name, 0.0))
+                    )
+                    node.solubles[name] = max(
+                        0.0, node.solubles.get(name, 0.0) + delta
+                    )
 
-    def _ingest_from_rings(self) -> None:
-        """Ring dispensing: each pie slice's ring hands its own unique
-        soluble to nearby nodes, at a rate set by how close each node
-        currently sits to its ring *in the client's own interface sim*.
-        That nearness doesn't exist back here at all -- the backend has
-        no node positions -- so it arrives through the external-physics
-        exchange (absorb_external_physics, domain "client", key
-        "ring_proximity": node_id -> 0..1 with 1 = right on the ring).
+    def _exchange_humidity(self) -> None:
+        """Batch passive solvent and ambient-solute exchange by node/material."""
+        if torch is None:
+            self._exchange_humidity_scalar()
+            return
+        anchor_pressure = self.nodes[self.anchor_id].pressure
+        heart_low = anchor_pressure < self.config.starvation_floor
+        ceiling = self.config.overpressure_ceiling
+        heart_high = ceiling > 0.0 and anchor_pressure > ceiling
+        network_roots = self.orthogonal_network_roots()
+        exchange_nodes: List[FluxNode] = []
+        node_slices: List[str] = []
+        radii: List[float] = []
+        material_names = set(self.config.scalar_fields)
+        for fields in self.config.slice_scalar_fields.values():
+            material_names.update(fields)
+        material_names.discard("humidity")
+        materials = sorted(material_names)
+
+        for nid, node in self.nodes.items():
+            if node.burned or node.humidity_exchange <= 0.0:
+                continue
+            slices = self._node_slice(nid, node, network_roots)
+            if slices is None:
+                continue
+            own_slice, _ = slices
+            center_id = (
+                node.center_id
+                if node.center_id in self.nodes
+                else self.anchor_id
+            )
+            center_level = self.nodes[center_id].level or 0
+            exchange_nodes.append(node)
+            node_slices.append(own_slice)
+            radii.append(float(abs((node.level or 0) - center_level)))
+        if not exchange_nodes:
+            return
+
+        self._emit_status(
+            "humidity", "sampling ambient fields", 1, 3
+        )
+        ambient_humidity = []
+        ambient_materials = []
+        for slice_name, radius in zip(node_slices, radii):
+            ambient_humidity.append(
+                max(
+                    0.0,
+                    self._field_value(slice_name, "humidity", radius),
+                )
+            )
+            ambient_materials.append(
+                [
+                    max(
+                        0.0,
+                        self._field_value(slice_name, name, radius),
+                    )
+                    for name in materials
+                ]
+            )
+
+        dtype = torch.float32
+        device = self.device
+        solvent = torch.tensor(
+            [max(0.0, node.solvent) for node in exchange_nodes],
+            dtype=dtype,
+            device=device,
+        )
+        solute_total = torch.tensor(
+            [
+                sum(max(0.0, value) for value in node.solubles.values())
+                for node in exchange_nodes
+            ],
+            dtype=dtype,
+            device=device,
+        )
+        volume = (solvent + solute_total).clamp_min(1e-12)
+        water_fraction = solvent / volume
+        osmotic_fraction = solute_total / volume
+        humidity = torch.tensor(
+            ambient_humidity, dtype=dtype, device=device
+        )
+        ambient = (
+            torch.tensor(ambient_materials, dtype=dtype, device=device)
+            if materials
+            else torch.empty(
+                (len(exchange_nodes), 0), dtype=dtype, device=device
+            )
+        )
+        ambient_osmoles = ambient.sum(dim=1)
+        ambient_activity = humidity / (
+            humidity + ambient_osmoles
+        ).clamp_min(1e-12)
+        exchange_rate = torch.tensor(
+            [node.humidity_exchange for node in exchange_nodes],
+            dtype=dtype,
+            device=device,
+        )
+        pressure_feature = torch.tanh(
+            torch.tensor(
+                [node.pressure for node in exchange_nodes],
+                dtype=dtype,
+                device=device,
+            )
+        )
+        hull_features = torch.stack(
+            (
+                torch.ones_like(volume),
+                pressure_feature,
+                water_fraction,
+                osmotic_fraction,
+                osmotic_fraction,
+                1.0 - osmotic_fraction.clamp_max(1.0),
+            ),
+            dim=1,
+        )
+        if self.config.physiology_learning_enabled:
+            self._ensure_subedge_archetype()
+            learned_hull = self._linear_archetype_openings(
+                "node:hull", self._NODE_ARCHETYPE_FEATURES, hull_features
+            )
+        else:
+            learned_hull = torch.ones_like(volume)
+        declared_hull = torch.tensor(
+            [
+                max(0.0, min(1.0, node.hull_permeability))
+                for node in exchange_nodes
+            ],
+            dtype=dtype,
+            device=device,
+        )
+        hull_opening = declared_hull * learned_hull
+
+        self._emit_status(
+            "humidity", "evaluating pore archetype batch", 2, 3
+        )
+        all_materials = ["solvent", *materials]
+        held = torch.zeros(
+            (len(exchange_nodes), len(all_materials)),
+            dtype=dtype,
+            device=device,
+        )
+        held[:, 0] = solvent
+        for column, name in enumerate(materials, start=1):
+            held[:, column] = torch.tensor(
+                [
+                    max(0.0, node.solubles.get(name, 0.0))
+                    for node in exchange_nodes
+                ],
+                dtype=dtype,
+                device=device,
+            )
+        material_fraction = held / volume[:, None]
+        pore_features = torch.stack(
+            (
+                torch.ones_like(material_fraction),
+                pressure_feature[:, None].expand_as(material_fraction),
+                water_fraction[:, None].expand_as(material_fraction),
+                osmotic_fraction[:, None].expand_as(material_fraction),
+                material_fraction,
+                1.0 - material_fraction.clamp_max(1.0),
+            ),
+            dim=2,
+        )
+        if self.config.physiology_learning_enabled:
+            learned_pore = self._linear_archetype_openings(
+                "node:pore",
+                self._NODE_ARCHETYPE_FEATURES,
+                pore_features.reshape(
+                    -1, len(self._NODE_ARCHETYPE_FEATURES)
+                ),
+            ).reshape_as(material_fraction)
+        else:
+            learned_pore = torch.ones_like(material_fraction)
+        declared_pore = torch.tensor(
+            [
+                [
+                    max(
+                        0.0,
+                        min(
+                            1.0,
+                            node.pore_permeabilities.get(name, 1.0),
+                        ),
+                    )
+                    for name in all_materials
+                ]
+                for node in exchange_nodes
+            ],
+            dtype=dtype,
+            device=device,
+        )
+        permeability = (
+            hull_opening[:, None] * declared_pore * learned_pore
+        )
+
+        self._emit_status(
+            "humidity", "applying exchange batch", 3, 3
+        )
+        target_solvent = humidity + solute_total * ambient_activity
+        solvent_flow = (
+            exchange_rate
+            * permeability[:, 0]
+            * (target_solvent - solvent)
+        )
+        if heart_low:
+            solvent_flow = solvent_flow.clamp_min(0.0)
+        elif heart_high:
+            solvent_flow = solvent_flow.clamp_max(0.0)
+        solvent = (solvent + solvent_flow).clamp_min(0.0)
+        if materials:
+            # Same rule as the scalar path: no solvent, no solute movement --
+            # a dry node is not a medium anything can dissolve into or out of.
+            has_water = (solvent > 0.0).to(dtype)[:, None]
+            material_delta = (
+                exchange_rate[:, None]
+                * permeability[:, 1:]
+                * (ambient - held[:, 1:])
+                * has_water
+            )
+            new_materials = (held[:, 1:] + material_delta).clamp_min(0.0)
+        else:
+            new_materials = held[:, 1:]
+
+        solvent_rows = solvent.detach().cpu().tolist()
+        material_rows = new_materials.detach().cpu().tolist()
+        for node, new_solvent, row in zip(
+            exchange_nodes, solvent_rows, material_rows
+        ):
+            node.solvent = new_solvent
+            for name, amount in zip(materials, row):
+                node.solubles[name] = amount
+
+    def _ingest_from_habitat_shells(self) -> None:
+        """Conserved shell dispensing from the active seed's finite habitat.
+
+        Each network-local nD habitat shell hands its own unique soluble to
+        nearby nodes, at a rate set by distance in that network's dimensions.
+        The backend has no mechanical coordinates, so the client publishes
+        the result through the external-physics exchange (domain "client_nd",
+        key "habitat_proximity": node_id -> 0..1). The projected S² radar
+        position never participates in uptake.
         No client watching means no payload means no dispensing: ring
         ingestion is genuinely part of the gamified simulation, not a
         backend-only process wearing its name.
 
         One unique substance per pie slice (see _node_slice for naming).
-        Ingesting your own slice's soluble consumes an equal amount of
-        the *opposite* slice's soluble (same group, other direction)
-        already held in the node: amount = proximity * opposite_held, so
-        nearness and available payment are the only throttles -- no
-        arbitrary rate constant.
+        Uptake debits the same named ion from the backend-owned habitat;
+        the node's opposite ion is untouched. This replaces the previous
+        implicit transmutation of one ion identity into another.
         """
-        client = self.external_physics.get("client", {})
-        proximity: Dict[int, float] = client.get("ring_proximity") or {}
+        client = self.external_physics.get("client_nd", {})
+        proximity: Dict[int, float] = client.get("habitat_proximity") or {}
         if not proximity:
+            return
+        patch = self._ensure_current_habitat()
+        target = max(
+            0.0,
+            min(1.0, float(self.config.growth_target_ion_concentration)),
+        )
+        uptake_rate = max(0.0, min(1.0, float(self.config.ring_uptake_rate)))
+        if target <= 0.0 or uptake_rate <= 0.0:
             return
         network_roots = self.orthogonal_network_roots()
         for nid, node in self.nodes.items():
             if node.burned:
+                continue
+            # A habitat shell hands off a dissolved soluble -- there is
+            # nothing to dissolve it into at a node holding no solvent.
+            if node.solvent <= 0.0:
                 continue
             near = proximity.get(nid)
             if not near:
@@ -4919,13 +6271,449 @@ class FluxGraph:
             slices = self._node_slice(nid, node, network_roots)
             if slices is None:
                 continue
-            own_name, opposite_name = slices
-            opposite_held = node.solubles.get(opposite_name, 0.0)
-            if opposite_held <= 0.0:
+            own_name, _ = slices
+            available = max(0.0, patch.get(own_name, 0.0))
+            if available <= 0.0:
                 continue
-            amount = min(1.0, max(0.0, float(near))) * opposite_held
-            node.solubles[opposite_name] = opposite_held - amount
-            node.solubles[own_name] = node.solubles.get(own_name, 0.0) + amount
+            held = max(0.0, node.solubles.get(own_name, 0.0))
+            volume = max(node.volume, 1.0)
+            concentration = held / volume
+            if concentration >= target:
+                continue
+            # Adding x solute also adds x total volume. This is the exact
+            # correction needed to reach target before contact throttling.
+            correction = (
+                (target * volume - held) / max(1e-12, 1.0 - target)
+            )
+            amount = min(
+                available,
+                correction
+                * min(1.0, max(0.0, float(near)))
+                * uptake_rate,
+            )
+            if amount <= 0.0:
+                continue
+            patch[own_name] = available - amount
+            node.solubles[own_name] = held + amount
+
+    def _solve_coupled_fluid_system(self) -> None:
+        """Relax nodes, path lumens, edge hulls, and spatial bath together.
+
+        Every row is a real fluid compartment and every sparse connection is
+        marshalled once, then all pressure, advection, diffusion, source
+        limiting, and accumulation happens with Torch scatter operations.
+        Audited tubes connect to nodes only at their terminals. Their ordered
+        lumen segments remain stateful between ticks; intermediate graph
+        nodes are deliberately absent from those connection lists.
+        """
+        if torch is None:
+            # The corrected model intentionally has one implementation: a
+            # vectorized coupled solve. Silently reverting to endpoint
+            # teleportation would change the physical ontology.
+            self.physiology_error = "PyTorch is required for coupled fluid transport"
+            return
+
+        cfg = self.config
+        live_nodes = [node for node in self.nodes.values() if not node.burned]
+        if not live_nodes:
+            return
+        self._reset_edge_flow()
+
+        # Compatibility/global inputs enter the spatial bath at their actual
+        # locality: the active seed. They cease being a globally mixed bath.
+        anchor_bath = self.bath_by_node.setdefault(self.anchor_id, {})
+        for name, amount in list(self.bath.items()):
+            if amount:
+                anchor_bath[name] = anchor_bath.get(name, 0.0) + max(0.0, float(amount))
+        self.bath.clear()
+        for node in live_nodes:
+            self.bath_by_node.setdefault(node.id, {})
+
+        compartments: List[Tuple[str, Any, Optional[int]]] = []
+        compliance: List[float] = []
+        node_comp: Dict[int, int] = {}
+        bath_comp: Dict[int, int] = {}
+        hull_comp: Dict[Tuple[int, int], int] = {}
+        tube_comp: Dict[Tuple[int, int], int] = {}
+
+        for node in live_nodes:
+            node_comp[node.id] = len(compartments)
+            compartments.append(("node", node, None))
+            compliance.append(max(1e-6, float(cfg.node_compliance)))
+        for node in live_nodes:
+            bath_comp[node.id] = len(compartments)
+            compartments.append(("bath", self.bath_by_node[node.id], None))
+            compliance.append(max(1e-6, float(cfg.bath_compliance)))
+        for edge_key, edge in self.edges.items():
+            if edge_key[0] not in node_comp or edge_key[1] not in node_comp:
+                continue
+            hull_comp[edge_key] = len(compartments)
+            compartments.append(("hull", edge, None))
+            compliance.append(max(1e-6, float(cfg.hull_compliance)))
+        live_traversals = [
+            traversal for traversal in self.traversals.values()
+            if traversal.start_id in node_comp and traversal.end_id in node_comp
+        ]
+        for traversal in live_traversals:
+            for sub_index, sub in enumerate(traversal.subedges):
+                sub.delivered_utility = 0.0
+                for segment_index in range(len(sub.segment_edge_keys)):
+                    tube_comp[(id(sub), segment_index)] = len(compartments)
+                    compartments.append(("tube", sub, segment_index))
+                    compliance.append(max(1e-6, float(cfg.tube_compliance)))
+
+        names = {"solvent"}
+        for kind, owner, segment_index in compartments:
+            if kind == "node":
+                names.update(owner.solubles)
+            elif kind == "bath":
+                names.update(owner)
+            elif kind == "hull":
+                names.update(owner.hull_solubles)
+            else:
+                names.update(owner.segment_solubles[segment_index])
+        component_names = ["solvent"] + sorted(names - {"solvent"})
+        component_index = {name: index for index, name in enumerate(component_names)}
+        rows: List[List[float]] = []
+        for kind, owner, segment_index in compartments:
+            row = [0.0] * len(component_names)
+            if kind == "node":
+                row[0], solubles = owner.solvent, owner.solubles
+            elif kind == "bath":
+                row[0], solubles = owner.get("solvent", 0.0), owner
+            elif kind == "hull":
+                row[0], solubles = owner.hull_solvent, owner.hull_solubles
+            else:
+                row[0] = owner.segment_solvent[segment_index]
+                solubles = owner.segment_solubles[segment_index]
+            for name, amount in solubles.items():
+                if name != "solvent" and name in component_index:
+                    row[component_index[name]] = max(0.0, float(amount))
+            rows.append(row)
+
+        # Sparse arcs. Passive connections get both directions; tube arcs
+        # are genuinely one-way and ordered from terminal to terminal.
+        arc_src: List[int] = []
+        arc_dst: List[int] = []
+        arc_g: List[float] = []
+        arc_edge: List[int] = []
+        arc_sign: List[float] = []
+        edge_items = list(self.edges.items())
+        edge_index = {key: index for index, (key, _) in enumerate(edge_items)}
+
+        def arc(src: int, dst: int, conductance: float,
+                edge_key: Optional[Tuple[int, int]] = None, sign: float = 0.0) -> None:
+            if conductance <= 0.0:
+                return
+            arc_src.append(src)
+            arc_dst.append(dst)
+            arc_g.append(conductance)
+            arc_edge.append(edge_index.get(edge_key, -1) if edge_key else -1)
+            arc_sign.append(sign)
+
+        def passive(a: int, b: int, conductance: float,
+                    edge_key: Optional[Tuple[int, int]] = None) -> None:
+            sign = 1.0
+            if edge_key and compartments[a][0] == "node":
+                sign = 1.0 if compartments[a][1].id == edge_key[0] else -1.0
+            arc(a, b, conductance, edge_key, sign)
+            arc(b, a, conductance, edge_key, -sign)
+
+        for edge_key, edge in edge_items:
+            a, b = edge_key
+            if edge_key not in hull_comp or a not in node_comp or b not in node_comp:
+                continue
+            hardening = 1.0 + cfg.branch_maturity_conductance_bonus * edge.maturity
+            valve = max(0.0, float(cfg.hull_node_valve)) * hardening
+            passive(node_comp[a], hull_comp[edge_key], valve, edge_key)
+            passive(hull_comp[edge_key], node_comp[b], valve, edge_key)
+            passive(bath_comp[a], bath_comp[b], cfg.bath_graph_conductance, edge_key)
+            passive(hull_comp[edge_key], bath_comp[a], cfg.hull_bath_permeability)
+            passive(hull_comp[edge_key], bath_comp[b], cfg.hull_bath_permeability)
+        for node in live_nodes:
+            passive(node_comp[node.id], bath_comp[node.id], cfg.node_bath_permeability)
+
+        terminal_arcs: List[Tuple[int, SubEdge, int]] = []
+        for traversal in live_traversals:
+            for sub in traversal.subedges:
+                count = len(sub.segment_edge_keys)
+                if not count:
+                    continue
+                start_id = traversal.start_id if sub.direction == "forward" else traversal.end_id
+                end_id = traversal.end_id if sub.direction == "forward" else traversal.start_id
+                chain = [node_comp[start_id]] + [
+                    tube_comp[(id(sub), i)] for i in range(count)
+                ] + [node_comp[end_id]]
+                gate = self._learned_subedge_opening(sub)
+                for link_index, (src, dst) in enumerate(zip(chain, chain[1:])):
+                    edge_key = sub.segment_edge_keys[min(link_index, count - 1)]
+                    causal_sign = 1.0 if sub.direction == "forward" else -1.0
+                    conductance = 1.0
+                    if link_index in (0, count):
+                        conductance *= gate
+                    edge = self.edges.get(edge_key)
+                    if edge is not None:
+                        conductance *= (
+                            1.0
+                            + cfg.branch_maturity_conductance_bonus * edge.maturity
+                        )
+                    arc(src, dst, conductance, edge_key, causal_sign)
+                    if link_index == count:
+                        terminal_arcs.append((len(arc_src) - 1, sub, end_id))
+
+        device, dtype = self.device, torch.float64
+        initial_values = torch.tensor(rows, dtype=dtype, device=device)
+        values = initial_values.clone()
+        compliance_t = torch.tensor(compliance, dtype=dtype, device=device)
+        if not arc_src:
+            return
+        src_idx = torch.tensor(arc_src, dtype=torch.long, device=device)
+        dst_idx = torch.tensor(arc_dst, dtype=torch.long, device=device)
+        conductance = torch.tensor(arc_g, dtype=dtype, device=device)
+        dt = max(0.0, float(cfg.fluid_time_step))
+        edge_flow = torch.zeros(len(edge_items), dtype=dtype, device=device)
+        edge_components = torch.zeros(
+            (len(edge_items), len(component_names)), dtype=dtype, device=device
+        )
+        delivered = torch.zeros(len(arc_src), dtype=dtype, device=device)
+
+        def limited_transfer(raw: Any, source: Any, available: Any) -> Any:
+            demand = torch.zeros_like(available)
+            demand.index_add_(0, source, raw)
+            scale = torch.where(
+                demand > 0.0,
+                torch.minimum(
+                    torch.ones_like(demand),
+                    available / demand.clamp_min(1e-12),
+                ),
+                torch.ones_like(demand),
+            )
+            return raw * scale.index_select(0, source)
+
+        client_result = None
+        if self.fluid_work_delegate is not None:
+            packet = {
+                "tick": self.tick_count,
+                "components": component_names,
+                "values": rows,
+                "compliance": compliance,
+                "compartments": [
+                    (
+                        {"kind": "node", "node_id": owner.id}
+                        if kind == "node"
+                        else {"kind": "bath", "node_id": next(
+                            node_id for node_id, mixture in self.bath_by_node.items()
+                            if mixture is owner
+                        )}
+                        if kind == "bath"
+                        else {"kind": "hull", "edge": [owner.from_id, owner.to_id]}
+                        if kind == "hull"
+                        else {
+                            "kind": "tube",
+                            "traversal": list(owner.traversal_key),
+                            "direction": owner.direction,
+                            "segment": segment_index,
+                            "edge": list(owner.segment_edge_keys[segment_index]),
+                        }
+                    )
+                    for kind, owner, segment_index in compartments
+                ],
+                "arcs": {
+                    "source": arc_src,
+                    "destination": arc_dst,
+                    "conductance": arc_g,
+                    "edge": [
+                        list(edge_items[index][0]) if index >= 0 else None
+                        for index in arc_edge
+                    ],
+                    "sign": arc_sign,
+                },
+                "parameters": {
+                    "substeps": max(1, int(cfg.fluid_solver_substeps)),
+                    "time_step": dt,
+                    "bulk_conductance": float(cfg.fluid_bulk_conductance),
+                    "ion_diffusion": float(cfg.fluid_diffusion_conductance),
+                    "osmotic_pressure": float(cfg.fluid_osmotic_pressure),
+                },
+            }
+            client_result = self.fluid_work_delegate(packet)
+
+        if client_result is not None:
+            result_rows = client_result.get("values", [])
+            arc_bulk = client_result.get("arc_bulk", [])
+            arc_components = client_result.get("arc_components", [])
+            expected_shape = (len(compartments), len(component_names))
+            if (
+                len(result_rows) != expected_shape[0]
+                or any(len(row) != expected_shape[1] for row in result_rows)
+                or len(arc_bulk) != len(arc_src)
+                or len(arc_components) != len(arc_src)
+                or any(len(row) != expected_shape[1] for row in arc_components)
+            ):
+                raise ValueError("client fluid result has the wrong tensor shape")
+            values = torch.tensor(result_rows, dtype=dtype, device=device)
+            if not bool(torch.isfinite(values).all()) or bool((values < -1e-9).any()):
+                raise ValueError("client fluid result contains invalid material amounts")
+            initial_total = initial_values.sum(dim=0)
+            final_total = values.sum(dim=0)
+            residual = float(torch.max(torch.abs(initial_total - final_total)).item())
+            if residual > 1e-7:
+                raise ValueError(
+                    f"client fluid result violates conservation (residual {residual:.3g})"
+                )
+            delivered = torch.tensor(arc_bulk, dtype=dtype, device=device)
+            arc_component_tensor = torch.tensor(
+                arc_components, dtype=dtype, device=device
+            )
+            edge_ids = torch.tensor(arc_edge, dtype=torch.long, device=device)
+            valid = edge_ids >= 0
+            if bool(valid.any()):
+                selected_edges = edge_ids[valid]
+                signs = torch.tensor(arc_sign, dtype=dtype, device=device)[valid]
+                edge_flow.index_add_(0, selected_edges, delivered[valid] * signs)
+                edge_components.index_add_(
+                    0,
+                    selected_edges,
+                    arc_component_tensor[valid] * signs[:, None],
+                )
+            self.last_fluid_proof = {
+                "tick": self.tick_count,
+                "worker": "client",
+                "conservation_residual": residual,
+                "substeps": max(1, int(cfg.fluid_solver_substeps)),
+                "work_id": client_result.get("work_id"),
+            }
+        else:
+          for _ in range(max(1, int(cfg.fluid_solver_substeps))):
+            volume = values.sum(dim=1)
+            solute = values[:, 1:].sum(dim=1) if values.shape[1] > 1 else torch.zeros_like(volume)
+            solvent = values[:, 0]
+            pressure = (
+                solvent
+                + cfg.fluid_osmotic_pressure
+                * solute / solvent.clamp_min(1e-6)
+            ) / compliance_t
+            raw_bulk = (
+                torch.relu(pressure.index_select(0, src_idx) - pressure.index_select(0, dst_idx))
+                * conductance * cfg.fluid_bulk_conductance * dt
+            )
+            moved_bulk = limited_transfer(raw_bulk, src_idx, volume)
+            source_values = values.index_select(0, src_idx)
+            mixture = (
+                source_values / source_values.sum(dim=1, keepdim=True).clamp_min(1e-12)
+                * moved_bulk[:, None]
+            )
+            values.index_add_(0, src_idx, -mixture)
+            values.index_add_(0, dst_idx, mixture)
+            delivered += moved_bulk
+
+            if values.shape[1] > 1:
+                volume = values.sum(dim=1).clamp_min(1e-12)
+                concentration = values[:, 1:] / volume[:, None]
+                # Diffusion needs a continuous water medium on both ends --
+                # a compartment holding zero solvent has nothing to dissolve
+                # a solute out of, or into, no matter the concentration gap.
+                has_water = values[:, 0] > 0.0
+                water_gate = (
+                    has_water.index_select(0, src_idx)
+                    & has_water.index_select(0, dst_idx)
+                ).to(dtype)[:, None]
+                raw_diff = (
+                    torch.relu(
+                        concentration.index_select(0, src_idx)
+                        - concentration.index_select(0, dst_idx)
+                    )
+                    * (conductance * cfg.fluid_diffusion_conductance * dt)[:, None]
+                    * water_gate
+                )
+                source_matrix = src_idx[:, None].expand_as(raw_diff)
+                demand = torch.zeros_like(values[:, 1:])
+                demand.scatter_add_(0, source_matrix, raw_diff)
+                scale = torch.where(
+                    demand > 0.0,
+                    torch.minimum(
+                        torch.ones_like(demand),
+                        values[:, 1:] / demand.clamp_min(1e-12),
+                    ),
+                    torch.ones_like(demand),
+                )
+                moved_diff = raw_diff * torch.gather(scale, 0, source_matrix)
+                delta = torch.zeros_like(values[:, 1:])
+                delta.scatter_add_(0, source_matrix, -moved_diff)
+                delta.scatter_add_(0, dst_idx[:, None].expand_as(moved_diff), moved_diff)
+                values[:, 1:] += delta
+                mixture[:, 1:] += moved_diff
+
+            edge_ids = torch.tensor(arc_edge, dtype=torch.long, device=device)
+            valid = edge_ids >= 0
+            if bool(valid.any()):
+                selected_edges = edge_ids[valid]
+                signs = torch.tensor(arc_sign, dtype=dtype, device=device)[valid]
+                edge_flow.index_add_(0, selected_edges, moved_bulk[valid] * signs)
+                edge_components.index_add_(
+                    0, selected_edges, mixture[valid] * signs[:, None]
+                )
+          self.last_fluid_proof = {
+              "tick": self.tick_count,
+              "worker": "server",
+              "conservation_residual": float(
+                  torch.max(
+                      torch.abs(initial_values.sum(dim=0) - values.sum(dim=0))
+                  ).item()
+              ),
+              "substeps": max(1, int(cfg.fluid_solver_substeps)),
+          }
+
+        values = values.clamp_min(0.0)
+        final_volume = values.sum(dim=1)
+        final_pressure = (
+            values[:, 0]
+            + cfg.fluid_osmotic_pressure
+            * values[:, 1:].sum(dim=1) / values[:, 0].clamp_min(1e-6)
+        ) / compliance_t
+        cpu_values = values.detach().cpu().tolist()
+        cpu_pressure = final_pressure.detach().cpu().tolist()
+        for row_index, ((kind, owner, segment_index), row, pressure_value) in enumerate(
+            zip(compartments, cpu_values, cpu_pressure)
+        ):
+            solubles = {
+                name: row[column]
+                for column, name in enumerate(component_names[1:], start=1)
+                if row[column] > 1e-12
+            }
+            if kind == "node":
+                owner.solvent, owner.solubles, owner.pressure = row[0], solubles, pressure_value
+            elif kind == "bath":
+                owner.clear()
+                if row[0] > 1e-12:
+                    owner["solvent"] = row[0]
+                owner.update(solubles)
+            elif kind == "hull":
+                owner.hull_solvent, owner.hull_solubles, owner.hull_pressure = row[0], solubles, pressure_value
+            else:
+                owner.segment_solvent[segment_index] = row[0]
+                owner.segment_solubles[segment_index] = solubles
+                owner.segment_pressures[segment_index] = pressure_value
+
+        delivered_cpu = delivered.detach().cpu().tolist()
+        for arc_index, sub, end_id in terminal_arcs:
+            destination = self.nodes[end_id]
+            before = max(destination.volume - delivered_cpu[arc_index], 1e-12)
+            need = max(
+                0.0,
+                cfg.growth_target_ion_concentration
+                - sum(destination.solubles.values()) / before,
+            )
+            sub.delivered_utility = delivered_cpu[arc_index] * need
+        flow_rows = edge_flow.detach().cpu().tolist()
+        component_rows = edge_components.detach().cpu().tolist()
+        for (_, edge), flow, row in zip(edge_items, flow_rows, component_rows):
+            edge.flow = flow
+            edge.component_flows = {
+                name: row[column]
+                for column, name in enumerate(component_names)
+                if abs(row[column]) > 1e-12
+            }
 
     def _transport_subedges_scalar(self) -> None:
         """One pass of volume transport through every traversal's subedges.
@@ -5014,9 +6802,8 @@ class FluxGraph:
         availability limiting, mixture movement, and path-flow accumulation
         are tensor operations.
         """
-        if torch is None:
-            self._transport_subedges_scalar()
-            return
+        self._solve_coupled_fluid_system()
+        return
 
         self._reset_edge_flow()
         network_roots = self.orthogonal_network_roots()
@@ -5369,6 +7156,29 @@ class FluxGraph:
             na, nb = self.nodes.get(a), self.nodes.get(b)
             edge.pressure_drop = (na.pressure - nb.pressure) if na and nb else 0.0
 
+    def _update_branch_maturity(self) -> None:
+        """Harden branches only when their tubes relieve terminal scarcity."""
+        retention = max(
+            0.0, min(1.0, float(self.config.branch_maturity_retention))
+        )
+        gain = max(0.0, float(self.config.branch_maturity_gain))
+        utility_by_edge: Dict[Tuple[int, int], float] = {}
+        for traversal in self.traversals.values():
+            for sub in traversal.subedges:
+                if sub.delivered_utility <= 0.0:
+                    continue
+                for edge_key in sub.segment_edge_keys:
+                    utility_by_edge[edge_key] = (
+                        utility_by_edge.get(edge_key, 0.0)
+                        + sub.delivered_utility
+                    )
+        for edge_key, edge in self.edges.items():
+            signal = 1.0 - math.exp(-utility_by_edge.get(edge_key, 0.0))
+            edge.maturity = max(
+                0.0,
+                min(1.0, retention * edge.maturity + gain * signal),
+            )
+
     def _record_edge_flow(
         self, node_ids: List[int], downward: bool, amount: float,
         mixture: Optional[Dict[str, float]] = None,
@@ -5502,28 +7312,40 @@ class FluxGraph:
         return batches
 
     def _run_node_factories(self) -> None:
-        """Execute configured node roles against circulation and/or CSF."""
+        """Execute configured node roles against circulation and/or CSF.
+
+        A factory's own recipe only declares the specific inputs it
+        consumes -- most don't name "solvent" as one of them, so nothing
+        here would otherwise stop a reaction from running in a mixture
+        that happens to hold zero water. Metabolism needs a medium to
+        happen in: no water in the relevant compartment means that
+        compartment's reactions simply don't run this tick, regardless of
+        whether its other named inputs are present.
+        """
         for node in self.nodes.values():
             node.factory_auxin = 0.0
             if node.burned:
                 continue
             circulation = dict(node.solubles)
             circulation["solvent"] = node.solvent
+            local_bath = self.bath_by_node.setdefault(node.id, {})
+            circulation_has_water = circulation.get("solvent", 0.0) > 0.0
+            bath_has_water = local_bath.get("solvent", 0.0) > 0.0
             changed_circulation = False
             for factory in node.factories:
                 if not factory.enabled or factory.throughput <= 0.0:
                     continue
                 medium = factory.medium.lower()
                 remaining = factory.throughput
-                if medium in ("circulatory", "both"):
+                if medium in ("circulatory", "both") and circulation_has_water:
                     used = self._run_factory_reaction(
-                        node, factory, circulation, remaining, self.bath
+                        node, factory, circulation, remaining, local_bath
                     )
                     remaining -= used
                     changed_circulation = changed_circulation or used > 0.0
-                if medium in ("csf", "both") and remaining > 0.0:
+                if medium in ("csf", "both") and remaining > 0.0 and bath_has_water:
                     self._run_factory_reaction(
-                        node, factory, self.bath, remaining, self.bath
+                        node, factory, local_bath, remaining, local_bath
                     )
                 elif medium not in ("circulatory", "csf", "both"):
                     raise ValueError(
@@ -5547,7 +7369,11 @@ class FluxGraph:
         if heart is None:
             heart = Heart()
             heart.set_script(self.config.heart_script)
-            heart.attach("csf_link", when="post", scope="total", fn=self._csf_link_hook)
+            heart.attach(
+                "csf_link", when="post", scope="total",
+                fn=lambda chambers, region=region:
+                    self._csf_link_hook(chambers, region),
+            )
             self.hearts[region] = heart
         self._bind_heart_learning(region, heart)
         return heart
@@ -5584,21 +7410,31 @@ class FluxGraph:
         )
         return heart
 
-    def _csf_link_hook(self, chambers: Dict[str, Dict[str, float]]) -> None:
+    def _csf_link_hook(
+        self, chambers: Dict[str, Dict[str, float]], region: str = "main"
+    ) -> None:
         """Exchange every chamber's contents with the CSF bath toward
         equalizing concentration, throttled by config.csf_link_rate.
         Dormant (a no-op) while the rate is 0."""
         rate = self.config.csf_link_rate
         if rate <= 0.0:
             return
+        heart = self.hearts.get(region)
+        locality = (
+            heart.seed_owner_id if heart is not None
+            and heart.seed_owner_id in self.nodes else self.anchor_id
+        )
+        local_bath = self.bath_by_node.setdefault(locality, {})
         for mix in chambers.values():
-            names = set(mix) | set(self.bath)
+            names = set(mix) | set(local_bath)
             for name in names:
-                delta = rate * (mix.get(name, 0.0) - self.bath.get(name, 0.0))
+                delta = rate * (
+                    mix.get(name, 0.0) - local_bath.get(name, 0.0)
+                )
                 if delta == 0.0:
                     continue
                 mix[name] = mix.get(name, 0.0) - delta
-                self.bath[name] = self.bath.get(name, 0.0) + delta
+                local_bath[name] = local_bath.get(name, 0.0) + delta
 
     def _pump_csf_to_rhizome(self) -> None:
         """Let only the active seed clean global CSF into one rhizome.
@@ -5613,11 +7449,16 @@ class FluxGraph:
         rate = max(0.0, min(1.0, self.config.rhizome_csf_pump_rate))
         if rate <= 0.0:
             return
+        local_bath = self.bath_by_node.setdefault(self.anchor_id, {})
         for name, amount in list(self.bath.items()):
+            if amount:
+                local_bath[name] = local_bath.get(name, 0.0) + amount
+        self.bath.clear()
+        for name, amount in list(local_bath.items()):
             if name == "solvent" or amount <= 0.0:
                 continue
             moved = amount * rate
-            self.bath[name] = amount - moved
+            local_bath[name] = amount - moved
             self.rhizome[name] = self.rhizome.get(name, 0.0) + moved
 
     def _exude_rhizome_to_soil(self) -> None:
@@ -5667,14 +7508,19 @@ class FluxGraph:
         heart = self.hearts.pop(region, None)
         if heart is None:
             return
+        locality = (
+            heart.seed_owner_id
+            if heart.seed_owner_id in self.nodes else self.anchor_id
+        )
+        local_bath = self.bath_by_node.setdefault(locality, {})
         for mixture in heart.chambers.values():
             for name, amount in mixture.items():
                 if amount:
-                    self.bath[name] = self.bath.get(name, 0.0) + amount
+                    local_bath[name] = local_bath.get(name, 0.0) + amount
         for reservoir in heart.reservoirs.values():
             for name, amount in reservoir.drain().items():
                 if amount:
-                    self.bath[name] = self.bath.get(name, 0.0) + amount
+                    local_bath[name] = local_bath.get(name, 0.0) + amount
 
     def _reap_dead_hearts(self, live_regions: "set[str]") -> None:
         """Spill hearts that no longer belong to a live level-zero seed.
@@ -5704,8 +7550,8 @@ class FluxGraph:
         reservoir exchange, contractions, osmotic rebalance, squeeze).
         The pump node's own solubles are never touched -- chambers and
         reservoirs hold supply, the node doesn't."""
-        inflow_routes: Dict[str, List[Tuple[SubEdge, FluxNode]]] = {}
-        outflow_routes: Dict[str, List[Tuple[SubEdge, FluxNode]]] = {}
+        inflow_routes: Dict[str, List[Tuple[SubEdge, int]]] = {}
+        outflow_routes: Dict[str, List[Tuple[SubEdge, int]]] = {}
         for traversal in self.traversals.values():
             start_id, end_id = traversal.start_id, traversal.end_id
             if pump_id not in (start_id, end_id):
@@ -5722,34 +7568,47 @@ class FluxGraph:
                 slices = self._node_slice(far_id, far, network_roots)
                 if slices is None:
                     continue
+                # The heart touches the lumen cross-section at its own
+                # terminal. It never drains or fills the remote endpoint.
+                segment_index = (
+                    len(sub.segment_edge_keys) - 1 if is_inflow else 0
+                )
+                if segment_index < 0:
+                    continue
                 routes = inflow_routes if is_inflow else outflow_routes
-                routes.setdefault(slices[0], []).append((sub, far))
+                routes.setdefault(slices[0], []).append((sub, segment_index))
 
         if not inflow_routes and not outflow_routes and region not in self.hearts:
             return  # nothing to pump and no heart yet -- don't materialize one
 
         pump = self.nodes[pump_id]
         heart = self._configure_seed_heart(region, pump_id, initially_full=False)
-
-        intake_plans = {
-            slice_name: self._chamber_intake_plan(routes, pump)
-            for slice_name, routes in inflow_routes.items()
-        }
-        for slice_name, plan in intake_plans.items():
-            pooled = self._drain_plan(plan)
-            chamber = heart.chamber(slice_name, "in")
-            for name, amount in pooled.items():
-                chamber[name] = chamber.get(name, 0.0) + amount
         for slice_name in outflow_routes:
             heart.chamber(slice_name, "out")  # chamber exists even before anything reaches it
+        for slice_name in inflow_routes:
+            heart.chamber(slice_name, "in")  # ditto, so a brand-new slice can still pull this same beat
 
+        # Intake is the pump's inhale, not a passive equalization: the same
+        # beat-driven contraction fraction that governs how hard an
+        # out-chamber pushes into the network now governs how hard an
+        # in-chamber pulls from it (see _squeeze_out_chambers -- "when it
+        # pushes, it pushes"; this is the same mechanic in reverse). No
+        # phase this tick means no beat at all, so nothing pulls or pushes.
         phase = heart.script[heart.phase_index % len(heart.script)] if heart.script else None
+        contractions = heart._resolve_contractions(phase) if phase is not None else {}
+        for slice_name, routes in inflow_routes.items():
+            chamber = heart.chamber(slice_name, "in")
+            fraction = contractions.get(f"{slice_name}|in", 0.0)
+            plan = self._chamber_intake_plan(routes, fraction)
+            pooled = self._drain_plan(plan)
+            for name, amount in pooled.items():
+                chamber[name] = chamber.get(name, 0.0) + amount
+
         heart._run_hooks("pre")
         heart.exchange_seed_reservoirs()
         self._permeate_heart_forward_to_background(heart)
         if phase is not None:
             valves = heart._resolve_valves(phase)
-            contractions = heart._resolve_contractions(phase)
             heart._osmotic_rebalance(valves)
             heart._squeeze_in_chambers(valves, contractions)
             self._squeeze_out_chambers(phase, contractions, outflow_routes, heart)
@@ -5762,7 +7621,8 @@ class FluxGraph:
         the main heart's in-chambers; dormant while lymph_return_rate is
         0 or the main heart hasn't formed yet."""
         rate = self.config.lymph_return_rate
-        if rate <= 0.0 or not self.bath:
+        local_bath = self.bath_by_node.setdefault(self.anchor_id, {})
+        if rate <= 0.0 or not local_bath:
             return
         heart = self.hearts.get("main")
         if heart is None:
@@ -5771,11 +7631,11 @@ class FluxGraph:
         if not in_keys:
             return
         share = 1.0 / len(in_keys)
-        for name, amount in list(self.bath.items()):
+        for name, amount in list(local_bath.items()):
             drained = amount * rate
             if drained == 0.0:
                 continue
-            self.bath[name] = amount - drained
+            local_bath[name] = amount - drained
             for key in in_keys:
                 heart.chambers[key][name] = heart.chambers[key].get(name, 0.0) + drained * share
 
@@ -5783,7 +7643,7 @@ class FluxGraph:
         self,
         phase: HeartPhase,
         contractions: Dict[str, float],
-        outflow_routes: Dict[str, List[Tuple["SubEdge", FluxNode]]],
+        outflow_routes: Dict[str, List[Tuple["SubEdge", int]]],
         heart: "Heart",
     ) -> None:
         """Contracting out-chambers expel to the network: their own
@@ -5819,32 +7679,94 @@ class FluxGraph:
                 expelled[name] = moved
             if not expelled:
                 continue
-            for sub, far in routes:
+            for sub, segment_index in routes:
                 opening = self._learned_subedge_opening(sub)
-                self._deposit_mixture(
-                    far, expelled, scale=opening / total_constriction
+                self._deposit_segment_mixture(
+                    sub, segment_index, expelled,
+                    scale=opening / total_constriction,
                 )
 
     def _chamber_intake_plan(
-        self, inflow: List[Tuple["SubEdge", FluxNode]], anchor: FluxNode
-    ) -> List[Tuple[FluxNode, float]]:
-        """What one chamber's inflow subedges would draw this beat --
-        computed exactly like ordinary transport (anchor standing in as
-        the destination), purely read-only, so every chamber can be
-        measured from the same snapshot before anything is drained.
-        """
-        return [
-            (far, amount)
-            for sub, far in inflow
-            if (amount := self._subedge_flow_amount(sub, far, anchor)) > 0.0
-        ]
+        self, inflow: List[Tuple["SubEdge", int]], fraction: float
+    ) -> List[Tuple[SubEdge, int, float]]:
+        """What one chamber's inflow subedges deliver this beat: an active
+        pull, not a passive pressure/volume comparison.
 
-    def _drain_plan(self, plan: List[Tuple[FluxNode, float]]) -> Dict[str, float]:
+        ``fraction`` is this beat's in-chamber contraction (see
+        _resolve_contractions) -- the exact same number that governs how
+        hard the matching out-chamber pushes into the network this same
+        beat (_squeeze_out_chambers), applied here in reverse: the pump
+        draws that fraction of whatever is actually sitting in each open
+        segment, unconditionally. A real pump doesn't check whether its
+        supply line has "enough pressure relative to me" before it
+        inhales -- it inhales, and whatever's there comes. (An earlier
+        version compared the segment against the chamber's, then the pump
+        node's, own volume -- both were passive equalizations disguised
+        as intake, and the node comparison in particular was a bar the
+        segment could structurally never clear, since the pump node's own
+        solvent/solubles are never touched by heart transport at all.)
+        Purely read-only so every chamber can be measured from the same
+        pre-beat snapshot before anything is drained.
+        """
+        plan = []
+        if fraction <= 0.0:
+            return plan
+        pull = min(1.0, fraction)
+        for sub, segment_index in inflow:
+            segment_volume = (
+                sub.segment_solvent[segment_index]
+                + sum(sub.segment_solubles[segment_index].values())
+            )
+            if segment_volume <= 0.0:
+                continue
+            amount = self._learned_subedge_opening(sub) * segment_volume * pull
+            if amount > 0.0:
+                plan.append((sub, segment_index, amount))
+        return plan
+
+    def _drain_plan(
+        self, plan: List[Tuple[SubEdge, int, float]]
+    ) -> Dict[str, float]:
         """Apply a measured intake plan, pooling every drained mix
         (solvent and solubles together) into one chamber-load."""
         pooled: Dict[str, float] = {}
-        for far, amount in plan:
-            for name, moved in self._drain_mixture(far, amount).items():
+        for sub, segment_index, amount in plan:
+            for name, moved in self._drain_segment_mixture(
+                sub, segment_index, amount
+            ).items():
                 pooled[name] = pooled.get(name, 0.0) + moved
         return pooled
+
+    @staticmethod
+    def _drain_segment_mixture(
+        sub: SubEdge, segment_index: int, amount: float
+    ) -> Dict[str, float]:
+        solvent = sub.segment_solvent[segment_index]
+        solubles = sub.segment_solubles[segment_index]
+        total = solvent + sum(solubles.values())
+        if total <= 0.0 or amount <= 0.0:
+            return {}
+        fraction = min(1.0, amount / total)
+        mixture = {"solvent": solvent * fraction}
+        sub.segment_solvent[segment_index] -= mixture["solvent"]
+        for name, held in list(solubles.items()):
+            moved = held * fraction
+            solubles[name] = held - moved
+            if moved:
+                mixture[name] = moved
+        return mixture
+
+    @staticmethod
+    def _deposit_segment_mixture(
+        sub: SubEdge, segment_index: int, mixture: Dict[str, float],
+        scale: float = 1.0,
+    ) -> None:
+        sub.segment_solvent[segment_index] += (
+            mixture.get("solvent", 0.0) * scale
+        )
+        solubles = sub.segment_solubles[segment_index]
+        for name, amount in mixture.items():
+            if name == "solvent":
+                continue
+            solubles[name] = solubles.get(name, 0.0) + amount * scale
 
