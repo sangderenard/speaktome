@@ -4,7 +4,7 @@
 
 ## Scope
 
-Isolated Turing worktree `C:\dev\Powershell\turing-dice-polyhedra-20261107`, branch `codex/meowdoku-dice-polyhedra-20261107`, commits `5da3b1cf`, `99d57569`, `b0daa7cf`, `111007d9`, `9535e517`, `049bc124`, and `97a1c6e6`. The live site and canonical Turing main were not edited.
+Isolated Turing worktree `C:\dev\Powershell\turing-dice-polyhedra-20261107`, branch `codex/meowdoku-dice-polyhedra-20261107`, commits `5da3b1cf`, `99d57569`, `b0daa7cf`, `111007d9`, `9535e517`, `049bc124`, `97a1c6e6`, and `a0f10b19`. The live site and canonical Turing main were not edited.
 
 ## Findings and work
 
@@ -14,7 +14,7 @@ Isolated Turing worktree `C:\dev\Powershell\turing-dice-polyhedra-20261107`, bra
 - `9535e517` corrected a doubled horizontal glyph offset that made numbers appear as only a few jagged strokes. Numerals now align with a real face edge. Default mesh detail is 64 divisions for d4/d6, 48 for other dice, with an optional cap of 128.
 - `9535e517` also added an initial closed-mesh rounding transform controlled by `bevelRadius`, an inward `faceRelief`, and `compensateRaised`. With compensation, raised marks are backed by an equal face inset, keeping mark peaks at or below the original support plane.
 - `049bc124` replaced the approximate rounding transform with a geometric radius construction: project each surface point onto the polyhedron inset by radius `r`, then offset it from that closest point by `r`. Edge samples lie on radius-`r` circular fillets, and corner samples on radius-`r` spherical caps. Face relief fades in only past each fillet's tangent boundary. The rendered triangle chords approximate the curved surface between those exact-radius vertices; higher subdivisions reduce the chord error.
-- `97a1c6e6` computes `safeInteriorRadius` as the exact origin-to-triangle minimum across the final triangulated shell, so face recesses and marking relief are included. `fitInclusionsInsideDie` scales the existing closed cat-eye/confetti/hybrid/spiral/ring/clear interior assembly uniformly into that centered ball with a user size fraction and clearance gap, preserving disjoint component ranges and densities for mass/inertia integration.
+- `97a1c6e6` computes `safeInteriorRadius` as the exact origin-to-triangle minimum across the final triangulated shell, so face recesses and marking relief are included. `fitInclusionsInsideDie` scales the existing closed cat-eye/confetti/hybrid/spiral/ring/clear interior assembly uniformly into that centered ball with a user size fraction and clearance gap, preserving disjoint component ranges and densities for mass/inertia integration. `a0f10b19` requires the gap to be positive so the assembly cannot touch the shell.
 
 ## Verification and limits
 
@@ -26,7 +26,7 @@ The marking material is an optical surface finish. Raised/recessed volume is bod
 
 ## Next Steps
 
-Cherry-pick all seven commits into the marble studio branch; expose shape, marking, tessellation, bevel radius, face relief, compensation, interior kind and die inclusion size controls; export `dice_mesh.js`; visually inspect marking legibility at each shape; and keep dice roll disabled while preserving real static mechanical properties. If the designer later supports a different marking bulk density, construct a closed marking material domain and integrate it separately.
+Cherry-pick all eight commits into the marble studio branch; expose shape, marking, tessellation, bevel radius, face relief, compensation, interior kind and die inclusion size controls; export `dice_mesh.js`; visually inspect marking legibility at each shape; and keep dice roll disabled while preserving real static mechanical properties. If the designer later supports a different marking bulk density, construct a closed marking material domain and integrate it separately.
 
 ## Prompt History
 
