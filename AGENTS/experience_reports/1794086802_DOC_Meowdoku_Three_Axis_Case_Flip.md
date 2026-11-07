@@ -22,7 +22,11 @@ The 256k product compiled but has not yet completed an end-to-end browser record
 
 ## Next Steps
 
-Review and integrate `42374bca`; rebuild the focused 3-D WebGPU products for the served site, verify a 256k X/Z Studio run and visual-only projection on the target GPU, then deploy when approved. Test the 2-D flat case visually as well.
+Rebuild the deployed 3-D WebGPU products for the served site, verify a 256k X/Z Studio run and visual-only projection on the target GPU, then deploy when approved. Test the 2-D flat case visually as well.
+
+## Later integration receipt
+
+Latest Turing `main` at `83090fe5` merged into the isolated branch as `35e606c3`. The only conflict was `web_export.py`'s asset list; the merge includes both current marble modules and `case_motion.js`. Root subsequently merged this complete branch into canonical Turing `main`, preserving unrelated user work. On the merged branch, the focused loading-library suite passed 15 tests, the case and marble-preview Node checks passed, and fresh SDF 3-D WebGPU `small` and `256k` builds passed (46 and 191 dispatches, no Wasm). The 256k browser run remains open: a separate process was using scratch port 8768 and served 404s for the manifests; no other process was stopped. Do not copy the two-size scratch manifest over the canonical eight-size manifest. Rebuild all deployed 3-D sizes with `wasm=False` or explicitly gate per-size shader support before exposing X/Z controls.
 
 ## Prompt History
 
