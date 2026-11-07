@@ -4,7 +4,7 @@
 
 ## Scope
 
-Isolated Turing worktree `C:\dev\Powershell\turing-dice-polyhedra-20261107`, branch `codex/meowdoku-dice-polyhedra-20261107`, commits `5da3b1cf`, `99d57569`, `b0daa7cf`, `111007d9`, `9535e517`, and `049bc124`. The live site and canonical Turing main were not edited.
+Isolated Turing worktree `C:\dev\Powershell\turing-dice-polyhedra-20261107`, branch `codex/meowdoku-dice-polyhedra-20261107`, commits `5da3b1cf`, `99d57569`, `b0daa7cf`, `111007d9`, `9535e517`, `049bc124`, and `97a1c6e6`. The live site and canonical Turing main were not edited.
 
 ## Findings and work
 
@@ -14,16 +14,19 @@ Isolated Turing worktree `C:\dev\Powershell\turing-dice-polyhedra-20261107`, bra
 - `9535e517` corrected a doubled horizontal glyph offset that made numbers appear as only a few jagged strokes. Numerals now align with a real face edge. Default mesh detail is 64 divisions for d4/d6, 48 for other dice, with an optional cap of 128.
 - `9535e517` also added an initial closed-mesh rounding transform controlled by `bevelRadius`, an inward `faceRelief`, and `compensateRaised`. With compensation, raised marks are backed by an equal face inset, keeping mark peaks at or below the original support plane.
 - `049bc124` replaced the approximate rounding transform with a geometric radius construction: project each surface point onto the polyhedron inset by radius `r`, then offset it from that closest point by `r`. Edge samples lie on radius-`r` circular fillets, and corner samples on radius-`r` spherical caps. Face relief fades in only past each fillet's tangent boundary. The rendered triangle chords approximate the curved surface between those exact-radius vertices; higher subdivisions reduce the chord error.
+- `97a1c6e6` computes `safeInteriorRadius` as the exact origin-to-triangle minimum across the final triangulated shell, so face recesses and marking relief are included. `fitInclusionsInsideDie` scales the existing closed cat-eye/confetti/hybrid/spiral/ring/clear interior assembly uniformly into that centered ball with a user size fraction and clearance gap, preserving disjoint component ranges and densities for mass/inertia integration.
 
 ## Verification and limits
 
 `node tests/meowdoku_dice_mesh_check.mjs` passes all six shapes. It checks directed edge closure/winding, face labels and opposite pairs, separate mark material IDs, positive mass/inertia, and recessed < flat < raised integrated mass without compensation. Bevel, face relief and compensation each change integrated mass. A beveled raised D6 had zero open/inverted directed edges among 147,456. At bevel 0.05, face relief 0.01 and compensated raised depth 0.025, max support-height spread across faces was zero for d4/d6/d8 and under `3.4e-16` normalized units for d10/d12/d20. D6 edge and corner radius-0.05 samples were within `1e-7` of the exact radius, including when face relief and raised marks were active. This establishes an equal mesh support envelope for those settings, not statistical fairness in a real roll.
 
+`node tests/meowdoku_dice_inclusion_fit_check.mjs` passes d4/d6/d10/d20 combined with all six interior designs, checks every scaled inclusion vertex lies inside the centered ball by the requested gap, preserves component ranges and confetti centers, and verifies positive combined mass and inertia. The centered-ball fit is conservative for narrow ribbons but gives a simple rigorous containment guarantee on the final triangle shell.
+
 The marking material is an optical surface finish. Raised/recessed volume is body substrate with body density. A separate-density solid inlay or finite paint film is not modeled. The current marble roll contact law is spherical and must remain disabled for these polyhedra until polyhedral contact physics exists.
 
 ## Next Steps
 
-Cherry-pick all six commits into the marble studio branch; expose shape, marking, tessellation, bevel radius, face relief and compensation controls; export `dice_mesh.js`; visually inspect marking legibility at each shape; and keep dice roll disabled while preserving real static mechanical properties. If the designer later supports a different marking bulk density, construct a closed marking material domain and integrate it separately.
+Cherry-pick all seven commits into the marble studio branch; expose shape, marking, tessellation, bevel radius, face relief, compensation, interior kind and die inclusion size controls; export `dice_mesh.js`; visually inspect marking legibility at each shape; and keep dice roll disabled while preserving real static mechanical properties. If the designer later supports a different marking bulk density, construct a closed marking material domain and integrate it separately.
 
 ## Prompt History
 
@@ -34,3 +37,5 @@ Cherry-pick all six commits into the marble studio branch; expose shape, marking
 > "Marble agent has current coherent studio through 2584c84a and is handling exporter. Coordinate proposed interface with them. Important: current roll integrator assumes spherical contact; dice roll must be gated until genuine polyhedron support/contact physics. Relief/recess marking should affect mesh and mass, not just shader if called mechanical. Focus on isolated topology/marking module and tests."
 
 > "Please include marking material ID per marking so Studio can use Pluck Phong material table (including color/specular/roughness/etc) separately from body. Marked face conventions should be documented and testable, including d10 numbering and d4 convention. Coordinate actual module API with marble agent."
+
+> "New user requirement: all marble interior designs must be usable inside dice. Please help marble agent by exposing exact die inradius/inner containment bound from final bevel+face relief+relief marks, and if needed a robust point-in-solid or safe scaling bound for existing catEyeMarble closed inclusion meshes. Coordinate API directly, preserve real mass/geometry and no overlaps. Work isolated. First ensure 049bc124 true-radius commit is integrated and update any tests."
