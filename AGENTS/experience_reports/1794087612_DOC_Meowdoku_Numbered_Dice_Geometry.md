@@ -4,13 +4,13 @@
 
 ## Scope
 
-Isolated Turing worktree `C:\dev\Powershell\turing-dice-polyhedra-20261107`, branch `codex/meowdoku-dice-polyhedra-20261107`, commits `5da3b1cf`, `99d57569`, and `b0daa7cf`. The live site and canonical Turing main were not edited.
+Isolated Turing worktree `C:\dev\Powershell\turing-dice-polyhedra-20261107`, branch `codex/meowdoku-dice-polyhedra-20261107`, commits `5da3b1cf`, `99d57569`, `b0daa7cf`, and `111007d9`. The live site and canonical Turing main were not edited.
 
 ## Findings and work
 
 - `diceSolid` constructs closed, outward-wound, triangulated d4/d6/d8/d10/d12/d20 shells in the existing `marble_mesh.js` face tuple format. The d10 is the polar dual of a pentagonal antiprism; the d12 is the polar dual of an icosahedron.
 - A separate Pluck material ID selects the numeric marking's optical finish. Flat marks use surface material assignment; raised and recessed marks displace the closed shell vertices. The resulting actual triangulated volume changes the `marbleMass` mass, center of mass, and full inertia tensor. The relief consists of seven-segment glyphs with a grid-resolved edge; it is not a font outline.
-- The d4 uses top-read vertex values repeated on all three incident faces. The d10 uses 0–9, upper ring 0,8,2,6,4, with opposite faces summing to nine. Other even-faced dice use opposed faces summing to side count plus one. The 6 and 9 are underlined. [Chessex's catalog](https://dicecollector.com/docs/diceinfo_chessex_2015.pdf) documents top-read d4s, 0–9 d10s and underlined 6/9. [Torben Mogensen's dice paper](https://s3.amazonaws.com/arena-attachments/1815990/d73b087f51579750940b5e032152939e.pdf?1519703478=) describes the d4 threefold corner convention and common d10 pole order; it also notes that there is no universal arrangement for other polyhedral labels beyond conventions such as constant-sum opposites.
+- The d4 uses top-read vertex values repeated on all three incident faces, with each numeral oriented toward its own apex. The d10 uses 0–9, upper ring 0,8,2,6,4, with opposite faces summing to nine. Other even-faced dice use opposed faces summing to side count plus one. The 6 and 9 are underlined. [Chessex's catalog](https://dicecollector.com/docs/diceinfo_chessex_2015.pdf) documents top-read d4s, 0–9 d10s and underlined 6/9. [Torben Mogensen's dice paper](https://s3.amazonaws.com/arena-attachments/1815990/d73b087f51579750940b5e032152939e.pdf?1519703478=) describes the d4 threefold corner convention and common d10 pole order; it also notes that there is no universal arrangement for other polyhedral labels beyond conventions such as constant-sum opposites.
 
 ## Verification and limits
 
@@ -20,7 +20,7 @@ The marking material is an optical surface finish. Raised/recessed volume is bod
 
 ## Next Steps
 
-Cherry-pick all three commits into the marble studio branch; add shape and marking controls, export `dice_mesh.js`, visually inspect marking legibility at each shape, and keep dice roll disabled while preserving real static mechanical properties. If the designer later supports a different marking bulk density, construct a closed marking material domain and integrate it separately.
+Cherry-pick all four commits into the marble studio branch; add shape and marking controls, export `dice_mesh.js`, visually inspect marking legibility at each shape, and keep dice roll disabled while preserving real static mechanical properties. If the designer later supports a different marking bulk density, construct a closed marking material domain and integrate it separately.
 
 ## Prompt History
 
