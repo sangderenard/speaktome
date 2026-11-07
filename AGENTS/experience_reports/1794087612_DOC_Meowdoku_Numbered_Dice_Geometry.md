@@ -4,7 +4,7 @@
 
 ## Scope
 
-Isolated Turing worktree `C:\dev\Powershell\turing-dice-polyhedra-20261107`, branch `codex/meowdoku-dice-polyhedra-20261107`, commits `5da3b1cf`, `99d57569`, `b0daa7cf`, `111007d9`, and `9535e517`. The live site and canonical Turing main were not edited.
+Isolated Turing worktree `C:\dev\Powershell\turing-dice-polyhedra-20261107`, branch `codex/meowdoku-dice-polyhedra-20261107`, commits `5da3b1cf`, `99d57569`, `b0daa7cf`, `111007d9`, `9535e517`, and `049bc124`. The live site and canonical Turing main were not edited.
 
 ## Findings and work
 
@@ -12,17 +12,18 @@ Isolated Turing worktree `C:\dev\Powershell\turing-dice-polyhedra-20261107`, bra
 - A separate Pluck material ID selects the numeric marking's optical finish. Flat marks use surface material assignment; raised and recessed marks displace the closed shell vertices. The resulting actual triangulated volume changes the `marbleMass` mass, center of mass, and full inertia tensor. The relief consists of seven-segment glyphs with a grid-resolved edge; it is not a font outline.
 - The d4 uses top-read vertex values repeated on all three incident faces, with each numeral oriented toward its own apex. The d10 uses 0–9, upper ring 0,8,2,6,4, with opposite faces summing to nine. Other even-faced dice use opposed faces summing to side count plus one. The 6 and 9 are underlined. [Chessex's catalog](https://dicecollector.com/docs/diceinfo_chessex_2015.pdf) documents top-read d4s, 0–9 d10s and underlined 6/9. [Torben Mogensen's dice paper](https://s3.amazonaws.com/arena-attachments/1815990/d73b087f51579750940b5e032152939e.pdf?1519703478=) describes the d4 threefold corner convention and common d10 pole order; it also notes that there is no universal arrangement for other polyhedral labels beyond conventions such as constant-sum opposites.
 - `9535e517` corrected a doubled horizontal glyph offset that made numbers appear as only a few jagged strokes. Numerals now align with a real face edge. Default mesh detail is 64 divisions for d4/d6, 48 for other dice, with an optional cap of 128.
-- The same commit added a global closed-mesh rounding transform controlled by `bevelRadius`, an inward `faceRelief` that fades to zero at shared edges, and `compensateRaised`. With compensation, raised marks are backed by an equal face inset, keeping mark peaks at or below the original support plane. The bevel value sets rounding width; it is not an exact circular fillet radius for every dihedral angle.
+- `9535e517` also added an initial closed-mesh rounding transform controlled by `bevelRadius`, an inward `faceRelief`, and `compensateRaised`. With compensation, raised marks are backed by an equal face inset, keeping mark peaks at or below the original support plane.
+- `049bc124` replaced the approximate rounding transform with a geometric radius construction: project each surface point onto the polyhedron inset by radius `r`, then offset it from that closest point by `r`. Edge samples lie on radius-`r` circular fillets, and corner samples on radius-`r` spherical caps. Face relief fades in only past each fillet's tangent boundary. The rendered triangle chords approximate the curved surface between those exact-radius vertices; higher subdivisions reduce the chord error.
 
 ## Verification and limits
 
-`node tests/meowdoku_dice_mesh_check.mjs` passes all six shapes. It checks directed edge closure/winding, face labels and opposite pairs, separate mark material IDs, positive mass/inertia, and recessed < flat < raised integrated mass without compensation. Bevel, face relief and compensation each change integrated mass. A beveled raised D6 had zero open/inverted directed edges among 147,456. At bevel 0.05, face relief 0.01 and compensated raised depth 0.025, max support-height spread across faces was zero for d4/d6/d8 and under `5.6e-16` normalized units for d10/d12/d20. This establishes an equal mesh support envelope for those settings, not statistical fairness in a real roll.
+`node tests/meowdoku_dice_mesh_check.mjs` passes all six shapes. It checks directed edge closure/winding, face labels and opposite pairs, separate mark material IDs, positive mass/inertia, and recessed < flat < raised integrated mass without compensation. Bevel, face relief and compensation each change integrated mass. A beveled raised D6 had zero open/inverted directed edges among 147,456. At bevel 0.05, face relief 0.01 and compensated raised depth 0.025, max support-height spread across faces was zero for d4/d6/d8 and under `3.4e-16` normalized units for d10/d12/d20. D6 edge and corner radius-0.05 samples were within `1e-7` of the exact radius, including when face relief and raised marks were active. This establishes an equal mesh support envelope for those settings, not statistical fairness in a real roll.
 
 The marking material is an optical surface finish. Raised/recessed volume is body substrate with body density. A separate-density solid inlay or finite paint film is not modeled. The current marble roll contact law is spherical and must remain disabled for these polyhedra until polyhedral contact physics exists.
 
 ## Next Steps
 
-Cherry-pick all five commits into the marble studio branch; expose shape, marking, tessellation, bevel, face relief and compensation controls; export `dice_mesh.js`; visually inspect marking legibility at each shape; and keep dice roll disabled while preserving real static mechanical properties. If the designer later supports a different marking bulk density, construct a closed marking material domain and integrate it separately.
+Cherry-pick all six commits into the marble studio branch; expose shape, marking, tessellation, bevel radius, face relief and compensation controls; export `dice_mesh.js`; visually inspect marking legibility at each shape; and keep dice roll disabled while preserving real static mechanical properties. If the designer later supports a different marking bulk density, construct a closed marking material domain and integrate it separately.
 
 ## Prompt History
 
