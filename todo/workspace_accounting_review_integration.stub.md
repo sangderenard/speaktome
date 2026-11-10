@@ -1,0 +1,3 @@
+# Integrate workspace accounting and local review safely
+
+Read AGENTS/experience_reports/1794336000_DOC_Workspace_Accounting_Merge_Ticket_Lane.md and Turing docs/WORKSPACE_ACCOUNTING_REVIEW_FOUNDATION_2026-11-10.md. Coordinate schema_version with state-root lane before production initialization. Bind owner endpoints to Accounts authentication; keep measurements, immutable snapshot evidence and removal receipts worker-only. Add OS isolation, per-user negative tests and durable snapshot/export/apply retention before exposing execution. No GitHub operation or credential creation is authorized by this stub.
