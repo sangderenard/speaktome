@@ -1,0 +1,16 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="C:\dev\Powershell\speaktome\tools\openrgb_sdk_shell\native_asrock_hid\asrock_polychrome_hid.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="C:\dev\Powershell\speaktome\tools\openrgb_sdk_shell\native_asrock_hid\CMakeLists.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{E590663B-E614-30DA-BAEF-CF01BAEA434B}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

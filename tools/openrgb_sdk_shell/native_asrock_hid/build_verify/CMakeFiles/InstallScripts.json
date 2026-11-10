@@ -1,0 +1,7 @@
+{
+	"InstallScripts" : 
+	[
+		"C:/dev/Powershell/speaktome/tools/openrgb_sdk_shell/native_asrock_hid/build_verify/cmake_install.cmake"
+	],
+	"Parallel" : false
+}

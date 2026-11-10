@@ -1,0 +1,13 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <CustomBuild Include="C:\dev\Powershell\speaktome\tools\openrgb_sdk_shell\native_asrock_hid\build_verify\CMakeFiles\a0351462a8ed7cfbc616a339627a9dad\generate.stamp.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="CMake Rules">
+      <UniqueIdentifier>{CC720B5B-4791-30C4-A24E-4E986015C8F3}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

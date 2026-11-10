@@ -1,0 +1,5 @@
+# Restore thick-lens trial readiness
+
+See ../1794243632_AUDIT_Thick_Lens_Bounded_Trial.md. Align the recursive sensor defaults with refinement_steps=1 and repeat the bounded native GPU trial after local execution policy permits completion. Require real transport completion, finite image, no overflow, and separate color/energy validation. Existing Studio rendering must remain intact.
+
+CPU reference completed with explicit T5 join; full evidence is recorded in the linked report. Automatic contracts now cover six authored YAML profiles, two surface registry presets and eleven focus-lab solver requests, with 40 focused regression tests passing. The next user-facing step is the existing composed Studio shader's contract adapter and focus/zoom/aperture controls. Resolve unknown distortion/spectral conventions and validate physical source-coordinate, focal, sensor, pupil and continuous focus domains before advertising equivalent compound presets. Keep the current source lenses, shader, timing and user jobs intact.

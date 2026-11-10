@@ -1,0 +1,10 @@
+^C:\DEV\POWERSHELL\SPEAKTOME\TOOLS\OPENRGB_SDK_SHELL\NATIVE_ASROCK_HID\CMAKELISTS.TXT
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -SC:/dev/Powershell/speaktome/tools/openrgb_sdk_shell/native_asrock_hid -BC:/dev/Powershell/speaktome/tools/openrgb_sdk_shell/native_asrock_hid/build_verify --check-stamp-file C:/dev/Powershell/speaktome/tools/openrgb_sdk_shell/native_asrock_hid/build_verify/CMakeFiles/generate.stamp
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd

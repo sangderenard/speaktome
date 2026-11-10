@@ -1,0 +1,971 @@
+{
+  "version": 1,
+  "refresh_rate": 30.117021276595743,
+  "controller": {
+    "device_name": "ASRock B650M Pro RS WiFi",
+    "mode": "Direct",
+    "transport": {
+      "kind": "direct_asrock_hid",
+      "vendor_id": 9934,
+      "product_id": 418,
+      "response_timeout_ms": 100,
+      "packet_mode": "burst",
+      "message_type": "stream",
+      "report_count": 14,
+      "window_size": 4,
+      "hidapi_dll": "C:\\Users\\alber\\AppData\\Local\\Temp\\OpenRGB-1.0-81bbe18\\OpenRGB Windows 64-bit\\hidapi-hotplug.dll",
+      "zones": [
+        {
+          "name": "RGB LED 1 Header",
+          "zone_type": 0,
+          "count": 1,
+          "maximum_count": 1,
+          "rg_swap": false
+        },
+        {
+          "name": "Addressable Header 1",
+          "zone_type": 2,
+          "count": 80,
+          "maximum_count": 100,
+          "rg_swap": false
+        },
+        {
+          "name": "Addressable Header 2",
+          "zone_type": 3,
+          "count": 80,
+          "maximum_count": 100,
+          "rg_swap": false
+        },
+        {
+          "name": "PCB",
+          "zone_type": 6,
+          "count": 4,
+          "maximum_count": 4,
+          "rg_swap": true
+        },
+        {
+          "name": "Addressable Header 3/Audio",
+          "zone_type": 7,
+          "count": 80,
+          "maximum_count": 100,
+          "rg_swap": false
+        }
+      ]
+    }
+  },
+  "arrays": {
+    "ring": {
+      "label": "Ring",
+      "zone": "Addressable Header 3/Audio",
+      "position_count": 8,
+      "geometry": {
+        "kind": "ring",
+        "identity_offset": 5,
+        "identity_direction": 1,
+        "site_rotation_steps": 0
+      },
+      "channel_order": "RGB",
+      "field_id": "ring-field",
+      "placement": {
+        "x": 0.0,
+        "y": 0.0,
+        "rotation_degrees": 0.0,
+        "rotation_rate_degrees": 0.0,
+        "rotation_rate_multiplier": 7.827586206896552,
+        "scale": 1.0
+      }
+    },
+    "motherboard": {
+      "label": "Motherboard strip",
+      "zone": "PCB",
+      "position_count": 4,
+      "geometry": {
+        "kind": "vertical_strip"
+      },
+      "channel_order": "GRB",
+      "field_id": "motherboard-field",
+      "placement": {
+        "x": 0.0,
+        "y": 0.0,
+        "rotation_degrees": 0.0,
+        "rotation_rate_degrees": 0.0,
+        "rotation_rate_multiplier": 1.0,
+        "scale": 1.0
+      }
+    }
+  },
+  "fields": {
+    "ring-field": {
+      "engine": "vectorscope",
+      "falloff_power": 8.0,
+      "center_contribution": 0.0,
+      "source_rotation_degrees": 0.0,
+      "source_rotation_rate_degrees": 0.0,
+      "projection": {
+        "inner_radius": 0.16551724137931034,
+        "outer_radius": 4.0,
+        "light_ring_radius": 0.45862068965517244
+      },
+      "brightness": 96,
+      "exposure": 3.0,
+      "physics": {
+        "geometry": "sphere",
+        "normalize_source_count": false,
+        "body_count": 1,
+        "hues": [
+          0.0,
+          99.81818181818183,
+          240.54545454545456
+        ],
+        "color_systems": [
+          "hsl",
+          "hsl",
+          "hsl"
+        ],
+        "color_temperatures_k": [
+          5600.0,
+          5600.0,
+          5600.0
+        ],
+        "color_white_points": [
+          "D65",
+          "D65",
+          "D65"
+        ],
+        "saturations": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "lightnesses": [
+          0.5,
+          0.5,
+          0.5
+        ],
+        "hue_rates": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "hue_rate_multipliers": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "strobe_waveforms": [
+          "off",
+          "off",
+          "off"
+        ],
+        "strobe_rates_hz": [
+          15.724137931034484,
+          14.068965517241379,
+          11.586206896551724
+        ],
+        "beat_polarities": [
+          1.0,
+          0.42068965517241375,
+          -0.43448275862068964
+        ],
+        "audio_bands": [
+          0,
+          0,
+          0
+        ],
+        "audio_windows_ms": [
+          120.0,
+          120.0,
+          120.0
+        ],
+        "masses": [
+          5.760344827586207,
+          0.25,
+          12.0
+        ],
+        "temperature_c": 0.0,
+        "thermal_coupling": 1.0
+      },
+      "spirograph": {
+        "speed": -0.7853981633974483,
+        "speed_multiplier": 1.0,
+        "normalize_source_count": false,
+        "selected_source": 1,
+        "sources": [
+          {
+            "hue": 0.0,
+            "color_system": "hsl",
+            "temperature_k": 5600.0,
+            "white_point": "D65",
+            "saturation": 1.0,
+            "lightness": 0.5,
+            "hue_rate": 0.0,
+            "hue_rate_multiplier": 1.0,
+            "angular_offset_degrees": 0.0,
+            "angular_rate_degrees": 0.0,
+            "angular_rate_multiplier": 1.0,
+            "strobe_waveform": "off",
+            "strobe_rate_hz": 15.0,
+            "beat_polarity": 1.0,
+            "audio_band": 0,
+            "audio_window_ms": 120.0,
+            "ratio_numerator": 2,
+            "ratio_denominator": 3
+          },
+          {
+            "hue": 57.10344827586207,
+            "color_system": "hsl",
+            "temperature_k": 5600.0,
+            "white_point": "D65",
+            "saturation": 1.0,
+            "lightness": 0.5,
+            "hue_rate": 0.0,
+            "hue_rate_multiplier": 1.0,
+            "angular_offset_degrees": 89.37931034482759,
+            "angular_rate_degrees": 0.0,
+            "angular_rate_multiplier": 1.0,
+            "strobe_waveform": "off",
+            "strobe_rate_hz": 0.0,
+            "beat_polarity": 1.0,
+            "audio_band": 0,
+            "audio_window_ms": 120.0,
+            "ratio_numerator": 2,
+            "ratio_denominator": 3
+          },
+          {
+            "hue": 224.18181818181816,
+            "color_system": "hsl",
+            "temperature_k": 5600.0,
+            "white_point": "D65",
+            "saturation": 1.0,
+            "lightness": 0.5,
+            "hue_rate": 0.0,
+            "hue_rate_multiplier": 1.0,
+            "angular_offset_degrees": 178.75862068965517,
+            "angular_rate_degrees": 0.0,
+            "angular_rate_multiplier": 1.0,
+            "strobe_waveform": "off",
+            "strobe_rate_hz": 0.0,
+            "beat_polarity": 1.0,
+            "audio_band": 0,
+            "audio_window_ms": 120.0,
+            "ratio_numerator": 2,
+            "ratio_denominator": 3
+          },
+          {
+            "hue": 106.75862068965516,
+            "color_system": "hsl",
+            "temperature_k": 5600.0,
+            "white_point": "D65",
+            "saturation": 1.0,
+            "lightness": 0.5,
+            "hue_rate": 0.0,
+            "hue_rate_multiplier": 1.0,
+            "angular_offset_degrees": 273.10344827586204,
+            "angular_rate_degrees": 0.0,
+            "angular_rate_multiplier": 1.0,
+            "strobe_waveform": "off",
+            "strobe_rate_hz": 0.0,
+            "beat_polarity": 1.0,
+            "audio_band": 0,
+            "audio_window_ms": 120.0,
+            "ratio_numerator": 2,
+            "ratio_denominator": 3
+          }
+        ]
+      },
+      "manual": {
+        "normalize_source_count": false,
+        "positions": [
+          [
+            0.6376858695490816,
+            -0.017887855962046992
+          ],
+          [
+            0.5629165124598852,
+            0.32499999999999996
+          ],
+          [
+            0.32179024888080976,
+            0.5607581549299522
+          ],
+          [
+            -0.030421782917157286,
+            0.6746790558398584
+          ],
+          [
+            -0.32499999999999984,
+            0.5629165124598852
+          ],
+          [
+            -0.5629165124598852,
+            0.32499999999999996
+          ],
+          [
+            -0.65,
+            7.960204194457797e-17
+          ],
+          [
+            -0.5398855086466544,
+            -0.31894935669675056
+          ],
+          [
+            -0.3250000000000003,
+            -0.562916512459885
+          ],
+          [
+            -1.1940306291686693e-16,
+            -0.65
+          ],
+          [
+            0.3293770180019673,
+            -0.5615697965947839
+          ],
+          [
+            0.5629165124598849,
+            -0.3250000000000003
+          ]
+        ],
+        "hues": [
+          0.0,
+          30.0,
+          60.0,
+          90.0,
+          120.0,
+          150.0,
+          180.0,
+          210.0,
+          240.0,
+          270.0,
+          300.0,
+          330.0
+        ],
+        "color_systems": [
+          "hsl",
+          "hsl",
+          "hsl",
+          "hsl",
+          "hsl",
+          "hsl",
+          "hsl",
+          "hsl",
+          "hsl",
+          "hsl",
+          "hsl",
+          "hsl"
+        ],
+        "color_temperatures_k": [
+          5600.0,
+          5600.0,
+          5600.0,
+          5600.0,
+          5600.0,
+          5600.0,
+          5600.0,
+          5600.0,
+          5600.0,
+          5600.0,
+          5600.0,
+          5600.0
+        ],
+        "color_white_points": [
+          "D65",
+          "D65",
+          "D65",
+          "D65",
+          "D65",
+          "D65",
+          "D65",
+          "D65",
+          "D65",
+          "D65",
+          "D65",
+          "D65"
+        ],
+        "saturations": [
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0
+        ],
+        "lightnesses": [
+          0.5,
+          0.5,
+          0.5,
+          0.5,
+          0.5,
+          0.5,
+          0.5,
+          0.5,
+          0.5,
+          0.5,
+          0.5,
+          0.5
+        ],
+        "hue_rates": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "hue_rate_multipliers": [
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0
+        ],
+        "strobe_waveforms": [
+          "audio",
+          "audio",
+          "audio",
+          "audio",
+          "audio",
+          "audio",
+          "audio",
+          "audio",
+          "audio",
+          "audio",
+          "audio",
+          "audio"
+        ],
+        "strobe_rates_hz": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "beat_polarities": [
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0
+        ],
+        "audio_bands": [
+          0,
+          1,
+          3,
+          4,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11
+        ],
+        "audio_windows_ms": [
+          120.0,
+          120.0,
+          120.0,
+          120.0,
+          120.0,
+          120.0,
+          120.0,
+          120.0,
+          120.0,
+          120.0,
+          120.0,
+          120.0
+        ],
+        "selected_source": 11,
+        "deployment_count": 12
+      },
+      "vectorscope": {
+        "hue": 315.3103448275862,
+        "color_system": "hsl",
+        "temperature_k": 3152.5974025974024,
+        "white_point": "D50",
+        "saturation": 1.0,
+        "lightness": 0.5,
+        "hue_rate": 0.0,
+        "hue_rate_multiplier": 1.0,
+        "strobe_waveform": "beat",
+        "strobe_rate_hz": 30.0,
+        "beat_polarity": 1.0,
+        "audio_band": 0,
+        "audio_window_ms": 120.0,
+        "gain": 0.8572727272727272,
+        "level": 2.2727272727272725,
+        "normalize_band_count": false,
+        "tail_milliseconds": 121.27659574468086,
+        "trace_points": 42,
+        "fft_size": 512,
+        "oversample": 1,
+        "min_frequency_hz": 27.5,
+        "max_frequency_hz": 18000.0
+      },
+      "source_rotation_rate_multiplier": 5.779310344827586,
+      "timing": {
+        "rate_hz": 8.111308307896872,
+        "phase_degrees": 111.27272727272727,
+        "predelay_ns": 0,
+        "pulse_width_ns": 1000000
+      },
+      "uniform": {
+        "hardware_mode": 1,
+        "hardware_speed": 0,
+        "hue": 0.0,
+        "color_system": "blackbody",
+        "temperature_k": 22399.35064935065,
+        "white_point": "D50",
+        "saturation": 1.0,
+        "lightness": 0.5,
+        "hue_rate": 0.0,
+        "hue_rate_multiplier": 1.0,
+        "strobe_waveform": "off",
+        "strobe_rate_hz": 15.0,
+        "beat_polarity": 1.0,
+        "audio_band": 43,
+        "audio_window_ms": 120.0
+      },
+      "sites": {
+        "selected_source": 0,
+        "sources": [
+          {
+            "hue": 0.0,
+            "saturation": 1.0,
+            "lightness": 0.5,
+            "hue_rate": 0.0,
+            "hue_rate_multiplier": 11.241379310344827,
+            "strobe_waveform": "off",
+            "strobe_rate_hz": 15.0,
+            "beat_polarity": 1.0,
+            "audio_band": 0,
+            "audio_window_ms": 120.0
+          },
+          {
+            "hue": 45.0,
+            "saturation": 1.0,
+            "lightness": 0.5,
+            "hue_rate": 0.0,
+            "hue_rate_multiplier": 1.0,
+            "strobe_waveform": "off",
+            "strobe_rate_hz": 0.0,
+            "beat_polarity": 1.0,
+            "audio_band": 0,
+            "audio_window_ms": 120.0
+          },
+          {
+            "hue": 90.0,
+            "saturation": 1.0,
+            "lightness": 0.5,
+            "hue_rate": 0.0,
+            "hue_rate_multiplier": 1.0,
+            "strobe_waveform": "off",
+            "strobe_rate_hz": 0.0,
+            "beat_polarity": 1.0,
+            "audio_band": 0,
+            "audio_window_ms": 120.0
+          },
+          {
+            "hue": 135.0,
+            "saturation": 1.0,
+            "lightness": 0.5,
+            "hue_rate": 0.0,
+            "hue_rate_multiplier": 1.0,
+            "strobe_waveform": "off",
+            "strobe_rate_hz": 0.0,
+            "beat_polarity": 1.0,
+            "audio_band": 0,
+            "audio_window_ms": 120.0
+          },
+          {
+            "hue": 180.0,
+            "saturation": 1.0,
+            "lightness": 0.5,
+            "hue_rate": 0.0,
+            "hue_rate_multiplier": 1.0,
+            "strobe_waveform": "off",
+            "strobe_rate_hz": 0.0,
+            "beat_polarity": 1.0,
+            "audio_band": 0,
+            "audio_window_ms": 120.0
+          },
+          {
+            "hue": 225.0,
+            "saturation": 1.0,
+            "lightness": 0.5,
+            "hue_rate": 0.0,
+            "hue_rate_multiplier": 1.0,
+            "strobe_waveform": "off",
+            "strobe_rate_hz": 0.0,
+            "beat_polarity": 1.0,
+            "audio_band": 0,
+            "audio_window_ms": 120.0
+          },
+          {
+            "hue": 270.0,
+            "saturation": 1.0,
+            "lightness": 0.5,
+            "hue_rate": 0.0,
+            "hue_rate_multiplier": 1.0,
+            "strobe_waveform": "off",
+            "strobe_rate_hz": 0.0,
+            "beat_polarity": 1.0,
+            "audio_band": 0,
+            "audio_window_ms": 120.0
+          },
+          {
+            "hue": 315.0,
+            "saturation": 1.0,
+            "lightness": 0.5,
+            "hue_rate": 0.0,
+            "hue_rate_multiplier": 1.0,
+            "strobe_waveform": "off",
+            "strobe_rate_hz": 0.0,
+            "beat_polarity": 1.0,
+            "audio_band": 0,
+            "audio_window_ms": 120.0
+          }
+        ]
+      }
+    },
+    "motherboard-field": {
+      "engine": "sites",
+      "falloff_power": 6.951063829787234,
+      "center_contribution": 0.0,
+      "source_rotation_degrees": 54.0,
+      "source_rotation_rate_degrees": 0.0,
+      "projection": {
+        "inner_radius": 0.41,
+        "outer_radius": 0.82,
+        "light_ring_radius": 1.0
+      },
+      "brightness": 96,
+      "exposure": 3.0,
+      "physics": {
+        "geometry": "torus",
+        "normalize_source_count": false,
+        "body_count": 1,
+        "hues": [
+          180.0,
+          300.0,
+          60.0
+        ],
+        "color_systems": [
+          "hsl",
+          "hsl",
+          "hsl"
+        ],
+        "color_temperatures_k": [
+          5600.0,
+          5600.0,
+          5600.0
+        ],
+        "color_white_points": [
+          "D65",
+          "D65",
+          "D65"
+        ],
+        "saturations": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "lightnesses": [
+          0.5,
+          0.5,
+          0.5
+        ],
+        "hue_rates": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "hue_rate_multipliers": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "strobe_waveforms": [
+          "off",
+          "off",
+          "off"
+        ],
+        "strobe_rates_hz": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "beat_polarities": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "audio_bands": [
+          0,
+          0,
+          0
+        ],
+        "audio_windows_ms": [
+          120.0,
+          120.0,
+          120.0
+        ],
+        "masses": [
+          3.0,
+          4.0,
+          5.0
+        ],
+        "temperature_c": 40.0,
+        "thermal_coupling": 1.0
+      },
+      "spirograph": {
+        "speed": 0.0,
+        "speed_multiplier": 1.0,
+        "normalize_source_count": false,
+        "selected_source": 0,
+        "sources": [
+          {
+            "hue": 0.0,
+            "color_system": "hsl",
+            "temperature_k": 5600.0,
+            "white_point": "D65",
+            "saturation": 1.0,
+            "lightness": 0.5,
+            "hue_rate": 0.0,
+            "hue_rate_multiplier": 1.0,
+            "angular_offset_degrees": 0.0,
+            "angular_rate_degrees": 0.0,
+            "angular_rate_multiplier": 1.0,
+            "strobe_waveform": "square",
+            "strobe_rate_hz": 0.0,
+            "beat_polarity": 1.0,
+            "audio_band": 0,
+            "audio_window_ms": 120.0,
+            "ratio_numerator": 1,
+            "ratio_denominator": 1
+          }
+        ]
+      },
+      "manual": {
+        "normalize_source_count": false,
+        "positions": [
+          [
+            0.55,
+            0.0
+          ],
+          [
+            -0.3,
+            0.52
+          ],
+          [
+            -0.3,
+            -0.52
+          ]
+        ],
+        "hues": [
+          140.39423853830888,
+          260.39423853830914,
+          20.394238538223192
+        ],
+        "color_systems": [
+          "hsl",
+          "hsl",
+          "hsl"
+        ],
+        "color_temperatures_k": [
+          5600.0,
+          5600.0,
+          5600.0
+        ],
+        "color_white_points": [
+          "D65",
+          "D65",
+          "D65"
+        ],
+        "saturations": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "lightnesses": [
+          0.5,
+          0.5,
+          0.5
+        ],
+        "hue_rates": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "hue_rate_multipliers": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "strobe_waveforms": [
+          "off",
+          "off",
+          "off"
+        ],
+        "strobe_rates_hz": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "beat_polarities": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "audio_bands": [
+          0,
+          0,
+          0
+        ],
+        "audio_windows_ms": [
+          120.0,
+          120.0,
+          120.0
+        ],
+        "selected_source": 0,
+        "deployment_count": 3
+      },
+      "vectorscope": {
+        "hue": 0.0,
+        "color_system": "hsl",
+        "temperature_k": 5600.0,
+        "white_point": "D65",
+        "saturation": 1.0,
+        "lightness": 0.5,
+        "hue_rate": 0.0,
+        "hue_rate_multiplier": 1.0,
+        "strobe_waveform": "beat",
+        "strobe_rate_hz": 0.0,
+        "beat_polarity": 1.0,
+        "audio_band": 0,
+        "audio_window_ms": 120.0,
+        "gain": 5.5631818181818184,
+        "level": 9.363636363636363,
+        "normalize_band_count": true,
+        "tail_milliseconds": 600.0,
+        "trace_points": 8,
+        "fft_size": 512,
+        "oversample": 1,
+        "min_frequency_hz": 27.5,
+        "max_frequency_hz": 18000.0
+      },
+      "source_rotation_rate_multiplier": 1.0,
+      "timing": {
+        "rate_hz": 1.0,
+        "phase_degrees": 0.0,
+        "predelay_ns": 0,
+        "pulse_width_ns": 100000000
+      },
+      "uniform": {
+        "hardware_mode": 1,
+        "hardware_speed": 224,
+        "hue": 0.0,
+        "color_system": "hsl",
+        "temperature_k": 5600.0,
+        "white_point": "D65",
+        "saturation": 1.0,
+        "lightness": 0.5,
+        "hue_rate": 0.0,
+        "hue_rate_multiplier": 1.0,
+        "strobe_waveform": "off",
+        "strobe_rate_hz": 8.489854932301741,
+        "beat_polarity": 1.0,
+        "audio_band": 7,
+        "audio_window_ms": 120.0
+      },
+      "sites": {
+        "selected_source": 0,
+        "sources": [
+          {
+            "hue": 0.0,
+            "saturation": 1.0,
+            "lightness": 0.5,
+            "hue_rate": 0.0,
+            "hue_rate_multiplier": 1.0,
+            "strobe_waveform": "off",
+            "strobe_rate_hz": 0.0,
+            "beat_polarity": 1.0,
+            "audio_band": 0,
+            "audio_window_ms": 120.0
+          },
+          {
+            "hue": 90.0,
+            "saturation": 1.0,
+            "lightness": 0.5,
+            "hue_rate": 0.0,
+            "hue_rate_multiplier": 1.0,
+            "strobe_waveform": "off",
+            "strobe_rate_hz": 0.0,
+            "beat_polarity": 1.0,
+            "audio_band": 0,
+            "audio_window_ms": 120.0
+          },
+          {
+            "hue": 180.0,
+            "saturation": 1.0,
+            "lightness": 0.5,
+            "hue_rate": 0.0,
+            "hue_rate_multiplier": 1.0,
+            "strobe_waveform": "off",
+            "strobe_rate_hz": 0.0,
+            "beat_polarity": 1.0,
+            "audio_band": 0,
+            "audio_window_ms": 120.0
+          },
+          {
+            "hue": 270.0,
+            "saturation": 1.0,
+            "lightness": 0.5,
+            "hue_rate": 0.0,
+            "hue_rate_multiplier": 1.0,
+            "strobe_waveform": "off",
+            "strobe_rate_hz": 0.0,
+            "beat_polarity": 1.0,
+            "audio_band": 0,
+            "audio_window_ms": 120.0
+          }
+        ]
+      }
+    }
+  },
+  "ui": {
+    "active_array": "ring"
+  }
+}

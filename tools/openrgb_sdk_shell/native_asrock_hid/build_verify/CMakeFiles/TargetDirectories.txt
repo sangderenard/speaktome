@@ -1,0 +1,3 @@
+C:/dev/Powershell/speaktome/tools/openrgb_sdk_shell/native_asrock_hid/build_verify/CMakeFiles/asrock_polychrome_hid.dir
+C:/dev/Powershell/speaktome/tools/openrgb_sdk_shell/native_asrock_hid/build_verify/CMakeFiles/ALL_BUILD.dir
+C:/dev/Powershell/speaktome/tools/openrgb_sdk_shell/native_asrock_hid/build_verify/CMakeFiles/ZERO_CHECK.dir
