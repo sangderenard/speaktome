@@ -301,3 +301,13 @@ Owner: "projects are converging at this moment. this is becoming under an unexpe
 role in machine sim, turing, and nodus, and the web service. I would like to ask you to do a thorough continuation
 report and summary in speaktome under that repo's agent conventions. the other agent is being told to migrate a few
 things and will later make a similar report"
+
+## Addendum, same evening: default branches (observed)
+
+The owner pointed out that the "main" of speaktome and of the root repository is `nogodsnomasters`. Confirmed on
+GitHub: that is the default branch of speaktome, the root repository, Nodus and spectral-analyzer; Turing's is `main`.
+Both working branches merged `origin/nogodsnomasters` with no conflicts and were pushed onto it as fast-forwards:
+speaktome `nogodsnomasters` = `045433b` (plus this addendum), root `nogodsnomasters` = `937de5d`. Every repository's
+default branch now holds the consolidated work. The local checkouts of speaktome and the root are still on
+`codex/direct-x86-vocabulary-report` and `codex/live-string-core-demo`, which point at the same commits; section 1's
+table is superseded by this paragraph for those two rows.
