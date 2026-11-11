@@ -1,0 +1,71 @@
+NAME
+       review - how a change reaches a default branch
+
+DESCRIPTION
+       Nobody pushes to a default branch. A change is one branch at one
+       commit; it is put up for review, and once it is accepted the admin
+       tool pushes and lands it. Only that tool talks to GitHub.
+
+   The steps
+       Use the tools of python -m speaktome_mcp.api.
+
+           reviews_checkout repository=NAME branch=YOURS
+                    The branch is registered to you. This is checking a
+                    branch out from the server.
+           git switch -c YOURS DEFAULT
+                    Commit there. Do not push.
+           reviews_submit repository=NAME branch=YOURS head=COMMIT
+                    COMMIT is the full 40-character id.
+           reviews_list
+                    Where every change stands, and your branches.
+
+       A peer who did not write the change may answer it with
+       reviews_remark, verdict agree or object. An admin settles it with
+       reviews_decide, naming the commit that was read. The author may
+       take it back with reviews_withdraw.
+
+   Where a change stands
+       waiting      Open, and its time-out has not passed.
+       objected     A peer objected. It waits for an admin.
+       accepted     Nobody objected and the time-out passed. Silence is
+                    consent. The time-out is 24 hours unless the author
+                    asked for another.
+       approved, rejected
+                    An admin decided.
+       withdrawn    The author took it back, or submitted a newer commit
+                    of the same branch.
+       landed       The default branch is at this commit.
+
+       A decision and a landing are about one commit. A branch that
+       moved is a different change and is submitted again.
+
+   Landing
+       The admin tool lands an accepted or approved change as a
+       fast-forward and never forces. A change that is not a descendant
+       of the default branch is held; its author merges the default
+       branch into it and submits the new commit. The author chooses,
+       with keep, whether the branch stays after it lands.
+
+   The lock
+       A push to a default branch, and the review-gate check on GitHub,
+       ask one question: does this commit have an accepted review?
+
+           GET /api/reviews/standing?repository=NAME&head=COMMIT
+
+       While the lock is mock, a commit without one gets a warning and
+       these steps, and goes through. When it is enforce, it is refused.
+       The mode is one line of the branch policy on the service.
+
+   How long a branch lives
+       A branch whose commits are all in the live source is removed a
+       day later. A branch with commits of its own lives 30 days after
+       its last commit when it is registered to nobody, and 365 days
+       when it is registered to an account. A branch under review, a
+       protected branch and a kept branch are not removed. Every removal
+       leaves a notice with the commit the branch was at.
+
+       Where a rule of the remote forbids deleting a branch, the copy
+       there is left and the report says so.
+
+SEE ALSO
+       index(5), speaktome(7), roles(7), report(5)

@@ -68,4 +68,4 @@ DESCRIPTION
        source; it cannot prove the fields.
 
 SEE ALSO
-       speaktome(7), roles(7), whoami(1), man(1)
+       speaktome(7), roles(7), whoami(1), man(1), review(5)

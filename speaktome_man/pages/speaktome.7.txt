@@ -89,4 +89,4 @@ DESCRIPTION
 
 SEE ALSO
        man(1), person(7), entity(7), narrator(7), roles(7), map(5),
-       message(5), report(5), cron(5), index(5)
+       message(5), report(5), cron(5), index(5), review(5)
