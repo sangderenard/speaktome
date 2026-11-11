@@ -10,7 +10,7 @@ from __future__ import annotations
 from http import HTTPStatus
 # --- END HEADER ---
 
-API_VERSION = 1
+API_VERSION = 2   # 2: picture_route (show, with a camera), site_route and the site module (a map as pages)
 
 
 def messages_route(self, path: str, method: str, *, messaging, accounts_db) -> None:
@@ -189,3 +189,87 @@ def living_data_query_route(self, *, living_data_query):
             return self._json(living_data_query.query(body))
     except (living_data_query.QueryError, RecursionError):
         return self._json({"error": "invalid or excessive Living Data query"}, 400)
+
+
+def picture_route(self, path, method, *, service, owners, recheck, PictureError, MAX_BODY):
+    """show, with a camera: ``POST /api/show/pictures`` asks for a picture, ``GET /api/show/pictures/{id}`` reads its receipt.
+
+    The body is ``{request_id, settings?, photo?}``; the host turns it into its Studio request, carries it over its
+    Nodus destination and births an account-owned photo job. The account, its owner keys and the authority recheck
+    come from the authenticated host (``owners``, ``recheck``), never from the body. The receipt names the real job;
+    the job's status, image and cancellation stay on the existing photo endpoints.
+    """
+    import re
+    self._set_cookie = []
+    if method == "POST":
+        self.close_connection = True
+    if self._is_viewer():
+        return self._refuse_viewer()
+    if not self._require("photo_submit"):
+        return
+    account = self._account()
+    if account is None:
+        return self._json({"error": "sign in to ask for a picture"}, 401)
+    if service is None:
+        return self._json({"error": "no Studio destination is configured on this host"}, 503)
+    if self.path.partition("?")[2]:
+        return self._json({"error": "picture routes accept no query parameters"}, 400)
+    base = "/api/show/pictures"
+    try:
+        if method == "GET":
+            match = re.fullmatch(base + r"/([0-9a-f]{32})", path)
+            if not match:
+                return self._json({"error": "not found"}, 404)
+            return self._json(service.status(account["id"], match[1]))
+        if path != base:
+            return self._json({"error": "not found"}, 404)
+        if self.headers.get("Content-Type", "").split(";", 1)[0].strip().lower() != "application/json":
+            return self._json({"error": "application/json required"}, 415)
+        body = self._body_json(MAX_BODY)
+        if body is None:
+            return
+        receipt = service.submit(account["id"], owners, recheck, body)
+        return self._json(receipt, 200 if receipt.get("replayed") else 202)
+    except PictureError as error:
+        return self._json({"error": str(error)}, error.status)
+    except (ValueError, TypeError, RecursionError):
+        return self._json({"error": "invalid picture request"}, 400)
+
+
+def site_route(self, path, *, site, maps):
+    """A map as a website: ``GET /site/<map>/`` is the map's root place, ``GET /site/<map>/<address>.html`` a place.
+
+    ``maps`` is the host's declaration, name -> ``{"source": callable returning the map, "capability": str,
+    "ttl": seconds}``. A page is rendered on first look and kept (``speaktome_api.site``); nothing is written for a
+    place nobody looks at. Pages carry no script and take everything from the map as data.
+    """
+    import re
+    self._set_cookie = []
+    match = re.fullmatch(r"/site/([a-z0-9][a-z0-9-]{0,31})(?:/(?:([A-Za-z0-9._-]{1,128})\.html)?)?", path)
+    declared = maps.get(match[1]) if match else None
+    if declared is None:
+        return self._json({"error": "not found"}, 404)
+    if not self._require(declared["capability"]):
+        return
+    if not path.startswith(f"/site/{match[1]}/"):
+        self.send_response(301)
+        self.send_header("Location", f"/site/{match[1]}/")
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+        return
+    try:
+        atlas = site.atlas(match[1], declared["source"], declared.get("ttl", 0.0))
+    except Exception as error:   # the map's source is another service; its failure is not this page's
+        return self._json({"error": f"the {match[1]} map is unavailable: {type(error).__name__}"}, 503)
+    try:
+        data = atlas.page(match[2] or "index")
+    except KeyError:
+        return self._json({"error": "no such place on this map"}, 404)
+    self.send_response(200)
+    self.send_header("Content-Type", "text/html; charset=utf-8")
+    self.send_header("Content-Length", str(len(data)))
+    self.send_header("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'")
+    self.send_header("X-Content-Type-Options", "nosniff")
+    self.send_header("Cache-Control", "no-cache")
+    self.end_headers()
+    self.wfile.write(data)

@@ -2,45 +2,99 @@ NAME
        show - have a picture made of the scene
 
 SYNOPSIS
-       REST:   POST /api/living-data/dm/worlds/{world}/commands
-                    {request_id, operation: "render-phong", position,
-                     facing, width?, height?}
-               GET  /api/living-data/dm/worlds/{world}/commands/{id}
+       Tool:   show [photo={...}] [settings={...}]
+               show picture=ID [image=true]
+       REST:   POST /api/show/pictures {request_id, settings?, photo?}
+               GET  /api/show/pictures/{id}
+               GET  /api/marble_photo?digest=DIGEST
+               GET  /api/marble_photo/image?digest=DIGEST&name=NAME
 
 DESCRIPTION
-       Asks for a rendered view of a registered world from a camera
-       position looking along a facing direction. Width and height are
-       64 to 1024 pixels and default to 512 by 384.
+       show is look with a camera. Where look answers with the places
+       around you, show answers with a picture.
 
-       The server does not draw. A render host, which is a browser page
-       attached to the world, draws the picture and hands it back. The
-       command is therefore answered at once with a state of queued or
-       rendering, and the finished picture is read later from the
-       command's receipt.
+       The picture is made by the Studio's own photo service. A request
+       becomes a Studio scene, travels over the system's Nodus contract
+       port to the Studio destination, and is committed there as a photo
+       job owned by your account. No second renderer or queue is
+       involved, and the job appears with your other photo jobs.
 
-       show is a narrator's verb, and it needs a world registered as
-       examine(1) describes and a render host attached to it.
+       A request may carry two things. The settings are a complete
+       Studio settings record: the object, the fully resolved Exposure
+       lighting profile, and the camera, whose positions are in metres.
+       A settings record replaces the host's baked default record whole;
+       the two are never merged. The photo options are the photo
+       service's own, such as resolution and seconds. Both may be left
+       out when the host has baked defaults.
+
+       Asking is answered at once with a receipt. The receipt's state
+       moves from queued to preparing and then ends as one of:
+
+           committed    A photo job exists. The receipt names it.
+           refused      Authority was withdrawn; no job was made.
+           failed       The scene could not be prepared, or no result
+                        came back; no job was made.
+           uncertain    The commit raised an error. A job may or may
+                        not exist. Nothing is retried.
+
+       A committed picture is not yet a finished one. The exposure runs
+       on the one GPU and is followed on the photo endpoints, which also
+       serve the image and cancel a job. With a picture id the tool
+       reads the receipt and the exposure together, and with image=true
+       it attaches the finished image.
+
+       The request carries no identity. The account, its ownership of
+       the job and its authority come from the signed-in session, and
+       authority is checked again just before the job is made. The hash
+       of the prepared scene checks that it arrived whole; it grants
+       nothing.
+
+       The request carries a request_id. Repeating it with the same
+       content returns the first receipt, marked replayed.
 
 IN A STORY
        "Paint me the scene."
 
 NEEDS
-       The dev_ui capability and a signed-in account.
+       The photo_submit capability and a signed-in account. Reading the
+       exposure and the image needs photo_read.
 
 ANSWER
-       state        queued, rendering or complete.
-       result       The picture, when complete. It is a PNG of at most
-                    2 MiB.
+       picture_id   The receipt's id.
+       state        As above.
+       job          The photo service's own record of the job, once
+                    committed. Its digest names the job.
+       status_url   Where the exposure is followed.
+       exposure     The exposure's state, size and image name (tool,
+                    with a picture id).
 
 REFUSALS
-       404  static world not found
-       409  request_id reused with different command
-       429  command receipt capacity reached; close and reattach world
+       401  sign in to ask for a picture
+       409  request_id already used with different content
+       429  picture queue is full; try again when one finishes
+                 One picture is prepared at a time and four may wait.
+       503  no Studio destination is configured on this host
+       404  picture not found
+                 The id is unknown or belongs to another account.
+
+EXAMPLE
+       show photo={"resolution": 256, "seconds": 5}
+           A picture was asked for; it is queued.
+       show picture=4f0c... image=true
+           The photo job exists and its exposure is complete.
 
 STATUS
-       Exists over REST, for the narrator. No tool offers it yet. A
-       picture taken from where a cursor stands, without registering a
-       world, does not exist.
+       Exists in the source. It reaches the live service at that
+       service's next restart.
+
+NOTES
+       The narrator's render-phong command is a different picture: a
+       browser page attached to a registered world draws it. It is
+       reached at POST /api/living-data/dm/worlds/{world}/commands and
+       no tool offers it.
+
+       A picture taken from where a cursor stands does not exist yet.
+       The Studio scene is not a place on a map.
 
 SEE ALSO
-       examine(1), narrator(7)
+       look(1), examine(1), narrator(7), roles(7)

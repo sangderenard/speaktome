@@ -62,6 +62,20 @@ DESCRIPTION
        through the same endpoint as any map and examined through the
        narrator's.
 
+   A map as pages
+       Because we have a graph, we can make a website. Each place of a
+       map is a page and each declared edge is a link. The service
+       renders a page the first time someone looks at it and keeps it,
+       so nothing is stored for a place nobody visits. A whole map can
+       also be baked ahead of time into a folder of static files, with
+       the same renderer.
+
+           GET /site/manual/       This manual. Needs view_site.
+           GET /site/system/       The running Nodus canvas. Needs
+                                   dev_ui.
+
+       A changed map is a new set of pages; the old set is dropped.
+
    Where the facts come from
        The pages describe the service as its source stood on 2026-11-11.
        The handlers for messages and for cursors are in

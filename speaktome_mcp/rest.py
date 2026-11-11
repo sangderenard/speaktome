@@ -71,12 +71,17 @@ class Rest:
             raise RestError("the secret file is empty")
         return secret
 
-    def _http(self, path: str, body=None, timeout: float = 40, secret: str | None = None):
+    def _http(self, path: str, body=None, timeout: float = 40, secret: str | None = None, raw_limit: int | None = None):
         data = None if body is None else json.dumps(body).encode("utf-8")
         request = urllib.request.Request(self.base + path, data=data, method="GET" if body is None else "POST",
                                          headers={"Content-Type": "application/json"} if body is not None else {})
         try:
             with self.opener.open(request, timeout=timeout) as response:
+                if raw_limit is not None:      # a file, not JSON: the bytes and their declared type, bounded
+                    raw = response.read(raw_limit + 1)
+                    if len(raw) > raw_limit:
+                        raise RestError(f"the file is larger than {raw_limit} bytes", 413)
+                    return raw, response.headers.get("Content-Type", "application/octet-stream").split(";", 1)[0].strip()
                 raw = response.read()
         except urllib.error.HTTPError as error:
             try:
@@ -116,14 +121,15 @@ class Rest:
         text = error.message.lower()
         return error.status == 401 or (error.status == 403 and ("sign in" in text or "signed in" in text))
 
-    def call(self, path: str, body=None, timeout: float = 40):
+    def call(self, path: str, body=None, timeout: float = 40, raw_limit: int | None = None):
+        """One request as the signed-in account. With ``raw_limit`` the answer is ``(bytes, content type)``, not JSON."""
         if not self.signed_in:
             self.sign_in()
         try:
-            return self._http(path, body, timeout)
+            return self._http(path, body, timeout, raw_limit=raw_limit)
         except RestError as error:
             if not self._unsigned(error):
                 raise
         self.signed_in = False
         self.sign_in()
-        return self._http(path, body, timeout)
+        return self._http(path, body, timeout, raw_limit=raw_limit)

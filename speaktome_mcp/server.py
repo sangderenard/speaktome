@@ -6,6 +6,7 @@ SPEAKTOME_SECRET_FILE (or SPEAKTOME_STATE_DIR) in the environment. Only JSON lin
 """
 from __future__ import annotations
 
+import base64
 import hashlib
 import json
 import secrets
@@ -34,6 +35,8 @@ INSTRUCTIONS = (
     "as errors with the server's status.")
 SESSIONS = "/api/living-data/sessions"
 WORLDS = "/api/living-data/dm/worlds"
+PICTURES = "/api/show/pictures"
+MAX_IMAGE_BYTES = 4 * 1024 * 1024
 MAPS = ["system", "manual"]
 MESSAGE_TYPES = ["note", "status", "question", "handoff", "approval_request", "answer"]
 SUBJECT_KINDS = ["lease", "job", "ticket", "file", "topic"]
@@ -70,6 +73,9 @@ def _validate(value, schema: dict, where: str = "arguments") -> None:
             raise ToolFail(f"{where} must be a string")
         if len(value) < schema.get("minLength", 0) or len(value) > schema.get("maxLength", 10**9):
             raise ToolFail(f"{where} has an invalid length")
+    elif kind == "boolean":
+        if not isinstance(value, bool):
+            raise ToolFail(f"{where} must be true or false")
     elif kind == "integer":
         if isinstance(value, bool) or not isinstance(value, int):
             raise ToolFail(f"{where} must be an integer")
@@ -268,6 +274,34 @@ class Tools:
         result["say"] = result.get("text") or f"The record of {at} was read."
         return result
 
+    # ---- pictures -------------------------------------------------------
+    def show(self, a):
+        """Ask for a picture of the Studio scene, or read how one is coming along; a finished one can be returned as an image."""
+        if "picture" not in a:
+            if "image" in a:
+                raise ToolFail("image is read from a picture you already asked for; give its picture id")
+            body = {"request_id": "mcp-" + secrets.token_urlsafe(16), **{k: a[k] for k in ("settings", "photo") if k in a}}
+            receipt = self.rest.call(PICTURES, body, timeout=60)
+            receipt["say"] = f"A picture was asked for; it is {receipt.get('state')}. Read it again with its picture id."
+            return receipt
+        if "settings" in a or "photo" in a:
+            raise ToolFail("give either a picture id to read, or settings and photo options to ask for a new one")
+        receipt = self.rest.call(f"{PICTURES}/{a['picture']}")
+        job = receipt.get("job") if isinstance(receipt.get("job"), dict) else None
+        if job is None or not isinstance(job.get("digest"), str):
+            receipt["say"] = f"The picture is {receipt.get('state')}" + (f": {receipt['detail']}" if receipt.get("detail") else ".")
+            return receipt
+        digest = urllib.parse.quote(job["digest"])
+        status = self.rest.call("/api/marble_photo?digest=" + digest)
+        receipt["exposure"] = {k: status[k] for k in ("state", "image", "width", "height", "elapsed_seconds", "total_frames", "error")
+                               if k in status}
+        receipt["say"] = f"The photo job exists and its exposure is {status.get('state')}."
+        if a.get("image") and isinstance(status.get("image"), str):
+            receipt["_image"] = self.rest.call(f"/api/marble_photo/image?digest={digest}&name={urllib.parse.quote(status['image'])}",
+                                               timeout=120, raw_limit=MAX_IMAGE_BYTES)
+            receipt["say"] += " The image is attached."
+        return receipt
+
     # ---- messaging ------------------------------------------------------
     def say(self, a):
         listing = self.rest.call("/api/messages/conversations")
@@ -352,6 +386,15 @@ class Tools:
                          "description": "Exact node identity; default is where you stand."},
                   "radius": {"type": "integer", "minimum": 0, "maximum": 4, "description": "Graph hops, default 1."}}),
             self.examine)
+        add("show", "Asks the Studio for a picture (an account-owned photo job; uses the GPU) or, with a picture id, reads its "
+            "receipt and exposure state and can attach the finished image (needs photo_submit; reading needs photo_read).",
+            _obj({"picture": {"type": "string", "minLength": 32, "maxLength": 32, "description": "A picture id from an earlier show."},
+                  "image": {"type": "boolean", "description": "With a picture id: attach the finished image."},
+                  "photo": {"type": "object", "additionalProperties": True,
+                            "description": "Photo options for a new picture, e.g. resolution and seconds; the photo service owns their bounds."},
+                  "settings": {"type": "object", "additionalProperties": True, "description": "A complete Studio settings record (object, the fully resolved "
+                               "Exposure lighting profile, camera in metres); omit to use the host's baked defaults."}}),
+            self.show)
         add("enter", "Opens your one cursor on a map at a node: the live Nodus graph, or the manual (needs dev_ui; refused if you already have a cursor).",
             _obj({"map": {"type": "string", "enum": MAPS,
                           "description": "system (default) is the running Nodus canvas; manual is the SpeakToMe manual."},
@@ -428,7 +471,11 @@ class Server:
         except Exception as error:  # never a traceback to the client
             print(f"speaktome_mcp: internal error in {params['name']}: {type(error).__name__}", file=sys.stderr, flush=True)
             result, is_error = {"error": "internal error", "status": 500}, True
-        return {"content": [{"type": "text", "text": json.dumps(result, ensure_ascii=False)}], "isError": is_error}
+        image = result.pop("_image", None) if isinstance(result, dict) else None
+        content = [{"type": "text", "text": json.dumps(result, ensure_ascii=False)}]
+        if image is not None:                   # (bytes, mime type): shown to the caller as a picture, never as text
+            content.append({"type": "image", "data": base64.b64encode(image[0]).decode("ascii"), "mimeType": image[1]})
+        return {"content": content, "isError": is_error}
 
     def handle(self, message):
         """One JSON-RPC message in, one response dict out (None for a notification)."""

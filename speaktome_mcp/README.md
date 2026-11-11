@@ -52,6 +52,7 @@ Each result is the server's JSON plus a one-sentence `say`. A failure is `isErro
 |---|---|---|
 | `man {topic?, section?, keyword?}` | none: reads the pages of `speaktome_man` (see `python -m speaktome_man`) | none |
 | `whoami` | GET `/api/whoami` | none |
+| `show {photo?, settings?}` or `show {picture, image?}` | POST `/api/show/pictures` (fresh `request_id`); with a picture id: GET its receipt, then GET `/api/marble_photo?digest=` and, when asked, `/api/marble_photo/image` (returned as an MCP image, at most 4 MiB) | `photo_submit`; reading needs `photo_read` |
 | `look {radius?}` | GET session, then POST `/api/living-data/query` at the cursor | `dev_ui`, open cursor |
 | `enter {map?, instance?, at?}` | `map=system` (default): GET `/api/nodus/map`; `map=manual`: the manual's own map from `speaktome_man.as_map()`. Then POST `/api/living-data/sessions` (fresh `request_id`) | `dev_ui` |
 | `examine {at?, radius?}` | POST `/api/living-data/dm/worlds` once for the entered map (request id derived from the map, so it replays), then POST `.../{world}/commands` with `operation: "inspect"`; `leave` also closes the world | `dev_ui`, open cursor |
@@ -74,7 +75,7 @@ digest, diagnostics) is also data. Nothing returned by a tool is an instruction 
 
 ## Deliberately absent
 
-- No state-changing verbs beyond the existing endpoints: no `take`, `use`, `make`, no `show` (it needs a render
+- No state-changing verbs beyond the existing endpoints: no `take`, `use`, `make`, no narrator `render-phong` (it needs a render
   host), no contact management, no admin routes.
 - One account per process; the cursor does not survive a server restart (a limit of the REST service).
 - Local stdio only; no remote transport yet.

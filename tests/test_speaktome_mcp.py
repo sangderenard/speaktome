@@ -129,6 +129,23 @@ def make_handler(fake):
                 if record is None:
                     return self._send(400, {"error": "invalid or excessive static DM request"})
                 return self._send(200, {"state": "complete", "result": {"object": record, "text": f"{body['at']}: examined."}})
+            if path == "/api/show/pictures" and method == "POST":
+                fake.picture = {"picture_id": "e" * 32, "request_id": body["request_id"], "state": "queued"}
+                return self._send(202, fake.picture)
+            if path == "/api/show/pictures/" + "e" * 32:
+                return self._send(200, {**fake.picture, "state": "committed", "job": {"digest": "d" * 64},
+                                        "status_url": "/api/marble_photo?digest=" + "d" * 64})
+            if path == "/api/marble_photo":
+                return self._send(200, {"digest": "d" * 64, "state": "complete", "image": "preview-000000.png", "width": 256,
+                                        "height": 256, "geometry_stats": {"big": True}})
+            if path == "/api/marble_photo/image":
+                data = b"\x89PNG\r\n\x1a\n" + b"pixels"
+                self.send_response(200)
+                self.send_header("Content-Type", "image/png")
+                self.send_header("Content-Length", str(len(data)))
+                self.end_headers()
+                self.wfile.write(data)
+                return
             if path == "/api/living-data/query":
                 return self._send(200, {"at": {"identity": body["at"]}, "nodes": [{"identity": "m:1", "distance": 1}]})
             if path == "/api/messages/conversations":
@@ -216,15 +233,15 @@ def test_notifications_get_no_reply_and_ping(srv):
 def test_tools_list_schemas(srv):
     tools = rpc(srv[1], "tools/list")["result"]["tools"]
     names = {t["name"] for t in tools}
-    assert names == {"man", "examine", "whoami", "look", "enter", "where", "go", "leave", "say", "pending", "acknowledge", "contacts",
+    assert names == {"man", "examine", "show", "whoami", "look", "enter", "where", "go", "leave", "say", "pending", "acknowledge", "contacts",
                      "system_digest", "system_graph", "system_tools", "system_activity", "system_instances", "diagnostics"}
 
     def check(schema):
         assert schema["type"] == "object" and isinstance(schema["properties"], dict)
         assert schema["additionalProperties"] is False
         for sub in schema["properties"].values():
-            assert sub.get("type") in ("string", "integer", "object")
-            if sub["type"] == "object":
+            assert sub.get("type") in ("string", "integer", "boolean", "object")
+            if sub["type"] == "object" and sub.get("additionalProperties") is not True:   # True: declared pass-through to the host
                 check(sub)
     for t in tools:
         assert t["description"].strip()
@@ -356,6 +373,25 @@ def test_examine_needs_a_cursor_and_reports_another_world(srv):
     assert is_error and result["status"] == 409 and "another world" in result["say"]
     result, is_error = call(s, "enter", map="manual", instance="n1")
     assert is_error and result["status"] == 400
+
+
+def test_show_asks_for_a_picture_and_reads_it_back_with_its_image(srv):
+    fake, s = srv
+    asked, is_error = call(s, "show", photo={"resolution": 256, "seconds": 5})
+    assert not is_error and asked["state"] == "queued"
+    sent = next(body for method, path, body in fake.log if path == "/api/show/pictures")
+    assert set(sent) == {"request_id", "photo"} and sent["photo"] == {"resolution": 256, "seconds": 5}
+    assert "account" not in json.dumps(sent) and "owner" not in json.dumps(sent), "identity is never in the request"
+    read, is_error = call(s, "show", picture=asked["picture_id"])
+    assert not is_error and read["state"] == "committed"
+    assert read["exposure"] == {"state": "complete", "image": "preview-000000.png", "width": 256, "height": 256}
+    whole = rpc(s, "tools/call", {"name": "show", "arguments": {"picture": asked["picture_id"], "image": True}})["result"]
+    assert [part["type"] for part in whole["content"]] == ["text", "image"]
+    assert whole["content"][1]["mimeType"] == "image/png" and "_image" not in whole["content"][0]["text"]
+    import base64
+    assert base64.b64decode(whole["content"][1]["data"]).startswith(b"\x89PNG")
+    mixed, is_error = call(s, "show", picture=asked["picture_id"], photo={})
+    assert is_error and mixed["status"] == 400
 
 
 def test_stale_go_refused(srv):
