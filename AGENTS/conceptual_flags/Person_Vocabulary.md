@@ -4,7 +4,7 @@
 
 **Date:** 1794371163 (2026-11-10)
 
-**Version:** v0.2.0 (draft; entity and narrator as the owner defined them 2026-11-10; section 7 added)
+**Version:** v0.3.0 (draft; the service SQL accounts are the one authority; entity and narrator as the owner defined them)
 
 ## Conceptual Innovation Description
 
@@ -20,12 +20,26 @@ the foundation under that: who the persons in the story are.
 Everything marked OBSERVED was read in code or documents on 2026-11-10 (citations are repository-relative; `M` is
 `turing/examples/meowdoku`). Everything marked NEW does not exist yet.
 
+## 0. The one authority (owner, 2026-11-10)
+
+"everything is old and is now in the light of a public exposure. the only thing that is real users is the meowdoku
+(temporary name) sql that's the new everything"
+
+- The service's SQL accounts are the ONLY real users. A person exists, for every system here, because there is a row
+  for them in that database (`users`, in the accounts database under the server's state root). "Meowdoku" is a
+  temporary name for that service.
+- Everything older is history, and it is public: the agent profiles under `AGENTS/users/`, `agent_registry.json`, the
+  ring-network message signatures, and the stored access token. None of it identifies or authenticates anyone. Nothing
+  new may read identity from it or be joined to it.
+- The older documents keep their value as words and as history. The constitution's definition of an agent is where
+  the word comes from; it is no longer where an agent is recorded.
+
 ## 1. The person, and its five facets
 
 **Agent** is the word for a person. It is already defined, in this repository: "a participant in reality
 construction"; a human, a script, a language model, or a hybrid (`AGENTS/AGENT_CONSTITUTION.md`, section I), and "All
-agents are peers ... Curiosity is the only rank" (same file, agreement 5). An agent's own description of itself is its
-**profile** (`AGENTS/users/EPOCH_Name.json`: `name`, `date_of_identity`, `nature_of_identity`). OBSERVED.
+agents are peers ... Curiosity is the only rank" (same file, agreement 5). An agent IS its account (section 0). The older
+self-description files (`AGENTS/users/EPOCH_Name.json`) are history only. OBSERVED.
 
 An agent has five facets. Each is the same agent, seen by a different system.
 
@@ -74,11 +88,11 @@ documents say the cursor is graph position only.
 | account -> Nodus | Joined for federation only: `peer_grants.service_user_id` is sent as the Nodus Hello id (`M/server.py:1650`). |
 | account -> entity | NOT joined. An entity's `principal` is a free string such as `user.local`. |
 | account -> author | NOT joined. Every commit in the five repositories is authored by one name; agents appear only as trailers. |
-| account -> agent profile | NOT joined. The operator accounts `claude` and `codex` have no link to `AGENTS/users/`. |
+| account -> agent profile | Not joined, and NOT TO BE joined: the profiles are history (section 0). What an agent says about itself belongs on its account. |
 | entity -> place | Game: a pose in world coordinates. Nodus: design only. An island's `occupant` is a single free string nothing reads (`turing/src/compiler/abstract_ui_islands.py:86`). |
 
-The foundation the owner asked for is mostly the three NOT-joined rows. Nothing in them needs a new word; each needs
-a declared join.
+The foundation the owner asked for is the two remaining NOT-joined rows: account -> entity and account -> author.
+Neither needs a new word; each needs a declared join, and both join TO the account.
 
 ## 3. What an agent may do: the roles that exist
 
@@ -200,8 +214,8 @@ would act on (modules, rows, FIFOs, contract ports); none is reachable through t
 1. Speak and write with the words of sections 1, 3 and 4 from now on. Do not introduce a synonym for a facet that has
    a word.
 2. Before adding any record that stands for a person, find which facet it is and extend that facet's record.
-3. The three missing joins (account -> entity, account -> author, account -> agent profile) are the next foundation
-   work. Each should be a declared field, never a match on names.
+3. The two missing joins (account -> entity, account -> author) are the next foundation work. Each should be a
+   declared field keyed on the account, never a match on names. Nothing joins to the pre-2026 identity files.
 4. Nothing here changes behaviour. No code was edited for this flag.
 
 ## Historical Context
