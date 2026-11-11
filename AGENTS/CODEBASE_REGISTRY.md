@@ -10,6 +10,7 @@ This document lists the independent project directories maintained in this repos
 - **fontmapper** — ASCII rendering and font mapping experiments. The v2
   modules live alongside the legacy `FM16` folder.
 - **tensors** — tensor backends and abstraction layer.
+- **speaktome_api** - standard-library REST contracts shared with the existing Turing service; see its README for backend ownership and rollout.
 
 - **wheelhouse** — minimal wheelhouse builder with Git-LFS avoidance scripts.
 
