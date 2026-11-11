@@ -121,9 +121,10 @@ def _sources():
     if not base.is_file():
         return None
     texts = [base.read_text(encoding="utf-8", errors="replace")]
-    reviews = base.with_name("branch_review.py")
-    if reviews.is_file():
-        texts.append(reviews.read_text(encoding="utf-8", errors="replace"))
+    for delegate in ("branch_review.py", "file_index.py"):       # route functions the server hands whole paths to
+        module = base.with_name(delegate)
+        if module.is_file():
+            texts.append(module.read_text(encoding="utf-8", errors="replace"))
     for name in ("routes.py", "reports.py"):
         texts.append((ROOT / "speaktome_api" / name).read_text(encoding="utf-8", errors="replace"))
     return texts
