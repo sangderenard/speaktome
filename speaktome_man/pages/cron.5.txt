@@ -98,6 +98,20 @@ NOTES
                              jobs, are left out; they are a different
                              policy.
 
+       A task need not be on the schedule. Anything that can reach the
+       table may ask for one task once, when an event happens: it
+       writes the same kind of request and submits one contract. That
+       is how the system tells every admin that a restart is coming
+       (system.broadcast).
+
+       The user list is a table of its own, named userlist. It receives
+       search terms and its finished output is every identity that
+       matched (identity.search); another of its tools represents one
+       identity (identity.represent). A term is role:admin,
+       kind:person, kind:service, or text found in a name. A broadcast
+       finds its audience by asking that table. The list is for the
+       system's use; no route hands it to people.
+
        The table is read when the canvas host starts. A table that
        cannot be read leaves the tool off, with the reason in cron.log;
        the canvas host and its other services start regardless.

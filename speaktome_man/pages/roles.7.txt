@@ -45,7 +45,9 @@ DESCRIPTION
        start:
 
            GET  /api/control/instances
-           POST /api/control/instances {instance, action, reason?}
+           POST /api/control/instances {instance, action, reason?,
+                                        delay?}
+           POST /api/control/instances/cancel {id}
 
        The action is restart, shutdown or start, and the instance is a
        name or * for all of them. The request is recorded with who
@@ -54,6 +56,12 @@ DESCRIPTION
        instance to agree: one that does not stop when asked is killed.
        A shutdown lasts until a start request or the next start of the
        whole stack.
+
+       With a delay, in seconds, the request is a countdown. Nodus
+       tells every admin that it will happen, and anyone who may make
+       such a request may interrupt it with cancel until it runs out.
+       The interruption is announced the same way. In the messenger the
+       announcement carries an Interrupt button.
 
    Refusal
        A request without the capability is refused by the server with
