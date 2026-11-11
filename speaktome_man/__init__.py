@@ -100,5 +100,43 @@ def index(keyword: str | None = None) -> list:
     return rows
 
 
+ROOT = "manual:speaktome"
+KINDS = {"1": "verb", "5": "format", "7": "concept"}
+
+
+def place(found: Page) -> str:
+    """The identity of a page's place on the manual's map."""
+    return f"{ROOT}/{found.section}/{found.file}"
+
+
+def as_map() -> dict:
+    """The manual as a map of the form the living data endpoints accept (``abstract-ui-div-map-v0``).
+
+    The same form the service gives a Nodus canvas: the map's identity is the root, every other place is a flat
+    entry of ``regions``, and every relationship is a ``tracks`` record. A section is a place contained by the
+    manual; a page is a place contained by its section; each SEE ALSO reference is a ``see-also`` track from page to
+    page. Each page is also an object of ``world.objects`` under the same identity, and that object is the page's
+    whole record, so the narrator's ``inspect`` returns the text.
+    """
+    everything = pages()
+    regions, tracks, objects = [], [], []
+    for section, name in SECTIONS.items():
+        identity = f"{ROOT}/{section}"
+        regions.append({"identity": identity, "kind": "section", "name": name, "buildings": []})
+        tracks.append({"source": identity, "target": ROOT, "relationship": "contained-by"})
+    for found in everything:
+        identity, kind = place(found), KINDS[found.section]
+        targets = [place(page(name, section)) for name, section in found.references()]
+        regions.append({"identity": identity, "kind": kind, "name": found.names[0], "buildings": []})
+        tracks.append({"source": identity, "target": f"{ROOT}/{found.section}", "relationship": "contained-by"})
+        tracks.extend({"source": identity, "target": target, "relationship": "see-also"} for target in targets)
+        objects.append({"identity": identity, "kind": kind, "name": found.names[0], "names": list(found.names),
+                        "section": found.section, "summary": found.summary, "status": found.part("STATUS"),
+                        "text": found.render(),
+                        "dependencies": [{"target": target, "relationship": "see-also"} for target in targets]})
+    return {"schema": "abstract-ui-div-map-v0", "identity": ROOT, "kind": "manual", "name": TITLE,
+            "regions": regions, "tracks": tracks, "world": {"objects": objects}}
+
+
 def listing(rows: list) -> str:
     return "\n".join(f"{row['name'] + '(' + row['section'] + ')':<24}- {row['summary']}" for row in rows)

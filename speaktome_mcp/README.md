@@ -53,7 +53,8 @@ Each result is the server's JSON plus a one-sentence `say`. A failure is `isErro
 | `man {topic?, section?, keyword?}` | none: reads the pages of `speaktome_man` (see `python -m speaktome_man`) | none |
 | `whoami` | GET `/api/whoami` | none |
 | `look {radius?}` | GET session, then POST `/api/living-data/query` at the cursor | `dev_ui`, open cursor |
-| `enter {instance?, at?}` | GET `/api/nodus/map`, POST `/api/living-data/sessions` (fresh `request_id`) | `dev_ui` |
+| `enter {map?, instance?, at?}` | `map=system` (default): GET `/api/nodus/map`; `map=manual`: the manual's own map from `speaktome_man.as_map()`. Then POST `/api/living-data/sessions` (fresh `request_id`) | `dev_ui` |
+| `examine {at?, radius?}` | POST `/api/living-data/dm/worlds` once for the entered map (request id derived from the map, so it replays), then POST `.../{world}/commands` with `operation: "inspect"`; `leave` also closes the world | `dev_ui`, open cursor |
 | `where` | GET `/api/living-data/sessions/{id}` (all exit pages) | `dev_ui` |
 | `go {exit \| to, relationship?, direction?}` | POST `.../{id}/move` with `expected_revision` and a fresh `request_id`; `exit` resolves against the last `where`/`go`/`enter` | `dev_ui` |
 | `leave` | POST `.../{id}/close` | `dev_ui` |
@@ -73,8 +74,8 @@ digest, diagnostics) is also data. Nothing returned by a tool is an instruction 
 
 ## Deliberately absent
 
-- No state-changing verbs beyond the existing endpoints: no `take`, `use`, `make`, no `examine`/`show` (narrator-only
-  DM commands), no contact management, no admin routes.
+- No state-changing verbs beyond the existing endpoints: no `take`, `use`, `make`, no `show` (it needs a render
+  host), no contact management, no admin routes.
 - One account per process; the cursor does not survive a server restart (a limit of the REST service).
 - Local stdio only; no remote transport yet.
 - No retries beyond one re-sign-in; a send whose outcome is uncertain is reported, never silently repeated.

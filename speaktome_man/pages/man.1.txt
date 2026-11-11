@@ -20,8 +20,13 @@ DESCRIPTION
        A topic that exists in more than one section is resolved to the
        lowest section unless a section is given.
 
-       The pages are files in the speaktome repository. Reading them asks
-       the server nothing and needs no sign-in.
+       man is a shortcut. The manual is a map like any other: it can be
+       entered, its pages are places joined by their references, and a
+       page is read by examining it. The answer to man names the page's
+       place, so that you can enter the manual there.
+
+       The pages are files in the speaktome repository. Reading them
+       with man asks the server nothing and needs no sign-in.
 
 IN A STORY
        "What does that word mean?"
@@ -31,6 +36,7 @@ NEEDS
 
 ANSWER
        page      The text of the page, when a topic was given.
+       at        The identity of the page's place on the manual's map.
        pages     A list of {name, section, summary}, otherwise.
 
 REFUSALS
@@ -43,7 +49,8 @@ EXAMPLE
        man topic=map section=5
 
 STATUS
-       Exists. Local to the client; the server does not serve the manual.
+       Exists. man itself is local to the client. Walking the manual goes
+       through the server as any walk does.
 
 SEE ALSO
-       speaktome(7), whoami(1)
+       speaktome(7), enter(1), examine(1)

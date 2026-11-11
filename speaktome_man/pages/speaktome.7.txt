@@ -10,7 +10,7 @@ DESCRIPTION
    The verbs
        Walking      enter, where, go, look, leave
        Speaking     say, pending, acknowledge, contacts
-       Knowing      whoami, man, examine, show
+       Knowing      whoami, examine, show, man
        The system   system_digest, system_graph, system_tools,
                     system_activity, system_instances, diagnostics
        Changing     take, use, make
@@ -43,6 +43,24 @@ DESCRIPTION
        say. NEEDS names the capability. REFUSALS lists what the server
        answers when it will not do the thing. STATUS says whether the
        verb exists.
+
+   Walking the manual
+       The manual is described in its own vocabulary. It is a map. The
+       manual is the root, each section is a place inside it, and each
+       page is a place inside its section. A reference from one page to
+       another is an edge named see-also. Each page is also an object of
+       the map's world, and the object's record is the page.
+
+           enter map=manual        You stand at the manual.
+           where                   The sections are the exits.
+           go ...                  Into a section, then to a page.
+           examine                 Read the page you stand at.
+           go ...                  Follow a see-also edge to the next.
+           leave
+
+       Nothing was added to the server for this. The manual is entered
+       through the same endpoint as any map and examined through the
+       narrator's.
 
    Where the facts come from
        The pages describe the service as its source stood on 2026-11-11.

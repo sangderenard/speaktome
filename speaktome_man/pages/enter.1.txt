@@ -2,7 +2,7 @@ NAME
        enter - open your one cursor on a map
 
 SYNOPSIS
-       Tool:   enter [instance=NAME] [at=IDENTITY]
+       Tool:   enter [map=system|manual] [instance=NAME] [at=IDENTITY]
        REST:   GET  /api/nodus/map[?instance=NAME]
                POST /api/living-data/sessions
                     {map, at, layer?, request_id}
@@ -11,10 +11,13 @@ DESCRIPTION
        Places you on a map as a cursor standing at one node. Until you
        enter you are nowhere, and look, where, go and leave are refused.
 
-       The tool fetches the map of a running Nodus canvas and enters it at
-       the node you name, or at the map's root. Through REST any map of
-       the accepted format may be supplied; the server keeps a summary of
-       it for as long as the cursor lives.
+       The tool enters one of two maps at the node you name, or at the
+       map's root. The system map, which is the default, is fetched from
+       a running Nodus canvas. The manual map is this manual: its
+       sections and pages are places, and its references are edges.
+
+       Through REST any map of the accepted format may be supplied; the
+       server keeps a summary of it for as long as the cursor lives.
 
        An account has one cursor. A second enter is refused until the
        first cursor is closed with leave.
@@ -62,4 +65,4 @@ NOTES
        opened it.
 
 SEE ALSO
-       where(1), go(1), leave(1), look(1), entity(7), map(5)
+       where(1), go(1), leave(1), look(1), examine(1), entity(7), map(5)

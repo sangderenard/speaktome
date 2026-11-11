@@ -96,9 +96,30 @@ def test_unknown_page_names_the_nearest():
     assert "enter" in failure.value.nearest
 
 
+def test_the_manual_is_a_map():
+    document = manual.as_map()
+    assert document["schema"] == "abstract-ui-div-map-v0" and document["identity"] == manual.ROOT
+    places = [region["identity"] for region in document["regions"]]
+    assert len(places) == len(set(places)) == len(manual.SECTIONS) + len(PAGES)
+    known = set(places) | {manual.ROOT}
+    for track in document["tracks"]:
+        assert track["source"] in known and track["target"] in known
+        assert track["relationship"] in ("contained-by", "see-also")
+    contained = {t["source"]: t["target"] for t in document["tracks"] if t["relationship"] == "contained-by"}
+    assert set(contained) == set(places), "every place is contained by exactly one place"
+    objects = {o["identity"]: o for o in document["world"]["objects"]}
+    assert len(objects) == len(PAGES)
+    for page in PAGES:
+        record = objects[manual.place(page)]
+        assert contained[manual.place(page)] == f"{manual.ROOT}/{page.section}"
+        assert record["text"] == page.render() and record["kind"] == manual.KINDS[page.section]
+        assert len(record["dependencies"]) == len(page.references())
+    json.dumps(document)
+
+
 def test_tool_returns_a_page():
     result, is_error = _call({"topic": "go"})
-    assert not is_error and result["section"] == "1"
+    assert not is_error and result["section"] == "1" and result["at"] == manual.place(manual.page("go"))
     assert result["page"].startswith("GO(1)") and "SEE ALSO" in result["page"]
 
 

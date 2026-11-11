@@ -46,5 +46,31 @@ Honest limits:
 - The roles page names the capabilities the verbs need. The full table of which role and which network origin grants
   what is in turing's `authz.py` and is not repeated.
 
+## Second pass, same day: the manual in the system's own vocabulary
+The owner corrected the first pass: the man pages were meant in the vocabulary of the system. The first pass was a
+Unix-style reader beside the system. The manual is now also a place in it.
+
+- `speaktome_man.as_map()` gives the manual as an `abstract-ui-div-map-v0` map, in the same form the service gives a
+  Nodus canvas (flat `regions`, relationships as `tracks`). The manual is the root; a section is a place contained by
+  it; a page is a place contained by its section; each SEE ALSO reference is a `see-also` track. Each page is also an
+  object of `world.objects` under the same identity, and the object's record holds the page text.
+- `enter map=manual` enters it through the existing cursor endpoint. `where` and `go` walk it unchanged.
+- `examine` is a new tool over the existing narrator endpoints: it registers the entered map as the account's world
+  once, sends `inspect`, and `leave` closes the world. The registration's request id is derived from the map, so the
+  same map replays to the same world. On the manual the record is the page; on the Nodus canvas it is the place's
+  kept fields (identity, kind, name).
+- Nothing was added to the server.
+
+Run against the live service as `claude`: enter map=manual (3 exits: Verbs, Formats, Concepts), go to Verbs (19
+exits), go to the page `go` (9 exits: its section and its see-also edges both ways), examine (the page text came back
+from the server in `object.text`), examine a section (kept fields only), leave; then enter the Nodus canvas, go to
+`market`, examine, leave. All answered; stderr empty. This is also the first run of `inspect` from this lane, which
+the first pass had documented from source only. Tests: 85 passed.
+
+Still true: `show` is documented from source only and has no tool; the `man` tool and `python -m speaktome_man`
+remain as shortcuts that read the same pages without the server.
+
 ## Prompt History
 Owner: "hey let's also take a crack at man pages"
+
+Owner: "in the vocabulary of the system i mean"

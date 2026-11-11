@@ -2,21 +2,38 @@ NAME
        examine - read one object's exact record
 
 SYNOPSIS
+       Tool:   examine [at=IDENTITY] [radius=0..4]
        REST:   POST /api/living-data/dm/worlds
                     {map, source_sha256, renderer_identity, request_id}
                POST /api/living-data/dm/worlds/{world}/commands
                     {request_id, operation: "inspect", at?, layer?,
                      radius?, limit?, offset?, edge_offset?}
+               POST /api/living-data/dm/worlds/{world}/close {}
 
 DESCRIPTION
        Where look reads a neighbourhood in summary, examine returns the
        whole record of one object as the map holds it, together with the
        references around it.
 
-       examine is a narrator's verb. The narrator first registers a map
-       as a world, and then examines objects of that world. An account
-       holds one world at a time. The layer is world or layout and
-       defaults to world; at defaults to the world's root.
+       examine is a narrator's verb. The narrator registers a map as a
+       world, and then examines objects of that world. An account holds
+       one world at a time. The layer is world or layout and defaults to
+       world; at defaults to the world's root.
+
+       The whole record is kept only for the objects of the map's world.
+       A place that is not also an object is examined in the layout
+       layer, which returns the fields the server keeps for a place:
+       its identity, kind and name, and a few others if it has them.
+
+       The tool examines the place you stand at, or a place you name on
+       the map you entered. The first examine registers that map as your
+       world; leave closes the world with the cursor. Registering the
+       same map again returns the same world, so a process that stopped
+       without leaving does not block the next one on that map.
+
+       On the manual's map every page is an object, and its record holds
+       the text of the page. To read the manual is to walk to a page and
+       examine it.
 
        The command carries a request_id. Repeating it with the same id
        returns the first answer, marked replayed.
@@ -25,7 +42,8 @@ IN A STORY
        "Examine the lantern."
 
 NEEDS
-       The dev_ui capability and a signed-in account.
+       The dev_ui capability and a signed-in account. The tool also needs
+       an open cursor.
 
 ANSWER
        object       The exact registered record of the object.
@@ -36,13 +54,22 @@ ANSWER
 
 REFUSALS
        404  static world not found
+       409  close your registered static world before replacing it
+                 The account holds a world made from another map. It is
+                 forgotten after 15 minutes unused.
        409  request_id reused with different command
        413  analytic object response exceeds 2 MiB
        429  command receipt capacity reached; close and reattach world
                  A world keeps 32 command receipts.
+       409  no open cursor in this process      (tool) Use enter first.
+
+EXAMPLE
+       enter map=manual at=manual:speaktome/1/go
+       examine
+           go: 6 declared graph references within 1 hops.
 
 STATUS
-       Exists over REST, for the narrator. No tool offers it yet.
+       Exists.
 
 SEE ALSO
-       look(1), show(1), narrator(7)
+       look(1), show(1), enter(1), man(1), narrator(7)
