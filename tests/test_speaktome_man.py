@@ -77,10 +77,16 @@ def test_a_verb_page_states_a_tool_form_exactly_when_a_tool_exists():
 
 def test_planned_verbs_are_not_tools_and_say_so():
     tools = _tools()
-    for verb in ("take", "use", "make"):
+    for verb in ("take", "use"):
         page = manual.page(verb, "1")
         assert page.part("STATUS").strip().startswith("Planned.")
         assert verb not in tools
+
+
+def test_make_is_bounded_to_experience_reports():
+    assert "make" in _tools()
+    assert "experience reports" in manual.page("make", "1").part("STATUS")
+    assert "General graph mutation remains planned" in manual.page("make", "1").part("STATUS")
 
 
 def test_lowest_section_wins_and_a_section_can_be_asked_for():

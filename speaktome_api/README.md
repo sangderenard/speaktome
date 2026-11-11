@@ -16,7 +16,12 @@ package, tensors, Turing, Nodus or a machine engine. The existing host calls:
 - `living_data_cursor_route`: `/api/living-data/sessions` graph navigation.
 - `living_data_query_route`: the existing read-only map query endpoint.
 
-`API_VERSION = 1` describes the host-to-handler binding, not a new URL version.
+`API_VERSION = 3` describes the host-to-handler binding, not a new URL version.
+Version 3 adds per-conversation image consent and authenticated PNG responses.
+Its messaging dependency supplies `MAX_IMAGE_REQUEST`, `image_status`,
+`image_consent`, `image_bytes`, and the optional `image` send argument. Deploy
+with the matching Turing host binding and messaging source. PNG bytes remain in
+the existing account-bound messaging store, never the static web directory.
 URLs, payloads, response codes and limits retain their existing meanings. The
 extraction preserves the old function bodies apart from dependency arguments.
 
@@ -99,3 +104,24 @@ messaging, client, authz, proxy trust, public-login, graph navigation and static
 DM HTTP tests exercise the actual adapter with temporary databases and
 ephemeral loopback listeners. Set `SPEAKTOME_REPO` to the checkout under test.
 Those checks do not establish a public TLS connection or live deployment.
+
+## Account-owned experience reports
+
+`reports.py` owns a separate version-1 guestbook HTTP contract, using the
+existing host identity/capability hooks and its Accounts-bound SQL service.
+`POST /api/reports` is the bounded `make` operation; `GET /api/reports/{id}`
+is exact `examine`; `/api/reports` lists summaries and `/api/reports/map`
+projects them into the existing Living Data map format for ordinary navigation.
+The host injects storage and exceptions. Request data cannot choose an owner,
+database, role, host path, backend or callable.
+
+This is a new SQL form of the original DOC/TTICKET/AUDIT/LOG guestbook, not
+the incident-ticket API. Explicit prompt history is preserved verbatim and
+next-step rows are committed with the immutable report. No automatic import
+or diagnostic capture, attachment upload, execution or public sharing occurs.
+Read and write both require `dev_ui` and a current authenticated session.
+Only the owner can read a report; there is no new admin or LAN bypass.
+Mutations have caller-chosen request ids, bounded JSON and same-origin checks.
+The route remains dormant until the matching source pair is deployed through
+the existing coordinated service lifecycle. Do not initialize live SQL merely
+to test this contract.

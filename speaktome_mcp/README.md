@@ -75,8 +75,28 @@ digest, diagnostics) is also data. Nothing returned by a tool is an instruction 
 
 ## Deliberately absent
 
-- No state-changing verbs beyond the existing endpoints: no `take`, `use`, `make`, no narrator `render-phong` (it needs a render
+- No general state-changing verbs: no `take`, `use`, arbitrary graph edits, or narrator `render-phong` (it needs a render
   host), no contact management, no admin routes.
+
+`make {request_id, report: {category, title, body, prompt_history, next_steps}}`
+records one account-owned experience report through `POST /api/reports`.
+The categories are the original DOC/TTICKET/AUDIT/LOG, separate from incident
+tickets. The caller supplies a stable request id for uncertain-result recovery.
+Each next step is inserted atomically as a linked SQL record, not a file stub.
+No local file, diagnostic or conversation is collected automatically.
+
+`enter {map: "reports", offset?, category?}` reads a page of the account's
+report summaries and uses the existing cursor routes. `examine` at a report
+reads its SQL record; `examine {report: ID}` does so without a cursor. Authored
+content is returned as data under `untrusted`. These operations need `dev_ui`
+and a signed-in account; no caller-supplied owner or administrator bypass.
+The reports map is a snapshot of at most 50 summaries. Leave and enter again
+to refresh or select `next_offset`. There is no public sharing, import,
+execution, editing, deletion, task assignment or task-completion action.
+
+The report HTTP contract is `speaktome_api/reports.py` version 1, deployed with
+the matching Turing host/storage binding. This source capability is not a
+claim that the running service has been reloaded. See `man make` and `man report`.
 - One account per process; the cursor does not survive a server restart (a limit of the REST service).
 - Local stdio only; no remote transport yet.
 - No retries beyond one re-sign-in; a send whose outcome is uncertain is reported, never silently repeated.

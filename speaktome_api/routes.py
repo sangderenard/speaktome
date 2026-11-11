@@ -10,7 +10,7 @@ from __future__ import annotations
 from http import HTTPStatus
 # --- END HEADER ---
 
-API_VERSION = 2   # 2: picture_route (show, with a camera), site_route and the site module (a map as pages)
+API_VERSION = 3   # 3: bounded PNG messages and per-chat image consent; retains picture/site bindings from 2.
 
 
 def messages_route(self, path: str, method: str, *, messaging, accounts_db) -> None:
@@ -26,7 +26,7 @@ def messages_route(self, path: str, method: str, *, messaging, accounts_db) -> N
         if not (self.headers.get("Content-Type") or "").lower().startswith("application/json"):
             self.close_connection = True
             return self._json({"error": "JSON only"}, HTTPStatus.UNSUPPORTED_MEDIA_TYPE)
-        body = self._body_json(16384)
+        body = self._body_json(messaging.MAX_IMAGE_REQUEST if path == "/api/messages/send" else 16384)
         if body is None:
             return
     db = messaging.connect(accounts_db)
@@ -38,6 +38,27 @@ def messages_route(self, path: str, method: str, *, messaging, accounts_db) -> N
                 return self._json(messaging.conversations(db, me))
             if method == "GET" and path == "/api/messages/contacts":
                 return self._json(messaging.contacts(db, me))
+            if path in ("/api/messages/images", "/api/messages/image"):
+                if not self._is_secure():
+                    return self._json({"error": "HTTPS required"}, HTTPStatus.FORBIDDEN)
+                if method == "GET" and path == "/api/messages/images":
+                    return self._json(messaging.image_status(db, me, query.get("peer")))
+                if method == "POST" and path == "/api/messages/images":
+                    if set(body) != {"conversation_handle", "enabled"}:
+                        return self._json({"error": "provide conversation_handle and enabled only"}, HTTPStatus.BAD_REQUEST)
+                    return self._json(messaging.image_consent(db, me, body["conversation_handle"], body["enabled"]))
+                if method == "GET" and path == "/api/messages/image":
+                    raw = messaging.image_bytes(db, me, query.get("id"))
+                    self.send_response(HTTPStatus.OK)
+                    self.send_header("Content-Type", "image/png")
+                    self.send_header("Content-Length", str(len(raw)))
+                    self.send_header("Cache-Control", "private, no-store")
+                    self.send_header("X-Content-Type-Options", "nosniff")
+                    self.send_header("Content-Security-Policy", "default-src 'none'; sandbox")
+                    self.send_header("Cross-Origin-Resource-Policy", "same-origin")
+                    self.end_headers()
+                    self.wfile.write(raw)
+                    return
             if method == "GET" and path == "/api/messages/thread":
                 before = query.get("before")
                 return self._json(messaging.thread(db, me, query.get("peer"), int(before) if before else None,
@@ -70,7 +91,7 @@ def messages_route(self, path: str, method: str, *, messaging, accounts_db) -> N
                         return self._json({"error": "provide a conversation_handle and no recipient name"}, HTTPStatus.BAD_REQUEST)
                 return self._json(messaging.send(db, me, body.get("to"), body.get("body"), subject=body.get("subject"),
                                                     msg_type=body.get("type"), conversation_handle=body.get("conversation_handle"),
-                                                    idempotency_key=body.get("idempotency_key")))
+                                                    idempotency_key=body.get("idempotency_key"), image=body.get("image")))
             if method == "POST" and path == "/api/messages/ack":
                 return self._json(messaging.ack(db, me, body.get("up_to")))
             if method == "POST" and path == "/api/messages/read":

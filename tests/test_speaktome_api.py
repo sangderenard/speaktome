@@ -66,7 +66,7 @@ class Host:
 class SharedRoutesTest(unittest.TestCase):
     def messaging(self):
         db = Mock()
-        backend = SimpleNamespace(connect=Mock(return_value=db), MessagingError=RouteError,
+        backend = SimpleNamespace(connect=Mock(return_value=db), MessagingError=RouteError, MAX_IMAGE_REQUEST=2828972,
                                   send=Mock(return_value={"ok": True}), contacts=Mock(return_value={"contacts": []}))
         return backend, db
 
@@ -105,9 +105,9 @@ class SharedRoutesTest(unittest.TestCase):
         self.assertEqual(self.message(host, backend, "POST"), (200, {"ok": True}))
         backend.connect.assert_called_once_with("existing-accounts.db")
         backend.send.assert_called_once_with(db, 7, None, "hi", subject=None, msg_type=None,
-                                            conversation_handle="handle", idempotency_key="same-key")
+                                            conversation_handle="handle", idempotency_key="same-key", image=None)
         db.close.assert_called_once()
-        self.assertEqual(host.body_limits, [16384])
+        self.assertEqual(host.body_limits, [backend.MAX_IMAGE_REQUEST])
 
     def test_secure_handle_routes_refuse_plaintext(self):
         for path, method, body in (("/api/messages/conversations", "GET", None),

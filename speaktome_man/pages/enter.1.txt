@@ -2,8 +2,11 @@ NAME
        enter - open your one cursor on a map
 
 SYNOPSIS
-       Tool:   enter [map=system|manual] [instance=NAME] [at=IDENTITY]
+       Tool:   enter [map=system|manual|reports] [at=IDENTITY]
+               system: [instance=NAME]
+               reports: [offset=N] [category=DOC|TTICKET|AUDIT|LOG]
        REST:   GET  /api/nodus/map[?instance=NAME]
+               GET  /api/reports/map[?offset=N&category=CATEGORY]
                POST /api/living-data/sessions
                     {map, at, layer?, request_id}
 
@@ -11,10 +14,13 @@ DESCRIPTION
        Places you on a map as a cursor standing at one node. Until you
        enter you are nowhere, and look, where, go and leave are refused.
 
-       The tool enters one of two maps at the node you name, or at the
+       The tool enters one of three maps at the node you name, or at the
        map's root. The system map, which is the default, is fetched from
        a running Nodus canvas. The manual map is this manual: its
        sections and pages are places, and its references are edges.
+       The reports map is a page of your SQL guestbook summaries, with
+       categories and reports as places. next_offset names another page;
+       leave before entering that page. Examine reads the full report.
 
        Through REST any map of the accepted format may be supplied; the
        server keeps a summary of it for as long as the cursor lives.
@@ -65,4 +71,4 @@ NOTES
        opened it.
 
 SEE ALSO
-       where(1), go(1), leave(1), look(1), examine(1), entity(7), map(5)
+       where(1), go(1), leave(1), look(1), examine(1), entity(7), report(5)

@@ -72,7 +72,7 @@ class Rest:
         return secret
 
     def _http(self, path: str, body=None, timeout: float = 40, secret: str | None = None, raw_limit: int | None = None):
-        data = None if body is None else json.dumps(body).encode("utf-8")
+        data = None if body is None else json.dumps(body, ensure_ascii=False).encode("utf-8")
         request = urllib.request.Request(self.base + path, data=data, method="GET" if body is None else "POST",
                                          headers={"Content-Type": "application/json"} if body is not None else {})
         try:

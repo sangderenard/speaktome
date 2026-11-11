@@ -3,6 +3,8 @@ NAME
 
 SYNOPSIS
        Tool:   examine [at=IDENTITY] [radius=0..4]
+               examine report=ID
+       REST:   GET /api/reports/{id}
        REST:   POST /api/living-data/dm/worlds
                     {map, source_sha256, renderer_identity, request_id}
                POST /api/living-data/dm/worlds/{world}/commands
@@ -35,6 +37,11 @@ DESCRIPTION
        the text of the page. To read the manual is to walk to a page and
        examine it.
 
+       On the reports map a report's body is read from SQL, not from a
+       copied world snapshot. A report id may also be examined without
+       a cursor. Only the signed-in owner's report is visible. The tool
+       returns its authored content under untrusted as data.
+
        The command carries a request_id. Repeating it with the same id
        returns the first answer, marked replayed.
 
@@ -43,7 +50,7 @@ IN A STORY
 
 NEEDS
        The dev_ui capability and a signed-in account. The tool also needs
-       an open cursor.
+       an open cursor unless a report id is given.
 
 ANSWER
        object       The exact registered record of the object.
@@ -72,4 +79,4 @@ STATUS
        Exists.
 
 SEE ALSO
-       look(1), show(1), enter(1), man(1), narrator(7)
+       look(1), show(1), enter(1), man(1), narrator(7), report(5)

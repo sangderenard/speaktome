@@ -233,14 +233,17 @@ def test_notifications_get_no_reply_and_ping(srv):
 def test_tools_list_schemas(srv):
     tools = rpc(srv[1], "tools/list")["result"]["tools"]
     names = {t["name"] for t in tools}
-    assert names == {"man", "examine", "show", "whoami", "look", "enter", "where", "go", "leave", "say", "pending", "acknowledge", "contacts",
+    assert names == {"man", "make", "examine", "show", "whoami", "look", "enter", "where", "go", "leave", "say", "pending", "acknowledge", "contacts",
                      "system_digest", "system_graph", "system_tools", "system_activity", "system_instances", "diagnostics"}
 
     def check(schema):
         assert schema["type"] == "object" and isinstance(schema["properties"], dict)
         assert schema["additionalProperties"] is False
         for sub in schema["properties"].values():
-            assert sub.get("type") in ("string", "integer", "boolean", "object")
+            assert sub.get("type") in ("string", "integer", "boolean", "object", "array")
+            if sub["type"] == "array":
+                assert sub["items"]["type"] == "string" and sub["maxItems"] <= 32
+                assert sub["items"]["maxLength"] <= 8192
             if sub["type"] == "object" and sub.get("additionalProperties") is not True:   # True: declared pass-through to the host
                 check(sub)
     for t in tools:

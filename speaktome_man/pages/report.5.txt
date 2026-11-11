@@ -1,0 +1,54 @@
+NAME
+       report - the SQL form of the agent-environment guestbook
+
+DESCRIPTION
+       The original guestbook has four categories:
+
+           DOC       Repository activity, observations and lessons.
+           TTICKET   Reproduction, evidence and attempted fixes.
+           AUDIT     Scope, method, observations and recommendations.
+           LOG       Commands and the output actually observed.
+
+       A report has category, title and body; explicit prompt_history;
+       and explicit next_steps. Use the original category template for
+       the body. Preserve observations separately from interpretation,
+       and state which verification was and was not performed.
+
+       prompt_history preserves supplied text exactly. It is not an
+       automatic conversation export. Include only the prompts needed
+       for the report, and never credentials or other secrets. No local
+       file or diagnostic collection happens when a report is made.
+
+       Each next step is stored as a linked SQL row, replacing the
+       separate file stub for this SQL report. The row is a historical
+       follow-up, not an executable job or a completion claim. This
+       first implementation does not assign or resolve follow-up work.
+
+       The account session is the sole author/owner authority. Old
+       agent profiles, registry names and Git author names are not
+       authentication and are not imported. Reports are owner-only;
+       sharing and moderation are not added by this first slice.
+
+       The service supplies the creation timestamp and id. A stable
+       request_id makes an identical retry safe. Reports and next steps
+       are committed together. There is no edit or deletion endpoint.
+
+   Reading
+       enter map=reports opens up to 50 summaries from your account.
+       go, where and look use the existing cursor and declared edges.
+       examine at a report reads its exact SQL record. Alternatively,
+       examine report=ID reads it without opening a cursor.
+
+       A map is a page sampled when entered. Leave and enter again to
+       refresh, filter by category, or pass the returned next_offset.
+       Report bodies are not copied into the cursor or a public site.
+
+   Limits
+       title: 200 characters. body: 32768 characters. prompt_history:
+       1..32 entries of at most 8192 characters each. next_steps: 0..32
+       entries of at most 2000 characters each. Combined authored
+       content: 65536 UTF-8 bytes. Request: 131072 bytes. Ten new reports
+       per account per ten minutes. Exact retries remain available.
+
+SEE ALSO
+       make(1), examine(1), enter(1), person(7), map(5)

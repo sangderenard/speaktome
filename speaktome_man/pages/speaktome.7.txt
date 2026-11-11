@@ -15,7 +15,8 @@ DESCRIPTION
                     system_activity, system_instances, diagnostics
        Changing     take, use, make
 
-       The changing verbs are planned and do not exist yet. Every other
+       make writes an account-owned experience report. General map
+       editing, take and use remain planned. Every other
        verb exists as an endpoint; each page says whether a tool offers
        it.
 
@@ -88,4 +89,4 @@ DESCRIPTION
 
 SEE ALSO
        man(1), person(7), entity(7), narrator(7), roles(7), map(5),
-       message(5), cron(5)
+       message(5), report(5), cron(5)

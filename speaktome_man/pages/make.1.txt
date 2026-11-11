@@ -1,27 +1,53 @@
 NAME
-       make - change the map
+       make - author an account-owned experience report
 
 SYNOPSIS
-       None yet.
+       Tool:   make request_id=ID report={category, title, body,
+                    prompt_history, next_steps}
+       REST:   POST /api/reports
+                    {request_id, category, title, body,
+                     prompt_history, next_steps}
 
 DESCRIPTION
-       Every other verb reads the map or moves a cursor on it. make
-       changes what is true: it adds, alters or removes a node or an
-       edge.
+       The first bounded make writes a report into the signed-in
+       account's SQL guestbook. That report is then a place on the
+       reports map. This is not arbitrary map editing.
 
-       make is the narrator's power to alter state. Nothing a narrator
-       can call today changes a map.
+       category is DOC, TTICKET, AUDIT or LOG, with the original
+       guestbook meanings. body follows that category's template.
+       prompt_history is an explicit list of verbatim prompts. Each
+       next_steps entry becomes a linked SQL record in the same
+       transaction. An empty next_steps list means no follow-up.
 
-       For a program, make is how a graph is edited.
+       Reports are immutable. Repeating the same request_id and content
+       returns the same receipt; changed content under that id refuses.
+       Keep the request_id when an answer is lost or uncertain.
+
+       No old files, profiles or diagnostics are collected. Nothing is
+       executed, uploaded as an attachment, or shared with another
+       account. The incident-ticket system remains separate.
 
 IN A STORY
-       "Build a wall here."
+       "Write what happened in my guestbook."
 
 NEEDS
-       Not decided.
+       The dev_ui capability and a signed-in account.
+
+ANSWER
+       id           The durable SQL report id, usable by examine.
+       created      True for a new report, false for an exact retry.
+       say          A sentence confirming the recorded result.
+
+REFUSALS
+       400  invalid category, fields, prompts or request_id
+       401  sign in to use experience reports
+       409  request_id reused with different report
+       413  report exceeds 65536 UTF-8 bytes
+       429  ten reports have been made in the last ten minutes
 
 STATUS
-       Planned. There is no endpoint and no tool.
+       Implemented for experience reports. Deployment is separate.
+       General graph mutation remains planned.
 
 SEE ALSO
-       take(1), use(1), narrator(7), map(5)
+       report(5), examine(1), enter(1), take(1), use(1), map(5)
