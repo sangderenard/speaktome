@@ -1,0 +1,45 @@
+NAME
+       groups - shared account places and flat memberships, not friends
+
+DESCRIPTION
+       A group is a named place with one owning account and a flat list
+       of accepted members. The owner may designate group administrators.
+       Group administrators may invite people and remove ordinary members;
+       only the owner may promote/demote group administrators. A system
+       admin role is not implicit membership or permission to republish.
+
+       GET /api/account/groups lists your memberships. POST with name and
+       request_id creates a group. GET /api/account/groups/{id} discloses
+       the member identities only to accepted members. No public account
+       or group-member directory is introduced.
+
+       POST /api/account/groups/{id}/invite takes a known username and a
+       required request_message. It returns an opaque acknowledgment for
+       unknown names as well, not evidence of membership or delivery.
+       GET /api/account/groups/invitations lists only your pending place
+       invitations, without the member roster or inviter account identity.
+       POST /api/account/groups/invitations/{id} with accept=true joins;
+       accept=false declines. An invitation from a removed/demoted group
+       administrator cannot be revived by re-promoting that administrator.
+
+       POST /api/account/groups/{id}/members takes an existing member's
+       username, role (member/admin, null to remove), and expected_revision.
+       POST /api/account/groups/{id}/leave with {} leaves immediately.
+       Read a fresh group revision after conflicting updates. The owner
+       cannot leave or transfer ownership through these operations.
+
+       These places are independent of the existing msg_contacts graph.
+       Joining never adds a friend, opens private messaging, approves image
+       exchange, or grants network/federation authority. The future private
+       partnership design requires a request message, mutual consent before
+       exposure, and a minimum wait before direct server-to-server activity.
+       That future wait is not selected or implemented by this change.
+
+       Each content service resolves its own authoritative owner and then
+       uses the shared content policy. This does not replace owned_assets,
+       alter a photo's job-owner cancellation rights, or import account
+       history from another identity. Personal is the safe default when
+       no sharing record exists. Public explicitly means Internet readers.
+
+SEE ALSO
+       report(5), person(7)

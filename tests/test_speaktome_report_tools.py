@@ -44,6 +44,19 @@ class ReportToolTests(unittest.TestCase):
             self.assertTrue(error)
         self.assertEqual(rest.calls, [])
 
+    def test_report_scope_schema_and_forwarding(self):
+        server=Server(Rest())
+        self.assertEqual(server.table['enter'][1]['properties']['scope']['enum'],['mine','shared','public','all'])
+        class StopRest(Rest):
+            def call(self,path,body=None,**kwargs):
+                self.calls.append((path,body))
+                raise RuntimeError('stop after first read')
+        for scope in ('mine','shared','public','all'):
+            rest=StopRest()
+            with self.assertRaises(RuntimeError): Tools(rest).enter(dict(map='reports',scope=scope))
+            self.assertEqual(rest.calls[0][0],'/api/reports/map?scope='+scope)
+        with self.assertRaises(ToolFail): Tools(Rest()).enter(dict(map='manual',scope='all'))
+
     def test_report_read_path_and_argument_validation(self):
         tools = Tools(Rest())
         for args in ({'report': '../x'}, {'report': 'a' * 32, 'at': 'elsewhere'}):

@@ -26,8 +26,10 @@ DESCRIPTION
 
        The account session is the sole author/owner authority. Old
        agent profiles, registry names and Git author names are not
-       authentication and are not imported. Reports are owner-only;
-       sharing and moderation are not added by this first slice.
+       authentication and are not imported. Reports start personal/private.
+       Content is immutable; its read-sharing policy can change separately.
+       Administrators may read all reports but cannot republish another
+       account's report. This does not link identities across accounts.
 
        The service supplies the creation timestamp and id. A stable
        request_id makes an identical retry safe. Reports and next steps
@@ -41,7 +43,39 @@ DESCRIPTION
 
        A map is a page sampled when entered. Leave and enter again to
        refresh, filter by category, or pass the returned next_offset.
-       Report bodies are not copied into the cursor or a public site.
+       Report bodies are not copied into the cursor. scope=mine is the
+       default; shared lists reports in your group spaces; public lists
+       signed-off reports; all is an explicit administrator-only view.
+       Saved cursor summaries are snapshots, not current authorization.
+
+   Sharing
+       POST /api/reports/{id}/sharing accepts visibility (personal, group,
+       public), group_id (a current membership, otherwise null), a fresh
+       expected_revision and sign_off (true only for public). Only the
+       report's owning account may change this policy. A stale revision
+       is refused; read before retrying. There is no bulk-publication step.
+
+       Public is owner sign-off on the entire immutable report, including
+       body, prompt_history and next_steps. Review all of them for secrets
+       and private information before publishing. GET /api/reports/public
+       and /api/reports/public/{id} need no login. Their responses omit
+       author/sign-off account IDs; public content is not a user directory.
+       Returning to personal/group prevents future public API reads; it
+       cannot recall copies already read by someone.
+
+       The /reports.html page defaults to public signed-off reports even
+       for administrators. All system reports, including private, is an
+       explicit admin choice. The owner form provides a visibility toggle
+       and a separate public sign-off checkbox. Static assets and both
+       API repositories must be deployed together before this is live.
+
+       Groups are flat memberships in shared places, not friendship
+       graphs. Invitation plus acceptance precedes content access and
+       member-identity exposure. Group leave/removal is effective at the
+       next SQL read. Public/private/group policy is shared account/content
+       infrastructure, not a report-specific group database. Existing
+       photos, designs and private messages keep their current policies
+       until their own service explicitly adopts a read-only adapter.
 
    Limits
        title: 200 characters. body: 32768 characters. prompt_history:

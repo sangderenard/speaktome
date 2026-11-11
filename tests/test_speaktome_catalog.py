@@ -1,4 +1,5 @@
 import json
+import os
 import re
 import sys
 from pathlib import Path
@@ -117,7 +118,7 @@ def test_public_is_json_and_allowed_only_on_request():
 
 
 def _sources():
-    base = ROOT.parent / "turing" / "examples" / "meowdoku" / "server.py"
+    base = Path(os.environ.get("TURING_REPO", str(ROOT.parent / "turing"))) / "examples" / "meowdoku" / "server.py"
     if not base.is_file():
         return None
     texts = [base.read_text(encoding="utf-8", errors="replace")]
@@ -125,7 +126,7 @@ def _sources():
         module = base.with_name(delegate)
         if module.is_file():
             texts.append(module.read_text(encoding="utf-8", errors="replace"))
-    for name in ("routes.py", "reports.py"):
+    for name in ("routes.py", "reports.py", "groups.py"):
         texts.append((ROOT / "speaktome_api" / name).read_text(encoding="utf-8", errors="replace"))
     return texts
 
