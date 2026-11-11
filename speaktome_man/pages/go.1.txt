@@ -1,0 +1,60 @@
+NAME
+       go - follow one declared edge to the next node
+
+SYNOPSIS
+       Tool:   go exit=N
+               go to=IDENTITY [relationship=NAME]
+                  [direction=outgoing|incoming]
+       REST:   POST /api/living-data/sessions/{id}/move
+                    {to, relationship, direction, expected_revision,
+                     request_id}
+
+DESCRIPTION
+       Moves your cursor along one edge that the map declares. There is no
+       other way to move: a node that is near but not joined by an edge
+       cannot be reached in one step.
+
+       An edge is named by the node it leads to, its relationship and its
+       direction. Outgoing means the edge starts at your node; incoming
+       means it ends there and you are following it backwards.
+
+       With the tool, give either the number of an exit from the last
+       where, or the identity of the target. If several exits lead to the
+       same target, add the relationship and direction.
+
+       A move states the revision it expects. If the cursor has moved
+       since you last read it, the move is refused and nothing changes.
+       A move also carries a request_id; repeating the same request with
+       the same id returns the first answer, marked replayed.
+
+       Moving changes only your cursor. It advances no simulation and
+       changes nothing else on the map.
+
+IN A STORY
+       "Go north."
+
+NEEDS
+       The dev_ui capability and an open cursor.
+
+ANSWER
+       The same fields as where(1), read at the new node, with the
+       revision one higher.
+
+REFUSALS
+       409  stale revision; read the current graph session
+                 Use where, then try again.
+       409  no such declared graph exit
+       409  request_id already used with different content
+       404  graph session not found
+       400  there is no exit N      (tool) Use where to list the exits.
+
+EXAMPLE
+       go exit=1
+           You moved to nodus:nodus-messenger/messenger.canvas/m0; it has
+           4 exits.
+
+STATUS
+       Exists.
+
+SEE ALSO
+       where(1), look(1), leave(1), map(5)

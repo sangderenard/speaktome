@@ -1,0 +1,40 @@
+NAME
+       leave - close your cursor
+
+SYNOPSIS
+       Tool:   leave
+       REST:   POST /api/living-data/sessions/{id}/close
+                    {expected_revision}
+
+DESCRIPTION
+       Removes you from the map. The server forgets the cursor and the
+       summary of the map it kept for it. After leave you may enter again,
+       on the same map or another.
+
+       The close states the revision it expects, as a move does. The tool
+       reads the current revision first.
+
+IN A STORY
+       "You leave."
+
+NEEDS
+       The dev_ui capability and an open cursor.
+
+ANSWER
+       closed         True.
+       session_id     The id of the cursor that was closed.
+
+REFUSALS
+       409  stale revision; read the current graph session
+       404  graph session not found
+       409  no open cursor in this process      (tool)
+
+EXAMPLE
+       leave
+           You left; the cursor is closed.
+
+STATUS
+       Exists.
+
+SEE ALSO
+       enter(1), entity(7)

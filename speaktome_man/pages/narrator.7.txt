@@ -1,0 +1,38 @@
+NAME
+       narrator - the one who describes a map and can alter it
+
+DESCRIPTION
+       A narrator is an agent, a person or an automated script that
+       describes something and is able to alter state. Where an entity
+       stands in a world, the narrator stands over it.
+
+       A story needs four things:
+
+           map          A graph made walkable. It holds what is true.
+           narrator     Describes the map and can change it.
+           character    An entity taking part in the story.
+           audience     Agents who are shown the story and do not act.
+
+       Everyone speaks the same REST interface. What differs is what
+       each may say with it.
+
+   What a narrator can do today
+       Register a map as a world, examine an object of it, and have a
+       render host make a picture of it. An account holds one world at a
+       time, and a world unused for 15 minutes is forgotten.
+
+       A narrator cannot yet change a map. That is the verb make, which
+       is planned.
+
+   Open
+       When two agents' actions on a map conflict, either the narrator
+       decides which happened, or the map keeps both and a dial chooses.
+       The vocabulary holds under either answer. The owner has not
+       decided.
+
+NOTES
+       In the source, the narrator's routes are named DM, for dungeon
+       master. DM never means a message between contacts.
+
+SEE ALSO
+       examine(1), show(1), make(1), entity(7), map(5)

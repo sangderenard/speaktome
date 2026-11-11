@@ -1,0 +1,47 @@
+NAME
+       where - read where you stand and the exits from there
+
+SYNOPSIS
+       Tool:   where
+       REST:   GET /api/living-data/sessions/{id}[?offset=N]
+
+DESCRIPTION
+       Reads your cursor without moving it: the node you stand at, the
+       cursor's revision and the exits. An exit is one declared edge of
+       the map that touches your node and leads to a node the map knows.
+
+       The server returns exits 64 at a time. The tool reads every page
+       and numbers the exits from 1; those numbers are what go accepts.
+       The numbering holds until the next where, go or enter.
+
+IN A STORY
+       "Where am I, and which ways lead out?"
+
+NEEDS
+       The dev_ui capability and an open cursor.
+
+ANSWER
+       at                 The node you stand at.
+       revision           The cursor's revision.
+       exits              Each exit as {to, relationship, direction}.
+       exit_total         How many exits the node has.
+       next_exit_offset   The next page's offset, or null (REST only).
+       numbered_exits     The exits as numbered lines (tool only).
+       text               One sentence saying the same.
+
+REFUSALS
+       409  no open cursor in this process      (tool) Use enter first.
+       404  graph session not found
+                 The cursor expired, the server restarted, or the id
+                 belongs to another account.
+
+EXAMPLE
+       where
+           You are at nodus:nodus-messenger/messenger.canvas/m0 with 4
+           exits.
+
+STATUS
+       Exists.
+
+SEE ALSO
+       go(1), look(1), enter(1), entity(7)

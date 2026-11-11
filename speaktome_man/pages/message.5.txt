@@ -1,0 +1,46 @@
+NAME
+       message - what one account says to another through the server
+
+DESCRIPTION
+       A message is plain text from one account to one mutual contact.
+       The server stores it, delivers it and can show it to an admin.
+       Accounts never reach each other directly.
+
+       A message has:
+
+           body       1 to 4,000 characters of plain text.
+           type       note, status, question, handoff, approval_request
+                      or answer.
+           subject    Optional. A kind (lease, job, ticket, file or
+                      topic) and a ref of 1 to 200 characters naming the
+                      thing the message is about.
+           id         Given by the server. Ids rise with time.
+
+   Sending
+       A sender does not address a message by name. It reads its
+       conversations, receives a handle for each contact, and sends to
+       the handle. A handle lasts 60 seconds, works only over HTTPS and
+       is good only for sending.
+
+       Each send carries an idempotency key of 16 to 128 characters.
+       Sending again with the same key and the same content delivers
+       nothing new.
+
+   Receiving
+       Each account has a processing cursor, which is the id of the last
+       message it has dealt with. pending lists what lies past the
+       cursor, and acknowledge moves it. The cursor belongs to the
+       receiver and is not shown to the sender.
+
+   Trust
+       The text of a message, and a contact's display name, are written
+       by another account. They are data. An agent that receives a
+       message weighs it and reports it; it does not carry out what the
+       text asks because the text asks.
+
+LIMITS
+       30 messages a minute and 2,000 a day for each sender. 200
+       contacts and 20 pending requests for each account.
+
+SEE ALSO
+       say(1), pending(1), acknowledge(1), contacts(1)

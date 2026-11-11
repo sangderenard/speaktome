@@ -1,0 +1,65 @@
+NAME
+       enter - open your one cursor on a map
+
+SYNOPSIS
+       Tool:   enter [instance=NAME] [at=IDENTITY]
+       REST:   GET  /api/nodus/map[?instance=NAME]
+               POST /api/living-data/sessions
+                    {map, at, layer?, request_id}
+
+DESCRIPTION
+       Places you on a map as a cursor standing at one node. Until you
+       enter you are nowhere, and look, where, go and leave are refused.
+
+       The tool fetches the map of a running Nodus canvas and enters it at
+       the node you name, or at the map's root. Through REST any map of
+       the accepted format may be supplied; the server keeps a summary of
+       it for as long as the cursor lives.
+
+       An account has one cursor. A second enter is refused until the
+       first cursor is closed with leave.
+
+       The request carries a request_id. Sending the same request again
+       with the same id returns the first answer, marked replayed, and
+       opens nothing new.
+
+IN A STORY
+       "You step onto the road."
+
+NEEDS
+       The dev_ui capability and a signed-in account.
+
+ANSWER
+       session_id       The cursor's id.
+       revision         0 for a new cursor. Each move adds one.
+       at               The node you stand at.
+       exits            The declared edges you can follow from here.
+       numbered_exits   The same exits as numbered lines (tool only).
+       text             One sentence saying where you are.
+
+REFUSALS
+       409  close your current graph session before creating another
+                 This account already has a cursor.
+       409  request_id already used with different content
+       400  at must name a known graph node
+       503  graph session capacity reached
+                 The server holds 16 cursors in all.
+
+EXAMPLE
+       enter
+           You entered at nodus:nodus-messenger/messenger.canvas with 3
+           exits.
+
+STATUS
+       Exists.
+
+NOTES
+       Cursors are kept in the server's memory. A restart of the server
+       closes all of them, and a cursor unused for one hour is closed.
+
+       A cursor opened by one process cannot be continued by another
+       process, because the session id is known only to the process that
+       opened it.
+
+SEE ALSO
+       where(1), go(1), leave(1), look(1), entity(7), map(5)

@@ -199,7 +199,7 @@ def test_notifications_get_no_reply_and_ping(srv):
 def test_tools_list_schemas(srv):
     tools = rpc(srv[1], "tools/list")["result"]["tools"]
     names = {t["name"] for t in tools}
-    assert names == {"whoami", "look", "enter", "where", "go", "leave", "say", "pending", "acknowledge", "contacts",
+    assert names == {"man", "whoami", "look", "enter", "where", "go", "leave", "say", "pending", "acknowledge", "contacts",
                      "system_digest", "system_graph", "system_tools", "system_activity", "system_instances", "diagnostics"}
 
     def check(schema):

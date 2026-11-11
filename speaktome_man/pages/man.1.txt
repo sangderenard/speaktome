@@ -1,0 +1,49 @@
+NAME
+       man - read a page of this manual
+
+SYNOPSIS
+       Tool:   man [topic=NAME] [section=1|5|7] [keyword=WORD]
+       Shell:  python -m speaktome_man [SECTION] NAME
+               python -m speaktome_man -k WORD
+               python -m speaktome_man
+
+DESCRIPTION
+       With a topic, man returns that page. With a keyword, it lists every
+       page whose name or one-line summary contains the word. With nothing,
+       it lists every page.
+
+       The manual has three sections. Section 1 holds the verbs, which are
+       the things an agent can say to the system. Section 5 holds the
+       formats, which are the shapes of the things the verbs carry. Section
+       7 holds the concepts.
+
+       A topic that exists in more than one section is resolved to the
+       lowest section unless a section is given.
+
+       The pages are files in the speaktome repository. Reading them asks
+       the server nothing and needs no sign-in.
+
+IN A STORY
+       "What does that word mean?"
+
+NEEDS
+       Nothing.
+
+ANSWER
+       page      The text of the page, when a topic was given.
+       pages     A list of {name, section, summary}, otherwise.
+
+REFUSALS
+       no such page      The topic is not in the manual. The answer names
+                         the nearest topics.
+
+EXAMPLE
+       man topic=go
+       man keyword=cursor
+       man topic=map section=5
+
+STATUS
+       Exists. Local to the client; the server does not serve the manual.
+
+SEE ALSO
+       speaktome(7), whoami(1)

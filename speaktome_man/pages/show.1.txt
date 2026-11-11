@@ -1,0 +1,46 @@
+NAME
+       show - have a picture made of the scene
+
+SYNOPSIS
+       REST:   POST /api/living-data/dm/worlds/{world}/commands
+                    {request_id, operation: "render-phong", position,
+                     facing, width?, height?}
+               GET  /api/living-data/dm/worlds/{world}/commands/{id}
+
+DESCRIPTION
+       Asks for a rendered view of a registered world from a camera
+       position looking along a facing direction. Width and height are
+       64 to 1024 pixels and default to 512 by 384.
+
+       The server does not draw. A render host, which is a browser page
+       attached to the world, draws the picture and hands it back. The
+       command is therefore answered at once with a state of queued or
+       rendering, and the finished picture is read later from the
+       command's receipt.
+
+       show is a narrator's verb, and it needs a world registered as
+       examine(1) describes and a render host attached to it.
+
+IN A STORY
+       "Paint me the scene."
+
+NEEDS
+       The dev_ui capability and a signed-in account.
+
+ANSWER
+       state        queued, rendering or complete.
+       result       The picture, when complete. It is a PNG of at most
+                    2 MiB.
+
+REFUSALS
+       404  static world not found
+       409  request_id reused with different command
+       429  command receipt capacity reached; close and reattach world
+
+STATUS
+       Exists over REST, for the narrator. No tool offers it yet. A
+       picture taken from where a cursor stands, without registering a
+       world, does not exist.
+
+SEE ALSO
+       examine(1), narrator(7)

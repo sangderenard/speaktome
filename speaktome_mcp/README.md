@@ -50,6 +50,7 @@ Each result is the server's JSON plus a one-sentence `say`. A failure is `isErro
 
 | Tool | REST endpoint | Capability |
 |---|---|---|
+| `man {topic?, section?, keyword?}` | none: reads the pages of `speaktome_man` (see `python -m speaktome_man`) | none |
 | `whoami` | GET `/api/whoami` | none |
 | `look {radius?}` | GET session, then POST `/api/living-data/query` at the cursor | `dev_ui`, open cursor |
 | `enter {instance?, at?}` | GET `/api/nodus/map`, POST `/api/living-data/sessions` (fresh `request_id`) | `dev_ui` |

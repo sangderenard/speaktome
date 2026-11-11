@@ -1,0 +1,55 @@
+NAME
+       speaktome - the vocabulary, and how to read this manual
+
+DESCRIPTION
+       A graph is a map. An entity is a cursor on it. A request is a
+       sentence. The same small set of verbs is a command in a text
+       adventure and a call in a program, and the REST interface of the
+       service is where the two are the same thing.
+
+   The verbs
+       Walking      enter, where, go, look, leave
+       Speaking     say, pending, acknowledge, contacts
+       Knowing      whoami, man, examine, show
+       The system   system_digest, system_graph, system_tools,
+                    system_activity, system_instances, diagnostics
+       Changing     take, use, make
+
+       The changing verbs are planned and do not exist yet. Every other
+       verb exists as an endpoint; each page says whether a tool offers
+       it.
+
+   The rules that keep it one language
+       1.  A verb names what is done to the graph, never how a client
+           draws it.
+       2.  Every verb is one request with one answer, and the answer is
+           both data and a sentence.
+       3.  A request that might be sent twice carries a request id, and
+           a move states the revision it expects. A story is then safe
+           to tell twice.
+       4.  An entity that belongs to no agent, such as the cat in a
+           story, takes the same verbs. A script or the narrator
+           controls it.
+       5.  Who may use a verb is a capability of the role, and the
+           server decides it.
+
+   Reading the manual
+       Section 1 holds the verbs, section 5 the formats and section 7
+       the concepts. A reference such as go(1) names a page and its
+       section.
+
+       Each verb's page has the same parts. SYNOPSIS gives the tool form
+       and the REST form. IN A STORY gives the sentence a player would
+       say. NEEDS names the capability. REFUSALS lists what the server
+       answers when it will not do the thing. STATUS says whether the
+       verb exists.
+
+   Where the facts come from
+       The pages describe the service as its source stood on 2026-11-11.
+       The handlers for messages and for cursors are in
+       speaktome_api/routes.py; the rest of the service is in the turing
+       repository under examples/meowdoku.
+
+SEE ALSO
+       man(1), person(7), entity(7), narrator(7), roles(7), map(5),
+       message(5)

@@ -1,0 +1,38 @@
+NAME
+       entity, cursor - something that stands at a place on a map
+
+DESCRIPTION
+       An entity is a cursor on a graph. It stands at one node, and by
+       standing there it is using that place. An agent in a world is an
+       entity. So is anything else that has a place and can move: the
+       cat in a story, or a thread of work in a program.
+
+       What an entity has is small:
+
+           a map        The graph it is on.
+           a place      The node it stands at.
+           a revision   A count that rises by one with each move.
+           an owner     The account it belongs to.
+
+       An entity moves only along the edges its map declares. Moving
+       changes the entity and nothing else.
+
+   The cursor that exists today
+       The service keeps one cursor for each account. It is opened by
+       enter, read by where, moved by go and closed by leave.
+
+       The cursor lives in the server's memory. It is closed when the
+       server restarts and when it has gone unused for one hour. The
+       server holds 16 cursors in all.
+
+       The revision is what makes moving safe when requests are repeated
+       or arrive late. A move names the revision it believes is current,
+       and is refused if the cursor has moved since.
+
+   What does not exist yet
+       An entity that belongs to no account, and is moved by a script or
+       by the narrator. Two entities on one map that can see each other.
+       An entity standing in more than one place.
+
+SEE ALSO
+       enter(1), where(1), go(1), leave(1), person(7), map(5)

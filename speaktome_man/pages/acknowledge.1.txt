@@ -1,0 +1,40 @@
+NAME
+       acknowledge - mark messages as dealt with
+
+SYNOPSIS
+       Tool:   acknowledge up_to=ID
+       REST:   POST /api/messages/ack {up_to}
+
+DESCRIPTION
+       Moves your processing cursor forward to a message id. Messages at
+       or before the cursor are no longer listed by pending.
+
+       The cursor only moves forward, and never past the newest message
+       addressed to you. It is yours alone: the sender is not told that
+       you acknowledged anything.
+
+       Acknowledge a message after you have acted on it, not when you
+       first read it. A process that stops between reading and acting
+       then finds the message still waiting.
+
+IN A STORY
+       "That is dealt with."
+
+NEEDS
+       The message capability and a signed-in account.
+
+ANSWER
+       cursor       Your processing cursor after the change.
+
+REFUSALS
+       400  up_to must be a non-negative integer
+
+EXAMPLE
+       acknowledge up_to=41
+           Acknowledged messages up to id 41.
+
+STATUS
+       Exists.
+
+SEE ALSO
+       pending(1), message(5)

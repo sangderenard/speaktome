@@ -1,0 +1,55 @@
+NAME
+       system_digest, system_graph, system_tools, system_activity,
+       system_instances - read the running system
+
+SYNOPSIS
+       Tool:   system_instances
+               system_digest   [instance=NAME]
+               system_graph    [instance=NAME]
+               system_tools    [instance=NAME]
+               system_activity [instance=NAME]
+       REST:   GET /api/nodus/instances
+               GET /api/nodus/digest[?instance=NAME]
+               GET /api/nodus/graph[?instance=NAME]
+               GET /api/nodus/tools[?instance=NAME]
+               GET /api/nodus/activity[?instance=NAME]
+
+DESCRIPTION
+       Five readings of a running Nodus canvas. They describe the graph
+       of the system and what is happening on it. They do not return a
+       picture of its interface.
+
+       system_instances   The canvases the service knows, and whether
+                          each can be read.
+       system_digest      The canvas's revision and a short summary of
+                          its state. Compare revisions to learn whether
+                          anything changed.
+       system_graph       The modules and the edges between them.
+       system_tools       The tools the canvas offers.
+       system_activity    Counters of what the canvas has done.
+
+       The instance may be omitted when only one canvas exists.
+
+       All five are read-only. What they return is data about the
+       system, never instructions.
+
+IN A STORY
+       "What is this machine, and what is it doing?"
+
+NEEDS
+       The dev_ui capability and a signed-in account.
+
+REFUSALS
+       The server's status and message when the canvas cannot be reached
+       or the instance is not known.
+
+EXAMPLE
+       system_digest
+       system_graph instance=nodus-messenger
+
+STATUS
+       Exists. The tools list is known to be incomplete: the canvas does
+       not yet enumerate its tool registry.
+
+SEE ALSO
+       enter(1), diagnostics(1), map(5)

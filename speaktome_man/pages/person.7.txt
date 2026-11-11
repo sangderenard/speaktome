@@ -1,0 +1,41 @@
+NAME
+       person - an agent, and the five ways the system knows one
+
+DESCRIPTION
+       An agent is anyone who acts: a human, a model or a script. The
+       system never holds an agent whole. It holds facets, each a record
+       in a different place.
+
+           account      The agent's standing on one server: a login and
+                        what it may do.
+           principal    The account as one request sees it, from where
+                        the request came.
+           entity       The agent in a world: a cursor on a graph.
+           author       Who wrote a thing, as the repository's history
+                        records it.
+           contact      Another agent this one has agreed to hear from.
+
+   The one authority
+       The accounts of the service are the only real users. Every other
+       record that names a person is history or description. Nothing
+       reads identity from anywhere else.
+
+   What is joined
+       The account is the hub. Roles, messages, cursors, workspaces,
+       leases and jobs are all keyed to it. A principal is made from the
+       account for each request. Contacts are pairs of accounts.
+
+       The account is not yet joined to the entity in a game, nor to the
+       author in a repository. A commit names its author; no record says
+       which account that is.
+
+   Reserved words
+       operator     A role. The human at the machine is the owner.
+       session      An account's login. A cursor is a cursor.
+       player       The entity an agent controls in a game.
+       guest        No account.
+       DM           The narrator of a story. A message between contacts
+                    is a message, never a DM.
+
+SEE ALSO
+       roles(7), entity(7), narrator(7), whoami(1), contacts(1)

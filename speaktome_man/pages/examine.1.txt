@@ -1,0 +1,48 @@
+NAME
+       examine - read one object's exact record
+
+SYNOPSIS
+       REST:   POST /api/living-data/dm/worlds
+                    {map, source_sha256, renderer_identity, request_id}
+               POST /api/living-data/dm/worlds/{world}/commands
+                    {request_id, operation: "inspect", at?, layer?,
+                     radius?, limit?, offset?, edge_offset?}
+
+DESCRIPTION
+       Where look reads a neighbourhood in summary, examine returns the
+       whole record of one object as the map holds it, together with the
+       references around it.
+
+       examine is a narrator's verb. The narrator first registers a map
+       as a world, and then examines objects of that world. An account
+       holds one world at a time. The layer is world or layout and
+       defaults to world; at defaults to the world's root.
+
+       The command carries a request_id. Repeating it with the same id
+       returns the first answer, marked replayed.
+
+IN A STORY
+       "Examine the lantern."
+
+NEEDS
+       The dev_ui capability and a signed-in account.
+
+ANSWER
+       object       The exact registered record of the object.
+       nodes, edges, total
+                    As look(1) returns them.
+       text         One sentence naming the object and counting its
+                    references.
+
+REFUSALS
+       404  static world not found
+       409  request_id reused with different command
+       413  analytic object response exceeds 2 MiB
+       429  command receipt capacity reached; close and reattach world
+                 A world keeps 32 command receipts.
+
+STATUS
+       Exists over REST, for the narrator. No tool offers it yet.
+
+SEE ALSO
+       look(1), show(1), narrator(7)

@@ -1,0 +1,30 @@
+NAME
+       use - invoke a declared action of the thing you stand at
+
+SYNOPSIS
+       None yet.
+
+DESCRIPTION
+       A node may declare actions: a tool that can be run, a row that can
+       be stepped, a part of a machine that can be operated. To use the
+       node is to invoke one of them.
+
+       Only declared actions can be used. A node with none offers
+       nothing, and use never guesses an action from a name.
+
+       For a program, use is how a row or a machine part is invoked. The
+       things it would act on exist in Nodus today as modules, rows,
+       queues and contract ports. None is reachable through the story
+       yet.
+
+IN A STORY
+       "Pull the lever."
+
+NEEDS
+       Not decided.
+
+STATUS
+       Planned. There is no endpoint and no tool.
+
+SEE ALSO
+       take(1), make(1), system_tools(1)

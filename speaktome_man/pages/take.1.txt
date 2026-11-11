@@ -1,0 +1,33 @@
+NAME
+       take - occupy a place, or hold a resource
+
+SYNOPSIS
+       None yet.
+
+DESCRIPTION
+       A place nobody has taken is a ruin: a default interior produced on
+       demand, which costs nothing and is always available. To take a
+       place is to put your own version of it there.
+
+       Several accounts may take the same place. Each keeps its own
+       version, and a dial at the door selects among them. Ruins remain
+       one of the dial's settings.
+
+       An author of the thing a place stands for may make their version
+       the permanent one. A guest keeps a taken place in their own
+       browser and is told to download it.
+
+       For a program, take is how a thread of work holds a resource.
+
+IN A STORY
+       "This place is mine."
+
+NEEDS
+       Not decided.
+
+STATUS
+       Planned. There is no endpoint and no tool. The record it will
+       write is the occupant entry of a place's document.
+
+SEE ALSO
+       use(1), make(1), entity(7), person(7)

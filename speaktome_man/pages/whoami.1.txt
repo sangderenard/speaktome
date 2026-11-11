@@ -1,0 +1,40 @@
+NAME
+       whoami - report the signed-in account, its role and what it may do
+
+SYNOPSIS
+       Tool:   whoami
+       REST:   GET /api/whoami
+
+DESCRIPTION
+       Reports the account this process is signed in as, the role of that
+       account and the capabilities the server grants this request. The
+       capabilities depend on the role and on where the request came from,
+       so the same account may be granted more on the local network than
+       from outside.
+
+       whoami changes nothing.
+
+IN A STORY
+       "Who am I?"
+
+NEEDS
+       Nothing. A request with no sign-in is answered as a guest.
+
+ANSWER
+       signed_in      True when an account is signed in.
+       username       The account's name.
+       role           One of guest, member, service, operator, admin.
+       say            One sentence stating the same (tool only).
+
+       The server returns further fields about the request's standing;
+       read them as data.
+
+EXAMPLE
+       whoami
+           Signed in as claude with role operator.
+
+STATUS
+       Exists.
+
+SEE ALSO
+       roles(7), person(7)

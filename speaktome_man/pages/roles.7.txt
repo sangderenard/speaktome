@@ -1,0 +1,50 @@
+NAME
+       roles, capabilities - what an account may do, and why
+
+DESCRIPTION
+       The server decides what each request may do. It grants a set of
+       capabilities, and each verb needs one of them.
+
+       The capabilities come from two sources, added together: the role
+       of the account, and where the request came from. A request from
+       the local network is granted more than one from outside, with or
+       without a sign-in.
+
+   Roles
+           guest        No account. From outside, a guest sees the
+                        public site only.
+           member       An account with no role given. May write in the
+                        studio, submit photos and compiles, share, and
+                        message.
+           service      An account a program runs under. A member's
+                        powers, with library management and federation.
+           operator     An account that runs the deployment. A member's
+                        powers, with deploy scripts, lifecycle control
+                        and federation.
+           admin        The account that governs accounts. Everything,
+                        including managing accounts and reading any
+                        thread.
+
+   Capabilities the verbs need
+           dev_ui            enter, where, go, look, leave, examine,
+                             show, and the system verbs.
+           message           say, pending, acknowledge, contacts.
+           account_manage    diagnostics; also reading other accounts'
+                             threads. Held only by the admin role.
+           lifecycle_admin   diagnostics. Held only by a request from
+                             the local network.
+
+       whoami and man need nothing.
+
+       The full list of capability names is in the service's authz
+       module, which is the one place they are computed.
+
+   Refusal
+       A request without the capability is refused by the server with
+       status 403. A verb that also needs an account answers 401 when
+       the capability is held but nobody is signed in. A client cannot
+       grant itself anything: the tools add no permissions to the
+       account they sign in as.
+
+SEE ALSO
+       whoami(1), person(7), diagnostics(1)

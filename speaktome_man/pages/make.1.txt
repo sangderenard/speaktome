@@ -1,0 +1,27 @@
+NAME
+       make - change the map
+
+SYNOPSIS
+       None yet.
+
+DESCRIPTION
+       Every other verb reads the map or moves a cursor on it. make
+       changes what is true: it adds, alters or removes a node or an
+       edge.
+
+       make is the narrator's power to alter state. Nothing a narrator
+       can call today changes a map.
+
+       For a program, make is how a graph is edited.
+
+IN A STORY
+       "Build a wall here."
+
+NEEDS
+       Not decided.
+
+STATUS
+       Planned. There is no endpoint and no tool.
+
+SEE ALSO
+       take(1), use(1), narrator(7), map(5)

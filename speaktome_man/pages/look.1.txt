@@ -1,0 +1,53 @@
+NAME
+       look - read the neighbourhood of the node you stand at
+
+SYNOPSIS
+       Tool:   look [radius=0..4]
+       REST:   POST /api/living-data/query
+                    {map, at, layer?, radius?, limit?, offset?,
+                     edge_offset?}
+
+DESCRIPTION
+       Reads the nodes that lie within a number of edges of your node, and
+       the edges among them, without moving your cursor. The radius counts
+       edges and defaults to 1.
+
+       look reads the map as it was supplied. It is not perception: it
+       does not hide what a character could not see, and it does not
+       report live state. A node that an edge names but the map does not
+       contain is listed as not known.
+
+       Through REST, look needs no cursor: the request supplies the map
+       and the node. Nodes are returned up to 256 at a time and edges 256
+       at a time, each with its own offset.
+
+IN A STORY
+       "Look around."
+
+NEEDS
+       The dev_ui capability and a signed-in account. The tool also needs
+       an open cursor, because it looks from where you stand.
+
+ANSWER
+       at                 The node looked from.
+       nodes              The nodes found, each with its distance.
+       edges              The declared edges among them.
+       total              How many nodes were found.
+       next_offset        The next page of nodes, or null.
+       next_edge_offset   The next page of edges, or null.
+       say                One sentence stating the count (tool only).
+
+REFUSALS
+       400  invalid or excessive Living Data query
+                 The map is not of the accepted format, exceeds 4,096
+                 nodes or 16,384 edges, or a field is out of range.
+       409  no open cursor in this process      (tool) Use enter first.
+
+EXAMPLE
+       look radius=2
+
+STATUS
+       Exists.
+
+SEE ALSO
+       where(1), examine(1), map(5)

@@ -1,0 +1,63 @@
+NAME
+       map - a graph made walkable
+
+DESCRIPTION
+       A map is one JSON object. It is what enter, look and the narrator's
+       verbs are given, and it holds what is true about a place.
+
+       The accepted format is named by its schema field:
+
+           schema          "abstract-ui-div-map-v0"
+           identity        The map's own identity. It is also a node.
+           name            A name for people. Optional.
+           regions         A list of regions.
+           tracks          A list of edges. Optional.
+           world           An object holding a list named objects.
+                           Optional.
+
+       A region holds a list named buildings, and a building holds a
+       list named rooms. The map, its regions, their buildings and their
+       rooms are the nodes of the layout layer. The objects of the world
+       are added as nodes in the world layer.
+
+   Nodes
+       Every node has an identity, which is a nonempty string of at most
+       1,024 characters and is unique in the map. A node may also carry
+       kind, name, member_kind, type_name and position. Those are the
+       only fields the server keeps for a cursor; everything else in the
+       supplied object is dropped.
+
+   Edges
+       Edges are declared, never inferred. There are two ways to declare
+       one:
+
+           On a node:   dependencies: [{target, relationship}]
+           On the map:  tracks: [{source, target, relationship}]
+
+       An edge is directed from its source to its target and is named by
+       its relationship. Tracks belong to the layout layer. An edge may
+       name a target the map does not contain; such a target can be
+       described but not entered.
+
+       Nodes are found only in the lists named above. Nothing is
+       discovered by searching inside other fields.
+
+LIMITS
+       4,096 nodes, 16,384 edges, and a request body of 4 MiB.
+
+EXAMPLE
+       {"schema": "abstract-ui-div-map-v0",
+        "identity": "house", "name": "The House",
+        "regions": [
+          {"identity": "house/hall", "name": "Hall",
+           "dependencies": [{"target": "house/stair",
+                             "relationship": "leads-to"}]},
+          {"identity": "house/stair", "name": "Stair"}]}
+
+NOTES
+       The service turns a running Nodus canvas into a map of this format
+       at GET /api/nodus/map. Any graph of identities and declared edges
+       can be turned into one.
+
+SEE ALSO
+       enter(1), look(1), go(1), entity(7)
