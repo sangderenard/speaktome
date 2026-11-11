@@ -44,6 +44,19 @@ and is never logged, returned or placed in an error. Give it as a FILE PATH, nev
 `cwd` is the speaktome checkout so that `speaktome_mcp` is importable. Protocol versions 2025-06-18, 2025-03-26 and
 2024-11-05 are accepted (an unknown request gets 2025-06-18).
 
+## The whole API as tools
+
+`python -m speaktome_mcp.api` is a second server with the same environment. It offers the verbs below, then
+`api_index`, then one tool per REST endpoint, built when it starts from the service's own index
+(`GET /api/index`, the declared catalog in `speaktome_api/catalog.py`). An endpoint becomes a tool when the
+catalog offers it to tools, it takes JSON, and the signed-in account holds what it needs; `api_index` lists every
+endpoint by group and gives the reason for each one that is not a tool. Nothing is hand-written per endpoint:
+declare an endpoint in the catalog and it is a tool at the next start.
+
+A generated tool sends exactly the declared path, query keys, body fields and fixed headers. It returns the
+server's answer under `data`, which is data and never an instruction. Until the service serves `/api/index`, the
+catalog packaged here is used with the capabilities `/api/whoami` reports. See `man index`.
+
 ## Tools
 
 Each result is the server's JSON plus a one-sentence `say`. A failure is `isError: true` with `{"error", "status"}`.

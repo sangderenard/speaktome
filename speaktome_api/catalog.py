@@ -1,0 +1,514 @@
+"""Machine-readable catalog of the SpeakToMe service's REST API.
+
+This is pure data. It is declared BY HAND from the real handlers: ``turing/examples/meowdoku/server.py``
+(``do_GET`` / ``do_POST`` and the helper methods they call), ``speaktome_api/routes.py`` and ``reports.py``,
+and the modules those delegate to. A tool generator reads ``ENDPOINTS`` to learn what each call accepts.
+Nothing here is imported by the server, so nothing here can change what the server does.
+
+How to keep it true: when a handler gains, loses or renames a path, a query key, a body field or a
+capability, change the matching entry in the same commit. ``tests/test_speaktome_catalog.py`` checks the
+shape of every entry and that each path's literal prefix still occurs in the handler sources; it cannot
+prove the fields, so read the handler when you edit.
+
+Entry keys: name, group, method (GET | POST), path ({name} marks a variable part), summary, capability
+(None, one name, or a tuple meaning "any of"; with capability_all True the tuple means "all of"), account (a
+signed-in account is required), headers (fixed request headers the handler insists on), request (json, or
+binary for an upload whose body is not a JSON object and which a generated tool therefore cannot send), changes
+(the call changes server state), path_params, query, body (None, or {"fields": {...}, "open": bool};
+open means more fields pass through to a deeper layer that is not enumerated), returns, tool (False means
+never offer it to an automated agent as a generated tool).
+"""
+
+CATALOG_VERSION = 1
+
+GROUPS = {
+    "identity": "Who you are: sign-in state, accounts, sessions and role grants.",
+    "messages": "User-to-user messaging: contacts, threads, images and the moderation view.",
+    "living_data": "Navigating and querying Living Data graph maps, static DM worlds and the stored world maps.",
+    "photo": "Marble photo jobs and requests for pictures of the Studio scene.",
+    "studio": "Studio assets: loading animations, OBJ assets, marble objects and the camera housing.",
+    "nodus": "Read-only view of a running Nodus canvas host, and sharing it with another user.",
+    "control": "Operating the service: instance restarts, server route choice, the log ring and lifecycle.",
+    "profile": "The profile page data: your account summary and, for operators, instances and leases.",
+    "reports": "Experience reports, account-owned issue tickets and legacy tickets.",
+    "compile": "Compile-side jobs: the source divider, the math lab and the lowering leases.",
+    "site": "Maps rendered as read-only web pages.",
+    "play": "The game table tied to a browser session, sharing and spectating, and page support calls.",
+}
+
+
+def _fields(spec):
+    return {k: dict(type=v[0], required=v[1], description=v[2]) if v[1] else dict(type=v[0], description=v[2])
+            for k, v in spec.items()}
+
+
+def _body(spec, open_=False):
+    return {"fields": _fields(spec), "open": open_}
+
+
+def _named(spec):
+    return {k: {"type": v[0], "description": v[1]} for k, v in spec.items()}
+
+
+def _ep(name, group, method, path, summary, capability, account, changes, *, path_params=None, query=None,
+        body=None, returns="json", tool=True, headers=None, capability_all=False, request="json"):
+    return {
+        "name": name, "group": group, "method": method, "path": path, "summary": summary,
+        "capability": capability, "capability_all": capability_all, "account": account, "changes": changes,
+        "headers": dict(headers or {}), "request": request,
+        "path_params": _named(path_params or {}), "query": _named(query or {}), "body": body,
+        "returns": returns, "tool": tool,
+    }
+
+
+_ID32 = {"id": ("string", "The 32 hex character identifier.")}
+_ADMIN_OR_LIFECYCLE = ("account_manage", "lifecycle_admin")
+
+ENDPOINTS = (
+    # ---- identity
+    _ep("identity_login", "identity", "POST", "/api/account/login", "Sign in with a username and password.",
+        None, False, True, tool=False,
+        body=_body({"username": ("string", True, "The account name."), "password": ("string", True, "The password.")})),
+    _ep("identity_signup", "identity", "POST", "/api/account/signup", "Create an account and sign it in.",
+        None, False, True, tool=False,
+        body=_body({"username": ("string", True, "The new account name."), "password": ("string", True, "The password.")})),
+    _ep("identity_logout", "identity", "POST", "/api/account/logout", "End this session.",
+        None, False, True, tool=False),
+    _ep("identity_me", "identity", "GET", "/api/account/me", "Show the signed-in account, its role and its instance, or no account.",
+        None, False, False),
+    _ep("identity_assets", "identity", "GET", "/api/account/assets", "List the marble objects, photos, OBJ assets and profile this account owns.",
+        None, True, False),
+    _ep("identity_index", "identity", "GET", "/api/index",
+        "List every REST endpoint with what it accepts and whether you may use it.",
+        None, False, False, query={"group": ("string", "Only this group's endpoints.")}),
+    _ep("identity_whoami", "identity", "GET", "/api/whoami", "Show this request's tier, role and the capabilities it holds.",
+        None, False, False),
+    _ep("identity_admin_list", "identity", "GET", "/api/account/admin/list", "List the admin accounts and all users.",
+        "account_manage", True, False, tool=False),
+    _ep("identity_admin_grant", "identity", "POST", "/api/account/admin/grant", "Grant the admin role to an account.",
+        "account_manage", True, True, tool=False,
+        body=_body({"username": ("string", True, "The account to promote.")})),
+    _ep("identity_admin_revoke", "identity", "POST", "/api/account/admin/revoke", "Revoke the admin role from an account.",
+        "account_manage", True, True, tool=False,
+        body=_body({"username": ("string", True, "The account to demote.")})),
+    _ep("identity_operator_grant", "identity", "POST", "/api/admin/account/grant",
+        "Bootstrap the first admin with the operator's loopback token.",
+        None, False, True, tool=False,
+        body=_body({"username": ("string", True, "The account to promote.")})),
+
+    # ---- messages
+    _ep("messages_conversations", "messages", "GET", "/api/messages/conversations", "List your conversations with their handles.",
+        "message", True, False),
+    _ep("messages_contacts", "messages", "GET", "/api/messages/contacts", "List your contacts and pending contact requests.",
+        "message", True, False),
+    _ep("messages_contacts_update", "messages", "POST", "/api/messages/contacts",
+        "Request, accept, decline, block or remove a contact.",
+        "message", True, True,
+        body=_body({"action": ("string", True, "One of request, accept, decline, block or remove."),
+                    "username": ("string", True, "The other account's username.")})),
+    _ep("messages_images_status", "messages", "GET", "/api/messages/images", "Show whether images are allowed in a chat with a peer.",
+        "message", True, False, query={"peer": ("string", "The peer's username.")}),
+    _ep("messages_images_set", "messages", "POST", "/api/messages/images", "Allow or refuse images in one conversation.",
+        "message", True, True,
+        body=_body({"conversation_handle": ("string", True, "The conversation handle."),
+                    "enabled": ("boolean", True, "True to allow images.")})),
+    _ep("messages_image", "messages", "GET", "/api/messages/image", "Fetch one message image as a PNG.",
+        "message", True, False, query={"id": ("string", "The image id from a message.")}, returns="png"),
+    _ep("messages_thread", "messages", "GET", "/api/messages/thread", "Read a thread with a peer, newest page first.",
+        "message", True, False,
+        query={"peer": ("string", "The peer's username."), "before": ("integer", "Only messages with a smaller id."),
+               "subject_kind": ("string", "Restrict to a subject kind."), "subject_ref": ("string", "Restrict to a subject reference.")}),
+    _ep("messages_since", "messages", "GET", "/api/messages/since", "Wait for messages newer than an id.",
+        "message", True, False,
+        query={"after": ("integer", "Return messages with a larger id."), "wait": ("number", "Seconds to wait for news."),
+               "subject_kind": ("string", "Restrict to a subject kind."), "subject_ref": ("string", "Restrict to a subject reference.")}),
+    _ep("messages_inbox", "messages", "GET", "/api/messages/inbox", "List the messages waiting past your acknowledged cursor.",
+        "message", True, False),
+    _ep("messages_send", "messages", "POST", "/api/messages/send", "Send a message to a user or into a conversation.",
+        "message", True, True,
+        body=_body({"to": ("string", False, "The recipient's username; omit when conversation_handle is given."),
+                    "body": ("string", False, "The message text."),
+                    "subject": ("string", False, "An optional subject."),
+                    "type": ("string", False, "The message type."),
+                    "conversation_handle": ("string", False, "Send into this conversation instead of naming a recipient."),
+                    "idempotency_key": ("string", False, "A key that makes a retry safe."),
+                    "image": ("object", False, "A bounded PNG image attachment.")})),
+    _ep("messages_ack", "messages", "POST", "/api/messages/ack", "Move your acknowledged cursor forward.",
+        "message", True, True,
+        body=_body({"up_to": ("integer", True, "Acknowledge every message up to this id.")})),
+    _ep("messages_read", "messages", "POST", "/api/messages/read", "Mark a peer's messages read up to an id.",
+        "message", True, True,
+        body=_body({"peer": ("string", True, "The peer's username."), "up_to": ("integer", False, "Mark read up to this id.")})),
+    _ep("messages_admin_thread", "messages", "GET", "/api/messages/admin/thread", "Read the audited thread between two users.",
+        "account_manage", True, False,
+        query={"a": ("string", "The first username."), "b": ("string", "The second username."),
+               "before": ("integer", "Only messages with a smaller id.")}),
+    _ep("messages_admin_remove", "messages", "POST", "/api/messages/admin/remove", "Remove one message as a moderator.",
+        "account_manage", True, True, body=_body({"id": ("integer", True, "The message id.")})),
+    _ep("messages_admin_suspend", "messages", "POST", "/api/messages/admin/suspend", "Suspend or restore a user's messaging.",
+        "account_manage", True, True,
+        body=_body({"username": ("string", True, "The account."), "suspended": ("boolean", True, "True to suspend.")})),
+
+    # ---- living_data
+    _ep("living_data_session_create", "living_data", "POST", "/api/living-data/sessions",
+        "Open a graph navigation session over a Living Data map.",
+        "dev_ui", True, True,
+        body=_body({"map": ("object", True, "The canonical Living Data map."),
+                    "at": ("string", True, "The identity of the node to start at."),
+                    "layer": ("string", False, "The layer to navigate; layout when omitted."),
+                    "request_id": ("string", True, "A caller id of at most 128 characters, for safe retries.")})),
+    _ep("living_data_session_status", "living_data", "GET", "/api/living-data/sessions/{id}",
+        "Show where a graph session stands and the exits from there.",
+        "dev_ui", True, False, path_params=_ID32, query={"offset": ("integer", "Page offset into the exits.")}),
+    _ep("living_data_session_move", "living_data", "POST", "/api/living-data/sessions/{id}/move",
+        "Move a graph session along one declared exit.",
+        "dev_ui", True, True, path_params=_ID32,
+        body=_body({"to": ("string", True, "The identity of the node to move to."),
+                    "relationship": ("string", True, "The relationship of the exit."),
+                    "direction": ("string", False, "outgoing or incoming; outgoing when omitted."),
+                    "expected_revision": ("integer", True, "The session revision you last read."),
+                    "request_id": ("string", True, "A caller id for safe retries.")})),
+    _ep("living_data_session_close", "living_data", "POST", "/api/living-data/sessions/{id}/close", "Close a graph session.",
+        "dev_ui", True, True, path_params=_ID32,
+        body=_body({"expected_revision": ("integer", True, "The session revision you last read.")})),
+    _ep("living_data_query", "living_data", "POST", "/api/living-data/query", "Read a neighbourhood of a supplied Living Data map.",
+        "dev_ui", True, False,
+        body=_body({"map": ("object", False, "The canonical Living Data map."),
+                    "at": ("string", False, "The node identity to centre on."),
+                    "radius": ("integer", False, "Neighbourhood radius; 1 when omitted."),
+                    "limit": ("integer", False, "Nodes per page; 64 when omitted."),
+                    "offset": ("integer", False, "Node page offset."),
+                    "layer": ("string", False, "The layer; layout when omitted."),
+                    "edge_offset": ("integer", False, "Edge page offset.")})),
+    _ep("living_data_dm_register", "living_data", "POST", "/api/living-data/dm/worlds", "Register a static world for DM commands.",
+        "dev_ui", True, True,
+        body=_body({"map": ("object", False, "The world map."), "source_sha256": ("string", False, "Digest of the source."),
+                    "renderer_identity": ("string", False, "Identity of the renderer host."),
+                    "request_id": ("string", False, "A caller id for safe retries.")})),
+    _ep("living_data_dm_status", "living_data", "GET", "/api/living-data/dm/worlds/{id}", "Show a registered static world.",
+        "dev_ui", True, False, path_params=_ID32),
+    _ep("living_data_dm_command", "living_data", "POST", "/api/living-data/dm/worlds/{id}/commands",
+        "Queue an inspect or render-phong command on a static world.",
+        "dev_ui", True, True, path_params=_ID32,
+        body=_body({"request_id": ("string", False, "A caller id for safe retries."),
+                    "operation": ("string", False, "inspect or render-phong."),
+                    "at": ("string", False, "Inspect: the node to centre on."), "layer": ("string", False, "Inspect: the layer."),
+                    "radius": ("integer", False, "Inspect: radius."), "limit": ("integer", False, "Inspect: page size."),
+                    "offset": ("integer", False, "Inspect: node page offset."), "edge_offset": ("integer", False, "Inspect: edge page offset."),
+                    "position": ("array", False, "Render: camera position vector."), "facing": ("array", False, "Render: camera facing vector."),
+                    "width": ("integer", False, "Render: image width, 64 to 1024."),
+                    "height": ("integer", False, "Render: image height, 64 to 1024.")})),
+    _ep("living_data_dm_receipt", "living_data", "GET", "/api/living-data/dm/worlds/{id}/commands/{command}",
+        "Read the receipt of one static world command.",
+        "dev_ui", True, False,
+        path_params={"id": ("string", "The 32 hex character world id."), "command": ("string", "The command request id.")}),
+    _ep("living_data_dm_host", "living_data", "POST", "/api/living-data/dm/worlds/{id}/host",
+        "Let a renderer host poll for and complete commands.",
+        "dev_ui", True, True, path_params=_ID32,
+        body=_body({"host_token": ("string", False, "The host's token."), "action": ("string", False, "poll or complete."),
+                    "request_id": ("string", False, "The command being completed."), "result": ("object", False, "The completed result.")})),
+    _ep("living_data_dm_close", "living_data", "POST", "/api/living-data/dm/worlds/{id}/close", "Close a static world.",
+        "dev_ui", True, True, path_params=_ID32, body=_body({})),
+    _ep("living_data_worldmap_index", "living_data", "GET", "/api/worldmap/index", "List the stored world maps by repository and commit.",
+        "dev_ui", False, False),
+    _ep("living_data_worldmap_map", "living_data", "GET", "/api/worldmap/map", "Fetch one stored world map.",
+        "dev_ui", False, False,
+        query={"repo": ("string", "The repository name, owner__name."), "commit": ("string", "The 40 hex character commit.")}),
+
+    # ---- photo
+    _ep("photo_jobs", "photo", "GET", "/api/marble_photo/jobs", "List your marble photo jobs.", "photo_read", False, False),
+    _ep("photo_lenses", "photo", "GET", "/api/marble_photo/lenses", "List the available camera lenses.", "photo_read", False, False),
+    _ep("photo_status", "photo", "GET", "/api/marble_photo", "Show the status of a photo job.",
+        "photo_read", False, False, query={"digest": ("string", "The job digest.")}),
+    _ep("photo_image", "photo", "GET", "/api/marble_photo/image", "Fetch a finished photo or artifact as a PNG.",
+        "photo_read", False, False,
+        query={"digest": ("string", "The job digest."), "name": ("string", "The artifact name.")}, returns="png"),
+    _ep("photo_hdr", "photo", "GET", "/api/marble_photo/hdr", "Download a finished photo's HDR file.",
+        "photo_read", False, False,
+        query={"digest": ("string", "The job digest."), "name": ("string", "The artifact name.")}, returns="binary"),
+    _ep("photo_field", "photo", "GET", "/api/marble_photo/field", "Download a photo job's field file.",
+        "photo_read", False, False,
+        query={"digest": ("string", "The job digest."), "name": ("string", "The field name.")}, returns="binary"),
+    _ep("photo_animation", "photo", "GET", "/api/marble_photo/animation", "Download a photo job's orbit animation.",
+        "photo_read", False, False, query={"digest": ("string", "The job digest.")}, returns="binary"),
+    _ep("photo_submit", "photo", "POST", "/api/marble_photo", "Start a photo job from an MRP1 binary upload.",
+        "photo_submit", False, True, request="binary"),
+    _ep("photo_cancel", "photo", "POST", "/api/marble_photo/cancel", "Cancel a photo job.",
+        "photo_submit", False, True, body=_body({"digest": ("string", True, "The job digest.")})),
+    _ep("photo_live", "photo", "POST", "/api/marble_photo/live", "Update or stop the live view of a photo job.",
+        "share_live", False, True,
+        body=_body({"digest": ("string", True, "The job digest."), "stop": ("boolean", False, "True to stop the live view.")}, True)),
+    _ep("photo_retouch", "photo", "POST", "/api/marble_photo/retouch", "Retouch a finished photo.",
+        "photo_submit", False, True, body=_body({"digest": ("string", True, "The job digest.")}, True)),
+    _ep("photo_film_preview", "photo", "POST", "/api/marble_photo/film_preview", "Preview a film look without rendering a photo.",
+        "photo_submit", False, False, body=_body({}, True)),
+    _ep("photo_picture_ask", "photo", "POST", "/api/show/pictures", "Ask the Studio for a picture of a scene.",
+        "photo_submit", True, True,
+        body=_body({"request_id": ("string", True, "A caller id; a repeat returns the same receipt."),
+                    "settings": ("object", False, "Picture settings."), "photo": ("object", False, "Photo options.")})),
+    _ep("photo_picture_receipt", "photo", "GET", "/api/show/pictures/{id}", "Read the receipt of a requested picture.",
+        "photo_submit", True, False, path_params=_ID32),
+
+    # ---- studio
+    _ep("studio_loading_library", "studio", "GET", "/api/loading_library", "List the loading animation library.",
+        None, False, False, tool=False),
+    _ep("studio_loading_anim", "studio", "GET", "/api/loading_anim", "Fetch the active loading animation, or a library entry.",
+        None, False, False, query={"v": ("string", "A library digest; the active animation when omitted.")},
+        returns="binary", tool=False),
+    _ep("studio_loading_anim_put", "studio", "POST", "/api/loading_anim", "Store a loading animation in the library.",
+        "owner_tools", False, True, tool=False, request="binary"),
+    _ep("studio_loading_candidate", "studio", "POST", "/api/loading_candidate", "Store a temporary candidate loading animation.",
+        "play", False, True, tool=False, request="binary"),
+    _ep("studio_loading_activate", "studio", "POST", "/api/loading_library/activate", "Make a library entry the active animation.",
+        "library_manage", False, True, tool=False, body=_body({"digest": ("string", True, "The library entry digest.")})),
+    _ep("studio_loading_graduate", "studio", "POST", "/api/loading_library/graduate", "Graduate a candidate into the library.",
+        "library_manage", False, True, tool=False, body=_body({"digest": ("string", True, "The library entry digest.")})),
+    _ep("studio_loading_delete", "studio", "POST", "/api/loading_library/delete", "Delete a library entry.",
+        "library_manage", False, True, tool=False, body=_body({"digest": ("string", True, "The library entry digest.")})),
+    _ep("studio_obj_assets", "studio", "GET", "/api/obj_assets", "List the OBJ assets you can see.", None, False, False),
+    _ep("studio_obj_asset", "studio", "GET", "/api/obj_assets/{id}", "Show one OBJ asset.",
+        None, False, False, path_params={"id": ("string", "The asset id.")}),
+    _ep("studio_obj_asset_source", "studio", "GET", "/api/obj_assets/{id}/source", "Fetch an OBJ asset's source text.",
+        None, False, False, path_params={"id": ("string", "The asset id.")}, returns="text"),
+    _ep("studio_obj_asset_mtl", "studio", "GET", "/api/obj_assets/{id}/mtl", "Fetch an OBJ asset's material text.",
+        None, False, False, path_params={"id": ("string", "The asset id.")}, returns="text"),
+    _ep("studio_obj_asset_add", "studio", "POST", "/api/obj_assets", "Add an OBJ asset to your account.",
+        "studio_write", True, True, body=_body({}, True)),
+    _ep("studio_marble_objects", "studio", "GET", "/api/marble_objects", "List the marble objects you can see.", None, False, False),
+    _ep("studio_marble_object", "studio", "GET", "/api/marble_objects/{digest}", "Show one marble object.",
+        None, False, False, path_params={"digest": ("string", "The object digest.")}),
+    _ep("studio_marble_object_add", "studio", "POST", "/api/marble_objects", "Save a marble object design.",
+        "studio_write", False, True, body=_body({}, True), headers={"X-Meowdoku-Marble": "1"}),
+    _ep("studio_marble_preview_spec", "studio", "GET", "/api/marble_preview_spec", "Fetch the Studio drive's compute spec for N marbles.",
+        None, False, False, query={"count": ("integer", "Marbles to run, 1 to 16; 1 when omitted.")}),
+    _ep("studio_camera_housing", "studio", "POST", "/api/marble_camera/housing", "Compute a camera housing response.",
+        "studio_write", False, False, body=_body({}, True)),
+
+    # ---- nodus
+    _ep("nodus_instances", "nodus", "GET", "/api/nodus/instances", "List the running Nodus instances.", "dev_ui", False, False),
+    _ep("nodus_digest", "nodus", "GET", "/api/nodus/digest", "Show a Nodus instance's canvas digest.",
+        "dev_ui", False, False, query={"instance": ("string", "The Nodus instance name; the default when omitted.")}),
+    _ep("nodus_graph", "nodus", "GET", "/api/nodus/graph", "Show a Nodus instance's graph.",
+        "dev_ui", False, False, query={"instance": ("string", "The Nodus instance name; the default when omitted.")}),
+    _ep("nodus_tools", "nodus", "GET", "/api/nodus/tools", "List the tools a Nodus instance exposes.",
+        "dev_ui", False, False, query={"instance": ("string", "The Nodus instance name; the default when omitted.")}),
+    _ep("nodus_activity", "nodus", "GET", "/api/nodus/activity", "Show recent activity on a Nodus instance.",
+        "dev_ui", False, False, query={"instance": ("string", "The Nodus instance name; the default when omitted.")}),
+    _ep("nodus_abstract", "nodus", "GET", "/api/nodus/abstract", "Show a Nodus graph as generic nodes.",
+        "dev_ui", False, False, query={"instance": ("string", "The Nodus instance name; the default when omitted.")}),
+    _ep("nodus_map", "nodus", "GET", "/api/nodus/map", "Show a Nodus graph as a Living Data map.",
+        "dev_ui", False, False, query={"instance": ("string", "The Nodus instance name; the default when omitted.")}),
+    _ep("nodus_share", "nodus", "POST", "/api/nodus/share", "Send another user a note about a Nodus instance.",
+        ("dev_ui", "message"), True, True, capability_all=True,
+        body=_body({"instance": ("string", False, "The Nodus instance; the default when omitted."),
+                    "to": ("string", True, "The recipient's username."), "note": ("string", False, "An optional note.")})),
+
+    # ---- control
+    _ep("control_instances", "control", "GET", "/api/control/instances", "List the service instances and recent control requests.",
+        _ADMIN_OR_LIFECYCLE, True, False),
+    _ep("control_instances_request", "control", "POST", "/api/control/instances",
+        "Ask the supervisor to restart, shut down or start an instance.",
+        _ADMIN_OR_LIFECYCLE, True, True,
+        body=_body({"instance": ("string", True, "The instance name."), "action": ("string", True, "restart, shutdown or start."),
+                    "reason": ("string", False, "Why, for the record."),
+                    "delay": ("number", False, "Seconds of countdown before it is performed.")})),
+    _ep("control_instances_cancel", "control", "POST", "/api/control/instances/cancel", "Cancel a control request not yet performed.",
+        _ADMIN_OR_LIFECYCLE, True, True, body=_body({"id": ("integer", True, "The request id.")})),
+    _ep("control_route", "control", "GET", "/api/route", "Show the server routes and which one this browser is on.", None, False, False),
+    _ep("control_route_set", "control", "POST", "/api/route", "Choose the Stable or Development server route.",
+        "dev_ui", False, True,
+        body=_body({"route": ("string", False, "A route name from the routes list."),
+                    "site": ("string", False, "stable or dev; used instead of route.")})),
+    _ep("control_log", "control", "GET", "/api/log", "Read the server's text log ring.",
+        "dev_ui", False, False,
+        query={"since": ("integer", "Return entries after this sequence number."), "limit": ("integer", "Entries to return; 500 when omitted."),
+               "src": ("string", "Comma separated sources to keep.")}),
+    _ep("control_lifecycle", "control", "GET", "/api/lifecycle", "Show the shutdown countdown and this session's restorable copy.",
+        None, False, False,
+        query={"snap": ("string", "Set to include this session's snapshot."), "have": ("string", "The snapshot id you already hold.")},
+        tool=False),
+    _ep("control_lifecycle_restore", "control", "POST", "/api/lifecycle/restore", "Re-seed this session from a saved copy.",
+        None, False, True, body=_body({"dump": ("object", False, "The session copy.")}), tool=False),
+    _ep("control_lifecycle_admin", "control", "POST", "/api/admin/lifecycle", "Request a save, restart or exit with the loopback token.",
+        "owner_tools", False, True, body=_body({}, True), tool=False),
+
+    # ---- profile
+    _ep("profile_me", "profile", "GET", "/api/profile/me", "Show your account summary and what it may do.", None, True, False),
+    _ep("profile_instances", "profile", "GET", "/api/profile/instances", "List the declared service instances and their state.",
+        _ADMIN_OR_LIFECYCLE, True, False),
+    _ep("profile_leases", "profile", "GET", "/api/profile/leases", "List the open server leases.",
+        _ADMIN_OR_LIFECYCLE, True, False),
+    _ep("profile_diagnostics", "profile", "GET", "/api/profile/diagnostics", "Read recent diagnostics for an instance.",
+        _ADMIN_OR_LIFECYCLE, True, False,
+        query={"name": ("string", "The instance name."), "lines": ("integer", "Lines to return; 80 when omitted.")}),
+
+    # ---- reports
+    _ep("reports_list", "reports", "GET", "/api/reports", "List your experience reports.",
+        "dev_ui", True, False,
+        query={"offset": ("integer", "Page offset."), "category": ("string", "DOC, TTICKET, AUDIT or LOG.")}),
+    _ep("reports_map", "reports", "GET", "/api/reports/map", "Show your experience reports as a map.",
+        "dev_ui", True, False,
+        query={"offset": ("integer", "Page offset."), "category": ("string", "DOC, TTICKET, AUDIT or LOG.")}),
+    _ep("reports_get", "reports", "GET", "/api/reports/{id}", "Read one experience report.",
+        "dev_ui", True, False, path_params=_ID32),
+    _ep("reports_make", "reports", "POST", "/api/reports", "Write an experience report.",
+        "dev_ui", True, True,
+        body=_body({"request_id": ("string", True, "A caller id; a repeat returns the same report."),
+                    "category": ("string", True, "DOC, TTICKET, AUDIT or LOG."), "title": ("string", True, "Title, at most 200 characters."),
+                    "body": ("string", True, "Body text."),
+                    "prompt_history": ("array", True, "The prompts that shaped the work, as text."),
+                    "next_steps": ("array", True, "Next steps, as text; may be empty.")})),
+    _ep("reports_issues_list", "reports", "GET", "/api/issues", "List issue tickets.",
+        "view_site", True, False,
+        query={"scope": ("string", "mine or another scope; mine when omitted."), "status": ("string", "A status, or all."),
+               "offset": ("integer", "Page offset.")}),
+    _ep("reports_issue_get", "reports", "GET", "/api/issues/{id}", "Read one issue ticket.",
+        "view_site", True, False, path_params={"id": ("string", "The ticket id.")},
+        query={"before_version": ("integer", "Read the ticket as of an earlier version.")}),
+    _ep("reports_issue_create", "reports", "POST", "/api/issues", "Open an issue ticket.",
+        "view_site", True, True, headers={"X-Meowdoku-Issue": "1"},
+        body=_body({"title": ("string", False, "Title, at most 200 characters."), "description": ("string", False, "Description."),
+                    "diagnostics": ("object", False, "Diagnostic data."), "client_key": ("string", False, "A caller key for safe retries.")})),
+    _ep("reports_issue_status", "reports", "POST", "/api/issues/{id}/status", "Change an issue ticket's status.",
+        "view_site", True, True, path_params={"id": ("string", "The ticket id.")}, headers={"X-Meowdoku-Issue": "1"},
+        body=_body({"status": ("string", True, "The new status."), "note": ("string", True, "A note on the change."),
+                    "version": ("integer", True, "The ticket version you last read.")})),
+    _ep("reports_tickets_list", "reports", "GET", "/api/tickets", "List legacy tickets, or read one.",
+        "dev_ui", False, False, query={"id": ("string", "A ticket id; all tickets when omitted.")}),
+    _ep("reports_tickets_submit", "reports", "POST", "/api/tickets", "Submit a legacy ticket.",
+        "play", False, True, body=_body({}, True), headers={"X-Meowdoku-Ticket": "1"}),
+    _ep("reports_tickets_status", "reports", "POST", "/api/tickets/status", "Change a legacy ticket's status.",
+        "owner_tools", False, True, headers={"X-Meowdoku-Ticket": "1"},
+        body=_body({"id": ("string", True, "The ticket id."), "status": ("string", True, "The new status."),
+                    "note": ("string", False, "A note on the change.")})),
+
+    # ---- compile
+    _ep("compile_divider_jobs", "compile", "GET", "/api/divider/jobs", "List your source divider jobs.",
+        "compile_submit", True, False),
+    _ep("compile_divider_job", "compile", "GET", "/api/divider/jobs/{id}", "Show one source divider job.",
+        "compile_submit", True, False, path_params={"id": ("string", "The 12 hex character job id.")}),
+    _ep("compile_divider_submit", "compile", "POST", "/api/divider/jobs", "Record a repository link as a divider job.",
+        "compile_submit", True, True,
+        body=_body({"repo": ("string", False, "The repository link."), "ref": ("string", False, "The ref to divide.")})),
+    _ep("compile_divider_cancel", "compile", "POST", "/api/divider/jobs/{id}/cancel", "Cancel a divider job.",
+        "compile_submit", True, True, path_params={"id": ("string", "The 12 hex character job id.")}),
+    _ep("compile_mathlab_jobs", "compile", "GET", "/api/mathlab/jobs", "List your math lab jobs.", "compile_submit", True, False),
+    _ep("compile_mathlab_job", "compile", "GET", "/api/mathlab/jobs/{id}", "Show one math lab job.",
+        "compile_submit", True, False, path_params={"id": ("string", "The 16 hex character job id.")}),
+    _ep("compile_mathlab_file", "compile", "GET", "/api/mathlab/jobs/{id}/file/{name}", "Fetch one product file of a math lab job.",
+        "compile_submit", True, False,
+        path_params={"id": ("string", "The 16 hex character job id."), "name": ("string", "A product file name the job lists.")},
+        returns="text"),
+    _ep("compile_mathlab_submit", "compile", "POST", "/api/mathlab/jobs", "Submit a law to the math lab.",
+        "compile_submit", True, True,
+        body=_body({"text": ("string", True, "The law source text."), "targets": ("array", False, "Target names to build.")})),
+    _ep("compile_mathlab_profile", "compile", "POST", "/api/mathlab/jobs/{id}/browser_profile",
+        "Record a browser timing for a completed math lab job.",
+        "compile_submit", True, True, path_params={"id": ("string", "The 16 hex character job id.")},
+        body=_body({"target": ("string", True, "wasm or wgsl."), "rows": ("integer", True, "Rows timed, 1 to 1e9."),
+                    "ns_per_row": ("number", True, "Nanoseconds per row."),
+                    "max_abs_err": ("number", False, "Largest absolute error seen."),
+                    "user_agent_hint": ("string", False, "The browser, at most 200 characters.")})),
+    _ep("compile_lowerings", "compile", "GET", "/api/lowerings", "List the lowering cores and their stored lowerings.",
+        "view_site", False, False),
+    _ep("compile_lowering_blob", "compile", "GET", "/api/lowerings/blob/{sha}", "Fetch a leased lowering's bytes.",
+        "studio_write", False, False, path_params={"sha": ("string", "The 64 hex character sha256 of the blob.")}, returns="binary"),
+    _ep("compile_lowering_checkout", "compile", "POST", "/api/lowerings/checkout", "Lease a lowering that fits a purpose.",
+        "studio_write", False, True,
+        body=_body({"purpose": ("array", True, "Two strings: family and name."),
+                    "capabilities": ("array", True, "Backend capability names."),
+                    "prefer": ("array", False, "Preferred backend names."),
+                    "seconds": ("number", False, "Lease length in seconds, up to 3600; 60 when omitted.")})),
+    _ep("compile_lowering_checkin", "compile", "POST", "/api/lowerings/checkin", "Return a lowering lease.",
+        "studio_write", False, True,
+        body=_body({"lease_id": ("integer", True, "The lease id."), "generation": ("integer", True, "The lease generation.")})),
+
+    # ---- site
+    _ep("site_map_root", "site", "GET", "/site/{map}/", "Read a declared map's root place as an HTML page.",
+        None, False, False, path_params={"map": ("string", "The map name.")}, returns="html"),
+    _ep("site_place", "site", "GET", "/site/{map}/{address}.html", "Read one place of a declared map as an HTML page.",
+        None, False, False,
+        path_params={"map": ("string", "The map name."), "address": ("string", "The place address.")}, returns="html"),
+
+    # ---- play
+    _ep("play_state", "play", "GET", "/api/state", "Read this browser table's game state.", None, False, False, tool=False),
+    _ep("play_catalog", "play", "GET", "/api/catalog", "List the games, levels and boards.", None, False, False, tool=False),
+    _ep("play_new", "play", "POST", "/api/new", "Start a game on this browser table.", None, False, True,
+        body=_body({"game": ("string", False, "The game name."), "id": ("string", False, "The board id.")}, True), tool=False),
+    _ep("play_action", "play", "POST", "/api/action", "Send one action to this browser table's game.",
+        None, False, True, body=_body({"type": ("string", False, "The action type.")}, True), tool=False),
+    _ep("play_action_batch", "play", "POST", "/api/action/batch", "Send a batch of actions to this browser table's game.",
+        None, False, True, body=_body({"actions": ("array", False, "The actions, up to 64 KiB in all.")}, True), tool=False),
+    _ep("play_profile", "play", "GET", "/api/profile", "Read this browser's player profile and the game's top scores.",
+        None, False, False, tool=False),
+    _ep("play_profile_set", "play", "POST", "/api/profile", "Pick this browser's player profile.",
+        None, False, True, body=_body({"name": ("string", False, "The profile name.")}, True), tool=False),
+    _ep("play_spectate_watch", "play", "GET", "/api/spectate/watch", "Poll a shared session as a viewer.",
+        None, False, False,
+        query={"vid": ("string", "The viewer id."), "rev": ("string", "The revision you hold."), "lrev": ("integer", "The live revision you hold."),
+               "nostate": ("string", "Set to 1 when a socket carries the game."), "gk": ("string", "The game key you hold."),
+               "kseq": ("integer", "The keyframe sequence you hold.")}, tool=False),
+    _ep("play_spectate", "play", "POST", "/api/spectate", "Start, stop or read the live spectating of your table.",
+        None, False, True, body=_body({"op": ("string", False, "start, stop or status.")}), tool=False),
+    _ep("play_spectate_key", "play", "POST", "/api/spectate/key", "Push the owner's position keyframe to spectators.",
+        None, False, True, body=_body({"key": ("string", False, "Base64 keyframe.")}), tool=False),
+    _ep("play_spectate_live", "play", "POST", "/api/spectate/live", "Push the owner's live state to spectators.",
+        None, False, True, body=_body({"live": ("object", False, "The live state.")}), tool=False),
+    _ep("play_share_create", "play", "POST", "/api/share", "Store a view and get a share id.",
+        None, False, True, body=_body({"view": ("object", False, "The view to share.")}), tool=False),
+    _ep("play_share_get", "play", "GET", "/api/share/{id}", "Read a shared view.",
+        None, False, False, path_params={"id": ("string", "The share id.")}, tool=False),
+    _ep("play_clientlog", "play", "POST", "/api/clientlog", "Report a page's uncaught error to the server log.",
+        None, False, True,
+        body=_body({"kind": ("string", False, "The error kind."), "msg": ("string", False, "The message."),
+                    "where": ("string", False, "Where it happened."), "stack": ("string", False, "The stack."),
+                    "ua": ("string", False, "The user agent.")}), tool=False),
+    _ep("play_ready", "play", "GET", "/api/ready", "Show per-product readiness and the loading animation.",
+        None, False, False, tool=False),
+    _ep("play_client_rays_join", "play", "POST", "/api/client_rays/join", "Join a photo job's client ray participation.",
+        "share_live", False, True, body=_body({"job": ("string", False, "The photo job.")}), tool=False),
+    _ep("play_client_rays_engine", "play", "POST", "/api/client_rays/engine/{action}",
+        "Worker-only mailbox for a photo engine on loopback.",
+        None, False, True, path_params={"action": ("string", "The engine action, for example scene.")},
+        body=_body({}, True), tool=False),
+)
+
+
+def by_name() -> dict:
+    """name -> endpoint."""
+    return {e["name"]: e for e in ENDPOINTS}
+
+
+def allowed(endpoint, capabilities, signed_in) -> bool:
+    """True when this caller may use the endpoint: signed in if it needs an account, and holding its capability."""
+    if endpoint["account"] and not signed_in:
+        return False
+    need = endpoint["capability"]
+    if need is None:
+        return True
+    have = set(capabilities or ())
+    if isinstance(need, (tuple, list)):
+        return (all if endpoint.get("capability_all") else any)(c in have for c in need)
+    return need in have
+
+
+def public(endpoint, capabilities=None, signed_in=False) -> dict:
+    """A JSON-serializable copy of an endpoint; with ``capabilities`` given it also carries ``allowed``."""
+    out = _copy(endpoint)
+    if capabilities is not None:
+        out["allowed"] = allowed(endpoint, capabilities, signed_in)
+    return out
+
+
+def index(capabilities=None, signed_in=False, group=None) -> dict:
+    """The whole catalog as one JSON document; with ``capabilities`` given every endpoint says whether it is allowed."""
+    rows = [public(e, capabilities, signed_in) for e in ENDPOINTS if group is None or e["group"] == group]
+    return {"catalog_version": CATALOG_VERSION, "groups": dict(GROUPS), "endpoints": rows}
+
+
+def _copy(value):
+    if isinstance(value, dict):
+        return {k: _copy(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_copy(v) for v in value]
+    return value

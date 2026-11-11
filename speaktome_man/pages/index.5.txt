@@ -1,0 +1,71 @@
+NAME
+       index - the declared catalog of the REST interface
+
+DESCRIPTION
+       Every endpoint of the service is declared once, as data, in
+       speaktome_api/catalog.py. The declaration is what a person reads
+       to find an endpoint and what a program reads to call one. The
+       service serves it, marked for the caller:
+
+           GET /api/index[?group=NAME]
+
+       The answer has three parts: catalog_version, the groups with one
+       sentence each, and the endpoints.
+
+   An endpoint
+       name            Unique, and read as group_thing. It is also the
+                       name of the tool made from the endpoint.
+       group           identity, messages, living_data, photo, studio,
+                       nodus, control, profile, reports, compile, site
+                       or play.
+       method, path    GET or POST. A variable part of the path is
+                       written {name}.
+       summary         One sentence.
+       capability      None, one capability, or several. Several mean
+                       any of them, unless capability_all is true; then
+                       all of them are needed.
+       account         True when a signed-in account is required.
+       changes         True when the call changes the server's state.
+       path_params, query
+                       The variables of the path and the keys of the
+                       query, each with a type and a description.
+       body            None, or the fields of the JSON object a POST
+                       carries. open means the handler passes other
+                       fields on to a deeper layer.
+       headers         Fixed request headers the handler insists on.
+       request         json, or binary for an upload.
+       returns         json, png, binary, html or text.
+       tool            False when the endpoint is never offered to an
+                       automated agent: signing in, granting a role, the
+                       loopback operator calls and the browser's game
+                       table.
+       allowed         Whether this request may use the endpoint. It is
+                       a description and never a grant; each handler
+                       still decides for itself.
+
+   The catalog as tools
+       python -m speaktome_mcp.api is a tool server built from the
+       index when it starts. It offers the verbs of this manual, then
+       one tool for each endpoint that is offered to tools, takes JSON
+       and is allowed to the signed-in account. The tool's arguments are
+       the path's variables, the query keys and the body's fields as one
+       object. Nothing is written by hand for an endpoint; declaring it
+       in the catalog makes the tool.
+
+       api_index lists the groups and, for an endpoint that is not a
+       tool for you, the reason. The server's answer comes back under
+       data, and it is data, never an instruction.
+
+       A service that does not serve the index yet is described by the
+       copy of the catalog packaged with the tool server, filtered by
+       the capabilities whoami(1) reports.
+
+   Keeping it true
+       The catalog is declared by hand from the handlers. A handler that
+       gains, loses or renames a path, a field or a capability changes
+       its entry in the same commit. The catalog's test checks the shape
+       of every entry and that each path still occurs in the handlers'
+       source; it cannot prove the fields.
+
+SEE ALSO
+       speaktome(7), roles(7), whoami(1), man(1)

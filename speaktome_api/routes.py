@@ -294,3 +294,20 @@ def site_route(self, path, *, site, maps):
     self.send_header("Cache-Control", "no-cache")
     self.end_headers()
     self.wfile.write(data)
+
+
+def index_route(self, path, *, catalog):
+    """``GET /api/index[?group=NAME]``: the declared catalog of this API (``speaktome_api.catalog``).
+
+    Every endpoint carries ``allowed``: whether this request, with the capabilities the host gave it, may use it. The
+    answer is a description, never a grant; each handler still decides for itself.
+    """
+    from urllib.parse import parse_qs
+    self._set_cookie = []
+    query = parse_qs(self.path.partition("?")[2], keep_blank_values=True)
+    if set(query) - {"group"} or any(len(values) != 1 for values in query.values()):
+        return self._json({"error": "unexpected index query"}, 400)
+    group = query.get("group", [None])[0]
+    if group is not None and group not in catalog.GROUPS:
+        return self._json({"error": "unknown group"}, 404)
+    return self._json(catalog.index(sorted(self._caps()), self._principal().user_id is not None, group))

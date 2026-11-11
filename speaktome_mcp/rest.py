@@ -71,10 +71,15 @@ class Rest:
             raise RestError("the secret file is empty")
         return secret
 
-    def _http(self, path: str, body=None, timeout: float = 40, secret: str | None = None, raw_limit: int | None = None):
+    def _http(self, path: str, body=None, timeout: float = 40, secret: str | None = None, raw_limit: int | None = None,
+              method: str | None = None, headers: dict | None = None):
+        if method == "POST" and body is None:
+            body = {}                          # a POST always carries a JSON object, as every handler here expects
         data = None if body is None else json.dumps(body, ensure_ascii=False).encode("utf-8")
-        request = urllib.request.Request(self.base + path, data=data, method="GET" if body is None else "POST",
-                                         headers={"Content-Type": "application/json"} if body is not None else {})
+        sent = dict(headers or {})
+        if body is not None:
+            sent["Content-Type"] = "application/json"
+        request = urllib.request.Request(self.base + path, data=data, method="GET" if body is None else "POST", headers=sent)
         try:
             with self.opener.open(request, timeout=timeout) as response:
                 if raw_limit is not None:      # a file, not JSON: the bytes and their declared type, bounded
@@ -121,15 +126,20 @@ class Rest:
         text = error.message.lower()
         return error.status == 401 or (error.status == 403 and ("sign in" in text or "signed in" in text))
 
-    def call(self, path: str, body=None, timeout: float = 40, raw_limit: int | None = None):
-        """One request as the signed-in account. With ``raw_limit`` the answer is ``(bytes, content type)``, not JSON."""
+    def call(self, path: str, body=None, timeout: float = 40, raw_limit: int | None = None, *,
+             method: str | None = None, headers: dict | None = None):
+        """One request as the signed-in account. With ``raw_limit`` the answer is ``(bytes, content type)``, not JSON.
+
+        ``method="POST"`` sends an empty JSON object when there is no body; ``headers`` are fixed request headers a
+        handler insists on. Neither can carry a credential: the session cookie is the only one this object holds.
+        """
         if not self.signed_in:
             self.sign_in()
         try:
-            return self._http(path, body, timeout, raw_limit=raw_limit)
+            return self._http(path, body, timeout, raw_limit=raw_limit, method=method, headers=headers)
         except RestError as error:
             if not self._unsigned(error):
                 raise
         self.signed_in = False
         self.sign_in()
-        return self._http(path, body, timeout, raw_limit=raw_limit)
+        return self._http(path, body, timeout, raw_limit=raw_limit, method=method, headers=headers)
