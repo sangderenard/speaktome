@@ -4,6 +4,7 @@ This document summarizes the major directories in `speaktome` and their purpose.
 
 - `AGENTS/` – meta guidelines, experience reports, and shared agent resources.
 - `speaktome/` – the main Python package.
+- `speaktome_api/` - shared REST handlers; no independent listener or state store.
 - `tests/` – automated pytest suite.
 - `testing/` – ad‑hoc helper scripts (manual demos, test runner wrappers).
 - `models/` – small pretrained models for demos.

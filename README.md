@@ -11,6 +11,7 @@ This directory is itself one project within the larger `C:\dev\Powershell` works
 - **tensorprinting** — experimental Grand Printing Press package.
 - **timesync** — system-clock offset helpers.
 - **AGENTS/tools** — shared repository-management helpers.
+- **speaktome_api** - [shared REST contracts](speaktome_api/README.md) for messaging and Living Data, hosted by the existing service.
 
 See [`AGENTS/CODEBASE_REGISTRY.md`](AGENTS/CODEBASE_REGISTRY.md) for the canonical registry and [`AGENTS_FILESYSTEM_MAP.md`](AGENTS_FILESYSTEM_MAP.md) for orientation.
 
