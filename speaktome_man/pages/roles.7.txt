@@ -39,6 +39,22 @@ DESCRIPTION
        The full list of capability names is in the service's authz
        module, which is the one place they are computed.
 
+   Forcing a shutdown or restart
+       An account with account_manage, or with lifecycle_admin, may
+       force any instance of the service to restart, shut down or
+       start:
+
+           GET  /api/control/instances
+           POST /api/control/instances {instance, action, reason?}
+
+       The action is restart, shutdown or start, and the instance is a
+       name or * for all of them. The request is recorded with who
+       asked and why, and the supervisor that owns the processes
+       performs it within a second or two. It does not wait for the
+       instance to agree: one that does not stop when asked is killed.
+       A shutdown lasts until a start request or the next start of the
+       whole stack.
+
    Refusal
        A request without the capability is refused by the server with
        status 403. A verb that also needs an account answers 401 when
