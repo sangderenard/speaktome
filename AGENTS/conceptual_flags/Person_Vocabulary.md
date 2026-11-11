@@ -4,7 +4,7 @@
 
 **Date:** 1794371163 (2026-11-10)
 
-**Version:** v0.1.0 (draft; one question in section 6 is the owner's to decide)
+**Version:** v0.2.0 (draft; entity and narrator as the owner defined them 2026-11-10; section 7 added)
 
 ## Conceptual Innovation Description
 
@@ -33,7 +33,7 @@ An agent has five facets. Each is the same agent, seen by a different system.
 |---|---|---|---|
 | On a server | **account** | The agent's standing on one server: a login and what it may do | `users` row, `users.id` (`M/accounts.py:82`) |
 | In one request | **principal** | The account as seen for this request, from this place | `Principal(role, user_id, username, origin, tier)` (`M/authz.py:163`) |
-| In a world | **entity** | The agent's body: durable, located, presentable | Game: `AbstractUIEntity` (`turing/src/compiler/abstract_ui_entities.py`). Nodus: design contract only (`nodus/docs/GRAPH_ENTITY_AND_SPRITE_CONTRACT.md`) |
+| In a world | **entity** | A cursor on a graph. It stands at a place, or several, and by standing there it is using that place's resource or state | Living data cursor (`turing/examples/meowdoku/living_data_cursor.py`, routes in `speaktome_api/routes.py`). Game body: `AbstractUIEntity` (`turing/src/compiler/abstract_ui_entities.py`). Nodus: design contract only (`nodus/docs/GRAPH_ENTITY_AND_SPRITE_CONTRACT.md`) |
 | In the repository | **author** | Who wrote a thing | Git author and `Co-Authored-By` trailers only; no record joins them to an account |
 | Among others | **contact** | Another agent this one has agreed to hear from | `msg_contacts` (`M/messaging.py:55`) |
 
@@ -48,6 +48,21 @@ Two bindings connect the facets, and both already have names:
 So: an **agent** holds an **account**; each request sees it as a **principal** with a **role**; a **controller** lease
 puts it in an **entity**; what it writes names it as **author**; the agents it has agreed to hear from are its
 **contacts**.
+
+**What an entity is** (owner, 2026-11-10): "an entity or whatever you want to call it is a user, they embody a place or
+places that relate to that they are using some resource or state and in that they are thread identities in a sense,
+but also just anything, the cat in a story, there a graph and it's a cursor on the graph."
+
+- An entity is a **cursor on a graph**. That is the whole definition; a body, a sprite or a marble is how it is shown.
+- An entity need not be an agent's. The cat in a story is an entity whose controller is the story.
+- Where an entity stands is what it is using. Standing at a node is holding that node's resource or state, which is
+  why an entity is a thread identity in a program and a character in a story at the same time.
+- An entity may stand in more than one place.
+
+The record already exists for the first three points: a living data **cursor** has a map, a position, and moves along
+declared edges with a revision check (`POST /api/living-data/sessions`, `GET .../{id}`, `POST .../{id}/move`,
+`POST .../{id}/close`). It is owned by an account. It does not yet advance anything or hold a resource: OBSERVED, the
+documents say the cursor is graph position only.
 
 ## 2. How the facets join today
 
@@ -116,8 +131,10 @@ say plainly that no game-master role, multiplayer identity, mutation or simulati
 Proposed words, all NEW as roles:
 
 - **map**: a graph made walkable. It holds what is true.
-- **narrator**: the agent that says what is the case and directs what is shown. `inspect` is the narrator saying what
-  a thing is; `render` is the narrator directing a picture of it.
+- **narrator**: an agent, a person or an automated script, that describes something and is able to alter state
+  (owner, 2026-11-10: "the narrator is an agent, person, or automated script describing something and being able to
+  alter state"). `inspect` is the narrator saying what a thing is; `render` is the narrator directing a picture of it.
+  Altering state is NEW: nothing a narrator can call today changes a map.
 - **character**: an entity taking part in a story on a map.
 - **audience**: agents who are shown the story and do not act in it (today's **viewer**, on a story).
 
@@ -133,6 +150,40 @@ the map keep both and let the dial choose?
   place, guests carrying their own permanence, and the dial at the door.
 
 The vocabulary above holds under either answer; only the direction of an action changes.
+
+## 7. The basic vocabulary: where a program and a text adventure are the same thing
+
+Owner, 2026-11-10: "rest api is how we make programming and text adventure the same thing with a smart basic
+vocabulary". A graph is a map; an entity is a cursor on it; a request is a sentence. The same small set of verbs is a
+command in an adventure and a call in a program. Most of them already exist as endpoints.
+
+| Verb | In a text adventure | In a program | REST today | State |
+|---|---|---|---|---|
+| **look** | "Look around." | Read the neighbourhood of a node | `POST /api/living-data/query {map, at, layer, radius}` | OBSERVED |
+| **enter** | "You step onto the road." | Open a cursor at a node | `POST /api/living-data/sessions {map, at}` | OBSERVED |
+| **where** | "Where am I, and what are the exits?" | Read the cursor: text and exits | `GET /api/living-data/sessions/{id}` | OBSERVED |
+| **go** | "Go north." | Follow one declared edge | `POST .../{id}/move {to, relationship, direction, expected_revision}` | OBSERVED |
+| **leave** | "You leave." | Close the cursor | `POST .../{id}/close` | OBSERVED |
+| **examine** | "Examine the lantern." | Read one object's exact record | DM command `inspect` | OBSERVED, narrator only |
+| **show** | "Paint me the scene." | Render a view of the state | DM command `render-phong`, done by a render host | OBSERVED, narrator only |
+| **say** | "Tell the keeper ..." | Send a message to a contact | `POST /api/messages/send` | OBSERVED |
+| **take** | "This place is mine." | Occupy a place; hold a resource | none | NEW (the occupant entry of a place's document) |
+| **use** | "Pull the lever." | Invoke a declared action of a node | none | NEW (an action on a tool, a row or a machine part) |
+| **make** | "Build a wall here." | Change the graph | none | NEW, and the narrator's power to alter state |
+
+Rules that keep it one language:
+
+1. A verb names what is done to the graph, never how the client draws it.
+2. Every verb is one request with one answer, and the answer is both data and a sentence. The cursor endpoint already
+   answers with text and exits.
+3. A request that might be retried carries a request id, and a move states the revision it expects; both already hold
+   for cursors and messages. That is what makes a story safe to tell twice.
+4. An entity that is not an agent's (the cat) takes the same verbs; its controller is a script or the narrator.
+5. Who may use which verb is a capability of the role, decided by the server, as everything else is.
+
+The last three verbs are where the game and the operating system meet: **take** is how a thread holds a resource,
+**use** is how a row or a machine part is invoked, and **make** is how a graph is edited. Nodus has the things these
+would act on (modules, rows, FIFOs, contract ports); none is reachable through the story yet.
 
 ## Relevant Files and Components
 
