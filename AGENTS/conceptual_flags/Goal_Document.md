@@ -70,10 +70,12 @@ marked NEW does not exist.
   carries its dependencies by copy has not had its linking done.
 - Dream in, dream out works for Python blocks (a record fed back in rebuilt every part to the same product). It
   proves the units stage; it says nothing about coordination.
-- The manual's hard copy is baked by the web server itself today (at start, and as the host of the cron task
+- The manual's hard copy was baked by the web server itself (at start, and as the host of the cron task
   `manual.hardcopy`). By the owner's point that is the wrong place: the server should serve, and a worker should bake.
   The cron tool already separates WHO ASKS from WHO PERFORMS, so moving the work is a matter of which process joins the
-  cron prefix as the host. The full site export (`web_export.py`) is run by hand today and belongs to the same worker.
+  cron prefix as the host. Done in source the same day (turing `8ea44581`): `deploy/task_worker.py` is that worker,
+  it also takes the nightly state backup, and the server lost the role. It is live only after the next restart. The
+  full site export (`web_export.py`) is still run by hand and belongs to the same worker next.
 
 ## 3. What a Goal document has to hold (a reading, not a design)
 

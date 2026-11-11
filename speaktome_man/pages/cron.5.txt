@@ -86,9 +86,17 @@ EXAMPLE
        report 0 6 * * * missed=all max_catch_up=2
 
 NOTES
-       The published hard copy of this manual is kept by the task
-       manual.hardcopy. It compares the manual with the copy last baked
-       and rebuilds the copy only when they differ.
+       The site's tasks are performed by a task worker, a process of its
+       own. The web server serves and does none of them.
+
+           manual.hardcopy   Compares the manual with the published hard
+                             copy and rebuilds the copy only when they
+                             differ.
+           state.backup      Takes one snapshot of the service's state
+                             each night and keeps a small number of
+                             them. Large binary products, such as photo
+                             jobs, are left out; they are a different
+                             policy.
 
        The table is read when the canvas host starts. A table that
        cannot be read leaves the tool off, with the reason in cron.log;
