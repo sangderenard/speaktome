@@ -67,5 +67,14 @@ DESCRIPTION
        Where a rule of the remote forbids deleting a branch, the copy
        there is left and the report says so.
 
+   Who removes
+       One account removes from the core and no other: the cleanup
+       account, shown as Pale Rider. Nobody signs in as it; the task
+       worker performs the cleaning in its name, and every notice of
+       removal is signed with it. reviews_removed lists the notices.
+       Its other job is to notice improper saves: what the core's own
+       checkouts hold outside a commit. It reports those and removes
+       nothing.
+
 SEE ALSO
        index(5), speaktome(7), roles(7), report(5)
