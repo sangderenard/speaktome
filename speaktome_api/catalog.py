@@ -32,6 +32,7 @@ GROUPS = {
     "profile": "The profile page data: your account summary and, for operators, instances and leases.",
     "reports": "Experience reports, account-owned issue tickets and legacy tickets.",
     "reviews": "Changes put up for peer review before they reach a default branch.",
+    "files": "The flat index of every file in the core, kept by the cleanup account.",
     "compile": "Compile-side jobs: the source divider, the math lab and the lowering leases.",
     "site": "Maps rendered as read-only web pages.",
     "play": "The game table tied to a browser session, sharing and spectating, and page support calls.",
@@ -336,6 +337,22 @@ ENDPOINTS = (
         None, False, False,
         query={"repository": ("string", "The repository's name in the branch policy."),
                "head": ("string", "The full 40-character commit id.")}),
+
+    # ---- files (turing examples/meowdoku/file_index.py)
+    _ep("files_search", "files", "GET", "/api/files/search", "Filter the flat index of the core's files by name, kind, size, age and state.",
+        "dev_ui", True, False,
+        query={"q": ("string", "Text the path contains."), "repository": ("string", "Only this repository."),
+               "ext": ("string", "Only this file extension, without the dot."),
+               "status": ("string", "tracked, modified, untracked or ignored."),
+               "under": ("string", "Only files under this folder of the repository."),
+               "min_bytes": ("integer", "At least this large."), "max_bytes": ("integer", "At most this large."),
+               "newer_than": ("number", "Changed after this Unix time."), "older_than": ("number", "Changed before this Unix time."),
+               "binary": ("boolean", "True for binary files only, false for text only."),
+               "order": ("string", "path, name, ext, bytes, mtime, lines, commits, last_commit_at, first_commit_at or depth; - in front for descending."),
+               "limit": ("integer", "Rows to return, at most 500; 100 when omitted."),
+               "offset": ("integer", "Rows to skip.")}),
+    _ep("files_summary", "files", "GET", "/api/files/summary", "Show when the file index was built and its totals by state and kind.",
+        "dev_ui", True, False),
 
     # ---- control
     _ep("control_instances", "control", "GET", "/api/control/instances", "List the service instances and recent control requests.",
