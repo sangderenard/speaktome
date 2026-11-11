@@ -4,7 +4,7 @@
 
 **Date:** 1794407400 (2026-11-11)
 
-**Version:** v0.1.0 (draft; the chain and its words as the owner stated them; nothing here is built except where marked OBSERVED)
+**Version:** v0.2.0 (the owner answered two questions; a first Goal document format exists and the builder writes it)
 
 ## Conceptual Innovation Description
 
@@ -92,16 +92,43 @@ lowered. When every node is lowered and every edge is resolved, the graph is exe
 typed nodes and edges is what Nodus already calls a graph definition. That would make "actionable system diagram"
 literal.
 
-## 4. Open, for the owner
+## 4. Answered by the owner, 2026-11-11
 
-1. Is the goal stated up front by the author (a target the processing works toward and may fall short of), or is it
-   the name of the processed result?
-2. Is the Goal document a dream document with new kinds of block (a link block, a unit block), or a separate format?
-3. As Nodus nodes: one row tool per compiled unit, with an edge for each link? That is the shape
+> "The processed result. A new format with linking syntax and abi/api comment tables, ready to be a graph
+> representation of itself because then anything can work with it"
+
+So: the goal is the name of the processed result, never declared beforehand (question 1), and the Goal document is a
+format of its own (question 2). What was built from that the same day:
+
+- `speaktome_goal/` (`speaktome.goal-document.v1`, standard library only): `render`, `parse`, `load`, `as_graph`,
+  `as_map`. Blocks framed by comment sentinels; a header line is `key = value` or a table row; the first row of each
+  table names its columns. Unit tables `api`, `link`, `build`, `abi`; document table `target`. Manual page `goal(5)`.
+- The linking syntax is the `link` table: a name the unit's text uses, the unit and entry that provide it, and how it
+  is bound (`reference` or `carried`).
+- turing `source_divider.write_goal_document` writes `<job>/goal.goal`. A unit's text is cut from its closure by
+  walking from its own definitions; what another unit provides is left out and becomes a link row. `api` rows are the
+  authored signatures; `build` rows are the completed lowerings, each naming its block in `record.dream`; `abi` rows
+  come from the product's own api description.
+- A graph of itself: `as_graph` gives goal, target, unit and build nodes with `contained-by`, `links-to`, `built-for`
+  and `achieves` edges; `as_map` gives the same as a map, so the existing pages, cursor and examine work on it
+  (`deploy/bake_site.py --goal-file`).
+
+What that does NOT yet do, stated plainly:
+
+- The builds listed were each made from a part that carried its dependencies by copy. Nothing builds the units
+  joined; the compiler's `linked_dependencies` path is where that would happen. The document says how they join.
+- It does not run as Nodus nodes. `as_graph` is a generic graph, not a `nodus.graph-definition.v1`.
+- It covers the units of the divided language. Blocks of other languages that rode through the units record are not
+  units of the Goal document yet.
+- "achieved" is counted per language: every unit has a build for it. Whether those builds run together is not tested.
+
+## 5. Still open, for the owner
+
+1. As Nodus nodes: one row tool per compiled unit, with an edge for each link? That is the shape
    `nodus.graph-definition.v1` already describes.
-4. The workers (baker, coordinator, the builder itself): are they hosts on Nodus contract prefixes, as the compile
+2. The workers (baker, coordinator, the builder itself): are they hosts on Nodus contract prefixes, as the compile
    host and the cron task host are, each its own process under the supervisor?
-5. A part that could not be lowered ("stays python"): does it block the goal, or does the Goal document run it as
+3. A part that could not be lowered ("stays python"): does it block the goal, or does the Goal document run it as
    Python beside the lowered units?
 
 ## Relevant Files and Components
@@ -116,7 +143,7 @@ literal.
 ## Implementation and Usage Guidance
 
 1. Call the divider's output the **compiled units** (or the units record). Do not call it the Goal document.
-2. Do not design the Goal document's format before the owner answers section 4, questions 1 and 2.
+2. The format is `speaktome_goal`; extend its tables rather than adding a second description of a unit.
 3. The first move that needs no answer: take the baking off the server. A worker process joins the `cron` prefix as
    the host for `manual.hardcopy` (and later the site export); the server keeps serving.
 4. Linking must use the identities the builder already resolved (piece ids, product hashes, the entries of an

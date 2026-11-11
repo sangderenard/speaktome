@@ -1,0 +1,96 @@
+NAME
+       goal - the linked form a body of source is processed into
+
+DESCRIPTION
+       A Goal document is what a Dream document becomes once it has been
+       processed. A Dream document holds what was written. The
+       part-by-part builder splits it into units and lowers each one. The
+       Goal document then states the units, what each offers, how they
+       are joined, and which lowerings of each exist. It is the name of
+       the processed result; nobody declares it beforehand.
+
+       It is a format of its own. Each block is framed by comment marks,
+       and each block's header is made of plain tables, so that anything
+       able to read text can read it. The document can also present
+       itself as a graph.
+
+   Blocks
+       One document block comes first, then one block for each unit:
+
+           /*@goal.document.v1
+           id = job-02172e9cfcf7
+           target | target | units | lowered | achieved
+           target | c      | 3     | 2       | no
+           @end*/
+
+           /*@goal.unit.v1
+           id = piece-1
+           language = python
+           state = lowered
+           ...tables...
+           @end*/
+           def step(x: float) -> float:
+               y = double(x) + 1.0
+               return y
+           /*@goal.end*/
+
+       A header line is either "key = value" or a table row, "table |
+       cell | cell". The first row of each table names its columns. An
+       empty cell is written as a dash.
+
+   The tables of a unit
+           api      What the unit offers: a row for each parameter and
+                    for the result of each entry, as it was written.
+           link     The linking syntax: a name this unit's text uses,
+                    the unit and entry that provide it, and how it is
+                    bound.
+           build    Each lowering of an entry that exists: the target
+                    language, the exported symbol, the product and its
+                    hash, and the block of the units record that holds
+                    the product's bytes.
+           abi      How a build is called: a row for each parameter, as
+                    the compiler that made the build described it.
+
+   Linking
+       A unit's text holds its own definitions and what those reach,
+       such as a constant it uses. What it takes from another unit is
+       not copied in. It is a row of the link table:
+
+           link | name   | unit    | entry  | how
+           link | double | piece-0 | double | reference
+
+       "reference" means the text only names the thing. "carried" means
+       the provider's definition could not be separated and is still
+       inside this text.
+
+   The goal
+       A unit's state is "lowered" when at least one build of it exists
+       and "source" otherwise: it runs as written.
+
+       The target table of the document block says, for each language,
+       how many units are built for it. The goal is achieved for a
+       language when every unit is.
+
+   The document as a graph
+       The goal, its targets, its units and their builds are nodes. A
+       link is an edge from a unit to the unit that provides for it; a
+       build has an edge to its target; the goal has an edge to each
+       target it is achieved for. In that form the document is a map: it
+       can be entered and walked, each unit examined, and the whole of it
+       baked into pages.
+
+NOTES
+       The part-by-part builder writes goal.goal beside record.dream for
+       each job. The record holds every part with what it calls copied
+       inside it, which is what lets a part be built alone. The Goal
+       document is the linked form and holds no product bytes; a build
+       row names the record's block and the product's hash.
+
+       Nothing is linked into a running whole yet. The builds listed
+       were each made from a part that carried its dependencies, so a
+       build of "step" contains its own copy of "double". The document
+       says how the units join; the builder does not yet build them
+       joined, and the document does not yet run as Nodus nodes.
+
+SEE ALSO
+       map(5), cron(5), speaktome(7), examine(1)
