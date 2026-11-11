@@ -8,7 +8,7 @@ Documenting the sequence of tasks around encrypting a token, pushing to GitHub, 
 
 ## Steps Taken
 - Created `xor_cipher.py` for simple XOR encryption.
-- Encrypted the provided PAT using passphrase `open-sesame` and stored result in `AGENTS/github_pat.enc`.
+- Encrypted the provided PAT using passphrase `[passphrase removed 2026-11-10]` and stored result in `AGENTS/github_pat.enc`.
 - Decrypted the token and attempted `git push --set-upstream https://<PAT>@github.com/sangderenard/speaktome.git work`.
 - Implemented updates to `validate_guestbook.py` including optional `--apply` mode and archiving hints.
 - Added `report_date_range.py` to list guestbook epoch ranges.

@@ -7,7 +7,7 @@
 Responded to a request to verify branch targeting and rerun repository management steps. Attempted a git pull then push using the encrypted PAT, followed by running the submodule refresher.
 
 ## Steps Taken
-- Decrypted `AGENTS/github_pat.enc` with `xor_cipher.py --decrypt --passphrase open-sesame`
+- Decrypted `AGENTS/github_pat.enc` with `xor_cipher.py --decrypt --passphrase [passphrase removed 2026-11-10]`
 - `git pull --rebase https://<PAT>@github.com/sangderenard/speaktome.git work`
 - `git push --set-upstream https://<PAT>@github.com/sangderenard/speaktome.git work`
 - `python AGENTS/tools/update_submodules.py`

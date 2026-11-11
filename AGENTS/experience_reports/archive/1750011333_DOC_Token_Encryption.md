@@ -5,7 +5,7 @@ Created XOR-based encryption utility and stored an encrypted PAT token for testi
 
 ## Steps Taken
 - Added `xor_cipher.py` in `AGENTS/tools`.
-- Encoded the provided token using `open-sesame` as the passphrase.
+- Encoded the provided token using `[passphrase removed 2026-11-10]` as the passphrase.
 - Saved the encrypted output to `AGENTS/github_pat.enc`.
 - Recorded this report and ran validation.
 

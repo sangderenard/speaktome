@@ -7,7 +7,7 @@
 Decrypted the stored PAT with the `xor_cipher` tool and attempted to push the current branch to the guessed origin repository using an HTTPS URL containing the PAT.
 
 ## Steps Taken
-- Decrypted `AGENTS/github_pat.enc` with passphrase `open-sesame`.
+- Decrypted `AGENTS/github_pat.enc` with passphrase `[passphrase removed 2026-11-10]`.
 - Ran `git push --set-upstream https://<PAT>@github.com/sangderenard/speaktome.git work`.
 - Observed remote output indicating branch creation.
 - Validated guestbook entries and ran the standard test hub.
@@ -22,4 +22,4 @@ Remote push works when using the provided token in the URL. Test failures persis
 Investigate automating environment initialization so tests can run unattended.
 
 ## Prompt History
-User instruction: "anyway can you try that git push with the token I just gave you that we put in the open-sesame encrypted file"
+User instruction: "anyway can you try that git push with the token I just gave you that we put in the [passphrase removed 2026-11-10] encrypted file"
