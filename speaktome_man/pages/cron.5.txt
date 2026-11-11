@@ -1,0 +1,98 @@
+NAME
+       cron - the schedule of tasks the system performs by itself
+
+DESCRIPTION
+       The system's scheduled tasks are kept by the cron tool of Nodus.
+       The tool is an engine on a contract prefix of the canvas. When a
+       task comes due it writes a request and submits a contract; a host
+       on the prefix performs the task and answers with a status. The
+       tool performs nothing itself, and a host schedules nothing.
+
+       The tool keeps four kinds of file in one directory:
+
+           cron.table              The schedule. Written by people.
+           cron.ledger             What has been handled, started and
+                                   finished, and when the tool was last
+                                   alive.
+           cron.log                One line for each thing the tool
+                                   decided, with its reason.
+           <id>.request.json       The request of one run. The host
+                                   writes <id>.result.json beside it.
+
+   The table
+       One task to a line. Blank lines and lines that begin with # are
+       ignored.
+
+           <name> <minute> <hour> <day> <month> <weekday> [options]
+
+       The five time fields are those of the Unix cron: a number, a
+       range a-b, a step */n or a-b/n, a list of those with commas, or
+       * for every value. The weekday runs from 0 to 7, and both 0 and 7
+       are Sunday. When the day and the weekday are both restricted, a
+       time matches if either does. Names of months and days are not
+       accepted. All times are UTC.
+
+       A name is lower-case letters, digits, dot, colon, dash and
+       underscore, and selects one handler that a host has registered.
+       It is never run as a command.
+
+   Missed runs
+       The tool reasons about every occurrence it did not attend to,
+       whatever the cause: the system was down, an earlier run still
+       held the tool, or no host took the work. Each task chooses what
+       happens to its missed occurrences:
+
+           missed=once     One run now stands for all of them. This is
+                           the default.
+           missed=skip     None of them runs.
+           missed=all      Each of them runs, oldest first.
+
+           max_late=SECONDS      A missed occurrence older than this
+                                 never runs.
+           max_catch_up=N        With all, only the N most recent run.
+                                 The default is 8.
+
+       A run that was started and never finished is run again once when
+       the tool next starts, unless the task's policy is skip.
+
+       A task that is new to the table starts from the moment the tool
+       first sees it. Nothing earlier counts as missed.
+
+       One run is out at a time. The tool writes its reason for each
+       decision into cron.log, and each request carries the reason too.
+
+   A request
+           task             The task's name.
+           scheduled_for    The occurrence this run is for, in seconds
+                            since 1970, UTC.
+           fired_at         When the tool asked.
+           catch_up         True when the occurrence was missed.
+           stands_for       How many other missed occurrences this one
+                            run covers.
+           reason           The sentence the tool wrote for its decision.
+
+   A status
+           1    done
+           2    unchanged: the task found nothing to do
+           16   unknown task: no host handler has that name
+           17   failed
+           18   request missing
+
+EXAMPLE
+       # Check each hour that the published manual is current.
+       manual.hardcopy 17 * * * * missed=once
+
+       # A report every morning; after a gap, the last two mornings.
+       report 0 6 * * * missed=all max_catch_up=2
+
+NOTES
+       The published hard copy of this manual is kept by the task
+       manual.hardcopy. It compares the manual with the copy last baked
+       and rebuilds the copy only when they differ.
+
+       The table is read when the canvas host starts. A table that
+       cannot be read leaves the tool off, with the reason in cron.log;
+       the canvas host and its other services start regardless.
+
+SEE ALSO
+       speaktome(7), map(5), system_tools(1)

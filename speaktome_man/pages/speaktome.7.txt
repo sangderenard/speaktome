@@ -76,6 +76,10 @@ DESCRIPTION
 
        A changed map is a new set of pages; the old set is dropped.
 
+       The site also publishes a hard copy of this manual at /manual/,
+       baked the same way. A scheduled task checks each hour that the
+       copy still matches the manual and rebuilds it when it does not.
+
    Where the facts come from
        The pages describe the service as its source stood on 2026-11-11.
        The handlers for messages and for cursors are in
@@ -84,4 +88,4 @@ DESCRIPTION
 
 SEE ALSO
        man(1), person(7), entity(7), narrator(7), roles(7), map(5),
-       message(5)
+       message(5), cron(5)
