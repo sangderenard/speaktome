@@ -84,8 +84,7 @@ EXAMPLE
            The photo job exists and its exposure is complete.
 
 STATUS
-       Exists in the source. It reaches the live service at that
-       service's next restart.
+       Exists. First live picture: 2026-11-11, 256 pixels, 5 seconds.
 
 NOTES
        The narrator's render-phong command is a different picture: a

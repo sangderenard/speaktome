@@ -50,6 +50,20 @@ Other limits: guests outside the local network do not hold `view_site`, so help 
 placed in the public release, which was not done. The repository world map is in another format and is not yet a
 declared map. No menu link was added.
 
+## Live, later the same day
+The owner answered "You run it". The stop window ran at 07:50 local through turing `deploy/Enable-StudioPort.ps1`:
+no exposure was running; the stack stopped; the canvas gained `studio.product` on port 47613 (the old canvas is kept
+beside it); the stack started. The stable log's first line is "[studio] pictures go through Nodus port 47613
+(studio.product)".
+
+- `/site/manual/` and `/site/system/` answer on the live site as the account `claude`; an unknown place answers 404.
+- One real picture through the `show` tool over stdio: asked (queued), preparing at 2.4 s, committed at 4.6 s,
+  exposing at 9.0 s, complete at 13.2 s. Photo job `53aa9257...`, 256 pixels, 5.078 exposure seconds. `show
+  picture=<id> image=true` returned a text part and an image part (169,678 bytes of PNG), which was saved and looked
+  at: the default Studio subject, noisy as five seconds would be. stderr empty, exit 0.
+
+This is the first GPU exposure through the path, and it removes the "not live" paragraph above.
+
 ## Prompt History
 Owner: "it'll be in a menu somewhere, help in the form of putting the graph online in another step in the
 universalization of computation into a physical system. because we have a graph, we can make a website, is the
