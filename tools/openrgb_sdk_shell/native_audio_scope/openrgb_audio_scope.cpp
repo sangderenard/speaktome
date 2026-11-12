@@ -358,8 +358,33 @@ SCOPE_API void* openrgb_audio_scope_create(
 
 SCOPE_API int openrgb_audio_scope_start(void* handle) {
   auto* context = static_cast<ScopeContext*>(handle);
-  if (!context || context->capture_thread.joinable()) return 0;
+  if (!context || context->capture_thread.joinable() || context->channel_count.load()) return 0;
   context->capture_thread = std::thread(capture_worker, context);
+  return 1;
+}
+
+// Dedicated file/device sources feed the same ring and fftfree analyzer without
+// opening WASAPI loopback. A scope cannot mix capture and external input.
+SCOPE_API int openrgb_audio_scope_feed_stereo(
+    void* handle, const float* samples, size_t frames, uint32_t sample_rate) {
+  auto* context = static_cast<ScopeContext*>(handle);
+  if (!context || !samples || !frames || frames > kCaptureCapacity ||
+      !sample_rate || context->capture_thread.joinable()) return 0;
+  std::lock_guard<std::mutex> lock(context->sample_mutex);
+  const uint32_t previous_rate = context->sample_rate.load();
+  if (previous_rate && previous_rate != sample_rate) return 0;
+  for (size_t i = 0; i < frames * 2; ++i)
+    if (!std::isfinite(samples[i])) return 0;
+  context->sample_rate.store(sample_rate);
+  context->channel_count.store(2);
+  for (size_t i = 0; i < frames; ++i) {
+    context->left[context->write_index] = samples[i * 2];
+    context->right[context->write_index] = samples[i * 2 + 1];
+    context->write_index = (context->write_index + 1) % kCaptureCapacity;
+  }
+  context->available = std::min(kCaptureCapacity, context->available + frames);
+  context->total_frames += frames;
+  context->running.store(true);
   return 1;
 }
 
