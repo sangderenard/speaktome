@@ -406,6 +406,16 @@ SCOPE_API int openrgb_audio_scope_running(void* handle) {
   return context && context->running.load() ? 1 : 0;
 }
 
+// Capture progress for external schedulers. The analyzer may return a cached
+// snapshot between FFT hops; a caller can use this counter to avoid emitting
+// that same window repeatedly while remaining paced by the audio device.
+SCOPE_API uint64_t openrgb_audio_scope_frame_count(void* handle) {
+  auto* context = static_cast<ScopeContext*>(handle);
+  if (!context) return 0;
+  std::lock_guard<std::mutex> lock(context->sample_mutex);
+  return context->total_frames;
+}
+
 SCOPE_API const char* openrgb_audio_scope_error(void* handle) {
   auto* context = static_cast<ScopeContext*>(handle);
   if (!context) return "native audio scope handle is null";
