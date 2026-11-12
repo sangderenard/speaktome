@@ -67,6 +67,35 @@ claim that FREE is a KPN yet. The collision engine is outside this lane.
 
 ## Lessons Learned
 
+### Scheduler profile, 2026-11-12
+
+Compared clean Nodus `8068e59` (persistent workers, worker-side dependency
+release) against clean `67e29d2` (persistent workers, manager-collected
+completion FIFOs). Both were built in separate user-filespace worktrees using
+MSVC Release, Torch disabled. A reproducible standalone harness at
+`C:/Users/alber/nodus-build/profile/scheduler_profile.cpp` ran eight native
+no-op plugin rows in independent, serial-chain, and seven-to-one fan-in
+topologies. Each revision ran three alternating rounds of seven batches of
+1,500 synchronous ticks; the table reports the median of each round's median
+microseconds per tick. The older commit's debug `persistent_workers(false)`
+path measures the former per-tick thread construction cost (four batches of
+150 ticks). Raw measurements are in
+`C:/Users/alber/nodus-build/profile/scheduler_profile_results.csv`.
+
+| Topology | Per-tick workers | `8068e59` persistent | `67e29d2` manager FIFO | New / prior persistent |
+|---|---:|---:|---:|---:|
+| Eight independent | 347.44 us | 31.05 us | 44.45 us | 1.43x |
+| Eight-row chain | 339.64 us | 31.15 us | 203.61 us | 6.54x |
+| Seven-to-one fan-in | 340.27 us | 35.15 us | 47.34 us | 1.35x |
+
+Every run observed zero additional row executions during a 100 ms pause
+without `submit_tick`, confirming that neither commit implements true FREE
+process execution. The serial-chain regression is attributable to a worker
+completion needing a manager wake and successor release at each edge. The
+numbers isolate no-op scheduler overhead; they do not estimate shader or audio
+throughput, nor do they include payload collation. Do not present the newer
+completion FIFO as a speed improvement over the prior persistent scheduler.
+
 - The SDL shell has its own persistent canvas tick thread and a separate
   `--canvas-config=IDX:DT:RATIO:FREE` setting. That shell flag decouples canvas
   steps from display frames; it does not make each table a free process.
@@ -93,10 +122,14 @@ dependents. Verify long-running
 production without new `gp_canvas_step` calls, fan-out ordering, cycles with
 seed tokens, pause/shutdown, and graph changes at quiescent boundaries. Do not
 present the current worker-pool change as completion of the KPN objective.
+Use the eight-row chain profile as a regression target when reducing manager
+handoff latency; preserve per-worker FIFO ordering and manager observability.
 
 ## Prompt History
 
 > "Can you resume nodus work and just put off compiling or can you make sure the compiler puts intermediaries and results in the user filespace if you can, if that blows up linking we'll have to work on that, that should get you able to work on and run a test nodus"
+
+> "Can you profile the difference between the old not free free and the new free"
 
 > "nodus can run things in different threads, I believe it uses mailboxes not sure, anyway, our audio can be made more realtime if it ends up contained in a table with free run permission, because if it isn't realtime it isn't appreciated"
 
