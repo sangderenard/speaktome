@@ -14,6 +14,6 @@ Focused Spectral tests cover phase, tension, repeats, delayed routing, exposure 
 
 > provide a few signal source generators too so users can use waves with different waveshape and tension, phase, frequency, a few ramp generators with basic configuration, make sure multiple triggers are supported by those signal generators in between camera on and the lighting, you can make the generators modulators on the camera signal, and we need to add sustain identical to the delay panel in use, has an ASDR envelope
 
-## Next Steps
+## Delivery
 
-Publish the Studio page to Stable through the existing exporter and restart with the official operator script after its exposure guard passes. Verify the DNS page and route.
+Spectral `009178d` and Turing `d030e18d` were pushed to their Stable branches. The Studio page was exported with `web_export.py --skip-boards`. `Restart-Stack.ps1` passed its exposure guard and restarted Meowdoku, Nodus and the task worker. The public DNS page and JavaScript returned HTTP 200; the camera routing endpoint returned its signed-in requirement for an anonymous request. An authenticated browser interaction and new GPU photo were not run.
