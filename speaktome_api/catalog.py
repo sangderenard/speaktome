@@ -447,7 +447,7 @@ ENDPOINTS = (
         "dev_ui", True, False),
 
     # ---- control
-    _ep("control_instances", "control", "GET", "/api/control/instances", "List the service instances and recent control requests.",
+    _ep("control_instances", "control", "GET", "/api/control/instances", "List the service instances, recent control requests and the running jobs a restart waits for.",
         _ADMIN_OR_LIFECYCLE, True, False),
     _ep("control_instances_request", "control", "POST", "/api/control/instances",
         "Ask the supervisor to restart, shut down or start an instance.",
@@ -455,8 +455,8 @@ ENDPOINTS = (
         body=_body({"instance": ("string", True, "The instance name."), "action": ("string", True, "restart, shutdown or start."),
                     "reason": ("string", False, "Why, for the record."),
                     "delay": ("number", False, "Seconds of countdown before it is performed."),
-                    "after_jobs": ("boolean", False, "Wait for running jobs (a GPU photo exposure) before a restart or "
-                                   "shutdown; true when omitted. false restarts at once.")})),
+                    "after_jobs": ("boolean", False, "Wait until the server-wide job table shows no running job on the named "
+                                   "instances (Pale Horse authorizes it then); true when omitted. false restarts at once.")})),
     _ep("control_instances_cancel", "control", "POST", "/api/control/instances/cancel", "Cancel a control request not yet performed.",
         _ADMIN_OR_LIFECYCLE, True, True, body=_body({"id": ("integer", True, "The request id.")})),
     _ep("control_route", "control", "GET", "/api/route", "Show the server routes and which one this browser is on.", None, False, False),
