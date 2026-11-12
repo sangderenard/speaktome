@@ -446,7 +446,7 @@ class Tools:
             _obj({"picture": {"type": "string", "minLength": 32, "maxLength": 32, "description": "A picture id from an earlier show."},
                   "image": {"type": "boolean", "description": "With a picture id: attach the finished image."},
                   "photo": {"type": "object", "additionalProperties": True,
-                            "description": "Photo options for a new picture, e.g. resolution and seconds; the photo service owns their bounds."},
+                            "description": "Photo options for a new picture: seconds, exposureSubsteps (model dt=seconds/substeps, <=0.1 s), exposureIso (25..6400), highlightClipPercent (0..25), and optional lightTimeline [{tick,lighting}] with complete resolved Studio lighting at increasing ticks. The photo service validates bounds and scene identity."},
                   "settings": {"type": "object", "additionalProperties": True, "description": "A complete Studio settings record (object, the fully resolved "
                                "Exposure lighting profile, camera in metres); omit to use the host's baked defaults."}}),
             self.show)

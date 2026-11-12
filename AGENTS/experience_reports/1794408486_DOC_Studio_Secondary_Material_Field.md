@@ -43,3 +43,18 @@ fixture export refresh, production change, or deployment performed in this conti
 The concurrent 32/64 comparison used a frozen pre-category source snapshot.
 
 User: “Let's have a setting for division scale and make it opt in by category, subject, stage, room”
+
+## 2026-11-11: native camera continuation observation
+
+Implemented explicit borrowed-buffer observation in `camera_designer/studio_camera_intervals.py` and the existing SensorAccumulator opt-in source/binding seam. No renderer, GPU context, exposure or screenshot was invoked. Five CPU tests passed in `tests/test_studio_camera_intervals.py`. ABI and remaining limits are in `docs/NATIVE_CAMERA_INTERVAL_OBSERVER.md`.
+
+The observer records original boundary intervals and full region state without extra RNG or optical-law changes. It preserves the native shared-band0 refraction limitation and rejects cooperative replay rather than duplicate records silently. This does not implement interior field screen evaluation. User requirements guiding this work: “also you need to alpha to the phong in sparsity of data. an empty region is not black, it's no information” and “include the rays calculated inside solids”. No confidence or completeness claim follows from nonzero energy or visit counts.
+
+Additional source-only work: explicit per-band continuation correction is independently opt-in and is NOT enabled by response-copy information requests. Exact pre-integration RHS copies now extend the existing sensor evidence module with bounded per-dispatch storage; original integration and RNG calls remain. Scalar deposit-knownness and direct-NEE branch outcomes are distinct from expression-presence. Fifteen CPU/offline compiler tests pass, including native plain/region and opaque-PBR variants, plus a fake-GL lifecycle without a context. First-visible hit position/material/boundary metadata is retained at its original event. Final browser face/layer mapping remains unresolved for sphere compression, rod partitions and omitted bubble surfaces; no screen completion is claimed.
+
+
+## 2026-11-11: scene-attached original response copies
+
+Added `studio_completed_samples.py`, `studio_scene_responses.py`, and `studio_scene_application.py`. The original completed camera sample and mirrored native additions are copied before pixel integration. Component slots retain original film-filtered values; the installed evidence kernel and linear color profile are reused producer-side. Typed forward/reactive packets and native scalar deposit snapshots remain separate semantics, never summed as camera radiance. Scene retention has explicit bounds, physical-scene invalidation, eviction/no-information counts, and camera/population provenance. The completed mode uses one 512-byte row per original camera sample rather than bounce histories. Ordinary source and mode remain unchanged without opt-in.
+
+48 CPU/offline compiler tests passed. No GPU context, exposure, rendering, screenshot, publication or deployment was performed. Runtime memory reservation, actual worker wiring and client query/composition review remain required. Application readiness remains false, and optional direct Phong specular override is not claimed supported by the new copied component product.

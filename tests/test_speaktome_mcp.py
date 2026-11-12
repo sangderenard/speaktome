@@ -380,10 +380,12 @@ def test_examine_needs_a_cursor_and_reports_another_world(srv):
 
 def test_show_asks_for_a_picture_and_reads_it_back_with_its_image(srv):
     fake, s = srv
-    asked, is_error = call(s, "show", photo={"resolution": 256, "seconds": 5})
+    exposure = {"resolution": 256, "seconds": 5, "exposureSubsteps": 300, "exposureIso": 200,
+                "highlightClipPercent": 25, "lightTimeline": [{"tick": 150, "lighting": {"version": 1}}]}
+    asked, is_error = call(s, "show", photo=exposure)
     assert not is_error and asked["state"] == "queued"
     sent = next(body for method, path, body in fake.log if path == "/api/show/pictures")
-    assert set(sent) == {"request_id", "photo"} and sent["photo"] == {"resolution": 256, "seconds": 5}
+    assert set(sent) == {"request_id", "photo"} and sent["photo"] == exposure
     assert "account" not in json.dumps(sent) and "owner" not in json.dumps(sent), "identity is never in the request"
     read, is_error = call(s, "show", picture=asked["picture_id"])
     assert not is_error and read["state"] == "committed"
