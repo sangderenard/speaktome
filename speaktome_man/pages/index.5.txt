@@ -16,7 +16,7 @@ DESCRIPTION
        name            Unique, and read as group_thing. It is also the
                        name of the tool made from the endpoint.
        group           identity, messages, living_data, photo, studio,
-                       nodus, reviews, relay, files, control,
+                       nodus, reviews, git, relay, files, control,
                        profile, reports, compile, site or play.
        method, path    GET or POST. A variable part of the path is
                        written {name}.

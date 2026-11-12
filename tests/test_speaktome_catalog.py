@@ -121,7 +121,7 @@ def _sources():
     if not base.is_file():
         return None
     texts = [base.read_text(encoding="utf-8", errors="replace")]
-    for delegate in ("branch_review.py", "file_index.py", "relay.py"):       # route functions the server hands whole paths to
+    for delegate in ("branch_review.py", "file_index.py", "relay.py", "core_git.py"):       # route functions the server hands whole paths to
         module = base.with_name(delegate)
         if module.is_file():
             texts.append(module.read_text(encoding="utf-8", errors="replace"))
