@@ -34,6 +34,7 @@ GROUPS = {
     "reviews": "Changes put up for peer review before they reach a default branch.",
     "git": "Git in the core, regulated: declared read operations, recorded in SQL. Changes go through reviews.",
     "relay": "Datagrams and packages, address to address, in and out, for any signed-in account.",
+    "mail": "Your mailbox at <username>@stichka.duckdns.org: the inbox, reading, sending and removing mail.",
     "files": "The flat index of every file in the core, kept by the cleanup account.",
     "compile": "Compile-side jobs: the source divider, the math lab and the lowering leases.",
     "site": "Maps rendered as read-only web pages.",
@@ -457,6 +458,24 @@ ENDPOINTS = (
         None, True, False,
         query={"address": ("integer", "Your address's number."), "after": ("integer", "Only packages after this id."),
                "limit": ("integer", "At most this many, up to 500.")}),
+
+    # ---- mail (turing examples/meowdoku/mail.py)
+    _ep("mail_inbox", "mail", "GET", "/api/mail/inbox",
+        "List your mailbox, newest first, with your address and how much of your space is used.", "message", True, False,
+        query={"folder": ("string", "inbox (the default) or sent."), "after": ("integer", "Only items after this id."),
+               "limit": ("integer", "At most this many, up to 200.")}),
+    _ep("mail_message", "mail", "GET", "/api/mail/message",
+        "Read one message of your mailbox as text and mark it read; a sent one lists each recipient's state.",
+        "message", True, True, query={"id": ("integer", "The item's id from mail_inbox.")}),
+    _ep("mail_send", "mail", "POST", "/api/mail/send",
+        "Send a plain-text message; mail to an address outside the domain also needs mail_send and goes out through the provider.",
+        "message", True, True,
+        body=_body({"to": ("array", True, "The recipients' addresses (a single address may be given as text)."),
+                    "subject": ("string", False, "One line."),
+                    "text": ("string", True, "The message text."),
+                    "idempotency_key": ("string", True, "16 to 128 characters; a replay returns the first message.")})),
+    _ep("mail_remove", "mail", "POST", "/api/mail/remove", "Remove one item from your mailbox.",
+        "message", True, True, body=_body({"id": ("integer", True, "The item's id from mail_inbox.")})),
 
     # ---- files (turing examples/meowdoku/file_index.py)
     _ep("files_search", "files", "GET", "/api/files/search", "Filter the flat index of the core's files by name, kind, size, age and state.",
