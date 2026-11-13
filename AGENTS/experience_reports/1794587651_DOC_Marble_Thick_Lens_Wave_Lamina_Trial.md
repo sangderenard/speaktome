@@ -20,12 +20,14 @@ coherent reflected and transmitted products for a bubble interface.
 
 ## Observed Behaviour
 
-All 94 focused tests passed. The thick-lens trial routes a sensor-side ray
+All 95 focused tests passed. The thick-lens trial routes a sensor-side ray
 through the exact T2 conics and a local 0.1 mm axial wave patch ending at the
 sphere surface. Native power attenuation matched the analytical
 Beer–Lambert factor in one-lane and three-lane trials. The saved host/rod/dye/
 bubble mapping used the existing `optical_extinction` source law. The bubble
 Jones pair conserved reflected plus transmitted power in three lanes.
+One native T4 host-to-bubble interface branched the field into reflected
+host and transmitted air patches with conserved seeded power.
 
 This is not a wave material bounce, structural-color image, or Studio photo.
 T3 does not yet instantiate a wave lamina from a material hit. Bubble
