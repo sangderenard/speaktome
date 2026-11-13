@@ -43,6 +43,7 @@ GROUPS = {
     "site": "Maps rendered as read-only web pages.",
     "play": "The game table tied to a browser session, sharing and spectating, and page support calls.",
     "markets": "Alpaca paper market observation, strategy seats and attributed paper orders.",
+    "foyer": "The one shared demo world anyone may walk and photograph; nothing in it is yours.",
 }
 
 
@@ -105,6 +106,24 @@ ENDPOINTS = (
         "Bootstrap the first admin with the operator's loopback token.",
         None, False, True, tool=False,
         body=_body({"username": ("string", True, "The account to promote.")}), credential="admin_token"),
+
+    # ---- foyer: the shared demo world (owner, 2026-11-13); kiosk, so guests, guest agents and interns all reach it
+    _ep("foyer_status", "foyer", "GET", "/api/foyer", "Show the foyer greeting, the demo world's identity and its start camera.",
+        "view_site", False, False, kiosk=True),
+    _ep("foyer_command", "foyer", "POST", "/api/foyer/commands",
+        "Ask the shared demo host for one inspect or one picture (render-phong) at a camera; one picture at a time.",
+        "view_site", False, True, kiosk=True,
+        body=_body({"request_id": ("string", True, "A fresh id of letters, digits, _ or -, up to 64."),
+                    "operation": ("string", True, "inspect or render-phong."),
+                    "at": ("string", False, "inspect: the object identity; the root when omitted."),
+                    "radius": ("integer", False, "inspect: graph hops."),
+                    "position": ("array", False, "render-phong: the camera position [x, y, z] in metres."),
+                    "facing": ("array", False, "render-phong: the camera direction [x, y, z]."),
+                    "width": ("integer", False, "render-phong: 64..640 pixels."),
+                    "height": ("integer", False, "render-phong: 64..640 pixels.")})),
+    _ep("foyer_receipt", "foyer", "GET", "/api/foyer/commands/{request_id}",
+        "Read a foyer command's receipt; a finished picture carries its PNG.",
+        "view_site", False, False, kiosk=True, path_params={"request_id": ("string", "Your request id.")}),
 
     # ---- messages
     _ep("messages_conversations", "messages", "GET", "/api/messages/conversations", "List your conversations with their handles.",

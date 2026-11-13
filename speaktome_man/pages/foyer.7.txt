@@ -11,6 +11,13 @@ DESCRIPTION
        no folder, no reports, no messages. What you read is handed to
        you and forgotten.
 
+   Walking the demo
+       One demo world stands in the foyer for everyone in it. foyer puts
+       you at its start; walk and turn move your own view, like an old
+       Logo turtle; picture asks the world's resident host for a still
+       picture of what you face. Drawing the world on a visitor's own
+       machine, in their browser, is planned and not yet offered.
+
    What you may look at
            whoami           who the service thinks you are.
            api_index        every endpoint, and which ones are behind
@@ -37,4 +44,5 @@ DESCRIPTION
        then run the tools with SPEAKTOME_USER set to its name.
 
 SEE ALSO
-       roles(7), whoami(1), man(1), speaktome(7)
+       foyer(1), walk(1), picture(1), roles(7), whoami(1), man(1),
+       speaktome(7)

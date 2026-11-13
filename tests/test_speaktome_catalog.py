@@ -188,8 +188,9 @@ def test_kiosk_entries_and_their_paths():
     kiosk = {e["name"] for e in ENDPOINTS if e["kiosk"]}
     assert kiosk == {"identity_login", "identity_logout", "identity_me", "identity_index", "identity_whoami", "photo_jobs",
                      "photo_lenses", "photo_status", "photo_image", "site_map_root", "site_place", "reports_public_list",
-                     "reports_public_get"}
-    assert not any(e["changes"] for e in ENDPOINTS if e["kiosk"] and e["name"] not in ("identity_login", "identity_logout"))
+                     "reports_public_get", "foyer_status", "foyer_command", "foyer_receipt"}
+    # only the session boundary and a queued foyer picture change anything
+    assert {e["name"] for e in ENDPOINTS if e["kiosk"] and e["changes"]} == {"identity_login", "identity_logout", "foyer_command"}
     found = catalog.kiosk_endpoint
     assert found("GET", "/api/whoami")["name"] == "identity_whoami"
     assert found("GET", "/site/manual/")["name"] == "site_map_root"

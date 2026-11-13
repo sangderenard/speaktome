@@ -138,6 +138,8 @@ def living_data_dm_route(self, path, method, *, service, CursorError, QueryError
         if body is None:
             return
         if path == base:
+            if "foyer" in body and not self._require("library_manage"):   # [FOYER] the shared demo world is published to everyone
+                return
             return self._json(service.register(account["id"], body), 201)
         if not match or match[3]:
             return self._json({"error": "not found"}, 404)
@@ -153,6 +155,52 @@ def living_data_dm_route(self, path, method, *, service, CursorError, QueryError
         return self._json({"error": str(error)}, error.status)
     except (QueryError, ValueError, RecursionError):
         return self._json({"error": "invalid or excessive static DM request"}, 400)
+
+
+def foyer_route(self, path, method, *, service, CursorError, QueryError, visitor):
+    """``/api/foyer``: the one shared demo world anyone in the foyer may walk and photograph (owner, 2026-11-13).
+
+    GET ``/api/foyer`` is the greeting, the demo's start camera and its identity; POST ``/api/foyer/commands``
+    ``{request_id, operation: inspect | render-phong, ...}`` asks the resident host for one look or one picture; GET
+    ``/api/foyer/commands/<request_id>`` reads its receipt (a picture's PNG is in ``result.png_base64``). ``visitor`` is the
+    host's identity key for the caller: an account, or the browser session of a visitor with no account. Nothing is kept
+    for a visitor beyond a bounded receipt, and nothing in the world is theirs.
+
+    Unlike the other routes this one keeps the host's pending Set-Cookie: for a visitor with no account the browser
+    session it names IS the visitor, so its receipts are found again on the next request.
+    """
+    import re
+    if method == "POST":
+        self.close_connection = True
+    if self._is_viewer():
+        return self._refuse_viewer()
+    if not self._require("view_site"):
+        return
+    try:
+        if self.path.partition("?")[2]:
+            raise CursorError("foyer routes accept no query parameters")
+        match = re.fullmatch(r"/api/foyer(?:/commands(?:/([A-Za-z0-9_-]{1,64}))?)?", path)
+        if not match:
+            return self._json({"error": "not found"}, 404)
+        if method == "GET":
+            if path == "/api/foyer":
+                return self._json(service.foyer_status())
+            if match[1]:
+                return self._json(service.foyer_receipt(visitor, match[1]))
+            return self._json({"error": "not found"}, 404)
+        if path != "/api/foyer/commands":
+            return self._json({"error": "not found"}, 404)
+        if self.headers.get("Content-Type", "").split(";", 1)[0].strip().lower() != "application/json":
+            return self._json({"error": "application/json required"}, 415)
+        body = self._body_json(4096)
+        if body is None:
+            return
+        result = service.foyer_command(visitor, body)
+        return self._json(result, 202 if result["state"] in ("queued", "rendering") else 200)
+    except CursorError as error:
+        return self._json({"error": str(error)}, error.status)
+    except (QueryError, ValueError, RecursionError):
+        return self._json({"error": "invalid or excessive foyer request"}, 400)
 
 
 def living_data_cursor_route(self, path, method, *, service, CursorError, QueryError, MAX_BODY):

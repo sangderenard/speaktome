@@ -9,9 +9,11 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
+import math
 import re
 import secrets
 import sys
+import time
 import urllib.parse
 
 try:
@@ -43,7 +45,9 @@ MAPS = ["system", "manual", "reports"]
 # The verbs a kiosk account (the read-only intern guest agent; /api/index says "kiosk") and a visitor with no account (the
 # foyer; /api/index says "guest") are offered: the manual is local and whoami only reads. Every other verb writes or needs
 # what neither holds, so speaktome_mcp.api drops it.
-KIOSK_VERBS = ("man", "whoami")
+KIOSK_VERBS = ("man", "whoami", "foyer", "walk", "turn", "picture")
+FOYER = "/api/foyer"
+NEXT = " Next: walk, turn (left, right, up, down) or picture. This is a demo; nothing here is yours."
 REPORTS = "/api/reports"
 MESSAGE_TYPES = ["note", "status", "question", "handoff", "approval_request", "answer"]
 SUBJECT_KINDS = ["lease", "job", "ticket", "file", "topic"]
@@ -116,6 +120,7 @@ class Tools:
         self.exits: list = []
         self.at = None
         self.world_id = None
+        self.turtle = None                          # [FOYER] {position, heading, pitch} in the demo world, kept here only
 
     # ---- cursor helpers -------------------------------------------------
     def _names(self) -> dict:
@@ -344,6 +349,76 @@ class Tools:
             receipt["say"] += " The image is attached."
         return receipt
 
+    # ---- the foyer: a turtle walk in the shared demo world ---------------
+    # The world is right-handed with Y up. Heading 0 faces +Z; turning right turns toward -X (forward x up = right).
+    def _turtle(self) -> dict:
+        if self.turtle is None:
+            self.foyer({})
+        return self.turtle
+
+    def _facing(self) -> list:
+        t = self.turtle
+        return [math.cos(t["pitch"]) * math.sin(t["heading"]), math.sin(t["pitch"]), math.cos(t["pitch"]) * math.cos(t["heading"])]
+
+    def _where(self) -> str:
+        t = self.turtle
+        x, y, z = (round(v, 2) for v in t["position"])
+        return (f"You stand at ({x}, {y}, {z}) facing heading {round(math.degrees(t['heading']) % 360)} degrees, "
+                f"pitch {round(math.degrees(t['pitch']))}.")
+
+    def foyer(self, a):
+        """Enter (or re-enter) the foyer: the greeting and the start camera; the turtle goes back to the start."""
+        status = self.rest.call(FOYER)
+        start = status.get("start") or {}
+        position, facing = list(start.get("position") or [0, 0, 0]), list(start.get("facing") or [0, 0, 1])
+        flat = math.hypot(facing[0], facing[2])
+        self.turtle = {"position": [float(v) for v in position], "heading": math.atan2(facing[0], facing[2]),
+                       "pitch": math.atan2(facing[1], flat) if flat or facing[1] else 0.0}
+        return {"untrusted": {"greeting": status.get("greeting")}, "demo": True, "start": start,
+                "say": "You are in the foyer, at the start. " + self._where() + NEXT}
+
+    def walk(self, a):
+        t = self._turtle()
+        metres = a.get("metres", 2)
+        t["position"] = [t["position"][0] + metres * math.sin(t["heading"]), t["position"][1],
+                         t["position"][2] + metres * math.cos(t["heading"])]
+        return {"position": t["position"], "facing": self._facing(), "demo": True,
+                "say": f"You walk {metres} m. " + self._where() + NEXT}
+
+    def turn(self, a):
+        t = self._turtle()
+        degrees, direction = a.get("degrees", 45), a["direction"]
+        if direction in ("left", "right"):
+            t["heading"] += math.radians(degrees) * (1 if direction == "left" else -1)
+        else:
+            t["pitch"] = max(-math.radians(80), min(math.radians(80), t["pitch"] + math.radians(degrees) * (1 if direction == "up" else -1)))
+        return {"position": t["position"], "facing": self._facing(), "demo": True,
+                "say": f"You turn {direction} {degrees} degrees. " + self._where() + NEXT}
+
+    def picture(self, a):
+        """Ask the foyer's resident host for one picture from where you stand, and wait for it."""
+        t = self._turtle()
+        request_id = "mcp-" + secrets.token_urlsafe(16)
+        body = {"request_id": request_id, "operation": "render-phong", "position": [round(v, 6) for v in t["position"]],
+                "facing": [round(v, 9) for v in self._facing()], "width": a.get("width", 512), "height": a.get("height", 384)}
+        receipt = self.rest.call(FOYER + "/commands", body)
+        deadline = time.monotonic() + 75
+        while receipt.get("state") in ("queued", "rendering") and time.monotonic() < deadline:
+            time.sleep(0.5)
+            receipt = self.rest.call(f"{FOYER}/commands/{request_id}")
+        result = receipt.get("result") or {}
+        out = {"request_id": request_id, "state": receipt.get("state"), "demo": True,
+               "camera": {"position": body["position"], "facing": body["facing"]}}
+        if receipt.get("state") == "complete" and isinstance(result.get("png_base64"), str):
+            out["png_sha256"] = result.get("png_sha256")
+            out["_image"] = (base64.b64decode(result["png_base64"]), "image/png")
+            out["say"] = "The picture is attached. " + self._where() + NEXT
+        elif receipt.get("state") in ("queued", "rendering"):
+            out["say"] = "The picture is still being taken; ask again later with the same view." + NEXT
+        else:
+            out["say"] = f"The picture failed: {result.get('error', 'no result')}." + NEXT
+        return out
+
     # ---- messaging ------------------------------------------------------
     def say(self, a):
         listing = self.rest.call("/api/messages/conversations")
@@ -471,6 +546,18 @@ class Tools:
                   "relationship": {"type": "string", "minLength": 1, "maxLength": 256},
                   "direction": {"type": "string", "enum": ["outgoing", "incoming"]}}), self.go)
         add("leave", "Closes your cursor, removing you from the graph (needs dev_ui).", _obj(), self.leave)
+        add("foyer", "Enters the foyer, the shared demo world anyone may walk: the greeting and the start, where your turtle "
+            "returns; read-only (needs view_site).", _obj(), self.foyer)
+        add("walk", "Walks your turtle forward (negative: back) in the foyer's demo world; moves only your own view (needs nothing).",
+            _obj({"metres": {"type": "integer", "minimum": -50, "maximum": 50, "description": "Whole metres, default 2."}}), self.walk)
+        add("turn", "Turns your turtle left, right, up or down in the foyer's demo world; moves only your own view (needs nothing).",
+            _obj({"direction": {"type": "string", "enum": ["left", "right", "up", "down"]},
+                  "degrees": {"type": "integer", "minimum": 0, "maximum": 180, "description": "Whole degrees, default 45."}}, ["direction"]),
+            self.turn)
+        add("picture", "Takes one picture from where your turtle stands, rendered by the foyer's resident host and attached as "
+            "an image; one at a time (needs view_site).",
+            _obj({"width": {"type": "integer", "minimum": 64, "maximum": 640, "description": "Default 512."},
+                  "height": {"type": "integer", "minimum": 64, "maximum": 640, "description": "Default 384."}}), self.picture)
         add("say", "Sends one message to a mutual contact through a short-lived conversation handle (needs message).",
             _obj({"to": {"type": "string", "minLength": 1, "maxLength": 128},
                   "body": {"type": "string", "minLength": 1, "maxLength": 4000},

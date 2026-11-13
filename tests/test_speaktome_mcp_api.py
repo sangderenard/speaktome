@@ -203,7 +203,8 @@ def test_a_kiosk_account_is_offered_only_the_kiosk_tools_and_reading_verbs():
     intern = ["view_site", "photo_read"]
     kiosk = {e["name"] for e in catalog.ENDPOINTS if e["kiosk"] and e["tool"] and catalog.allowed(e, intern, True)}
     assert kiosk == {"identity_me", "identity_index", "identity_whoami", "photo_jobs", "photo_lenses", "photo_status", "photo_image",
-                     "site_map_root", "site_place", "reports_public_list", "reports_public_get"}
+                     "site_map_root", "site_place", "reports_public_list", "reports_public_get",
+                     "foyer_status", "foyer_command", "foyer_receipt"}
     for fake in (Fake(intern, kiosk=True), Fake(intern, kiosk=True, index=False)):
         server = api.ApiServer(fake)
         assert names(server) == set(verbs.KIOSK_VERBS) | {"api_index"} | kiosk
@@ -219,7 +220,7 @@ def test_a_visitor_looks_through_the_window():
     reads = {e["name"] for e in catalog.ENDPOINTS
              if e["tool"] and e["request"] == "json" and catalog.allowed(e, visitor, False, guest=True)}
     assert {"identity_whoami", "photo_image", "reports_public_list", "site_place", "play_radio"} <= reads
-    assert not any(catalog.by_name()[n]["changes"] for n in reads), "a visitor's tools only read"
+    assert {n for n in reads if catalog.by_name()[n]["changes"]} == {"foyer_command"}, "a visitor's tools only read, or ask for a picture"
     for fake in (Fake(visitor, signed_in=False, guest=True), Fake(visitor, signed_in=False, guest=True, index=False)):
         server = api.ApiServer(fake)
         assert names(server) == set(verbs.KIOSK_VERBS) | {"api_index"} | reads
@@ -260,4 +261,27 @@ def test_without_an_account_name_the_session_is_a_visitor_that_never_signs_in():
     assert opener.paths == ["https://cats.example.org/api/whoami"] and rest.logins == 0
     with pytest.raises(RestError):
         rest.sign_in()
+
+
+def test_the_turtle_walks_turns_and_takes_a_picture_in_the_foyer():
+    import base64
+    png = bytes([0x89]) + b"PNG" + bytes([13, 10, 26, 10]) + bytes(16)
+    fake = Fake(["view_site", "photo_read", "play"], signed_in=False, guest=True, answers={
+        "/api/foyer": {"greeting": "a demo", "start": {"position": [0, 1, 0], "facing": [0, 0, 1]}},
+        "/api/foyer/commands": {"state": "complete", "result": {"png_base64": base64.b64encode(png).decode(), "png_sha256": "x"}}})
+    server = api.ApiServer(fake)
+    assert {"foyer", "walk", "turn", "picture"} <= names(server)
+    entered = call(server, "foyer")[0]
+    assert entered["demo"] and entered["untrusted"]["greeting"] == "a demo" and "Next: walk" in entered["say"]
+    assert call(server, "walk", metres=2)[0]["position"] == [0, 1, 2]
+    turned = call(server, "turn", direction="right", degrees=90)[0]       # right of +Z is -X: the world is right-handed, Y up
+    assert [round(v, 9) for v in turned["facing"]] == [-1, 0, 0]
+    assert [round(v, 9) for v in call(server, "walk", metres=1)[0]["position"]] == [-1, 1, 2]
+    taken, is_error, content = call(server, "picture", width=320, height=240)
+    assert not is_error and taken["demo"] and content[1]["type"] == "image" and base64.b64decode(content[1]["data"]) == png
+    sent = next(c for c in fake.calls if c["path"] == "/api/foyer/commands")["body"]
+    assert sent["operation"] == "render-phong" and sent["position"] == [-1, 1, 2] and sent["width"] == 320
+    assert [round(v, 9) for v in sent["facing"]] == [-1, 0, 0]
+    up = call(server, "turn", direction="up", degrees=180)[0]               # pitch stops at 80 degrees
+    assert round(up["facing"][1], 6) == round(__import__("math").sin(__import__("math").radians(80)), 6)
 
