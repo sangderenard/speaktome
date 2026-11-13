@@ -24,6 +24,20 @@ The owner asked for a demonstration of concurrent ray tracing jobs saturating GP
 
 All 18 jobs in this matched series exited 0 with `in_flight=0`. The eight-job run produced exactly 20 million valid `STRIKE` records per job. Across the eight jobs, each of T1, T2, and T3 counted **97,332,016 CPU** and **62,667,984 GPU** rays, totaling 160 million per stage. Combined process CPU time was 892.6 CPU seconds during a 57.76-second longest job, about 15.45 logical CPU cores on a 24-logical-core machine. Thus CPU and GPU native workers did run concurrently. The six-to-eight throughput change is within ~1%, indicating a dispatch throughput plateau for this specific scene, queue window, and machine. It does not prove 100% physical GPU or CPU occupancy.
 
+Separate lane curves used the same scene and 10 million rays per job (`--rays 10000 --batches 1000 --window 30000`, one pipeline mode per run):
+
+| Lane | Concurrent jobs | Longest job (s) | Aggregate rays/s | Other measured load |
+|---|---:|---:|---:|---:|
+| CPU only | 2 | 10.53 | 1.90 million | 12.50 process CPU seconds/wall second |
+| CPU only | 4 | 15.39 | 2.60 million | 14.96 process CPU seconds/wall second |
+| CPU only | 6 | 24.36 | 2.46 million | 15.03 process CPU seconds/wall second |
+| GPU only | 2 | 14.15 | 1.41 million | ~74.6% AMD 3D engine |
+| GPU only | 4 | 23.85 | 1.68 million | ~83.9% AMD 3D engine |
+| GPU only | 6 | 35.05 | 1.71 million | ~84.5% AMD 3D engine |
+| GPU only | 8 | 44.85 | 1.78 million | ~89.4% AMD 3D engine |
+
+Every lane job exited 0, drained to `in_flight=0`, and emitted one valid `STRIKE` per submitted ray. CPU throughput declined from four to six jobs, while GPU throughput gained only 6% from four to eight jobs despite twice as many GPU contexts. The eight-GPU-job point still gained about 4% over six; it is near sustained engine saturation, not a mathematically proven maximum.
+
 The CPU-only qualification emitted one terminal record per ray; the GPU-only qualification emitted a strike record for every ray but no terminal output records, although T3's GPU processed counter reached the full input count. This is an output-contract difference to investigate before using this benchmark as evidence of final exposure parity. The benchmark uses zero-reflectance material and `max_bounces=1`; it does not exercise T4/T5, BDPT, a film image, or compound lens traversal.
 
 The Nodus `KernelPipelineTool` and original Spectral shader adapters already execute sensor raygen→T1→exact-conic T2 in a shared tensor state library. T3 has a validated Vulkan artifact but Nodus's generic shader row currently leases only storage buffers and cannot bind its image resource. The earlier four-worker Nodus canvas trial used fabric plus T1, not full T1–T3 ray jobs. The present saturation numbers therefore belong to Spectral's original native CPU/AMD OpenGL pipeline. They must not be reported as Nodus three-GPU ray-market results. See `nodus/docs/KERNEL_PIPELINE_ADOPTION_2026-11-13.md` and `nodus/docs/TENSOR_STATE_LIBRARY_GPU_DISPATCH_2026-11-12.md`.
