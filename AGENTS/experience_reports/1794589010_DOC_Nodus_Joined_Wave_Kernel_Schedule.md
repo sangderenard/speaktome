@@ -29,6 +29,12 @@ one-row regression also passed on all three. Logs are at
 `C:/Users/alber/nodus-build/wave-joined-angular-material-512.log` and
 `C:/Users/alber/nodus-build/wave-single-angular-512.log`.
 
+The test also wrote the verified device-0 complex tensor to
+`C:/Users/alber/nodus-build/nodus-joined-wave-field.png`. Its RGB channels
+show signed real amplitude, signed imaginary amplitude, and normalized
+power. The visible diagonal bands come from the authored periodic fixture;
+the image is not a scene render or a diffraction claim.
+
 The current Nodus ray proof still has distinct sensor→T1→exact T2→T3 and
 T3→sort/pack/scatter→T5 schedules. This new wave schedule establishes an
 intra-T4 field handoff, but does not route a T3 branch into the T4 arena or
