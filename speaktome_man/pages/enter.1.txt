@@ -5,8 +5,9 @@ SYNOPSIS
        Tool:   enter [map=system|manual|reports] [at=IDENTITY]
                system: [instance=NAME]
                reports: [offset=N] [category=DOC|TTICKET|AUDIT|LOG]
+                        [scope=mine|shared|public|all]
        REST:   GET  /api/nodus/map[?instance=NAME]
-               GET  /api/reports/map[?offset=N&category=CATEGORY]
+               GET  /api/reports/map[?offset=N&category=CATEGORY&scope=SCOPE]
                POST /api/living-data/sessions
                     {map, at, layer?, request_id}
 

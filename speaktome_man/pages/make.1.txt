@@ -31,7 +31,7 @@ IN A STORY
        "Write what happened in my guestbook."
 
 NEEDS
-       The dev_ui capability and a signed-in account.
+       A signed-in account.
 
 ANSWER
        id           The durable SQL report id, usable by examine.

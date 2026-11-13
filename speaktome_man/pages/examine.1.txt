@@ -49,7 +49,8 @@ IN A STORY
        "Examine the lantern."
 
 NEEDS
-       The dev_ui capability and a signed-in account. The tool also needs
+       A signed-in account for reports; dev_ui for graph inspection.
+       The tool also needs
        an open cursor unless a report id is given.
 
 ANSWER

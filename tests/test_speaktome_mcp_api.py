@@ -180,3 +180,18 @@ def test_the_catalog_gives_each_argument_one_meaning():
             assert isinstance(entry["capability"], tuple)
     share = catalog.by_name()["nodus_share"]
     assert not catalog.allowed(share, ["message"], True) and catalog.allowed(share, ["message", "dev_ui"], True)
+
+
+def test_report_sharing_and_groups_are_available_to_signed_in_members():
+    fake=Fake(capabilities=[],signed_in=True)
+    server=api.ApiServer(fake)
+    offered=names(server)
+    assert {'reports_make','reports_sharing','groups_create','groups_invite','groups_respond'} <= offered
+    result,error,_=call(server,'reports_sharing',id='ab'*16,visibility='public',expected_revision=0,sign_off=True)
+    assert not error
+    assert fake.calls[-1]['path']=='/api/reports/'+'ab'*16+'/sharing'
+    assert fake.calls[-1]['body']==dict(visibility='public',expected_revision=0,sign_off=True)
+    call(server,'groups_member_role',id='ab'*16,username='member',expected_revision=2)
+    assert fake.calls[-1]['body']==dict(username='member',expected_revision=2)
+    assert {'reports_public_list','reports_public_get'} <= names(api.ApiServer(Fake(capabilities=[],signed_in=False)))
+    assert 'reports_sharing' not in names(api.ApiServer(Fake(capabilities=[],signed_in=False)))
