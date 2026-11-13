@@ -1,0 +1,62 @@
+NAME
+       mail - mailboxes for the accounts, and mail in and out
+
+DESCRIPTION
+       Every person account has a mailbox at
+
+           <username>@stichka.duckdns.org
+
+       Service accounts have none. The mailbox is reached through the
+       site, signed in with the account: mail_inbox lists it,
+       mail_message reads one item, mail_send sends, mail_remove takes
+       an item out. There is no separate mail password.
+
+       Mail comes in on an odd port, 47625, never port 25. Only our own
+       servers, or someone who set the port by hand, know there is mail
+       to connect to; that is itself a filter. Ordinary mail servers on
+       the internet try port 25 only, so their mail does not arrive.
+
+       Mail goes out through a mail provider, from the provider's own
+       verified address, shown as "<name> via stichka.duckdns.org". It
+       carries no reply address at this domain: the text says that an
+       answer goes through the site. Mail to an address outside the
+       domain needs the capability mail_send. Mail between accounts of
+       the site does not.
+
+   The email manager table
+       Each message and each recipient is a row. The rows are routed by
+       a table of the Nodus canvas, named mail, as the cron tool's
+       tasks are. Whoever stores a row asks the table for one task;
+       the mail service, the host of the table, performs it:
+
+           mail.file       Puts the waiting local recipients of one
+                           message into their mailboxes.
+           mail.send       Hands the waiting outside recipients of one
+                           message to the provider.
+           mail.sweep      Does both for every row still waiting. The
+                           table's own cron tool asks for it every five
+                           minutes.
+
+       A request names a message and nothing else: no text, no address
+       and no secret.
+
+   States
+       A recipient is queued, then one of:
+
+           delivered       In a local mailbox.
+           sent            Accepted by the provider.
+           deferred        A temporary failure. It is tried again
+                           after 5, 15, 60, 240 and 720 minutes, and
+                           given up three days after it was sent.
+           failed          Refused, or given up.
+
+       Reading a message you sent shows each recipient's state and what
+       the provider answered.
+
+   Limits
+       10 MB a message, 20 recipients, 20 messages a minute from one
+       address, 200 MB a mailbox, 50 outgoing messages a day. Mail is
+       never relayed: only addresses of this domain are accepted.
+
+SEE ALSO
+       message(5), cron(5), roles(7)
