@@ -16,7 +16,8 @@ signed-in account is required), headers (fixed request headers the handler insis
 binary for an upload whose body is not a JSON object and which a generated tool therefore cannot send), changes
 (the call changes server state), path_params, query, body (None, or {"fields": {...}, "open": bool};
 open means more fields pass through to a deeper layer that is not enumerated), returns, tool (False means
-never offer it to an automated agent as a generated tool).
+never offer it to an automated agent as a generated tool), kiosk (True: a kiosk account, the read-only intern
+guest agent, may use it; the host answers a kiosk account on these entries only, see ``kiosk_endpoint``).
 """
 
 CATALOG_VERSION = 1
@@ -56,13 +57,13 @@ def _named(spec):
 
 
 def _ep(name, group, method, path, summary, capability, account, changes, *, path_params=None, query=None,
-        body=None, returns="json", tool=True, headers=None, capability_all=False, request="json"):
+        body=None, returns="json", tool=True, headers=None, capability_all=False, request="json", kiosk=False):
     return {
         "name": name, "group": group, "method": method, "path": path, "summary": summary,
         "capability": capability, "capability_all": capability_all, "account": account, "changes": changes,
         "headers": dict(headers or {}), "request": request,
         "path_params": _named(path_params or {}), "query": _named(query or {}), "body": body,
-        "returns": returns, "tool": tool,
+        "returns": returns, "tool": tool, "kiosk": kiosk,
     }
 
 
@@ -72,22 +73,22 @@ _ADMIN_OR_LIFECYCLE = ("account_manage", "lifecycle_admin")
 ENDPOINTS = (
     # ---- identity
     _ep("identity_login", "identity", "POST", "/api/account/login", "Sign in with a username and password.",
-        None, False, True, tool=False,
+        None, False, True, tool=False, kiosk=True,
         body=_body({"username": ("string", True, "The account name."), "password": ("string", True, "The password.")})),
     _ep("identity_signup", "identity", "POST", "/api/account/signup", "Create an account and sign it in.",
         None, False, True, tool=False,
         body=_body({"username": ("string", True, "The new account name."), "password": ("string", True, "The password.")})),
     _ep("identity_logout", "identity", "POST", "/api/account/logout", "End this session.",
-        None, False, True, tool=False),
+        None, False, True, tool=False, kiosk=True),
     _ep("identity_me", "identity", "GET", "/api/account/me", "Show the signed-in account, its role and its instance, or no account.",
-        None, False, False),
+        None, False, False, kiosk=True),
     _ep("identity_assets", "identity", "GET", "/api/account/assets", "List the marble objects, photos, OBJ assets and profile this account owns.",
         None, True, False),
     _ep("identity_index", "identity", "GET", "/api/index",
         "List every REST endpoint with what it accepts and whether you may use it.",
-        None, False, False, query={"group": ("string", "Only this group's endpoints.")}),
+        None, False, False, query={"group": ("string", "Only this group's endpoints.")}, kiosk=True),
     _ep("identity_whoami", "identity", "GET", "/api/whoami", "Show this request's tier, role and the capabilities it holds.",
-        None, False, False),
+        None, False, False, kiosk=True),
     _ep("identity_admin_list", "identity", "GET", "/api/account/admin/list", "List the admin accounts and all users.",
         "account_manage", True, False, tool=False),
     _ep("identity_admin_grant", "identity", "POST", "/api/account/admin/grant", "Grant the admin role to an account.",
@@ -221,10 +222,12 @@ ENDPOINTS = (
         query={"repo": ("string", "The repository name, owner__name."), "commit": ("string", "The 40 hex character commit.")}),
 
     # ---- photo
-    _ep("photo_jobs", "photo", "GET", "/api/marble_photo/jobs", "List your marble photo jobs.", "photo_read", False, False),
-    _ep("photo_lenses", "photo", "GET", "/api/marble_photo/lenses", "List the available camera lenses.", "photo_read", False, False),
+    _ep("photo_jobs", "photo", "GET", "/api/marble_photo/jobs", "List your marble photo jobs.", "photo_read", False, False,
+        kiosk=True),
+    _ep("photo_lenses", "photo", "GET", "/api/marble_photo/lenses", "List the available camera lenses.", "photo_read", False, False,
+        kiosk=True),
     _ep("photo_status", "photo", "GET", "/api/marble_photo", "Show the status of a photo job.",
-        "photo_read", False, False, query={"digest": ("string", "The job digest.")}),
+        "photo_read", False, False, query={"digest": ("string", "The job digest.")}, kiosk=True),
     _ep("photo_calibration_qr", "photo", "POST", "/api/marble_photo/calibration_qr",
         "Locate the authored exposure QR in an owned saved photo's PNG.",
         "photo_read", True, False,
@@ -234,7 +237,7 @@ ENDPOINTS = (
                     "modules": ("array", True, "The 33 rows of authored QR module bits.")})),
     _ep("photo_image", "photo", "GET", "/api/marble_photo/image", "Fetch a finished photo or artifact as a PNG.",
         "photo_read", False, False,
-        query={"digest": ("string", "The job digest."), "name": ("string", "The artifact name.")}, returns="png"),
+        query={"digest": ("string", "The job digest."), "name": ("string", "The artifact name.")}, returns="png", kiosk=True),
     _ep("photo_hdr", "photo", "GET", "/api/marble_photo/hdr", "Download a finished photo's HDR file.",
         "photo_read", False, False,
         query={"digest": ("string", "The job digest."), "name": ("string", "The artifact name.")}, returns="binary"),
@@ -526,9 +529,10 @@ ENDPOINTS = (
                     "prompt_history": ("array", True, "The prompts that shaped the work, as text."),
                     "next_steps": ("array", True, "Next steps, as text; may be empty.")})),
     _ep("reports_public_list", "reports", "GET", "/api/reports/public", "List Internet-public signed-off reports without exposing account IDs.",
-        None, False, False, query={"offset": ("integer", "Page offset."), "category": ("string", "DOC, TTICKET, AUDIT or LOG.")}),
+        None, False, False, query={"offset": ("integer", "Page offset."), "category": ("string", "DOC, TTICKET, AUDIT or LOG.")},
+        kiosk=True),
     _ep("reports_public_get", "reports", "GET", "/api/reports/public/{id}", "Read a public report, including its prompt history and next steps.",
-        None, False, False, path_params=_ID32),
+        None, False, False, path_params=_ID32, kiosk=True),
     _ep("reports_sharing", "reports", "POST", "/api/reports/{id}/sharing", "Change your report's personal, group or Internet-public visibility with owner sign-off.",
         None, True, True, path_params=_ID32,
         body=_body({"visibility": ("string", True, "personal, group, or public."),
@@ -679,10 +683,11 @@ ENDPOINTS = (
 
     # ---- site
     _ep("site_map_root", "site", "GET", "/site/{map}/", "Read a declared map's root place as an HTML page.",
-        None, False, False, path_params={"map": ("string", "The map name.")}, returns="html"),
+        None, False, False, path_params={"map": ("string", "The map name.")}, returns="html", kiosk=True),
     _ep("site_place", "site", "GET", "/site/{map}/{address}.html", "Read one place of a declared map as an HTML page.",
         None, False, False,
-        path_params={"map": ("string", "The map name."), "address": ("string", "The place address.")}, returns="html"),
+        path_params={"map": ("string", "The map name."), "address": ("string", "The place address.")}, returns="html",
+        kiosk=True),
 
     # ---- play
     _ep("play_state", "play", "GET", "/api/state", "Read this browser table's game state.", None, False, False, tool=False),
@@ -733,8 +738,26 @@ def by_name() -> dict:
     return {e["name"]: e for e in ENDPOINTS}
 
 
-def allowed(endpoint, capabilities, signed_in) -> bool:
-    """True when this caller may use the endpoint: signed in if it needs an account, and holding its capability."""
+def kiosk_endpoint(method, path):
+    """The kiosk entry whose method and path template match a request path (query removed), or None.
+
+    A host answers a kiosk account (the read-only intern guest agent) only when this finds an entry; ``{name}`` matches
+    one non-empty path segment, or the part of one segment before a literal suffix. The handler still validates
+    everything and still asks for the entry's capability.
+    """
+    for entry, pattern in _KIOSK_PATTERNS:
+        if entry["method"] == method and pattern.fullmatch(path):
+            return entry
+    return None
+
+
+def allowed(endpoint, capabilities, signed_in, kiosk=False) -> bool:
+    """True when this caller may use the endpoint: signed in if it needs an account, and holding its capability.
+
+    A kiosk caller may use only the entries declared kiosk.
+    """
+    if kiosk and not endpoint.get("kiosk"):
+        return False
     if endpoint["account"] and not signed_in:
         return False
     need = endpoint["capability"]
@@ -746,18 +769,21 @@ def allowed(endpoint, capabilities, signed_in) -> bool:
     return need in have
 
 
-def public(endpoint, capabilities=None, signed_in=False) -> dict:
+def public(endpoint, capabilities=None, signed_in=False, kiosk=False) -> dict:
     """A JSON-serializable copy of an endpoint; with ``capabilities`` given it also carries ``allowed``."""
     out = _copy(endpoint)
     if capabilities is not None:
-        out["allowed"] = allowed(endpoint, capabilities, signed_in)
+        out["allowed"] = allowed(endpoint, capabilities, signed_in, kiosk)
     return out
 
 
-def index(capabilities=None, signed_in=False, group=None) -> dict:
-    """The whole catalog as one JSON document; with ``capabilities`` given every endpoint says whether it is allowed."""
-    rows = [public(e, capabilities, signed_in) for e in ENDPOINTS if group is None or e["group"] == group]
-    return {"catalog_version": CATALOG_VERSION, "groups": dict(GROUPS), "endpoints": rows}
+def index(capabilities=None, signed_in=False, group=None, kiosk=False) -> dict:
+    """The whole catalog as one JSON document; with ``capabilities`` given every endpoint says whether it is allowed.
+
+    ``kiosk`` is True for a kiosk caller: only the kiosk entries are allowed, and the document says so.
+    """
+    rows = [public(e, capabilities, signed_in, kiosk) for e in ENDPOINTS if group is None or e["group"] == group]
+    return {"catalog_version": CATALOG_VERSION, "groups": dict(GROUPS), "kiosk": bool(kiosk), "endpoints": rows}
 
 
 def _copy(value):
@@ -766,3 +792,13 @@ def _copy(value):
     if isinstance(value, (list, tuple)):
         return [_copy(v) for v in value]
     return value
+
+
+def _template(path):
+    """A path template as a pattern: each {name} is one non-empty segment (or the part before a literal suffix)."""
+    import re
+    return re.compile("".join("[^/]+" if part.startswith("{") else re.escape(part)
+                              for part in re.split(r"(\{[a-z_]+\})", path) if part))
+
+
+_KIOSK_PATTERNS = tuple((e, _template(e["path"])) for e in ENDPOINTS if e["kiosk"])

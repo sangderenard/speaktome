@@ -2,7 +2,8 @@
 
 Run ``python -m speaktome_mcp.api`` with the same environment as ``speaktome_mcp.server``. The table is the story
 verbs of that server, then ``api_index``, then one tool per endpoint that ``GET /api/index`` lists as offered to
-tools and allowed to the signed-in account. No tool here is written by hand: the name, the description, the input
+tools and allowed to the signed-in account (a kiosk account, the read-only intern, also keeps only the verbs in
+``server.KIOSK_VERBS``). No tool here is written by hand: the name, the description, the input
 schema and the request all come from the endpoint's catalog entry (``speaktome_api.catalog``), so a new endpoint
 becomes a tool by being declared there.
 
@@ -166,9 +167,10 @@ def load(rest) -> tuple:
     try:
         who = rest.call("/api/whoami")
         capabilities, signed_in = list(who.get("capabilities") or []), bool(who.get("signed_in"))
+        kiosk = who.get("kiosk") is True
     except (RestError, AttributeError):
         return packaged.index(), f"the packaged catalog, unchecked: {problem} and whoami failed"
-    return packaged.index(capabilities, signed_in), f"the packaged catalog with this account's capabilities: {problem}"
+    return packaged.index(capabilities, signed_in, kiosk=kiosk), f"the packaged catalog with this account's capabilities: {problem}"
 
 
 class ApiServer(Server):
@@ -185,6 +187,9 @@ class ApiServer(Server):
         if self.document is not None:
             return
         self.document, self.source = load(self.rest)
+        if self.document.get("kiosk") is True:     # a kiosk account: only the reading verbs; the server refuses the rest anyway
+            for name in [n for n in self.table if n not in verbs.KIOSK_VERBS]:
+                del self.table[name]
         self.table["api_index"] = (
             "Lists the REST API by group: every endpoint's tool name, method, path, what it needs and, when it is not "
             "a tool for you, why. Read-only; start here to find a tool.",

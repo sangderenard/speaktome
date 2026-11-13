@@ -40,6 +40,9 @@ WORLDS = "/api/living-data/dm/worlds"
 PICTURES = "/api/show/pictures"
 MAX_IMAGE_BYTES = 4 * 1024 * 1024
 MAPS = ["system", "manual", "reports"]
+# The verbs a kiosk account (the read-only intern guest agent; /api/index says "kiosk") is offered: the manual is local and
+# whoami only reads. Every other verb writes or needs what a kiosk account does not hold, so speaktome_mcp.api drops it.
+KIOSK_VERBS = ("man", "whoami")
 REPORTS = "/api/reports"
 MESSAGE_TYPES = ["note", "status", "question", "handoff", "approval_request", "answer"]
 SUBJECT_KINDS = ["lease", "job", "ticket", "file", "topic"]

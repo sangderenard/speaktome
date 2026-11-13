@@ -182,3 +182,31 @@ def test_index_route_marks_each_endpoint_for_the_caller():
         refused = Handler(bad, [], None)
         routes.index_route(refused, "/api/index", catalog=catalog)
         assert refused.sent[0] == code
+
+
+def test_kiosk_entries_and_their_paths():
+    kiosk = {e["name"] for e in ENDPOINTS if e["kiosk"]}
+    assert kiosk == {"identity_login", "identity_logout", "identity_me", "identity_index", "identity_whoami", "photo_jobs",
+                     "photo_lenses", "photo_status", "photo_image", "site_map_root", "site_place", "reports_public_list",
+                     "reports_public_get"}
+    assert not any(e["changes"] for e in ENDPOINTS if e["kiosk"] and e["name"] not in ("identity_login", "identity_logout"))
+    found = catalog.kiosk_endpoint
+    assert found("GET", "/api/whoami")["name"] == "identity_whoami"
+    assert found("GET", "/site/manual/")["name"] == "site_map_root"
+    assert found("GET", "/site/manual/go.html")["name"] == "site_place"
+    assert found("GET", "/api/reports/public/" + "a" * 32)["name"] == "reports_public_get"
+    for method, path in (("POST", "/api/whoami"), ("GET", "/site/manual/a/b.html"), ("GET", "/site/manual"),
+                         ("GET", "/api/reports/" + "a" * 32), ("POST", "/api/reports"), ("POST", "/api/relay/send"),
+                         ("GET", "/api/account/groups"), ("GET", "/api/whoami/extra")):
+        assert found(method, path) is None, (method, path)
+
+
+def test_a_kiosk_caller_is_allowed_only_kiosk_entries():
+    by = catalog.by_name()
+    assert catalog.allowed(by["relay_send"], [], True) and not catalog.allowed(by["relay_send"], [], True, kiosk=True)
+    assert catalog.allowed(by["photo_image"], ["photo_read"], True, kiosk=True)
+    assert not catalog.allowed(by["photo_image"], [], True, kiosk=True), "kiosk never replaces the capability"
+    document = catalog.index(["view_site", "photo_read"], True, kiosk=True)
+    assert document["kiosk"] is True and catalog.index(["view_site"], True)["kiosk"] is False
+    assert {e["name"] for e in document["endpoints"] if e["allowed"]} == {e["name"] for e in ENDPOINTS if e["kiosk"]}
+

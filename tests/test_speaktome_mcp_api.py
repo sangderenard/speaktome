@@ -19,8 +19,9 @@ AGENT = ["dev_ui", "message", "view_site", "photo_read"]
 class Fake:
     """Answers /api/index (or refuses it) and records every call."""
 
-    def __init__(self, capabilities=AGENT, signed_in=True, index=True, reachable=True, answers=None):
+    def __init__(self, capabilities=AGENT, signed_in=True, index=True, reachable=True, answers=None, kiosk=False):
         self.capabilities, self.signed_in, self.index, self.reachable = capabilities, signed_in, index, reachable
+        self.kiosk = kiosk
         self.answers = answers or {}
         self.calls = []
 
@@ -31,9 +32,9 @@ class Fake:
         if path == api.INDEX:
             if not self.index:
                 raise RestError("not found", 404)
-            return json.loads(json.dumps(catalog.index(self.capabilities, self.signed_in)))
+            return json.loads(json.dumps(catalog.index(self.capabilities, self.signed_in, kiosk=self.kiosk)))
         if path == "/api/whoami":
-            return {"capabilities": self.capabilities, "signed_in": self.signed_in}
+            return {"capabilities": self.capabilities, "signed_in": self.signed_in, "kiosk": self.kiosk}
         if path in self.answers:
             return self.answers[path]
         return (b"\x89PNG", "image/png") if raw_limit is not None else {"ok": True}
@@ -195,3 +196,19 @@ def test_report_sharing_and_groups_are_available_to_signed_in_members():
     assert fake.calls[-1]['body']==dict(username='member',expected_revision=2)
     assert {'reports_public_list','reports_public_get'} <= names(api.ApiServer(Fake(capabilities=[],signed_in=False)))
     assert 'reports_sharing' not in names(api.ApiServer(Fake(capabilities=[],signed_in=False)))
+
+
+def test_a_kiosk_account_is_offered_only_the_kiosk_tools_and_reading_verbs():
+    from speaktome_mcp import server as verbs
+    intern = ["view_site", "photo_read"]
+    kiosk = {e["name"] for e in catalog.ENDPOINTS if e["kiosk"] and e["tool"] and catalog.allowed(e, intern, True)}
+    assert kiosk == {"identity_me", "identity_index", "identity_whoami", "photo_jobs", "photo_lenses", "photo_status", "photo_image",
+                     "site_map_root", "site_place", "reports_public_list", "reports_public_get"}
+    for fake in (Fake(intern, kiosk=True), Fake(intern, kiosk=True, index=False)):
+        server = api.ApiServer(fake)
+        assert names(server) == set(verbs.KIOSK_VERBS) | {"api_index"} | kiosk
+        refused = server.handle({"jsonrpc": "2.0", "id": 1, "method": "tools/call",
+                                 "params": {"name": "say", "arguments": {"to": "someone", "body": "hello"}}})
+        assert "unknown tool say" in refused["error"]["message"]
+    assert "make" in names(api.ApiServer(Fake(intern))), "the same capabilities without kiosk keep every verb"
+

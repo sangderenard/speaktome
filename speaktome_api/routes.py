@@ -300,7 +300,8 @@ def index_route(self, path, *, catalog):
     """``GET /api/index[?group=NAME]``: the declared catalog of this API (``speaktome_api.catalog``).
 
     Every endpoint carries ``allowed``: whether this request, with the capabilities the host gave it, may use it. The
-    answer is a description, never a grant; each handler still decides for itself.
+    answer is a description, never a grant; each handler still decides for itself. A host whose handler has ``_kiosk()``
+    returning True (a kiosk account, the read-only intern) is answering a caller allowed only the kiosk entries.
     """
     from urllib.parse import parse_qs
     self._set_cookie = []
@@ -310,4 +311,5 @@ def index_route(self, path, *, catalog):
     group = query.get("group", [None])[0]
     if group is not None and group not in catalog.GROUPS:
         return self._json({"error": "unknown group"}, 404)
-    return self._json(catalog.index(sorted(self._caps()), self._principal().user_id is not None, group))
+    kiosk = bool(getattr(self, "_kiosk", lambda: False)())
+    return self._json(catalog.index(sorted(self._caps()), self._principal().user_id is not None, group, kiosk))
