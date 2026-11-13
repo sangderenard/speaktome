@@ -19,9 +19,9 @@ AGENT = ["dev_ui", "message", "view_site", "photo_read"]
 class Fake:
     """Answers /api/index (or refuses it) and records every call."""
 
-    def __init__(self, capabilities=AGENT, signed_in=True, index=True, reachable=True, answers=None, kiosk=False):
+    def __init__(self, capabilities=AGENT, signed_in=True, index=True, reachable=True, answers=None, kiosk=False, guest=False):
         self.capabilities, self.signed_in, self.index, self.reachable = capabilities, signed_in, index, reachable
-        self.kiosk = kiosk
+        self.kiosk, self.guest = kiosk, guest
         self.answers = answers or {}
         self.calls = []
 
@@ -32,9 +32,9 @@ class Fake:
         if path == api.INDEX:
             if not self.index:
                 raise RestError("not found", 404)
-            return json.loads(json.dumps(catalog.index(self.capabilities, self.signed_in, kiosk=self.kiosk)))
+            return json.loads(json.dumps(catalog.index(self.capabilities, self.signed_in, kiosk=self.kiosk, guest=self.guest)))
         if path == "/api/whoami":
-            return {"capabilities": self.capabilities, "signed_in": self.signed_in, "kiosk": self.kiosk}
+            return {"capabilities": self.capabilities, "signed_in": self.signed_in, "kiosk": self.kiosk, "guest": self.guest}
         if path in self.answers:
             return self.answers[path]
         return (b"\x89PNG", "image/png") if raw_limit is not None else {"ok": True}
@@ -211,4 +211,53 @@ def test_a_kiosk_account_is_offered_only_the_kiosk_tools_and_reading_verbs():
                                  "params": {"name": "say", "arguments": {"to": "someone", "body": "hello"}}})
         assert "unknown tool say" in refused["error"]["message"]
     assert "make" in names(api.ApiServer(Fake(intern))), "the same capabilities without kiosk keep every verb"
+
+
+def test_a_visitor_looks_through_the_window():
+    from speaktome_mcp import server as verbs
+    visitor = ["view_site", "photo_read", "play"]
+    reads = {e["name"] for e in catalog.ENDPOINTS
+             if e["tool"] and e["request"] == "json" and catalog.allowed(e, visitor, False, guest=True)}
+    assert {"identity_whoami", "photo_image", "reports_public_list", "site_place", "play_radio"} <= reads
+    assert not any(catalog.by_name()[n]["changes"] for n in reads), "a visitor's tools only read"
+    for fake in (Fake(visitor, signed_in=False, guest=True), Fake(visitor, signed_in=False, guest=True, index=False)):
+        server = api.ApiServer(fake)
+        assert names(server) == set(verbs.KIOSK_VERBS) | {"api_index"} | reads
+        window = call(server, "api_index")[0]
+        assert window["visitor"] is True and "foyer" in window["say"]
+        rows = {row["tool"]: row for group in window["groups"].values() for row in group["endpoints"]}
+        assert rows["messages_send"]["not_a_tool"] == api.VISITOR
+    who = call(api.ApiServer(Fake(visitor, signed_in=False, guest=True,
+                                  answers={"/api/whoami": {"signed_in": False, "guest": True}})), "whoami")[0]
+    assert "foyer" in who["say"]
+
+
+def test_without_an_account_name_the_session_is_a_visitor_that_never_signs_in():
+    from speaktome_mcp.rest import Rest
+
+    class Opener:
+        def __init__(self):
+            self.paths = []
+
+        def open(self, request, timeout=None):
+            import io
+            self.paths.append(request.full_url)
+
+            class Answer(io.BytesIO):
+                headers = {}
+
+                def __enter__(self):
+                    return self
+
+                def __exit__(self, *exc):
+                    return False
+            return Answer(b'{"signed_in": false, "guest": true}')
+
+    assert Rest.from_env({"SPEAKTOME_BASE": "https://cats.example.org"}).visitor is True
+    opener = Opener()
+    rest = Rest("https://cats.example.org", None, None, opener=opener)
+    assert rest.call("/api/whoami") == {"signed_in": False, "guest": True}
+    assert opener.paths == ["https://cats.example.org/api/whoami"] and rest.logins == 0
+    with pytest.raises(RestError):
+        rest.sign_in()
 

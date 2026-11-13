@@ -40,8 +40,9 @@ WORLDS = "/api/living-data/dm/worlds"
 PICTURES = "/api/show/pictures"
 MAX_IMAGE_BYTES = 4 * 1024 * 1024
 MAPS = ["system", "manual", "reports"]
-# The verbs a kiosk account (the read-only intern guest agent; /api/index says "kiosk") is offered: the manual is local and
-# whoami only reads. Every other verb writes or needs what a kiosk account does not hold, so speaktome_mcp.api drops it.
+# The verbs a kiosk account (the read-only intern guest agent; /api/index says "kiosk") and a visitor with no account (the
+# foyer; /api/index says "guest") are offered: the manual is local and whoami only reads. Every other verb writes or needs
+# what neither holds, so speaktome_mcp.api drops it.
 KIOSK_VERBS = ("man", "whoami")
 REPORTS = "/api/reports"
 MESSAGE_TYPES = ["note", "status", "question", "handoff", "approval_request", "answer"]
@@ -169,7 +170,8 @@ class Tools:
     def whoami(self, a):
         r = self.rest.call("/api/whoami")
         r["say"] = (f"Signed in as {r.get('username')} with role {r.get('role')}." if r.get("signed_in")
-                    else "Not signed in.")
+                    else "Not signed in: you are a visitor in the foyer. You may look; nothing here is for you until an admin "
+                         "makes you an intern account. Read man topic=foyer.")
         return r
 
     # ---- walking --------------------------------------------------------
