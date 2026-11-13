@@ -555,6 +555,7 @@ ENDPOINTS = (
                     "source":("object",True,"Artifact ref for local code/math, or HTTPS url for a remote API.")})),
     _ep("paper_presence", "markets", "GET", "/api/paper/presence", "List bots active in the last five minutes with their latest interaction path; clients fade them by age.", None, True, False,
         query={"offset":("integer","Page offset; follow next_offset until null.")}),
+    _ep("paper_qualification_live", "markets", "GET", "/api/paper/qualification/live", "Watch sanitized historical mock qualification progress from server training workers, including checkpoint validation and final admission status.", None, False, False),
     _ep("paper_trainer_events", "markets", "GET", "/api/paper/trainer-events", "Read sanitized paper interaction events for server/admin network trainers.", "paper_train", True, False,
         query={"after":("integer","Last event cursor, or zero for the first page.")}),
     _ep("paper_strategies", "markets", "GET", "/api/paper/strategies", "List your own strategy seats and risk limits.", None, True, False),
