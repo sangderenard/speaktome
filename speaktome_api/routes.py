@@ -257,6 +257,55 @@ def picture_route(self, path, method, *, service, owners, recheck, PictureError,
         return self._json({"error": "invalid picture request"}, 400)
 
 
+def compute_route(self, path, method, *, service, owners, recheck_for, ComputeError, MAX_BODY):
+    """One Nodus request queue; operation capabilities are trusted host declarations.
+
+    The client names a declared operation, never a command, module, endpoint or
+    credential. Photo compatibility and compute requests share queue admission.
+    """
+    import re
+    self._set_cookie = []
+    if method == "POST":
+        self.close_connection = True
+    if self._is_viewer():
+        return self._refuse_viewer()
+    account = self._account()
+    if account is None:
+        return self._json({"error": "sign in to request compute"}, 401)
+    if service is None:
+        return self._json({"error": "no Nodus compute destination configured"}, 503)
+    if self.path.partition("?")[2]:
+        return self._json({"error": "compute routes accept no query parameters"}, 400)
+    base = "/api/compute/requests"
+    try:
+        if method == "GET":
+            match = re.fullmatch(base + r"/([0-9a-f]{32})(/product)?", path)
+            if not match:
+                return self._json({"error": "not found"}, 404)
+            receipt = service.status(account["id"], match[1])
+            if receipt.get("schema") != "speaktome.compute.v1":
+                return self._json({"error": "not found"}, 404)
+            if not self._require(service.capability(receipt["operation"])):
+                return
+            return self._json(service.product(account["id"], match[1]) if match[2] else receipt)
+        if method != "POST" or path != base:
+            return self._json({"error": "not found"}, 404)
+        if self.headers.get("Content-Type", "").split(";", 1)[0].strip().lower() != "application/json":
+            return self._json({"error": "application/json required"}, 415)
+        body = self._body_json(MAX_BODY)
+        if body is None:
+            return
+        capability = service.capability(body.get("operation") if isinstance(body, dict) else None)
+        if not self._require(capability):
+            return
+        receipt = service.submit_compute(account["id"], owners, recheck_for(capability), body)
+        return self._json(receipt, 200 if receipt.get("replayed") else 202)
+    except ComputeError as error:
+        return self._json({"error": str(error)}, error.status)
+    except (ValueError, TypeError, RecursionError):
+        return self._json({"error": "invalid compute request"}, 400)
+
+
 def site_route(self, path, *, site, maps):
     """A map as a website: ``GET /site/<map>/`` is the map's root place, ``GET /site/<map>/<address>.html`` a place.
 
