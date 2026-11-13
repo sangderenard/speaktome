@@ -2,6 +2,17 @@
 
 **Date:** 2026-11-13 UTC
 
+## Later same-day update
+
+The earlier five-stage receipt below remains accurate for its already-sorted
+fixture. The authored bitonic sort-step shader has since been added to the
+Nodus pipeline. A fixture with interleaved camera and light records ran
+sort-init, all 21 compare/swap passes for 64 items, pack, both scatter modes,
+and connect: 26 completed stages on each Vulkan device. Direct key/index
+assertions proved ascending order and the light/camera partition; all three
+devices again produced 1,024 valid connections and RGB `(1024,1024,1024)`.
+Receipt: `C:/Users/alber/nodus-build/t5_nodus_full_sort_connect.log`.
+
 ## Overview
 
 The authored Spectral T5 sort-init, pack, scatter, and connection stages now
@@ -50,7 +61,6 @@ violation; do not re-enable that threading without addressing those failures.
 
 ## Next Steps
 
-- Include authored bitonic sort steps in a Nodus pipeline for unsorted records.
 - Couple T3-emitted side records and T1/T2 side streams into that pipeline.
 - Form a native Nodus T4 row around the existing angular-spectrum contract,
   then measure compatible cross-arena batching without changing the solver.
