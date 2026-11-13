@@ -21,6 +21,13 @@ This is a joined producer/consumer proof, not a completed exposure or a second
 Nodus runner sequence. T1/T2→T3, bounce feedback, original Spectral runner
 adoption, canvas multi-job dispatch, and cross-estimator linear weighting
 are still open. T4 on a thick-lens aperture is a separate bonus gate.
+The other requested ray tracer is Studio's camera/forward family in
+`spectral-analyzer/demo_pluck_gl.py`; the authored T1–T5 sequence here does
+not stand in for it. `nodus/docs/STUDIO_NATIVE_PATH_FAMILY_INVENTORY.md`
+records its distinct camera, forward, and reactive roots. A common state
+library can host both only after that family has runnable Nodus components;
+their linear sums and effective sample weights must be retained separately
+until the common film response.
 
 The earlier five-stage receipt below remains accurate for its already-sorted
 fixture. The authored bitonic sort-step shader has since been added to the
