@@ -210,3 +210,23 @@ def test_a_kiosk_caller_is_allowed_only_kiosk_entries():
     assert document["kiosk"] is True and catalog.index(["view_site"], True)["kiosk"] is False
     assert {e["name"] for e in document["endpoints"] if e["allowed"]} == {e["name"] for e in ENDPOINTS if e["kiosk"]}
 
+
+
+def test_guest_reachable_entries_and_credentials():
+    guest = {e["name"] for e in ENDPOINTS if e["guest"]}
+    assert {"play_state", "play_action", "play_new", "identity_signup", "control_route", "control_lifecycle", "play_radio"} <= guest
+    assert not any(e["guest"] and e["kiosk"] for e in ENDPOINTS), "kiosk entries are reachable by guests already"
+    assert {e["name"]: e["credential"] for e in ENDPOINTS if e["credential"]} == {
+        "identity_operator_grant": "admin_token", "control_lifecycle_admin": "admin_token", "play_client_rays_engine": "engine_secret"}
+    found = catalog.guest_endpoint
+    assert found("POST", "/api/action")["name"] == "play_action"
+    assert found("POST", "/api/admin/lifecycle")["name"] == "control_lifecycle_admin"
+    assert found("GET", "/api/whoami")["name"] == "identity_whoami"                     # kiosk entries too
+    for method, path in (("POST", "/api/reports"), ("POST", "/api/tickets"), ("POST", "/api/obj_assets"), ("GET", "/api/log"),
+                         ("POST", "/api/relay/send"), ("GET", "/api/user-files")):
+        assert found(method, path) is None, (method, path)
+    assert catalog.endpoint_for("GET", "/api/reports/public")["name"] == "reports_public_list"   # the literal template wins
+    assert catalog.endpoint_for("POST", "/api/messages/send")["capability"] == "message"
+    document = catalog.index(["view_site", "photo_read", "play"], False, guest=True)
+    assert document["guest"] is True
+    assert {e["name"] for e in document["endpoints"] if e["allowed"]} <= {e["name"] for e in ENDPOINTS if catalog.reachable_by_guest(e)}

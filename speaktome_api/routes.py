@@ -301,7 +301,8 @@ def index_route(self, path, *, catalog):
 
     Every endpoint carries ``allowed``: whether this request, with the capabilities the host gave it, may use it. The
     answer is a description, never a grant; each handler still decides for itself. A host whose handler has ``_kiosk()``
-    returning True (a kiosk account, the read-only intern) is answering a caller allowed only the kiosk entries.
+    returning True (a kiosk account, the read-only intern) is answering a caller allowed only the kiosk entries; one
+    whose ``_guest_gated()`` returns True (a visitor with no account) a caller allowed only the guest-reachable entries.
     """
     from urllib.parse import parse_qs
     self._set_cookie = []
@@ -312,4 +313,5 @@ def index_route(self, path, *, catalog):
     if group is not None and group not in catalog.GROUPS:
         return self._json({"error": "unknown group"}, 404)
     kiosk = bool(getattr(self, "_kiosk", lambda: False)())
-    return self._json(catalog.index(sorted(self._caps()), self._principal().user_id is not None, group, kiosk))
+    guest = bool(getattr(self, "_guest_gated", lambda: False)())
+    return self._json(catalog.index(sorted(self._caps()), self._principal().user_id is not None, group, kiosk, guest))
