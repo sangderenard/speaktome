@@ -4,6 +4,21 @@
 
 ## Later same-day update
 
+The Nodus pipeline now also has a T3-produced input mode. Sixty-four controlled
+refined hits (32 light and 32 camera) enter authored `ray_material` as its first
+stage, and T3's BDPT output address is the same state-library tensor used by
+the authored sort/pack/scatter/T5 stages. All 27 stages completed on Vulkan
+devices 0, 1, and 2. Each run produced 64 BDPT vertices, 64 spectral records,
+32 PDF records, a 32/32 sorted split, 1,024 T5 connections, and linear RGB
+`(1024,1024,1024)`. Emissive light endpoints carry their PDF in the vertex,
+so the side PDF count is 32. The prior 26-stage constructed-record mode still
+passes. Receipt: `C:/Users/alber/nodus-build/t3_to_t5_nodus.log`.
+
+This is a joined producer/consumer proof, not a completed exposure or a second
+Nodus runner sequence. T1/T2→T3, bounce feedback, original Spectral runner
+adoption, concurrent multi-job dispatch, and cross-estimator linear weighting
+are still open. T4 on a thick-lens aperture is a separate bonus gate.
+
 The earlier five-stage receipt below remains accurate for its already-sorted
 fixture. The authored bitonic sort-step shader has since been added to the
 Nodus pipeline. A fixture with interleaved camera and light records ran
@@ -71,3 +86,5 @@ violation; do not re-enable that threading without addressing those failures.
 > keep on keeping on, did you need any help? also I just added the speaktome mcp, see if you can use it or if I need a reboot
 
 > whenever you can get to it, t4 should have it's wave algorithm checked and made into a kernel so, just like the rope simulation, we can run all wave simulations at once
+
+> we want to be able to run both ray tracers on many jobs at once through the kernel library, that's the present end goal. intermediate bonus round is getting the wave sim working and test it on a thick lens camera aperture
