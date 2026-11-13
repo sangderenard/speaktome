@@ -12,11 +12,14 @@ devices 0, 1, and 2. Each run produced 64 BDPT vertices, 64 spectral records,
 32 PDF records, a 32/32 sorted split, 1,024 T5 connections, and linear RGB
 `(1024,1024,1024)`. Emissive light endpoints carry their PDF in the vertex,
 so the side PDF count is 32. The prior 26-stage constructed-record mode still
-passes. Receipt: `C:/Users/alber/nodus-build/t3_to_t5_nodus.log`.
+passes. Six generated-record jobs now run as concurrent host submissions,
+two per GPU row, leasing disjoint ranges under the same Nodus library card.
+All six passed. This is not a GPU occupancy or live canvas result. Receipt:
+`C:/Users/alber/nodus-build/t3_to_t5_nodus_six_jobs.log`.
 
 This is a joined producer/consumer proof, not a completed exposure or a second
 Nodus runner sequence. T1/T2→T3, bounce feedback, original Spectral runner
-adoption, concurrent multi-job dispatch, and cross-estimator linear weighting
+adoption, canvas multi-job dispatch, and cross-estimator linear weighting
 are still open. T4 on a thick-lens aperture is a separate bonus gate.
 
 The earlier five-stage receipt below remains accurate for its already-sorted
