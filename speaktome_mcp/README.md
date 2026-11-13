@@ -67,10 +67,10 @@ Each result is the server's JSON plus a one-sentence `say`. A failure is `isErro
 | `whoami` | GET `/api/whoami` | none |
 | `show {photo?, settings?}` or `show {picture, image?}` | POST `/api/show/pictures` (fresh `request_id`); with a picture id: GET its receipt, then GET `/api/marble_photo?digest=` and, when asked, `/api/marble_photo/image` (returned as an MCP image, at most 4 MiB) | `photo_submit`; reading needs `photo_read` |
 | `look {radius?}` | GET session, then POST `/api/living-data/query` at the cursor | `dev_ui`, open cursor |
-| `enter {map?, instance?, at?}` | `map=system` (default): GET `/api/nodus/map`; `map=manual`: the manual's own map from `speaktome_man.as_map()`. Then POST `/api/living-data/sessions` (fresh `request_id`) | `dev_ui` |
+| `enter {map?, instance?, at?, offset?}` | `map=system` (default): GET `/api/nodus/map`; `map=manual`: the manual's own map from `speaktome_man.as_map()`; `map=orientation`: GET `/api/orientation/map` (every markdown file of the core in causal order, at the account's saved place; `man orientation`). Then POST `/api/living-data/sessions` (fresh `request_id`) | `dev_ui`; orientation also `core_git` |
 | `examine {at?, radius?}` | POST `/api/living-data/dm/worlds` once for the entered map (request id derived from the map, so it replays), then POST `.../{world}/commands` with `operation: "inspect"`; `leave` also closes the world | `dev_ui`, open cursor |
 | `where` | GET `/api/living-data/sessions/{id}` (all exit pages) | `dev_ui` |
-| `go {exit \| to, relationship?, direction?}` | POST `.../{id}/move` with `expected_revision` and a fresh `request_id`; `exit` resolves against the last `where`/`go`/`enter` | `dev_ui` |
+| `go {exit \| to and/or relationship, direction?}` | POST `.../{id}/move` with `expected_revision` and a fresh `request_id`; `exit` resolves against the last `where`/`go`/`enter`; a relationship alone needs exactly one matching exit (`relationship=next` steps the orientation, which then POSTs `/api/orientation {at}` so the saved place follows) | `dev_ui` |
 | `leave` | POST `.../{id}/close` | `dev_ui` |
 | `say {to, body, type?, subject?}` | GET `/api/messages/conversations`, POST `/api/messages/send` with `conversation_handle` and a fresh `idempotency_key`; never sends `to` | `message` |
 | `pending` | GET `/api/messages/inbox` | `message` |
