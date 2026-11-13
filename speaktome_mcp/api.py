@@ -16,6 +16,7 @@ body fields and fixed headers; it cannot name another host, another path or a he
 from __future__ import annotations
 
 import json
+import os
 import re
 import sys
 import urllib.parse
@@ -126,7 +127,11 @@ def request(endpoint: dict, arguments: dict) -> tuple:
 
 def perform(rest, endpoint: dict, arguments: dict) -> dict:
     path, body = request(endpoint, arguments)
-    extra = {"method": endpoint["method"], "headers": dict(endpoint.get("headers") or {})}
+    headers = {"X-Meowdoku-Entry": "mcp", **dict(endpoint.get("headers") or {})}
+    bot_id = os.environ.get("SPEAKTOME_BOT_ID", "")
+    if re.fullmatch(r"[0-9a-f]{32}", bot_id):
+        headers["X-Meowdoku-Bot"] = bot_id
+    extra = {"method": endpoint["method"], "headers": headers}
     kind = endpoint.get("returns", "json")
     if kind == "json":
         data = rest.call(path, body, **extra)
