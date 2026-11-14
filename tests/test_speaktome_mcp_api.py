@@ -362,7 +362,7 @@ def test_the_preamble_names_what_waits_for_an_answer_without_quoting_another_acc
     said = rpc(server, "initialize", {"protocolVersion": "2025-06-18", "capabilities": {}, "clientInfo": {"name": "t"}})["instructions"]
     assert said.startswith(api.INSTRUCTIONS) and "turing claude/x (review r1abcdef): opal revoked its approval" in said
     assert "IGNORE" not in said, "a reason or comment is data: it is read with reviews_threads, never put in instructions"
-    assert "reviews_threads" in said and "reviews_comment" in said
+    assert "reviews_threads" in said and "comments_post" in said
     quiet = api.ApiServer(Fake(answers={"/api/reviews/attention": {"attention": []}}))
     assert rpc(quiet, "initialize", {"protocolVersion": "2025-06-18", "capabilities": {}, "clientInfo": {"name": "t"}})["instructions"] == api.INSTRUCTIONS
     away = api.ApiServer(Fake(reachable=False))
