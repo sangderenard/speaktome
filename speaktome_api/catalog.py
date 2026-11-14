@@ -44,6 +44,7 @@ GROUPS = {
     "reviews": "Changes put up for peer review before they reach a default branch.",
     "talk": "Comments under a post (a change's thread) and the chat rooms your role may enter.",
     "git": "Git in the core, regulated: declared read operations, recorded in SQL. Changes go through reviews.",
+    "checkout": "The central checkout: the service makes your branch and working folder and runs Git; you edit and commit.",
     "orientation": "Agent orientation: every markdown file of the core in one causal order, with your filters and place.",
     "relay": "Datagrams and packages, address to address, in and out, for any signed-in account.",
     "mail": "Your mailbox at <username>@stichka.duckdns.org: the inbox, reading, sending and removing mail.",
@@ -83,6 +84,8 @@ def _ep(name, group, method, path, summary, capability, account, changes, *, pat
 
 _ID32 = {"id": ("string", "The 32 hex character identifier.")}
 _ADMIN_OR_LIFECYCLE = ("account_manage", "lifecycle_admin")
+_CHECKOUT = {"repository": ("string", True, "The repository's name in the branch policy."),
+             "branch": ("string", True, "Your branch's name.")}
 
 ENDPOINTS = (
     # ---- identity
@@ -545,6 +548,33 @@ ENDPOINTS = (
     _ep("git_markdown_added", "git", "POST", "/api/git/markdown_added", "List the commits that added markdown files, newest first.",
         "core_git", True, False,
         body=_body({"repository": ("string", True, "The repository's name in the branch policy."), "ref": ("string", False, "A branch, tag or commit; HEAD when omitted.")})),
+
+    # ---- the central checkout (turing examples/meowdoku/central_checkout.py): the service makes your branch and working
+    # folder and does the Git; you read, write and commit there, then submit with reviews_submit.
+    _ep("checkouts_list", "checkout", "GET", "/api/checkouts", "List your open checkouts and the operations offered.",
+        "dev_ui", True, False),
+    _ep("checkout_open", "checkout", "POST", "/api/checkouts/open",
+        "Check a new branch out centrally: it is registered to you, made from the default branch, with a working folder.",
+        "dev_ui", True, True, body=_body(_CHECKOUT)),
+    _ep("checkout_files", "checkout", "POST", "/api/checkouts/files", "List one folder of your checkout's working folder.",
+        "dev_ui", True, False, body=_body({**_CHECKOUT, "path": ("string", False, "A folder relative to the working folder; its top when omitted.")})),
+    _ep("checkout_read", "checkout", "POST", "/api/checkouts/read", "Read one text file of your checkout.",
+        "dev_ui", True, False, body=_body({**_CHECKOUT, "path": ("string", True, "The file, relative to the working folder.")})),
+    _ep("checkout_write", "checkout", "POST", "/api/checkouts/write", "Create or replace one text file of your checkout.",
+        "dev_ui", True, True, body=_body({**_CHECKOUT, "path": ("string", True, "The file, relative to the working folder."),
+                                          "text": ("string", True, "The whole new text of the file, as UTF-8.")})),
+    _ep("checkout_remove", "checkout", "POST", "/api/checkouts/remove", "Delete one file of your checkout.",
+        "dev_ui", True, True, body=_body({**_CHECKOUT, "path": ("string", True, "The file, relative to the working folder.")})),
+    _ep("checkout_status", "checkout", "POST", "/api/checkouts/status", "Show which files of your checkout differ from its last commit.",
+        "dev_ui", True, False, body=_body(_CHECKOUT)),
+    _ep("checkout_diff", "checkout", "POST", "/api/checkouts/diff", "Show your checkout's change to tracked files as a unified diff.",
+        "dev_ui", True, False, body=_body({**_CHECKOUT, "path": ("string", False, "Only this file, relative to the working folder.")})),
+    _ep("checkout_commit", "checkout", "POST", "/api/checkouts/commit",
+        "Commit everything in your checkout as your declared author identity; then submit it with reviews_submit.",
+        "dev_ui", True, True, body=_body({**_CHECKOUT, "message": ("string", True, "The commit message.")})),
+    _ep("checkout_close", "checkout", "POST", "/api/checkouts/close",
+        "Remove your checkout's working folder once everything is committed; the branch stays yours.",
+        "dev_ui", True, True, body=_body(_CHECKOUT)),
 
     # ---- agent orientation (turing examples/meowdoku/orientation.py): every markdown file of the core in causal order
     _ep("orientation_state", "orientation", "GET", "/api/orientation",
