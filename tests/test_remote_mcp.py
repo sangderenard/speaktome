@@ -163,3 +163,16 @@ class NetworkPolicyTests(unittest.IsolatedAsyncioTestCase):
             with self.assertRaises(PermissionError):
                 await PublicNetworkBackend(backend,mixed).connect_tcp('fixture.invalid',443)
         self.assertEqual(len(backend.calls),1)
+
+
+class FailureDiagnosticTests(unittest.TestCase):
+    def test_nested_safe_categories_do_not_leak_secrets(self):
+        from speaktome_api.remote_mcp import failure_category, ProviderOriginDenied
+        import ssl
+        secret = 'https://private.invalid/callback?code=secret&state=secret'
+        self.assertEqual(failure_category(ExceptionGroup(secret,[ProviderOriginDenied(secret)])),
+                         'provider_origin_not_approved')
+        error = httpx.ConnectError(secret)
+        error.__cause__ = ssl.SSLError(secret)
+        self.assertEqual(failure_category(error), 'provider_tls_failed')
+        self.assertEqual(failure_category(ValueError(secret)), 'provider_connection_failed')

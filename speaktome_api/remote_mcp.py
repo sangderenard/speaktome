@@ -18,6 +18,48 @@ from mcp.client.streamable_http import streamable_http_client
 from mcp.shared.auth import OAuthClientMetadata
 
 
+class ProviderOriginDenied(PermissionError):
+    pass
+
+
+class ProviderAddressDenied(PermissionError):
+    pass
+
+
+def failure_category(exc):
+    """Finite safe diagnostic vocabulary; never serialize exception text/URLs."""
+    import socket
+    import ssl
+    import httpcore
+    from mcp.client.auth.exceptions import OAuthRegistrationError, OAuthTokenError, OAuthFlowError
+    pending, seen, codes = [exc], set(), []
+    while pending and len(seen) < 64:
+        current = pending.pop()
+        if id(current) in seen:
+            continue
+        seen.add(id(current))
+        pending.extend(getattr(current, 'exceptions', ()))
+        pending.extend(e for e in (current.__cause__, current.__context__) if e is not None)
+        if isinstance(current, ProviderOriginDenied): codes.append('provider_origin_not_approved')
+        elif isinstance(current, ProviderAddressDenied): codes.append('provider_address_not_public')
+        elif isinstance(current, ssl.SSLError): codes.append('provider_tls_failed')
+        elif isinstance(current, socket.gaierror): codes.append('provider_dns_failed')
+        elif isinstance(current, OAuthRegistrationError): codes.append('provider_registration_failed')
+        elif isinstance(current, OAuthTokenError): codes.append('provider_token_failed')
+        elif isinstance(current, OAuthFlowError): codes.append('provider_oauth_failed')
+        elif isinstance(current, httpx.HTTPStatusError): codes.append('provider_http_rejected')
+        elif isinstance(current, (httpx.TimeoutException, httpcore.TimeoutException, TimeoutError)):
+            codes.append('provider_network_timeout')
+        elif isinstance(current, (httpx.ConnectError, httpcore.ConnectError)):
+            codes.append('provider_connect_failed')
+    for code in ('provider_origin_not_approved', 'provider_address_not_public',
+                 'provider_tls_failed', 'provider_dns_failed', 'provider_registration_failed',
+                 'provider_token_failed', 'provider_oauth_failed', 'provider_http_rejected',
+                 'provider_network_timeout', 'provider_connect_failed'):
+        if code in codes: return code
+    return 'provider_connection_failed'
+
+
 def _https(url: str) -> str:
     p = urlsplit(url)
     if p.scheme != 'https' or not p.hostname or p.username or p.password or p.fragment:
@@ -62,7 +104,7 @@ class OriginPolicyTransport(httpx.AsyncBaseTransport):
     async def handle_async_request(self, request):
         _https(str(request.url))
         if _origin(str(request.url)) not in self.allowed:
-            raise PermissionError('provider requested an unapproved origin')
+            raise ProviderOriginDenied('provider requested an unapproved origin')
         return await self.delegate.handle_async_request(request)
 
     async def aclose(self):
@@ -97,7 +139,7 @@ class RemoteMCP:
         async def checked_redirect(url):
             _https(url)
             if _origin(url) not in provider.allowed_origins:
-                raise PermissionError('authorization origin is not approved')
+                raise ProviderOriginDenied('authorization origin is not approved')
             await redirect(url)
 
         storage = self.storage_for(owner, provider_id)
@@ -285,9 +327,9 @@ class ConnectionService:
                 raise
             except TimeoutError:
                 r.update(status='failed', error='authorization_expired')
-            except Exception:
+            except Exception as exc:
                 # Raw OAuth exceptions can contain codes/state/tokens. Never return/log them.
-                r.update(status='failed', error='provider_connection_failed')
+                r.update(status='failed', error=failure_category(exc))
             finally:
                 r.update(url=None, state=None)
                 r['ready'].set()
@@ -384,7 +426,7 @@ class PublicNetworkBackend:
             ip = ipaddress.ip_address(address)
             effective = getattr(ip, 'ipv4_mapped', None) or ip
             if not effective.is_global or effective.is_multicast or effective.is_reserved:
-                raise PermissionError('provider hostname resolved to a nonpublic address')
+                raise ProviderAddressDenied('provider hostname resolved to a nonpublic address')
         # The destination is an IP now; the backend cannot re-resolve the hostname.
         return await self.delegate.connect_tcp(addresses[0], port, timeout=timeout,
                     local_address=local_address, socket_options=socket_options)
