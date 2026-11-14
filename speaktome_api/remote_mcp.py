@@ -335,11 +335,18 @@ class ConnectionService:
                     import logging
                     import traceback
                     from pathlib import PurePath
-                    locations = [(PurePath(f.filename).name, f.name, f.lineno)
-                                 for f in traceback.extract_tb(exc.__traceback__)[-12:]]
-                    logging.getLogger(__name__).warning(
-                        'Outgoing MCP failure type=%s locations=%s',
-                        type(exc).__name__, locations)
+                    pending, seen = [exc], set()
+                    while pending and len(seen) < 16:
+                        error = pending.pop()
+                        if id(error) in seen: continue
+                        seen.add(id(error))
+                        pending.extend(getattr(error, 'exceptions', ()))
+                        pending.extend(e for e in (error.__cause__, error.__context__) if e is not None)
+                        locations = [(PurePath(f.filename).name, f.name, f.lineno)
+                                     for f in traceback.extract_tb(error.__traceback__)[-12:]]
+                        logging.getLogger(__name__).warning(
+                            'Outgoing MCP failure type=%s locations=%s',
+                            type(error).__name__, locations)
                 r.update(status='failed', error=category)
             finally:
                 r.update(url=None, state=None)
