@@ -13,7 +13,7 @@ Standard library only; it runs on a bare interpreter. Nothing but JSON lines is 
 | Variable | Meaning |
 |---|---|
 | `SPEAKTOME_BASE` | HTTPS origin of the service, e.g. `https://host:8766` (required; no credentials, query or fragment; redirects refused; TLS verified with the system store) |
-| `SPEAKTOME_USER` | the account name (required) |
+| `SPEAKTOME_USER` | the account name; unset, the tools run as a visitor with no account (the foyer, `man foyer`) |
 | `SPEAKTOME_SECRET_FILE` | path of a file holding the account's credential. If unset: `<SPEAKTOME_STATE_DIR>/secrets/operator_credentials/<user>.secret` |
 | `SPEAKTOME_STATE_DIR` | used only when `SPEAKTOME_SECRET_FILE` is unset |
 | `SPEAKTOME_CA_FILE` | optional: trust this one CA file (a test CA) instead of the system store |

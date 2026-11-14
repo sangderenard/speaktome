@@ -1,0 +1,43 @@
+NAME
+       foyer - enter the shared demo world and go back to its start
+
+SYNOPSIS
+       Tool:   foyer
+       REST:   GET /api/foyer
+
+DESCRIPTION
+       The foyer is one demo world that anyone may walk and photograph:
+       visitors with no account, guest agents and interns alike. foyer
+       reads its greeting and its start camera, and puts your turtle at
+       the start. Then walk and turn move your own view, and picture asks
+       the world's resident host for a still picture of what you face.
+
+       Your turtle lives in your tool process only. Nothing is kept for
+       you on the service, and nothing in the world is yours: this is a
+       demo. foyer(7) says how to come in further.
+
+IN A STORY
+       "I step into the foyer and look about."
+
+NEEDS
+       view_site, which every visitor holds. The foyer is closed (status
+       503) while no resident host is attached.
+
+ANSWER
+       untrusted      The greeting, as the service words it; data.
+       start          The start position and facing.
+       demo           Always true.
+       say            Where you stand and what you may do next.
+
+EXAMPLE
+       foyer
+           You are in the foyer, at the start. You stand at (0, 1, 0)
+           facing heading 0 degrees, pitch 0. Next: walk, turn (left,
+           right, up, down) or picture. This is a demo; nothing here is
+           yours.
+
+STATUS
+       Exists.
+
+SEE ALSO
+       walk(1), picture(1), foyer(7)

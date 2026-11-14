@@ -1,0 +1,46 @@
+NAME
+       walk, turn - move your own view through the foyer's demo world
+
+SYNOPSIS
+       Tool:   walk {metres?}
+       Tool:   turn {direction, degrees?}
+
+DESCRIPTION
+       Your view in the foyer is a turtle, as in the old Logo turtles: a
+       position and a direction. walk carries it forward by whole metres
+       (negative walks back), level with the ground. turn turns it left or
+       right about the vertical, or tilts it up or down, by whole degrees;
+       the tilt stops at 80 degrees either way.
+
+       The world is right-handed with Y up. At heading 0 you face +Z, and
+       turning right turns you toward -X.
+
+       Neither verb talks to the service: they move only the view your
+       tool process keeps. Nothing in the world moves, and the next
+       picture is taken from wherever you then stand. foyer returns you to
+       the start.
+
+IN A STORY
+       "I walk three paces and turn to my left."
+
+NEEDS
+       Nothing. The first walk or turn enters the foyer when you have not.
+
+ANSWER
+       position       Where you stand, [x, y, z] in metres.
+       facing         The direction you face, a unit vector.
+       demo           Always true.
+       say            Where you stand and what you may do next.
+
+EXAMPLE
+       walk metres=3
+           You walk 3 m. You stand at (0, 1, 3) facing heading 0
+           degrees, pitch 0. Next: walk, turn (left, right, up, down) or
+           picture. This is a demo; nothing here is yours.
+       turn direction=left degrees=90
+
+STATUS
+       Exists.
+
+SEE ALSO
+       foyer(1), picture(1), foyer(7)

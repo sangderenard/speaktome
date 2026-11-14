@@ -2,7 +2,8 @@
 
 Run ``python -m speaktome_mcp.api`` with the same environment as ``speaktome_mcp.server``. The table is the story
 verbs of that server, then ``api_index``, then one tool per endpoint that ``GET /api/index`` lists as offered to
-tools and allowed to the signed-in account. No tool here is written by hand: the name, the description, the input
+tools and allowed to the signed-in account (a kiosk account, the read-only intern, also keeps only the verbs in
+``server.KIOSK_VERBS``). No tool here is written by hand: the name, the description, the input
 schema and the request all come from the endpoint's catalog entry (``speaktome_api.catalog``), so a new endpoint
 becomes a tool by being declared there.
 
@@ -58,14 +59,17 @@ def needs(endpoint: dict) -> str:
     return phrase + (", signed in" if endpoint.get("account") else "")
 
 
-def offered(endpoint: dict) -> str | None:
-    """None when the endpoint becomes a tool; otherwise the reason it does not."""
+VISITOR = "for interns and members, not for a visitor: look, and ask for an intern account (man topic=foyer)"
+
+
+def offered(endpoint: dict, visitor: bool = False) -> str | None:
+    """None when the endpoint becomes a tool; otherwise the reason it does not. ``visitor``: the caller has no account."""
     if not endpoint.get("tool"):
         return "not offered to tools"
     if endpoint.get("request", "json") != "json":
         return "takes a binary upload, which a tool cannot send"
     if endpoint.get("allowed") is False:
-        return f"this account lacks what it needs ({needs(endpoint)})"
+        return VISITOR if visitor else f"this account lacks what it needs ({needs(endpoint)})"
     if not NAME.fullmatch(str(endpoint.get("name", ""))) or endpoint.get("method") not in ("GET", "POST"):
         return "its catalog entry is malformed"
     return None
@@ -166,9 +170,11 @@ def load(rest) -> tuple:
     try:
         who = rest.call("/api/whoami")
         capabilities, signed_in = list(who.get("capabilities") or []), bool(who.get("signed_in"))
+        kiosk, guest = who.get("kiosk") is True, who.get("guest") is True
     except (RestError, AttributeError):
         return packaged.index(), f"the packaged catalog, unchecked: {problem} and whoami failed"
-    return packaged.index(capabilities, signed_in), f"the packaged catalog with this account's capabilities: {problem}"
+    return (packaged.index(capabilities, signed_in, kiosk=kiosk, guest=guest),
+            f"the packaged catalog with this account's capabilities: {problem}")
 
 
 class ApiServer(Server):
@@ -180,11 +186,16 @@ class ApiServer(Server):
         self.document = None
         self.source = None
         self.annotations = {}
+        self.visitor = False                       # set by build(): the index answered a caller with no account
 
     def build(self) -> None:
         if self.document is not None:
             return
         self.document, self.source = load(self.rest)
+        self.visitor = self.document.get("guest") is True
+        if self.document.get("kiosk") is True or self.visitor:     # a kiosk account or a visitor: only the reading verbs
+            for name in [n for n in self.table if n not in verbs.KIOSK_VERBS]:
+                del self.table[name]
         self.table["api_index"] = (
             "Lists the REST API by group: every endpoint's tool name, method, path, what it needs and, when it is not "
             "a tool for you, why. Read-only; start here to find a tool.",
@@ -192,7 +203,7 @@ class ApiServer(Server):
             self.api_index)
         self.annotations["api_index"] = {"readOnlyHint": True}
         for endpoint in self.document["endpoints"]:
-            if offered(endpoint) is not None or endpoint["name"] in self.table:
+            if offered(endpoint, self.visitor) is not None or endpoint["name"] in self.table:
                 continue
             self.table[endpoint["name"]] = (describe(endpoint), schema(endpoint), self._caller(endpoint))
             self.annotations[endpoint["name"]] = {"readOnlyHint": not endpoint.get("changes")}
@@ -209,7 +220,7 @@ class ApiServer(Server):
         for endpoint in self.document["endpoints"]:
             if wanted is not None and endpoint.get("group") != wanted:
                 continue
-            reason = offered(endpoint)
+            reason = offered(endpoint, self.visitor)
             if reason is None and self.table.get(endpoint["name"], (None,))[0] != describe(endpoint):
                 reason = "a verb of the same name already covers it"
             row = {"tool": endpoint.get("name"), "method": endpoint.get("method"), "path": endpoint.get("path"),
@@ -219,6 +230,11 @@ class ApiServer(Server):
             rows.setdefault(endpoint.get("group"), []).append(row)
         total = sum(len(v) for v in rows.values())
         tools = sum(1 for v in rows.values() for row in v if "not_a_tool" not in row)
+        if self.visitor:
+            return {"source": self.source, "catalog_version": self.document.get("catalog_version"), "visitor": True,
+                    "groups": {name: {"about": groups.get(name, ""), "endpoints": rows[name]} for name in sorted(rows, key=str)},
+                    "say": f"You are a visitor in the foyer: {total} endpoints, {tools} of them you may look through. Nothing "
+                           "here is for you until an admin makes you an intern account; read man topic=foyer."}
         return {"source": self.source, "catalog_version": self.document.get("catalog_version"),
                 "groups": {name: {"about": groups.get(name, ""), "endpoints": rows[name]} for name in sorted(rows, key=str)},
                 "say": f"{total} endpoints, {tools} of them tools for this account; read from {self.source}."}
