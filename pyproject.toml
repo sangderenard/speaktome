@@ -53,3 +53,12 @@ gpu-torch = []
 [build-system]
 requires = ["poetry-core>=1.5.0"]
 build-backend = "poetry.core.masonry.api"
+
+# Outgoing provider clients only; incoming stdio stays standard-library-only.
+[tool.poetry.group.remote-mcp]
+optional = true
+
+[tool.poetry.group.remote-mcp.dependencies]
+mcp = "1.29.0"
+httpx = "0.28.1"
+httpcore = "1.0.9"

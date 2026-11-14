@@ -125,3 +125,46 @@ Mutations have caller-chosen request ids, bounded JSON and same-origin checks.
 The route remains dormant until the matching source pair is deployed through
 the existing coordinated service lifecycle. Do not initialize live SQL merely
 to test this contract.
+
+## Outgoing MCP provider adapter (not yet a site connection endpoint)
+
+`remote_mcp.RemoteMCP` is the optional SDK-backed client, separate from the
+standard-library incoming `speaktome_mcp` server. The optional `remote-mcp`
+Poetry group pins the verified SDK to `mcp==1.29.0`; configure dependencies through
+repository setup, not manual pip. Import it only in hosts enabling this feature.
+
+The host supplies operator-owned `Provider` configuration, an owner/provider-bound
+`TokenStorage` vault factory and a policy-enforcing HTTP transport factory. The
+adapter additionally restricts every HTTP request and browser authorization URL
+to exact approved HTTPS origins. Host egress must still enforce DNS/IP policy;
+origin checking alone does not prevent DNS rebinding. Provider discovery may
+introduce a separate issuer origin; it must be approved before connect can work.
+No Suno issuer, scope or tool schema is assumed.
+
+Explicit connect calls `tools(owner, provider, redirect=..., callback=...)`.
+The official SDK discovers metadata, performs registration if supported, issues
+PKCE and validates callback state, exchanges/refreshes tokens, initializes MCP,
+and lists all tool pages. The redirect callback hands the URL to the authenticated
+user's browser. The callback handler must return only the code/state from that
+same owner's bounded pending connection. Do not log authorization URLs, callback
+queries, raw SDK exceptions or token responses. The host must suppress/redact SDK
+auth logs, which can contain state values. Normal `tools`/`call` operations cannot
+start an authorization and never borrow another user's token. `call` checks the
+current discovered menu and retains the full MCP result, including `isError`.
+It does not replace the site's per-call approval rules or billing consent.
+
+`ConnectionService` provides the synchronous host lifecycle: `begin`, `status`,
+`callback`, `tools`, `call`, `disconnect`, and `close`. It owns an isolated asyncio
+thread, limits runtime connection records, bounds pending authorization lifetime,
+serializes owner/provider operations, and rejects wrong-owner, wrong-state and
+replayed callbacks. `JsonVault(read, write, clear)` adapts host-protected atomic
+JSON persistence without defining a competing filesystem/security policy.
+Disconnect cancels a pending flow and deletes local credentials; it does not claim
+to revoke the provider grant. Status `authorized` means credentials exist, whereas
+`connected` means a tools listing succeeded in the current process.
+
+**Host integration required:** authenticated and CSRF-protected routes, persistent
+secure storage callbacks, approved egress transport and dependency installation.
+No Suno account action is part of tests; all network responses are offline fixtures
+exercising the installed official SDK 1.29.0. Do not advertise the site as ready
+until the host routes, deployment and real provider handoff have been verified.
