@@ -15,12 +15,12 @@ This document enumerates work items suitable for agents operating without networ
 - Update retirement manager tests to cover this logic.
 
 ## 3. Expand Header Validation Helper
-- **File:** `AGENTS/tools/validate_headers.py`
+- **File:** `AGENTS/tools/headers/validate_headers.py`
 - Flesh out the stubbed helper to scan each module for the required header block ending with `# --- END HEADER ---`.
 - Provide CLI options for interactive fix-ups and integration with `pre-commit`.
 
 ## 4. Recursive Test Runner Enhancements
-- **File:** `AGENTS/tools/test_all_headers.py`
+- **File:** `AGENTS/tools/headers/test_all_headers.py`
 - Improve the stubbed script so it can locate and execute `Class.test()` methods in subprocesses.
 - Capture results in JSON for `AGENTS/tools/format_test_digest.py`.
 
