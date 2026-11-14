@@ -798,6 +798,11 @@ ENDPOINTS = (
         None, False, False, tool=False, guest=True),
     _ep("play_radio", "play", "GET", "/api/radio", "Show the Nodus Radio snapshot the site navigation displays.",
         "view_site", False, False, guest=True),
+    # The opt-in HLS stream behind the same view_site gate (turing server.py /api/radio/hls/, nodus_radio_hls.read checks the
+    # file name). Declared guest-reachable like /api/radio: without this entry the visitor gate answers 401 before the handler.
+    _ep("play_radio_hls", "play", "GET", "/api/radio/hls/{file}", "Read one file of the opt-in Nodus Radio HLS stream.",
+        "view_site", False, False, path_params={"file": ("string", "The playlist or segment file name.")},
+        returns="binary", guest=True),
     _ep("play_client_rays_join", "play", "POST", "/api/client_rays/join", "Join a photo job's client ray participation.",
         "share_live", False, True, body=_body({"job": ("string", False, "The photo job.")}), tool=False),
     _ep("play_client_rays_engine", "play", "POST", "/api/client_rays/engine/{action}",
