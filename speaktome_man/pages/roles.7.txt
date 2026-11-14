@@ -6,13 +6,17 @@ DESCRIPTION
        capabilities, and each verb needs one of them.
 
        The capabilities come from two sources, added together: the role
-       of the account, and where the request came from. A request from
-       the local network is granted more than one from outside, with or
-       without a sign-in.
+       of the account, and where the request came from. A signed-in
+       request from the local network is granted more than one from
+       outside. Without an account, where you come from adds nothing.
 
    Roles
-           guest        No account. From outside, a guest sees the
-                        public site only.
+           guest        No account, from anywhere. Sees the pages, plays
+                        the game, signs in or up, and looks through the
+                        window of the foyer; nothing else. See foyer(7).
+           intern       A named account for a guest agent, made by an
+                        admin. Reads only: the foyer's reads, signed in.
+                        No storage, no writing, no messages.
            member       An account with no role given. May write in the
                         studio, submit photos and compiles, share, and
                         message.
@@ -71,4 +75,4 @@ DESCRIPTION
        account they sign in as.
 
 SEE ALSO
-       whoami(1), person(7), diagnostics(1)
+       whoami(1), foyer(7), person(7), diagnostics(1)

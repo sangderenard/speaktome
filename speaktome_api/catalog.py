@@ -16,7 +16,11 @@ signed-in account is required), headers (fixed request headers the handler insis
 binary for an upload whose body is not a JSON object and which a generated tool therefore cannot send), changes
 (the call changes server state), path_params, query, body (None, or {"fields": {...}, "open": bool};
 open means more fields pass through to a deeper layer that is not enumerated), returns, tool (False means
-never offer it to an automated agent as a generated tool).
+never offer it to an automated agent as a generated tool), kiosk (True: a kiosk account, the read-only intern
+guest agent, may use it; the host answers a kiosk account on these entries only, see ``kiosk_endpoint``), guest (True:
+a visitor with no account keeps it beside the kiosk entries: the pages' and the game table's calls), credential (None, or
+the name of the credential the handler itself checks, such as admin_token: a caller with no account reaches the entry
+and the handler's check is the authority; see ``guest_endpoint``).
 
 A field spec may also carry ``schema``: an inline JSON Schema object or boolean copied unchanged into
 that field's generated input schema. Its outer ``required`` remains the catalogue boolean; nested
@@ -39,6 +43,7 @@ GROUPS = {
     "reports": "Experience reports, account-owned issue tickets and legacy tickets.",
     "reviews": "Changes put up for peer review before they reach a default branch.",
     "git": "Git in the core, regulated: declared read operations, recorded in SQL. Changes go through reviews.",
+    "orientation": "Agent orientation: every markdown file of the core in one causal order, with your filters and place.",
     "relay": "Datagrams and packages, address to address, in and out, for any signed-in account.",
     "mail": "Your mailbox at <username>@stichka.duckdns.org: the inbox, reading, sending and removing mail.",
     "files": "The flat index of every file in the core, kept by the cleanup account.",
@@ -46,6 +51,7 @@ GROUPS = {
     "site": "Maps rendered as read-only web pages.",
     "play": "The game table tied to a browser session, sharing and spectating, and page support calls.",
     "markets": "Alpaca paper market observation, strategy seats and attributed paper orders.",
+    "foyer": "The one shared demo world anyone may walk and photograph; nothing in it is yours.",
 }
 
 
@@ -63,13 +69,14 @@ def _named(spec):
 
 
 def _ep(name, group, method, path, summary, capability, account, changes, *, path_params=None, query=None,
-        body=None, returns="json", tool=True, headers=None, capability_all=False, request="json"):
+        body=None, returns="json", tool=True, headers=None, capability_all=False, request="json", kiosk=False,
+        guest=False, credential=None):
     return {
         "name": name, "group": group, "method": method, "path": path, "summary": summary,
         "capability": capability, "capability_all": capability_all, "account": account, "changes": changes,
         "headers": dict(headers or {}), "request": request,
         "path_params": _named(path_params or {}), "query": _named(query or {}), "body": body,
-        "returns": returns, "tool": tool,
+        "returns": returns, "tool": tool, "kiosk": kiosk, "guest": guest, "credential": credential,
     }
 
 
@@ -79,22 +86,22 @@ _ADMIN_OR_LIFECYCLE = ("account_manage", "lifecycle_admin")
 ENDPOINTS = (
     # ---- identity
     _ep("identity_login", "identity", "POST", "/api/account/login", "Sign in with a username and password.",
-        None, False, True, tool=False,
+        None, False, True, tool=False, kiosk=True,
         body=_body({"username": ("string", True, "The account name."), "password": ("string", True, "The password.")})),
     _ep("identity_signup", "identity", "POST", "/api/account/signup", "Create an account and sign it in.",
         None, False, True, tool=False,
-        body=_body({"username": ("string", True, "The new account name."), "password": ("string", True, "The password.")})),
+        body=_body({"username": ("string", True, "The new account name."), "password": ("string", True, "The password.")}), guest=True),
     _ep("identity_logout", "identity", "POST", "/api/account/logout", "End this session.",
-        None, False, True, tool=False),
+        None, False, True, tool=False, kiosk=True),
     _ep("identity_me", "identity", "GET", "/api/account/me", "Show the signed-in account, its role and its instance, or no account.",
-        None, False, False),
+        None, False, False, kiosk=True),
     _ep("identity_assets", "identity", "GET", "/api/account/assets", "List the marble objects, photos, OBJ assets and profile this account owns.",
         None, True, False),
     _ep("identity_index", "identity", "GET", "/api/index",
         "List every REST endpoint with what it accepts and whether you may use it.",
-        None, False, False, query={"group": ("string", "Only this group's endpoints.")}),
+        None, False, False, query={"group": ("string", "Only this group's endpoints.")}, kiosk=True),
     _ep("identity_whoami", "identity", "GET", "/api/whoami", "Show this request's tier, role and the capabilities it holds.",
-        None, False, False),
+        None, False, False, kiosk=True),
     _ep("identity_admin_list", "identity", "GET", "/api/account/admin/list", "List the admin accounts and all users.",
         "account_manage", True, False, tool=False),
     _ep("identity_admin_grant", "identity", "POST", "/api/account/admin/grant", "Grant the admin role to an account.",
@@ -106,7 +113,25 @@ ENDPOINTS = (
     _ep("identity_operator_grant", "identity", "POST", "/api/admin/account/grant",
         "Bootstrap the first admin with the operator's loopback token.",
         None, False, True, tool=False,
-        body=_body({"username": ("string", True, "The account to promote.")})),
+        body=_body({"username": ("string", True, "The account to promote.")}), credential="admin_token"),
+
+    # ---- foyer: the shared demo world (owner, 2026-11-13); kiosk, so guests, guest agents and interns all reach it
+    _ep("foyer_status", "foyer", "GET", "/api/foyer", "Show the foyer greeting, the demo world's identity and its start camera.",
+        "view_site", False, False, kiosk=True),
+    _ep("foyer_command", "foyer", "POST", "/api/foyer/commands",
+        "Ask the shared demo host for one inspect or one picture (render-phong) at a camera; one picture at a time.",
+        "view_site", False, True, kiosk=True,
+        body=_body({"request_id": ("string", True, "A fresh id of letters, digits, _ or -, up to 64."),
+                    "operation": ("string", True, "inspect or render-phong."),
+                    "at": ("string", False, "inspect: the object identity; the root when omitted."),
+                    "radius": ("integer", False, "inspect: graph hops."),
+                    "position": ("array", False, "render-phong: the camera position [x, y, z] in metres."),
+                    "facing": ("array", False, "render-phong: the camera direction [x, y, z]."),
+                    "width": ("integer", False, "render-phong: 64..640 pixels."),
+                    "height": ("integer", False, "render-phong: 64..640 pixels.")})),
+    _ep("foyer_receipt", "foyer", "GET", "/api/foyer/commands/{request_id}",
+        "Read a foyer command's receipt; a finished picture carries its PNG.",
+        "view_site", False, False, kiosk=True, path_params={"request_id": ("string", "Your request id.")}),
 
     # ---- messages
     _ep("messages_conversations", "messages", "GET", "/api/messages/conversations", "List your conversations with their handles.",
@@ -228,10 +253,12 @@ ENDPOINTS = (
         query={"repo": ("string", "The repository name, owner__name."), "commit": ("string", "The 40 hex character commit.")}),
 
     # ---- photo
-    _ep("photo_jobs", "photo", "GET", "/api/marble_photo/jobs", "List your marble photo jobs.", "photo_read", False, False),
-    _ep("photo_lenses", "photo", "GET", "/api/marble_photo/lenses", "List the available camera lenses.", "photo_read", False, False),
+    _ep("photo_jobs", "photo", "GET", "/api/marble_photo/jobs", "List your marble photo jobs.", "photo_read", False, False,
+        kiosk=True),
+    _ep("photo_lenses", "photo", "GET", "/api/marble_photo/lenses", "List the available camera lenses.", "photo_read", False, False,
+        kiosk=True),
     _ep("photo_status", "photo", "GET", "/api/marble_photo", "Show the status of a photo job.",
-        "photo_read", False, False, query={"digest": ("string", "The job digest.")}),
+        "photo_read", False, False, query={"digest": ("string", "The job digest.")}, kiosk=True),
     _ep("photo_calibration_qr", "photo", "POST", "/api/marble_photo/calibration_qr",
         "Locate the authored exposure QR in an owned saved photo's PNG.",
         "photo_read", True, False,
@@ -241,7 +268,7 @@ ENDPOINTS = (
                     "modules": ("array", True, "The 33 rows of authored QR module bits.")})),
     _ep("photo_image", "photo", "GET", "/api/marble_photo/image", "Fetch a finished photo or artifact as a PNG.",
         "photo_read", False, False,
-        query={"digest": ("string", "The job digest."), "name": ("string", "The artifact name.")}, returns="png"),
+        query={"digest": ("string", "The job digest."), "name": ("string", "The artifact name.")}, returns="png", kiosk=True),
     _ep("photo_hdr", "photo", "GET", "/api/marble_photo/hdr", "Download a finished photo's HDR file.",
         "photo_read", False, False,
         query={"digest": ("string", "The job digest."), "name": ("string", "The artifact name.")}, returns="binary"),
@@ -258,8 +285,7 @@ ENDPOINTS = (
         "share_live", False, True,
         body=_body({"digest": ("string", True, "The job digest."), "stop": ("boolean", False, "True to stop the live view.")}, True)),
     _ep("photo_retouch", "photo", "POST", "/api/marble_photo/retouch",
-        "Re-develop a photo from its saved linear exposure: band projection (linear to RGB), linear corrections, then tone and "
-        "transfer. The raw HDR is never changed; the result is the job's retouched_image (photo_status, then photo_image).",
+        "Re-develop a photo from its saved linear exposure; the raw HDR never changes (then photo_status and photo_image).",
         "photo_submit", False, True, body=_body({
             "digest": ("string", True, "The job digest."),
             "spectral_look": ("string", False, "Eight-band to RGB projection: visible_reference (visible bands as RGB), "
@@ -310,10 +336,10 @@ ENDPOINTS = (
 
     # ---- studio
     _ep("studio_loading_library", "studio", "GET", "/api/loading_library", "List the loading animation library.",
-        None, False, False, tool=False),
+        None, False, False, tool=False, guest=True),
     _ep("studio_loading_anim", "studio", "GET", "/api/loading_anim", "Fetch the active loading animation, or a library entry.",
         None, False, False, query={"v": ("string", "A library digest; the active animation when omitted.")},
-        returns="binary", tool=False),
+        returns="binary", tool=False, guest=True),
     _ep("studio_loading_anim_put", "studio", "POST", "/api/loading_anim", "Store a loading animation in the library.",
         "owner_tools", False, True, tool=False, request="binary"),
     _ep("studio_loading_candidate", "studio", "POST", "/api/loading_candidate", "Store a temporary candidate loading animation.",
@@ -324,22 +350,22 @@ ENDPOINTS = (
         "library_manage", False, True, tool=False, body=_body({"digest": ("string", True, "The library entry digest.")})),
     _ep("studio_loading_delete", "studio", "POST", "/api/loading_library/delete", "Delete a library entry.",
         "library_manage", False, True, tool=False, body=_body({"digest": ("string", True, "The library entry digest.")})),
-    _ep("studio_obj_assets", "studio", "GET", "/api/obj_assets", "List the OBJ assets you can see.", None, False, False),
+    _ep("studio_obj_assets", "studio", "GET", "/api/obj_assets", "List the OBJ assets you can see.", None, False, False, guest=True),
     _ep("studio_obj_asset", "studio", "GET", "/api/obj_assets/{id}", "Show one OBJ asset.",
-        None, False, False, path_params={"id": ("string", "The asset id.")}),
+        None, False, False, path_params={"id": ("string", "The asset id.")}, guest=True),
     _ep("studio_obj_asset_source", "studio", "GET", "/api/obj_assets/{id}/source", "Fetch an OBJ asset's source text.",
-        None, False, False, path_params={"id": ("string", "The asset id.")}, returns="text"),
+        None, False, False, path_params={"id": ("string", "The asset id.")}, returns="text", guest=True),
     _ep("studio_obj_asset_mtl", "studio", "GET", "/api/obj_assets/{id}/mtl", "Fetch an OBJ asset's material text.",
-        None, False, False, path_params={"id": ("string", "The asset id.")}, returns="text"),
+        None, False, False, path_params={"id": ("string", "The asset id.")}, returns="text", guest=True),
     _ep("studio_obj_asset_add", "studio", "POST", "/api/obj_assets", "Add an OBJ asset to your account.",
         "studio_write", True, True, body=_body({}, True)),
-    _ep("studio_marble_objects", "studio", "GET", "/api/marble_objects", "List the marble objects you can see.", None, False, False),
+    _ep("studio_marble_objects", "studio", "GET", "/api/marble_objects", "List the marble objects you can see.", None, False, False, guest=True),
     _ep("studio_marble_object", "studio", "GET", "/api/marble_objects/{digest}", "Show one marble object.",
-        None, False, False, path_params={"digest": ("string", "The object digest.")}),
+        None, False, False, path_params={"digest": ("string", "The object digest.")}, guest=True),
     _ep("studio_marble_object_add", "studio", "POST", "/api/marble_objects", "Save a marble object design.",
         "studio_write", False, True, body=_body({}, True), headers={"X-Meowdoku-Marble": "1"}),
     _ep("studio_marble_preview_spec", "studio", "GET", "/api/marble_preview_spec", "Fetch the Studio drive's compute spec for N marbles.",
-        None, False, False, query={"count": ("integer", "Marbles to run, 1 to 16; 1 when omitted.")}),
+        None, False, False, query={"count": ("integer", "Marbles to run, 1 to 16; 1 when omitted.")}, guest=True),
     _ep("studio_camera_housing", "studio", "POST", "/api/marble_camera/housing", "Compute a camera housing response.",
         "studio_write", False, False, body=_body({}, True)),
 
@@ -412,7 +438,7 @@ ENDPOINTS = (
     _ep("reviews_standing", "reviews", "GET", "/api/reviews/standing", "Say whether one commit has an accepted review, and how to get one.",
         None, False, False,
         query={"repository": ("string", "The repository's name in the branch policy."),
-               "head": ("string", "The full 40-character commit id.")}),
+               "head": ("string", "The full 40-character commit id.")}, guest=True),
 
     # ---- git (turing examples/meowdoku/core_git.py)
     _ep("git_repositories", "git", "GET", "/api/git/repositories", "List the core repositories, their default branches and the Git operations offered.",
@@ -444,6 +470,28 @@ ENDPOINTS = (
         "core_git", True, False,
         body=_body({"repository": ("string", True, "The repository's name in the branch policy."), "ref": ("string", False, "A branch, tag or commit; HEAD when omitted."),
                     "path": ("string", False, "Only files under this folder.")})),
+    _ep("git_markdown_links", "git", "POST", "/api/git/markdown_links", "List every markdown link to a .md file, in file and line order.",
+        "core_git", True, False,
+        body=_body({"repository": ("string", True, "The repository's name in the branch policy."), "ref": ("string", False, "A branch, tag or commit; HEAD when omitted.")})),
+    _ep("git_markdown_added", "git", "POST", "/api/git/markdown_added", "List the commits that added markdown files, newest first.",
+        "core_git", True, False,
+        body=_body({"repository": ("string", True, "The repository's name in the branch policy."), "ref": ("string", False, "A branch, tag or commit; HEAD when omitted.")})),
+
+    # ---- agent orientation (turing examples/meowdoku/orientation.py): every markdown file of the core in causal order
+    _ep("orientation_state", "orientation", "GET", "/api/orientation",
+        "Show your orientation filters, your place in the causal order and the counts.",
+        ("core_git", "dev_ui"), True, False, capability_all=True),
+    _ep("orientation_update", "orientation", "POST", "/api/orientation",
+        "Change your orientation filters, or set or step your place in the causal order.",
+        ("core_git", "dev_ui"), True, True, capability_all=True,
+        body=_body({"filters": ("object", False, "repository, prefix, kind (agents, readme, report, handoff, doc) and keyword; replaces the filters."),
+                    "clear": ("boolean", False, "True to remove every filter."),
+                    "at": ("string", False, "A document identity (doc:<repository>/<path>) to stand on."),
+                    "step": ("string", False, "first, next, previous or last.")})),
+    _ep("orientation_map", "orientation", "GET", "/api/orientation/map",
+        "Show one page of the filtered causal order as a map for the graph cursor.",
+        ("core_git", "dev_ui"), True, False, capability_all=True,
+        query={"offset": ("integer", "Page offset; the page holding your place when omitted.")}),
 
     # ---- relay (turing examples/meowdoku/relay.py)
     _ep("relay_addresses", "relay", "GET", "/api/relay/addresses", "List the relay addresses you hold open.", None, True, False),
@@ -512,7 +560,7 @@ ENDPOINTS = (
                                    "instances (Pale Horse authorizes it then); true when omitted. false restarts at once.")})),
     _ep("control_instances_cancel", "control", "POST", "/api/control/instances/cancel", "Cancel a control request not yet performed.",
         _ADMIN_OR_LIFECYCLE, True, True, body=_body({"id": ("integer", True, "The request id.")})),
-    _ep("control_route", "control", "GET", "/api/route", "Show the server routes and which one this browser is on.", None, False, False),
+    _ep("control_route", "control", "GET", "/api/route", "Show the server routes and which one this browser is on.", None, False, False, guest=True),
     _ep("control_route_set", "control", "POST", "/api/route", "Choose the Stable or Development server route.",
         "dev_ui", False, True,
         body=_body({"route": ("string", False, "A route name from the routes list."),
@@ -524,11 +572,11 @@ ENDPOINTS = (
     _ep("control_lifecycle", "control", "GET", "/api/lifecycle", "Show the shutdown countdown and this session's restorable copy.",
         None, False, False,
         query={"snap": ("string", "Set to include this session's snapshot."), "have": ("string", "The snapshot id you already hold.")},
-        tool=False),
+        tool=False, guest=True),
     _ep("control_lifecycle_restore", "control", "POST", "/api/lifecycle/restore", "Re-seed this session from a saved copy.",
-        None, False, True, body=_body({"dump": ("object", False, "The session copy.")}), tool=False),
+        None, False, True, body=_body({"dump": ("object", False, "The session copy.")}), tool=False, guest=True),
     _ep("control_lifecycle_admin", "control", "POST", "/api/admin/lifecycle", "Request a save, restart or exit with the loopback token.",
-        "owner_tools", False, True, body=_body({}, True), tool=False),
+        None, False, True, body=_body({}, True), tool=False, credential="admin_token"),
 
     # ---- profile
     _ep("profile_me", "profile", "GET", "/api/profile/me", "Show your account summary and what it may do.", None, True, False),
@@ -559,9 +607,10 @@ ENDPOINTS = (
                     "prompt_history": ("array", True, "The prompts that shaped the work, as text."),
                     "next_steps": ("array", True, "Next steps, as text; may be empty.")})),
     _ep("reports_public_list", "reports", "GET", "/api/reports/public", "List Internet-public signed-off reports without exposing account IDs.",
-        None, False, False, query={"offset": ("integer", "Page offset."), "category": ("string", "DOC, TTICKET, AUDIT or LOG.")}),
+        None, False, False, query={"offset": ("integer", "Page offset."), "category": ("string", "DOC, TTICKET, AUDIT or LOG.")},
+        kiosk=True),
     _ep("reports_public_get", "reports", "GET", "/api/reports/public/{id}", "Read a public report, including its prompt history and next steps.",
-        None, False, False, path_params=_ID32),
+        None, False, False, path_params=_ID32, kiosk=True),
     _ep("reports_sharing", "reports", "POST", "/api/reports/{id}/sharing", "Change your report's personal, group or Internet-public visibility with owner sign-off.",
         None, True, True, path_params=_ID32,
         body=_body({"visibility": ("string", True, "personal, group, or public."),
@@ -697,7 +746,7 @@ ENDPOINTS = (
                     "max_abs_err": ("number", False, "Largest absolute error seen."),
                     "user_agent_hint": ("string", False, "The browser, at most 200 characters.")})),
     _ep("compile_lowerings", "compile", "GET", "/api/lowerings", "List the lowering cores and their stored lowerings.",
-        "view_site", False, False),
+        "view_site", False, False, guest=True),
     _ep("compile_lowering_blob", "compile", "GET", "/api/lowerings/blob/{sha}", "Fetch a leased lowering's bytes.",
         "studio_write", False, False, path_params={"sha": ("string", "The 64 hex character sha256 of the blob.")}, returns="binary"),
     _ep("compile_lowering_checkout", "compile", "POST", "/api/lowerings/checkout", "Lease a lowering that fits a purpose.",
@@ -712,52 +761,60 @@ ENDPOINTS = (
 
     # ---- site
     _ep("site_map_root", "site", "GET", "/site/{map}/", "Read a declared map's root place as an HTML page.",
-        None, False, False, path_params={"map": ("string", "The map name.")}, returns="html"),
+        None, False, False, path_params={"map": ("string", "The map name.")}, returns="html", kiosk=True),
     _ep("site_place", "site", "GET", "/site/{map}/{address}.html", "Read one place of a declared map as an HTML page.",
         None, False, False,
-        path_params={"map": ("string", "The map name."), "address": ("string", "The place address.")}, returns="html"),
+        path_params={"map": ("string", "The map name."), "address": ("string", "The place address.")}, returns="html",
+        kiosk=True),
 
     # ---- play
-    _ep("play_state", "play", "GET", "/api/state", "Read this browser table's game state.", None, False, False, tool=False),
-    _ep("play_catalog", "play", "GET", "/api/catalog", "List the games, levels and boards.", None, False, False, tool=False),
+    _ep("play_state", "play", "GET", "/api/state", "Read this browser table's game state.", None, False, False, tool=False, guest=True),
+    _ep("play_catalog", "play", "GET", "/api/catalog", "List the games, levels and boards.", None, False, False, tool=False, guest=True),
     _ep("play_new", "play", "POST", "/api/new", "Start a game on this browser table.", None, False, True,
-        body=_body({"game": ("string", False, "The game name."), "id": ("string", False, "The board id.")}, True), tool=False),
+        body=_body({"game": ("string", False, "The game name."), "id": ("string", False, "The board id.")}, True), tool=False, guest=True),
     _ep("play_action", "play", "POST", "/api/action", "Send one action to this browser table's game.",
-        None, False, True, body=_body({"type": ("string", False, "The action type.")}, True), tool=False),
+        None, False, True, body=_body({"type": ("string", False, "The action type.")}, True), tool=False, guest=True),
     _ep("play_action_batch", "play", "POST", "/api/action/batch", "Send a batch of actions to this browser table's game.",
-        None, False, True, body=_body({"actions": ("array", False, "The actions, up to 64 KiB in all.")}, True), tool=False),
+        None, False, True, body=_body({"actions": ("array", False, "The actions, up to 64 KiB in all.")}, True), tool=False, guest=True),
     _ep("play_profile", "play", "GET", "/api/profile", "Read this browser's player profile and the game's top scores.",
-        None, False, False, tool=False),
+        None, False, False, tool=False, guest=True),
     _ep("play_profile_set", "play", "POST", "/api/profile", "Pick this browser's player profile.",
-        None, False, True, body=_body({"name": ("string", False, "The profile name.")}, True), tool=False),
+        None, False, True, body=_body({"name": ("string", False, "The profile name.")}, True), tool=False, guest=True),
     _ep("play_spectate_watch", "play", "GET", "/api/spectate/watch", "Poll a shared session as a viewer.",
         None, False, False,
         query={"vid": ("string", "The viewer id."), "rev": ("string", "The revision you hold."), "lrev": ("integer", "The live revision you hold."),
                "nostate": ("string", "Set to 1 when a socket carries the game."), "gk": ("string", "The game key you hold."),
-               "kseq": ("integer", "The keyframe sequence you hold.")}, tool=False),
+               "kseq": ("integer", "The keyframe sequence you hold.")}, tool=False, guest=True),
     _ep("play_spectate", "play", "POST", "/api/spectate", "Start, stop or read the live spectating of your table.",
-        None, False, True, body=_body({"op": ("string", False, "start, stop or status.")}), tool=False),
+        None, False, True, body=_body({"op": ("string", False, "start, stop or status.")}), tool=False, guest=True),
     _ep("play_spectate_key", "play", "POST", "/api/spectate/key", "Push the owner's position keyframe to spectators.",
-        None, False, True, body=_body({"key": ("string", False, "Base64 keyframe.")}), tool=False),
+        None, False, True, body=_body({"key": ("string", False, "Base64 keyframe.")}), tool=False, guest=True),
     _ep("play_spectate_live", "play", "POST", "/api/spectate/live", "Push the owner's live state to spectators.",
-        None, False, True, body=_body({"live": ("object", False, "The live state.")}), tool=False),
+        None, False, True, body=_body({"live": ("object", False, "The live state.")}), tool=False, guest=True),
     _ep("play_share_create", "play", "POST", "/api/share", "Store a view and get a share id.",
-        None, False, True, body=_body({"view": ("object", False, "The view to share.")}), tool=False),
+        None, False, True, body=_body({"view": ("object", False, "The view to share.")}), tool=False, guest=True),
     _ep("play_share_get", "play", "GET", "/api/share/{id}", "Read a shared view.",
-        None, False, False, path_params={"id": ("string", "The share id.")}, tool=False),
+        None, False, False, path_params={"id": ("string", "The share id.")}, tool=False, guest=True),
     _ep("play_clientlog", "play", "POST", "/api/clientlog", "Report a page's uncaught error to the server log.",
         None, False, True,
         body=_body({"kind": ("string", False, "The error kind."), "msg": ("string", False, "The message."),
                     "where": ("string", False, "Where it happened."), "stack": ("string", False, "The stack."),
-                    "ua": ("string", False, "The user agent.")}), tool=False),
+                    "ua": ("string", False, "The user agent.")}), tool=False, guest=True),
     _ep("play_ready", "play", "GET", "/api/ready", "Show per-product readiness and the loading animation.",
-        None, False, False, tool=False),
+        None, False, False, tool=False, guest=True),
+    _ep("play_radio", "play", "GET", "/api/radio", "Show the Nodus Radio snapshot the site navigation displays.",
+        "view_site", False, False, guest=True),
+    # The opt-in HLS stream behind the same view_site gate (turing server.py /api/radio/hls/, nodus_radio_hls.read checks the
+    # file name). Declared guest-reachable like /api/radio: without this entry the visitor gate answers 401 before the handler.
+    _ep("play_radio_hls", "play", "GET", "/api/radio/hls/{file}", "Read one file of the opt-in Nodus Radio HLS stream.",
+        "view_site", False, False, path_params={"file": ("string", "The playlist or segment file name.")},
+        returns="binary", guest=True),
     _ep("play_client_rays_join", "play", "POST", "/api/client_rays/join", "Join a photo job's client ray participation.",
         "share_live", False, True, body=_body({"job": ("string", False, "The photo job.")}), tool=False),
     _ep("play_client_rays_engine", "play", "POST", "/api/client_rays/engine/{action}",
         "Worker-only mailbox for a photo engine on loopback.",
         None, False, True, path_params={"action": ("string", "The engine action, for example scene.")},
-        body=_body({}, True), tool=False),
+        body=_body({}, True), tool=False, credential="engine_secret"),
 )
 
 
@@ -766,8 +823,57 @@ def by_name() -> dict:
     return {e["name"]: e for e in ENDPOINTS}
 
 
-def allowed(endpoint, capabilities, signed_in) -> bool:
-    """True when this caller may use the endpoint: signed in if it needs an account, and holding its capability."""
+def kiosk_endpoint(method, path):
+    """The kiosk entry whose method and path template match a request path (query removed), or None.
+
+    A host answers a kiosk account (the read-only intern guest agent) only when this finds an entry; ``{name}`` matches
+    one non-empty path segment, or the part of one segment before a literal suffix. The handler still validates
+    everything and still asks for the entry's capability.
+    """
+    for entry, pattern in _KIOSK_PATTERNS:
+        if entry["method"] == method and pattern.fullmatch(path):
+            return entry
+    return None
+
+
+def guest_endpoint(method, path):
+    """The entry a caller with no account may reach (kiosk, guest or credential entries) for a request path, or None.
+
+    A host answers a visitor with no account on these entries and on its pages (paths outside /api/ and /ws); everything
+    else is refused before any handler runs. The handler still validates everything and still asks for its capability.
+    """
+    for entry, pattern in _GUEST_PATTERNS:
+        if entry["method"] == method and pattern.fullmatch(path):
+            return entry
+    return None
+
+
+def endpoint_for(method, path):
+    """Any entry whose method and path template match a request path, the most literal template first, or None.
+
+    A host that refuses a request before its handler uses it to answer as that handler's first check would: the entry's
+    capability, then its account requirement.
+    """
+    for entry, pattern in _ALL_PATTERNS:
+        if entry["method"] == method and pattern.fullmatch(path):
+            return entry
+    return None
+
+
+def reachable_by_guest(endpoint) -> bool:
+    """True for an entry a caller with no account may reach: kiosk, guest, or answered by its own credential."""
+    return bool(endpoint.get("kiosk") or endpoint.get("guest") or endpoint.get("credential"))
+
+
+def allowed(endpoint, capabilities, signed_in, kiosk=False, guest=False) -> bool:
+    """True when this caller may use the endpoint: signed in if it needs an account, and holding its capability.
+
+    A kiosk caller may use only the entries declared kiosk; a gated guest only the entries ``reachable_by_guest``.
+    """
+    if kiosk and not endpoint.get("kiosk"):
+        return False
+    if guest and not reachable_by_guest(endpoint):
+        return False
     if endpoint["account"] and not signed_in:
         return False
     need = endpoint["capability"]
@@ -779,18 +885,23 @@ def allowed(endpoint, capabilities, signed_in) -> bool:
     return need in have
 
 
-def public(endpoint, capabilities=None, signed_in=False) -> dict:
+def public(endpoint, capabilities=None, signed_in=False, kiosk=False, guest=False) -> dict:
     """A JSON-serializable copy of an endpoint; with ``capabilities`` given it also carries ``allowed``."""
     out = _copy(endpoint)
     if capabilities is not None:
-        out["allowed"] = allowed(endpoint, capabilities, signed_in)
+        out["allowed"] = allowed(endpoint, capabilities, signed_in, kiosk, guest)
     return out
 
 
-def index(capabilities=None, signed_in=False, group=None) -> dict:
-    """The whole catalog as one JSON document; with ``capabilities`` given every endpoint says whether it is allowed."""
-    rows = [public(e, capabilities, signed_in) for e in ENDPOINTS if group is None or e["group"] == group]
-    return {"catalog_version": CATALOG_VERSION, "groups": dict(GROUPS), "endpoints": rows}
+def index(capabilities=None, signed_in=False, group=None, kiosk=False, guest=False) -> dict:
+    """The whole catalog as one JSON document; with ``capabilities`` given every endpoint says whether it is allowed.
+
+    ``kiosk`` is True for a kiosk caller: only the kiosk entries are allowed, and the document says so. ``guest`` is
+    True for a gated caller with no account: only the entries ``reachable_by_guest`` are allowed.
+    """
+    rows = [public(e, capabilities, signed_in, kiosk, guest) for e in ENDPOINTS if group is None or e["group"] == group]
+    return {"catalog_version": CATALOG_VERSION, "groups": dict(GROUPS), "kiosk": bool(kiosk), "guest": bool(guest),
+            "endpoints": rows}
 
 
 def _copy(value):
@@ -799,3 +910,15 @@ def _copy(value):
     if isinstance(value, (list, tuple)):
         return [_copy(v) for v in value]
     return value
+
+
+def _template(path):
+    """A path template as a pattern: each {name} is one non-empty segment (or the part before a literal suffix)."""
+    import re
+    return re.compile("".join("[^/]+" if part.startswith("{") else re.escape(part)
+                              for part in re.split(r"(\{[a-z_]+\})", path) if part))
+
+
+_KIOSK_PATTERNS = tuple((e, _template(e["path"])) for e in ENDPOINTS if e["kiosk"])
+_GUEST_PATTERNS = tuple((e, _template(e["path"])) for e in ENDPOINTS if reachable_by_guest(e))
+_ALL_PATTERNS = tuple(sorted(((e, _template(e["path"])) for e in ENDPOINTS), key=lambda pair: pair[0]["path"].count("{")))

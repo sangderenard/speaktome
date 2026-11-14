@@ -234,6 +234,7 @@ def test_tools_list_schemas(srv):
     tools = rpc(srv[1], "tools/list")["result"]["tools"]
     names = {t["name"] for t in tools}
     assert names == {"man", "make", "examine", "show", "whoami", "look", "enter", "where", "go", "leave", "say", "pending", "acknowledge", "contacts",
+                     "foyer", "walk", "turn", "picture",
                      "system_digest", "system_graph", "system_tools", "system_activity", "system_instances", "diagnostics"}
 
     def check(schema):

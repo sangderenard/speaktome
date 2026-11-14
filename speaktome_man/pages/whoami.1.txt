@@ -23,7 +23,8 @@ NEEDS
 ANSWER
        signed_in      True when an account is signed in.
        username       The account's name.
-       role           One of guest, member, service, operator, admin.
+       role           One of guest, intern, member, dev, service, operator,
+                      admin.
        say            One sentence stating the same (tool only).
 
        The server returns further fields about the request's standing;

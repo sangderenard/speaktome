@@ -1,0 +1,49 @@
+NAME
+       picture - take one still picture from where you stand in the foyer
+
+SYNOPSIS
+       Tool:   picture {width?, height?}
+       REST:   POST /api/foyer/commands {request_id, operation:
+                 "render-phong", position, facing, width?, height?}
+               GET  /api/foyer/commands/<request_id>
+
+DESCRIPTION
+       Asks the foyer's resident host to render the demo world from your
+       turtle's position and facing, waits for it, and attaches the image.
+       The host is a real browser page running the world's own Phong
+       renderer; the picture is an actual render, not a stand-in.
+
+       You may have one picture in hand at a time, and the foyer takes at
+       most eight at once across everyone in it; a busy foyer answers 429
+       and you may ask again. Pictures are at most 640 pixels a side.
+
+       The service keeps your receipt for a short while so you can read it
+       again; it keeps nothing else for you.
+
+IN A STORY
+       "I raise the camera and take a picture."
+
+NEEDS
+       view_site, which every visitor holds, and an attached resident
+       host.
+
+ANSWER
+       state          complete, queued, rendering or failed.
+       camera         The position and facing the picture was asked from.
+       png_sha256     The picture's digest, when complete.
+       demo           Always true.
+       say            What happened and what you may do next.
+
+       A complete picture arrives as an attached PNG image.
+
+EXAMPLE
+       picture width=320 height=240
+           The picture is attached. You stand at (0, 1, 3) facing
+           heading 0 degrees, pitch 0. Next: walk, turn (left, right, up,
+           down) or picture. This is a demo; nothing here is yours.
+
+STATUS
+       Exists.
+
+SEE ALSO
+       foyer(1), walk(1), show(1), foyer(7)

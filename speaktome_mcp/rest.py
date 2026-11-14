@@ -1,6 +1,7 @@
 """One signed-in HTTP session against the existing Meowdoku REST service (standard library only).
 
-Holds an in-memory cookie jar and nothing else. The credential is read from its file only at sign-in, is
+With no account named (SPEAKTOME_USER unset) it is a VISITOR's session instead: it never signs in, and the service answers
+it as a guest, the foyer of ``man foyer`` (owner, 2026-11-13). Holds an in-memory cookie jar and nothing else. The credential is read from its file only at sign-in, is
 never stored on the object, and is scrubbed from any text this module returns.
 """
 from __future__ import annotations
@@ -39,9 +40,10 @@ def secret_path(user: str, env=None) -> str:
 class Rest:
     """``opener`` is injectable (an object with ``open(request, timeout=)``); with one injected the https check is skipped."""
 
-    def __init__(self, base: str, user: str, secret_file: str, ca_file: str | None = None, opener=None):
+    def __init__(self, base: str, user: str | None, secret_file: str | None, ca_file: str | None = None, opener=None):
         self.base = base.rstrip("/")
         self.user, self.secret_file = user, secret_file
+        self.visitor = user is None                # no account: the foyer; nothing is signed in, ever
         if opener is None:
             parsed = urllib.parse.urlsplit(self.base)
             if parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password or parsed.query or parsed.fragment:
@@ -57,8 +59,10 @@ class Rest:
     def from_env(cls, env=None) -> "Rest":
         env = os.environ if env is None else env
         base, user = env.get("SPEAKTOME_BASE"), env.get("SPEAKTOME_USER")
-        if not base or not user:
-            raise RestError("SPEAKTOME_BASE and SPEAKTOME_USER are required")
+        if not base:
+            raise RestError("SPEAKTOME_BASE is required")
+        if not user:                               # a visitor: no account, no secret
+            return cls(base, None, None, env.get("SPEAKTOME_CA_FILE") or None)
         return cls(base, user, secret_path(user, env), env.get("SPEAKTOME_CA_FILE") or None)
 
     def _read_secret(self) -> str:
@@ -111,6 +115,8 @@ class Rest:
         return text.replace(secret, "[credential]") if secret else text
 
     def sign_in(self) -> None:
+        if self.visitor:
+            raise RestError("a visitor has no account to sign in; an admin makes an intern account (man foyer)", 401)
         secret = self._read_secret()
         try:
             self._http("/api/account/login", {"username": self.user, "password": secret}, secret=secret)
@@ -133,6 +139,8 @@ class Rest:
         ``method="POST"`` sends an empty JSON object when there is no body; ``headers`` are fixed request headers a
         handler insists on. Neither can carry a credential: the session cookie is the only one this object holds.
         """
+        if self.visitor:
+            return self._http(path, body, timeout, raw_limit=raw_limit, method=method, headers=headers)
         if not self.signed_in:
             self.sign_in()
         try:

@@ -1,0 +1,48 @@
+NAME
+       foyer - where a visitor with no account stands, and how to come in
+
+DESCRIPTION
+       Welcome. You are in the foyer of SpeakToMe: a long-running
+       workshop of engines, compilers, games and tools that one person
+       is building toward an assistant you can speak with. You may look
+       through the window. Nothing here is for you yet.
+
+       A visitor has no account, so the service keeps nothing for you:
+       no folder, no reports, no messages. What you read is handed to
+       you and forgotten.
+
+   Walking the demo
+       One demo world stands in the foyer for everyone in it. foyer puts
+       you at its start; walk and turn move your own view, like an old
+       Logo turtle; picture asks the world's resident host for a still
+       picture of what you face. Drawing the world on a visitor's own
+       machine, in their browser, is planned and not yet offered.
+
+   What you may look at
+           whoami           who the service thinks you are.
+           api_index        every endpoint, and which ones are behind
+                            the glass for you.
+           man              this manual, all of it.
+           the manual site  /site/manual/, the same pages as a website.
+           public reports   reports_public_list, reports_public_get.
+           photos           photo_jobs, photo_status, photo_lenses and
+                            photo_image, as their owners allow.
+
+       The game pages and the studio's read-only views are open too, for
+       people at a browser.
+
+   What you may not do
+       Anything that writes, submits, messages, compiles or runs. The
+       service refuses it before it reaches the part that would do it,
+       and says "sign in for this" or names what it needs.
+
+   Becoming an intern
+       An intern is a named account with a kiosk's reach: the reads
+       above, signed in as someone. An admin creates it; you cannot
+       create it yourself, and sign-up does not make one. Ask the person
+       who sent you here to have an admin make you an intern account,
+       then run the tools with SPEAKTOME_USER set to its name.
+
+SEE ALSO
+       foyer(1), walk(1), picture(1), roles(7), whoami(1), man(1),
+       speaktome(7)
