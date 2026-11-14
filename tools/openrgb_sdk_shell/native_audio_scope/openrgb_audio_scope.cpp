@@ -332,6 +332,45 @@ bool analyze(ScopeContext* context) {
 
 extern "C" {
 
+// Capture-only mode retains the existing WASAPI/PCM ring, without loading
+// fftfree or creating any FFT plan. Nodus owns the spectral transform.
+SCOPE_API void* openrgb_audio_scope_create_capture() {
+  return new ScopeContext();
+}
+
+// The caller owns an absolute frame cursor. If the ring overwrites unread
+// frames, advance to its oldest retained frame and report the exact gap.
+// A zero return means no new samples; it never repeats an old window.
+SCOPE_API size_t openrgb_audio_scope_read_stereo(
+    void* handle, uint64_t* next_frame, float* out_interleaved,
+    size_t capacity_frames, uint32_t* out_sample_rate, uint64_t* out_lost_frames) {
+  auto* context = static_cast<ScopeContext*>(handle);
+  if (!context || !next_frame || !out_interleaved || !capacity_frames ||
+      capacity_frames > kCaptureCapacity || !out_sample_rate || !out_lost_frames) return 0;
+  std::lock_guard<std::mutex> lock(context->sample_mutex);
+  const uint64_t oldest = context->total_frames - context->available;
+  const uint64_t requested = *next_frame;
+  const uint64_t lost = requested < oldest ? oldest - requested : 0;
+  const uint64_t first = std::max(requested, oldest);
+  *out_lost_frames = lost;
+  *out_sample_rate = context->sample_rate.load();
+  if (first >= context->total_frames) {
+    if (lost) *next_frame = first;
+    return 0;
+  }
+  const size_t count = static_cast<size_t>(std::min<uint64_t>(
+      capacity_frames, context->total_frames - first));
+  const size_t start = (context->write_index + kCaptureCapacity -
+                        static_cast<size_t>(context->total_frames - first)) % kCaptureCapacity;
+  for (size_t i = 0; i < count; ++i) {
+    const size_t at = (start + i) % kCaptureCapacity;
+    out_interleaved[2*i] = context->left[at];
+    out_interleaved[2*i+1] = context->right[at];
+  }
+  *next_frame = first + count;
+  return count;
+}
+
 SCOPE_API void* openrgb_audio_scope_create(
     const wchar_t* fftfree_dll, size_t fft_size, size_t oversample,
     size_t band_count, float min_hz, float max_hz) {

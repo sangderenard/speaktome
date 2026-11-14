@@ -5,6 +5,46 @@ import os
 import unittest
 
 
+@unittest.skipUnless(os.environ.get("NODUS_SCOPE_DLL"), "native scope DLL not configured")
+class CaptureOnlyCursorTests(unittest.TestCase):
+    def test_raw_pcm_cursor_and_overrun_without_fft(self):
+        dll = c.CDLL(os.environ["NODUS_SCOPE_DLL"])
+        dll.openrgb_audio_scope_create_capture.restype = c.c_void_p
+        dll.openrgb_audio_scope_free.argtypes = [c.c_void_p]
+        feed = dll.openrgb_audio_scope_feed_stereo
+        feed.argtypes = [c.c_void_p, c.POINTER(c.c_float), c.c_size_t, c.c_uint32]
+        read = dll.openrgb_audio_scope_read_stereo
+        read.argtypes = [c.c_void_p, c.POINTER(c.c_uint64), c.POINTER(c.c_float),
+                         c.c_size_t, c.POINTER(c.c_uint32), c.POINTER(c.c_uint64)]
+        read.restype = c.c_size_t
+        handle = dll.openrgb_audio_scope_create_capture()
+        self.assertTrue(handle)
+        try:
+            values = (c.c_float * 8)(1, 2, 3, 4, 5, 6, 7, 8)
+            self.assertEqual(feed(handle, values, 4, 48000), 1)
+            cursor, rate, lost = c.c_uint64(), c.c_uint32(), c.c_uint64()
+            out = (c.c_float * 4)()
+            self.assertEqual(read(handle, c.byref(cursor), out, 2,
+                                  c.byref(rate), c.byref(lost)), 2)
+            self.assertEqual((cursor.value, rate.value, lost.value), (2, 48000, 0))
+            self.assertEqual(list(out), [1, 2, 3, 4])
+            self.assertEqual(read(handle, c.byref(cursor), out, 2,
+                                  c.byref(rate), c.byref(lost)), 2)
+            self.assertEqual((cursor.value, lost.value), (4, 0))
+            self.assertEqual(list(out), [5, 6, 7, 8])
+            self.assertEqual(read(handle, c.byref(cursor), out, 2,
+                                  c.byref(rate), c.byref(lost)), 0)
+            chunk = (c.c_float * 8192)()
+            for _ in range(65):
+                self.assertEqual(feed(handle, chunk, 4096, 48000), 1)
+            self.assertEqual(read(handle, c.byref(cursor), out, 2,
+                                  c.byref(rate), c.byref(lost)), 2)
+            self.assertEqual(lost.value, 4096)
+            self.assertEqual(cursor.value, 4102)
+        finally:
+            dll.openrgb_audio_scope_free(handle)
+
+
 @unittest.skipUnless(os.environ.get("NODUS_SCOPE_DLL") and os.environ.get("NODUS_FFT_DLL"), "native DLLs not configured")
 class ExternalScopeFeedTests(unittest.TestCase):
     def test_external_source_is_finite_and_excludes_loopback(self):
