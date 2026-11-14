@@ -188,9 +188,12 @@ def test_kiosk_entries_and_their_paths():
     kiosk = {e["name"] for e in ENDPOINTS if e["kiosk"]}
     assert kiosk == {"identity_login", "identity_logout", "identity_me", "identity_index", "identity_whoami", "photo_jobs",
                      "photo_lenses", "photo_status", "photo_image", "site_map_root", "site_place", "reports_public_list",
-                     "reports_public_get", "foyer_status", "foyer_command", "foyer_receipt"}
-    # only the session boundary and a queued foyer picture change anything
-    assert {e["name"] for e in ENDPOINTS if e["kiosk"] and e["changes"]} == {"identity_login", "identity_logout", "foyer_command"}
+                     "reports_public_get", "foyer_status", "foyer_command", "foyer_receipt",
+                     "chat_rooms", "chat_room", "chat_post"}
+    # only the session boundary, a queued foyer picture and a message in a room the role may enter (the owner, 2026-11-14:
+    # every agent, guest agents and up, has a chat room) change anything
+    assert {e["name"] for e in ENDPOINTS if e["kiosk"] and e["changes"]} == {"identity_login", "identity_logout", "foyer_command",
+                                                                          "chat_post"}
     found = catalog.kiosk_endpoint
     assert found("GET", "/api/whoami")["name"] == "identity_whoami"
     assert found("GET", "/site/manual/")["name"] == "site_map_root"
