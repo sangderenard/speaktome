@@ -176,3 +176,7 @@ class FailureDiagnosticTests(unittest.TestCase):
         error.__cause__ = ssl.SSLError(secret)
         self.assertEqual(failure_category(error), 'provider_tls_failed')
         self.assertEqual(failure_category(ValueError(secret)), 'provider_connection_failed')
+        from speaktome_api.remote_mcp import denied_origin
+        error = ExceptionGroup('wrapper', [ProviderOriginDenied(secret)])
+        self.assertEqual(denied_origin(error), 'https://private.invalid')
+        self.assertNotIn('secret', str(error.exceptions[0]))

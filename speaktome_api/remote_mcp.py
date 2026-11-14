@@ -19,7 +19,22 @@ from mcp.shared.auth import OAuthClientMetadata
 
 
 class ProviderOriginDenied(PermissionError):
-    pass
+    def __init__(self, url):
+        # Retain only the normalized origin; OAuth query/path never survive.
+        self.origin = _origin(_https(url))
+        super().__init__('provider origin is not approved')
+
+
+def denied_origin(exc):
+    pending, seen = [exc], set()
+    while pending and len(seen) < 64:
+        current = pending.pop()
+        if id(current) in seen: continue
+        seen.add(id(current))
+        if isinstance(current, ProviderOriginDenied): return current.origin
+        pending.extend(getattr(current, 'exceptions', ()))
+        pending.extend(e for e in (current.__cause__, current.__context__) if e is not None)
+    return None
 
 
 class ProviderAddressDenied(PermissionError):
@@ -104,7 +119,7 @@ class OriginPolicyTransport(httpx.AsyncBaseTransport):
     async def handle_async_request(self, request):
         _https(str(request.url))
         if _origin(str(request.url)) not in self.allowed:
-            raise ProviderOriginDenied('provider requested an unapproved origin')
+            raise ProviderOriginDenied(str(request.url))
         return await self.delegate.handle_async_request(request)
 
     async def aclose(self):
@@ -139,7 +154,7 @@ class RemoteMCP:
         async def checked_redirect(url):
             _https(url)
             if _origin(url) not in provider.allowed_origins:
-                raise ProviderOriginDenied('authorization origin is not approved')
+                raise ProviderOriginDenied(url)
             await redirect(url)
 
         storage = self.storage_for(owner, provider_id)
@@ -279,7 +294,7 @@ class ConnectionService:
                     raise RuntimeError('connection capacity reached')
                 del self._records[idle]
             self._records[key] = dict(lock=asyncio.Lock(), task=None, status='disconnected',
-                                      ready=None, reply=None, url=None, state=None, error=None)
+                                      ready=None, reply=None, url=None, state=None, error=None, required_origin=None)
         return self._records[key]
 
     async def _status(self, owner, provider):
@@ -290,6 +305,7 @@ class ConnectionService:
             status = 'authorized'  # Stored authorization, not a live health claim.
         result = {'status':status, 'configured':configured}
         if r['error']: result['error'] = r['error']
+        if r.get('required_origin'): result['required_origin'] = r['required_origin']
         if r['url'] and status == 'authorization_required':
             result['authorization_url'] = r['url']
         return result
@@ -304,7 +320,7 @@ class ConnectionService:
             return await self._status(owner, provider)
         if r['lock'].locked():
             raise RuntimeError('connection is busy')
-        r.update(status='connecting', error=None, url=None, state=None,
+        r.update(status='connecting', error=None, required_origin=None, url=None, state=None,
                  ready=asyncio.Event(), reply=self._loop.create_future())
 
         async def redirect(url):
@@ -347,7 +363,7 @@ class ConnectionService:
                         logging.getLogger(__name__).warning(
                             'Outgoing MCP failure type=%s locations=%s',
                             type(error).__name__, locations)
-                r.update(status='failed', error=category)
+                r.update(status='failed', error=category, required_origin=denied_origin(exc))
             finally:
                 r.update(url=None, state=None)
                 r['ready'].set()
@@ -399,7 +415,7 @@ class ConnectionService:
             await asyncio.gather(r['task'], return_exceptions=True)
         async with r['lock']:
             await self.client.storage_for(owner, provider).clear()
-            r.update(status='disconnected', error=None, url=None, state=None)
+            r.update(status='disconnected', error=None, required_origin=None, url=None, state=None)
         return {'status':'disconnected'}
 
     def disconnect(self, owner, provider): return self._run(self._disconnect(owner, provider))
