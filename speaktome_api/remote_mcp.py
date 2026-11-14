@@ -329,7 +329,18 @@ class ConnectionService:
                 r.update(status='failed', error='authorization_expired')
             except Exception as exc:
                 # Raw OAuth exceptions can contain codes/state/tokens. Never return/log them.
-                r.update(status='failed', error=failure_category(exc))
+                category = failure_category(exc)
+                if category == 'provider_connection_failed':
+                    # Code locations only: no exception text, args, source lines or locals.
+                    import logging
+                    import traceback
+                    from pathlib import PurePath
+                    locations = [(PurePath(f.filename).name, f.name, f.lineno)
+                                 for f in traceback.extract_tb(exc.__traceback__)[-12:]]
+                    logging.getLogger(__name__).warning(
+                        'Outgoing MCP failure type=%s locations=%s',
+                        type(exc).__name__, locations)
+                r.update(status='failed', error=category)
             finally:
                 r.update(url=None, state=None)
                 r['ready'].set()
