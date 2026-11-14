@@ -15,6 +15,7 @@ body fields and fixed headers; it cannot name another host, another path or a he
 """
 from __future__ import annotations
 
+import copy
 import json
 import os
 import re
@@ -71,7 +72,14 @@ def offered(endpoint: dict) -> str | None:
     return None
 
 
-def _property(spec: dict) -> dict:
+def _property(spec: dict) -> dict | bool:
+    # `required` outside `schema` is catalogue routing metadata, not the
+    # JSON Schema object's list of required child properties. Keep them apart.
+    if "schema" in spec:
+        declared = spec["schema"]
+        if not isinstance(declared, (dict, bool)):
+            raise ToolFail("catalogue field schema must be an object or boolean")
+        return copy.deepcopy(declared)
     kind = spec.get("type") if spec.get("type") in TYPES else "string"
     out = {"type": kind, "description": str(spec.get("description", ""))}
     if kind == "string":

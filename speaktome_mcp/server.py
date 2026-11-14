@@ -55,7 +55,11 @@ class _Bad(Exception):
     pass
 
 
-def _validate(value, schema: dict, where: str = "arguments") -> None:
+def _validate(value, schema: dict | bool, where: str = "arguments") -> None:
+    if schema is True:
+        return
+    if schema is False:
+        raise ToolFail(f"{where} is not permitted")
     kind = schema.get("type")
     if kind == "object":
         if not isinstance(value, dict):
@@ -90,7 +94,7 @@ def _validate(value, schema: dict, where: str = "arguments") -> None:
         if value < schema.get("minimum", -2**63) or value > schema.get("maximum", 2**63):
             raise ToolFail(f"{where} is out of range")
     if "enum" in schema and value not in schema["enum"]:
-        raise ToolFail(f"{where} must be one of {', '.join(schema['enum'])}")
+        raise ToolFail(f"{where} must be one of {', '.join(json.dumps(item) for item in schema['enum'])}")
 
 
 def _obj(properties=None, required=None) -> dict:

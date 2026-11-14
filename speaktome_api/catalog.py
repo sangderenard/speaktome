@@ -17,6 +17,12 @@ binary for an upload whose body is not a JSON object and which a generated tool 
 (the call changes server state), path_params, query, body (None, or {"fields": {...}, "open": bool};
 open means more fields pass through to a deeper layer that is not enumerated), returns, tool (False means
 never offer it to an automated agent as a generated tool).
+
+A field spec may also carry ``schema``: an inline JSON Schema object or boolean copied unchanged into
+that field's generated input schema. Its outer ``required`` remains the catalogue boolean; nested
+``required`` lists belong inside ``schema``. Legacy specs retain their generated defaults. This preserves
+inline constraints, not arbitrary external MCP schemas: root-relative $ref/$defs need deliberate placement
+in the final tool schema. The service remains responsible for complete input validation.
 """
 
 CATALOG_VERSION = 1

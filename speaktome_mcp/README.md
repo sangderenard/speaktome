@@ -119,3 +119,15 @@ claim that the running service has been reloaded. See `man make` and `man report
 `python -m pytest tests/test_speaktome_mcp.py -q` (a fake REST server on an ephemeral loopback port). Note that
 `tests/conftest.py` of this repository tries to set up its own environment and skips when it cannot; in a bare
 interpreter add `--noconftest`.
+
+## Inline field schemas
+
+Catalogue field specs may include `schema` containing an inline JSON Schema
+object or boolean. The generated tool copies it without flattening nested
+properties, items, bounds, enums, or combinators, and without adding the legacy
+string/object defaults. The outer catalogue `required` boolean still selects
+whether the argument itself is mandatory. Existing compact specs are unchanged.
+The lightweight MCP argument checks are not a complete JSON Schema validator;
+the authenticated REST handler remains authoritative. This is not an outgoing
+MCP connection, OAuth implementation, or provider tool catalogue. Root-relative
+references cannot simply be transplanted from an external schema into a field.

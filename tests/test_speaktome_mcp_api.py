@@ -195,3 +195,67 @@ def test_report_sharing_and_groups_are_available_to_signed_in_members():
     assert fake.calls[-1]['body']==dict(username='member',expected_revision=2)
     assert {'reports_public_list','reports_public_get'} <= names(api.ApiServer(Fake(capabilities=[],signed_in=False)))
     assert 'reports_sharing' not in names(api.ApiServer(Fake(capabilities=[],signed_in=False)))
+
+
+def test_inline_field_schema_is_preserved_without_mutating_catalogue():
+    nested = {
+        "type": "object", "required": ["voices"], "additionalProperties": False,
+        "properties": {"voices": {"type": "array", "minItems": 1,
+            "items": {"type": "object", "required": ["gain"],
+                "properties": {"gain": {"type": "number", "minimum": 0, "maximum": 1},
+                               "mode": {"enum": ["a", "b"]}},
+                "additionalProperties": False}}},
+        "allOf": [{"description": "Keep composition metadata intact"}],
+    }
+    endpoint = {"body": {"fields": {"settings": {
+        "type": "object", "description": "Settings", "required": True, "schema": nested}}, "open": False}}
+    result = api.schema(endpoint)
+    assert result["required"] == ["settings"]
+    assert result["properties"]["settings"] == nested
+    result["properties"]["settings"]["properties"]["voices"]["minItems"] = 5
+    assert nested["properties"]["voices"]["minItems"] == 1
+    assert api._property({"type": "string", "schema": {"type": "string", "maxLength": 90000}}) == {
+        "type": "string", "maxLength": 90000}
+
+
+def test_legacy_field_schemas_are_unchanged_for_entire_catalogue():
+    for entry in catalog.ENDPOINTS:
+        fields = list(entry["path_params"].values()) + list(entry["query"].values())
+        fields += list((entry["body"] or {"fields": {}})["fields"].values())
+        for spec in fields:
+            kind = spec.get("type") if spec.get("type") in api.TYPES else "string"
+            expected = {"type": kind, "description": str(spec.get("description", ""))}
+            if kind == "string":
+                expected["maxLength"] = 65536
+            elif kind == "object":
+                expected["additionalProperties"] = True
+            assert api._property(spec) == expected
+
+
+def test_inline_schema_reaches_tools_list_and_preserves_request_routing():
+    fake = Fake()
+    document = catalog.index(AGENT, True)
+    entry = next(e for e in document["endpoints"] if e["name"] == "messages_ack")
+    entry["body"]["fields"]["up_to"]["schema"] = {"type": "integer", "enum": [7, 8]}
+    server = api.ApiServer(fake)
+    original = fake.call
+    fake.call = lambda path, *args, **kwargs: document if path == api.INDEX else original(path, *args, **kwargs)
+    tool = next(t for t in rpc(server, "tools/list")["tools"] if t["name"] == "messages_ack")
+    assert tool["inputSchema"]["properties"]["up_to"] == {"type": "integer", "enum": [7, 8]}
+    result, error, _ = call(server, "messages_ack", up_to=7)
+    assert not error and fake.calls[-1]["body"] == {"up_to": 7}
+    count = len(fake.calls)
+    result, error, _ = call(server, "messages_ack", up_to=9)
+    assert error and "7, 8" in result["error"] and len(fake.calls) == count
+
+
+def test_boolean_schemas_are_handled_by_lightweight_argument_checks():
+    from speaktome_mcp.server import _validate, ToolFail
+    assert api._property({"schema": True}) is True
+    _validate({"anything": 1}, True)
+    with pytest.raises(ToolFail, match="not permitted"):
+        _validate(1, False)
+    with pytest.raises(ToolFail, match="not permitted"):
+        _validate([1], {"type": "array", "items": False})
+    with pytest.raises(ToolFail, match="object or boolean"):
+        api._property({"schema": "not a schema"})
