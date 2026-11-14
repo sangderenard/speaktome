@@ -5,6 +5,7 @@ SYNOPSIS
        Tool:   go exit=N
                go to=IDENTITY [relationship=NAME]
                   [direction=outgoing|incoming]
+               go relationship=NAME [direction=outgoing|incoming]
        REST:   POST /api/living-data/sessions/{id}/move
                     {to, relationship, direction, expected_revision,
                      request_id}
@@ -20,7 +21,10 @@ DESCRIPTION
 
        With the tool, give either the number of an exit from the last
        where, or the identity of the target. If several exits lead to the
-       same target, add the relationship and direction.
+       same target, add the relationship and direction. A relationship
+       alone (outgoing unless you say incoming) is enough when exactly
+       one exit has it: go relationship=next steps through the
+       orientation(5).
 
        A move states the revision it expects. If the cursor has moved
        since you last read it, the move is refused and nothing changes.
@@ -57,4 +61,4 @@ STATUS
        Exists.
 
 SEE ALSO
-       where(1), look(1), leave(1), map(5)
+       where(1), look(1), leave(1), map(5), orientation(5)

@@ -33,6 +33,7 @@ GROUPS = {
     "reports": "Experience reports, account-owned issue tickets and legacy tickets.",
     "reviews": "Changes put up for peer review before they reach a default branch.",
     "git": "Git in the core, regulated: declared read operations, recorded in SQL. Changes go through reviews.",
+    "orientation": "Agent orientation: every markdown file of the core in one causal order, with your filters and place.",
     "relay": "Datagrams and packages, address to address, in and out, for any signed-in account.",
     "mail": "Your mailbox at <username>@stichka.duckdns.org: the inbox, reading, sending and removing mail.",
     "files": "The flat index of every file in the core, kept by the cleanup account.",
@@ -252,8 +253,7 @@ ENDPOINTS = (
         "share_live", False, True,
         body=_body({"digest": ("string", True, "The job digest."), "stop": ("boolean", False, "True to stop the live view.")}, True)),
     _ep("photo_retouch", "photo", "POST", "/api/marble_photo/retouch",
-        "Re-develop a photo from its saved linear exposure: band projection (linear to RGB), linear corrections, then tone and "
-        "transfer. The raw HDR is never changed; the result is the job's retouched_image (photo_status, then photo_image).",
+        "Re-develop a photo from its saved linear exposure; the raw HDR never changes (then photo_status and photo_image).",
         "photo_submit", False, True, body=_body({
             "digest": ("string", True, "The job digest."),
             "spectral_look": ("string", False, "Eight-band to RGB projection: visible_reference (visible bands as RGB), "
@@ -438,6 +438,28 @@ ENDPOINTS = (
         "core_git", True, False,
         body=_body({"repository": ("string", True, "The repository's name in the branch policy."), "ref": ("string", False, "A branch, tag or commit; HEAD when omitted."),
                     "path": ("string", False, "Only files under this folder.")})),
+    _ep("git_markdown_links", "git", "POST", "/api/git/markdown_links", "List every markdown link to a .md file, in file and line order.",
+        "core_git", True, False,
+        body=_body({"repository": ("string", True, "The repository's name in the branch policy."), "ref": ("string", False, "A branch, tag or commit; HEAD when omitted.")})),
+    _ep("git_markdown_added", "git", "POST", "/api/git/markdown_added", "List the commits that added markdown files, newest first.",
+        "core_git", True, False,
+        body=_body({"repository": ("string", True, "The repository's name in the branch policy."), "ref": ("string", False, "A branch, tag or commit; HEAD when omitted.")})),
+
+    # ---- agent orientation (turing examples/meowdoku/orientation.py): every markdown file of the core in causal order
+    _ep("orientation_state", "orientation", "GET", "/api/orientation",
+        "Show your orientation filters, your place in the causal order and the counts.",
+        ("core_git", "dev_ui"), True, False, capability_all=True),
+    _ep("orientation_update", "orientation", "POST", "/api/orientation",
+        "Change your orientation filters, or set or step your place in the causal order.",
+        ("core_git", "dev_ui"), True, True, capability_all=True,
+        body=_body({"filters": ("object", False, "repository, prefix, kind (agents, readme, report, handoff, doc) and keyword; replaces the filters."),
+                    "clear": ("boolean", False, "True to remove every filter."),
+                    "at": ("string", False, "A document identity (doc:<repository>/<path>) to stand on."),
+                    "step": ("string", False, "first, next, previous or last.")})),
+    _ep("orientation_map", "orientation", "GET", "/api/orientation/map",
+        "Show one page of the filtered causal order as a map for the graph cursor.",
+        ("core_git", "dev_ui"), True, False, capability_all=True,
+        query={"offset": ("integer", "Page offset; the page holding your place when omitted.")}),
 
     # ---- relay (turing examples/meowdoku/relay.py)
     _ep("relay_addresses", "relay", "GET", "/api/relay/addresses", "List the relay addresses you hold open.", None, True, False),
