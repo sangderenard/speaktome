@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
+import time
 from typing import Callable
 from urllib.parse import urlsplit
 
@@ -15,7 +16,11 @@ import httpx
 from mcp import ClientSession
 from mcp.client.auth import OAuthClientProvider, TokenStorage
 from mcp.client.streamable_http import streamable_http_client
-from mcp.shared.auth import OAuthClientMetadata
+from mcp.shared.auth import OAuthClientMetadata, OAuthMetadata
+
+# Refresh this long before the provider's stated expiry, so a token does not run out between the check and the
+# request it is sent with.
+EXPIRY_MARGIN = 60.0
 
 
 class ProviderOriginDenied(PermissionError):
@@ -172,12 +177,31 @@ class RemoteMCP:
             redirect_handler=checked_redirect if redirect else reject_redirect,
             callback_handler=callback,
         )
+        # Every session is a new SDK provider that reloads the stored tokens. The SDK does not reload their expiry,
+        # so it would send an expired access token and never refresh. Before it has rediscovered the authorization
+        # server it also refreshes at <server>/token, which is not where every provider's token endpoint is.
+        # Either way the 401 then starts a full authorization that needs the browser: measured 2026-11-15, Suno
+        # asked to be connected again 15 minutes (its expires_in) after every connection. A vault that keeps the
+        # expiry and the discovered metadata (JsonVault) gives both back. The origin policy still applies to the
+        # endpoint the stored metadata names.
+        expiry = getattr(storage, 'token_expiry', None)
+        if expiry is not None:
+            oauth.context.token_expiry_time = expiry()
+        metadata = getattr(storage, 'get_oauth_metadata', None)
+        saved = metadata() if metadata is not None else None
+        if saved:
+            oauth.context.oauth_metadata = OAuthMetadata.model_validate(saved)
         transport = OriginPolicyTransport(self.transport_for(provider_id), provider.allowed_origins)
         async with httpx.AsyncClient(auth=oauth, transport=transport, timeout=30,
                                      follow_redirects=False, trust_env=False) as http:
             async with streamable_http_client(provider.server_url, http_client=http) as streams:
                 async with ClientSession(streams[0], streams[1]) as session:
                     await session.initialize()
+                    found = oauth.context.oauth_metadata
+                    if metadata is not None and found is not None:
+                        found = found.model_dump(mode='json', exclude_none=True)
+                        if found != saved:
+                            storage.set_oauth_metadata(found)
                     yield session
 
     async def tools(self, owner, provider_id, *, redirect=None, callback=None):
@@ -226,7 +250,33 @@ class JsonVault:
 
     async def set_tokens(self, tokens):
         data = self._read() or {}
-        data['tokens'] = tokens.model_dump(mode='json', exclude_none=True)
+        record = tokens.model_dump(mode='json', exclude_none=True)
+        kept = (data.get('tokens') or {}).get('refresh_token')
+        if kept and 'refresh_token' not in record:
+            record['refresh_token'] = kept      # a refresh answer may leave it out; the old one stays valid (RFC 6749 6)
+        data['tokens'] = record
+        data['expires_at'] = time.time() + tokens.expires_in if tokens.expires_in else None
+        self._write(data)
+
+    def token_expiry(self):
+        """When the stored access token stops being valid, as the SDK's token_expiry_time: EXPIRY_MARGIN before the
+        recorded expiry; 0 (expired, so it is refreshed) for tokens stored without one; None when there are no tokens
+        or the provider gave no expires_in."""
+        data = self._read() or {}
+        if not data.get('tokens'):
+            return None
+        if 'expires_at' not in data:
+            return 0.0
+        return None if data['expires_at'] is None else float(data['expires_at']) - EXPIRY_MARGIN
+
+    def get_oauth_metadata(self):
+        """The authorization server metadata the SDK discovered, kept so a later session refreshes at its token
+        endpoint."""
+        return (self._read() or {}).get('oauth_metadata')
+
+    def set_oauth_metadata(self, metadata):
+        data = self._read() or {}
+        data['oauth_metadata'] = metadata
         self._write(data)
 
     async def get_client_info(self):

@@ -180,3 +180,96 @@ class FailureDiagnosticTests(unittest.TestCase):
         error = ExceptionGroup('wrapper', [ProviderOriginDenied(secret)])
         self.assertEqual(denied_origin(error), 'https://private.invalid')
         self.assertNotIn('secret', str(error.exceptions[0]))
+
+
+class StoredTokenRefreshTests(unittest.IsolatedAsyncioTestCase):
+    """Each session reloads the vault. A later session refreshes an expired access token at the token endpoint
+    discovery found (not <server>/token), with no browser; measured 2026-11-15, Suno needed connecting again 15
+    minutes after every connection."""
+    def setUp(self):
+        from speaktome_api.remote_mcp import JsonVault
+        self.record, self.grants, self.stray, self.refused = None, [], [], 0
+        self.live, self.handoff = None, None
+        def read(): return json.loads(self.record) if self.record else None
+        def write(value): self.record = json.dumps(value)
+        def clear(): self.record = None
+        self.vault = JsonVault(read, write, clear)
+        provider = Provider('https://fixture.invalid/mcp', 'https://site.invalid/callback',
+                            frozenset({'https://fixture.invalid'}))
+        self.client = RemoteMCP({'music': provider}, lambda owner, name: self.vault,
+                                lambda _: httpx.MockTransport(self.respond))
+    def stored(self): return json.loads(self.record)
+    def respond(self, r):
+        path = r.url.path
+        if path.startswith('/.well-known/oauth-protected-resource'):
+            return httpx.Response(200, json={'resource': 'https://fixture.invalid/mcp',
+                                             'authorization_servers': ['https://fixture.invalid/oauth']})
+        if path.startswith('/.well-known/'):
+            return httpx.Response(200, json={'issuer': 'https://fixture.invalid/oauth',
+                'authorization_endpoint': 'https://fixture.invalid/oauth/authorize/',
+                'token_endpoint': 'https://fixture.invalid/oauth/token/',
+                'registration_endpoint': 'https://fixture.invalid/oauth/register/',
+                'response_types_supported': ['code'], 'code_challenge_methods_supported': ['S256'],
+                'grant_types_supported': ['authorization_code', 'refresh_token']})
+        if path == '/oauth/register/':
+            return httpx.Response(201, json={'client_id': 'fixture-client',
+                'redirect_uris': ['https://site.invalid/callback'], 'token_endpoint_auth_method': 'none'})
+        if path == '/oauth/token/':
+            form = parse_qs(r.content.decode())
+            self.grants.append(form['grant_type'][0])
+            if form['grant_type'] == ['authorization_code']:
+                self.live = 'first-token'
+                return httpx.Response(200, json={'access_token': 'first-token', 'token_type': 'Bearer',
+                                                 'expires_in': 900, 'refresh_token': 'refresh-1'})
+            self.assertEqual(form['refresh_token'], ['refresh-1'])
+            self.live = 'fresh-token'           # the answer leaves the refresh token out
+            return httpx.Response(200, json={'access_token': 'fresh-token', 'token_type': 'Bearer', 'expires_in': 900})
+        if path != '/mcp':
+            self.stray.append(path)
+            return httpx.Response(404)
+        if self.live is None or r.headers.get('Authorization') != 'Bearer ' + self.live:
+            self.refused += 1
+            return httpx.Response(401, headers={'WWW-Authenticate':
+                'Bearer resource_metadata="https://fixture.invalid/.well-known/oauth-protected-resource/mcp"'})
+        if r.method == 'DELETE': return httpx.Response(200)
+        if r.method == 'GET': return httpx.Response(405)
+        body = json.loads(r.content)
+        if 'id' not in body: return httpx.Response(202)
+        method = body['method']
+        if method == 'initialize':
+            result = {'protocolVersion': '2025-11-25', 'serverInfo': {'name': 'fixture', 'version': '1'},
+                      'capabilities': {'tools': {}}}
+        elif method == 'tools/list': result = {'tools': [{'name': 'play', 'inputSchema': {'type': 'object'}}]}
+        elif method == 'tools/call': result = {'content': [{'type': 'text', 'text': 'fixture-result'}]}
+        else: raise AssertionError(method)
+        return httpx.Response(200, json={'jsonrpc': '2.0', 'id': body['id'], 'result': result})
+    async def redirect(self, url): self.handoff = url
+    async def callback(self): return 'fixture-code', parse_qs(urlsplit(self.handoff).query)['state'][0]
+    async def connect(self):
+        await self.client.tools('alice', 'music', redirect=self.redirect, callback=self.callback)
+        self.refused = 0
+    async def test_connection_keeps_the_expiry_and_the_discovered_token_endpoint(self):
+        import time
+        await self.connect()
+        record = self.stored()
+        self.assertEqual(record['oauth_metadata']['token_endpoint'], 'https://fixture.invalid/oauth/token/')
+        self.assertAlmostEqual(record['expires_at'], time.time() + 900, delta=30)
+    async def test_an_unexpired_token_is_sent_as_stored(self):
+        await self.connect()
+        await self.client.tools('alice', 'music')
+        self.assertEqual((self.grants, self.refused, self.stray), (['authorization_code'], 0, []))
+    async def test_an_expired_token_is_refreshed_without_the_browser(self):
+        import time
+        await self.connect()
+        record = self.stored()
+        record['expires_at'] = time.time() - 1          # the next session comes after the token ran out
+        self.record = json.dumps(record)
+        result = await self.client.call('alice', 'music', 'play', {})
+        self.assertEqual(result['content'][0]['text'], 'fixture-result')
+        self.assertEqual((self.grants, self.refused, self.stray), (['authorization_code', 'refresh_token'], 0, []))
+        tokens = self.stored()['tokens']
+        self.assertEqual((tokens['access_token'], tokens['refresh_token']), ('fresh-token', 'refresh-1'))
+    def test_a_token_stored_without_an_expiry_counts_as_expired(self):
+        self.assertIsNone(self.vault.token_expiry())
+        self.record = json.dumps({'tokens': {'access_token': 'old', 'token_type': 'Bearer', 'refresh_token': 'r'}})
+        self.assertEqual(self.vault.token_expiry(), 0.0)
