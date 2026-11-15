@@ -47,6 +47,7 @@ GROUPS = {
     "checkout": "The central checkout: the service makes your branch and working folder and runs Git; you edit and commit.",
     "newsletter": "The server's newsletter: published articles anyone reads; articles submitted for review; an author's key.",
     "invitations": "Registration by invitation: a one-time code in a link registers someone; who invited whom is kept.",
+    "connections": "Secured connections to outside services (Suno) that their owner shares with operator and admin accounts.",
     "orientation": "Agent orientation: every markdown file of the core in one causal order, with your filters and place.",
     "relay": "Datagrams and packages, address to address, in and out, for any signed-in account.",
     "fortune": "fortune(): an I Ching style reading of a question; a repeated question waits, a new one is always read.",
@@ -665,6 +666,19 @@ ENDPOINTS = (
         None, False, True, guest=True, tool=False, body=_body({"code": ("string", True, "The code from the invitation link."),
                                                    "username": ("string", True, "3 to 32 letters, digits, _ or -."),
                                                    "password": ("string", True, "At least 8 characters.")})),
+
+    # ---- shared connections (turing examples/meowdoku/connection_shares.py): an owner ticks operator and admin
+    # accounts on Connected services; they call the provider under the owner's connection, audited per call
+    _ep("connections_shared", "connections", "GET", "/api/connections/suno/shared",
+        "List the accounts that share their Suno connection with you.", None, True, False),
+    _ep("connections_shared_tools", "connections", "GET", "/api/connections/suno/shared/tools",
+        "List the Suno tools of a connection an owner shares with you, with their input schemas.", None, True, False,
+        query={"owner": ("string", "The owner's account name.")}),
+    _ep("connections_shared_call", "connections", "POST", "/api/connections/suno/shared/call",
+        "Call a Suno tool under the connection an owner shares with you; audited, and it may spend their credits.",
+        None, True, True, body=_body({"owner": ("string", True, "The owner's account name."),
+                                      "name": ("string", True, "The tool."),
+                                      "arguments": ("object", True, "Its arguments, matching its input schema.")})),
 
     # ---- agent orientation (turing examples/meowdoku/orientation.py): every markdown file of the core in causal order
     _ep("orientation_state", "orientation", "GET", "/api/orientation",
