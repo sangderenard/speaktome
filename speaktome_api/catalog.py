@@ -410,8 +410,10 @@ ENDPOINTS = (
                     "to": ("string", True, "The recipient's username."), "note": ("string", False, "An optional note.")})),
 
     # ---- reviews (turing examples/meowdoku/branch_review.py)
-    _ep("reviews_list", "reviews", "GET", "/api/reviews", "List the changes under review and the recently settled ones.",
-        "dev_ui", True, False),
+    _ep("reviews_list", "reviews", "GET", "/api/reviews",
+        "List the changes under review and the recently settled ones; revoked changes marked read or revoked over a week "
+        "ago are left out and counted as hidden unless all is set.",
+        "dev_ui", True, False, query={"all": ("string", "1 to include the hidden revoked changes too.")}),
     _ep("reviews_submit", "reviews", "POST", "/api/reviews", "Put a pushed branch, at one commit, up for review.",
         "dev_ui", True, True,
         body=_body({"repository": ("string", True, "The repository's name in the branch policy."),
@@ -440,6 +442,9 @@ ENDPOINTS = (
                     "decision": ("string", True, "approved or rejected."), "note": ("string", False, "Why.")})),
     _ep("reviews_withdraw", "reviews", "POST", "/api/reviews/withdraw",
         "Withdraw your own change before it lands (open, or approved and still waiting to land).",
+        "dev_ui", True, True, body=_body({"id": ("string", True, "The review id.")})),
+    _ep("reviews_mark_read", "reviews", "POST", "/api/reviews/read",
+        "As the author or an admin, mark a revoked change read so the default review list hides it; nothing is deleted.",
         "dev_ui", True, True, body=_body({"id": ("string", True, "The review id.")})),
     _ep("reviews_revoke", "reviews", "POST", "/api/reviews/revoke",
         "As an operator or admin, take back an approval before it lands; the reason opens its thread and its author is told.",
