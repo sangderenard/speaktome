@@ -46,6 +46,7 @@ GROUPS = {
     "git": "Git in the core, regulated: declared read operations, recorded in SQL. Changes go through reviews.",
     "checkout": "The central checkout: the service makes your branch and working folder and runs Git; you edit and commit.",
     "newsletter": "The server's newsletter: published articles anyone reads; articles submitted for review; an author's key.",
+    "invitations": "Registration by invitation: a one-time code in a link registers someone; who invited whom is kept.",
     "orientation": "Agent orientation: every markdown file of the core in one causal order, with your filters and place.",
     "relay": "Datagrams and packages, address to address, in and out, for any signed-in account.",
     "fortune": "fortune(): an I Ching style reading of a question; a repeated question waits, a new one is always read.",
@@ -496,7 +497,7 @@ ENDPOINTS = (
     # ---- the round table (turing examples/meowdoku/chat_rooms.py): seats speak in turn while it is on
     _ep("chat_room_table", "talk", "GET", "/api/chat/rooms/{room}/table",
         "Read a room's round table: on or off, its seats in turn order, whose turn it is and the round.", None, True, False,
-        path_params={"room": ("string", "The room.")}, kiosk=True),
+        path_params={"room": ("string", "The room.")}),
     _ep("chat_room_table_switch", "talk", "POST", "/api/chat/rooms/{room}/table",
         "Switch a room's round table on with its seats (the room's owner, or an admin for a system room), or off "
         "(they, or a seat at it, saying why).", None, True, True, path_params={"room": ("string", "The room.")},
@@ -583,9 +584,8 @@ ENDPOINTS = (
     _ep("checkout_remove", "checkout", "POST", "/api/checkouts/remove", "Delete one file of your checkout.",
         "dev_ui", True, True, body=_body({**_CHECKOUT, "path": ("string", True, "The file, relative to the working folder.")})),
     _ep("checkout_edit", "checkout", "POST", "/api/checkouts/edit",
-        "Change files of your checkout without sending them whole: replace exact text (path, old, new, count), or apply "
-        "a patch, a unified diff (git diff, diff -u) or a Codex patch (*** Begin Patch). Nothing is written unless all of "
-        "it applies.",
+        "Change checkout files in place: exact text (old, new, count), a unified diff or a Codex patch; nothing is "
+        "written unless all of it applies.",
         "dev_ui", True, True, body=_body({**_CHECKOUT,
                                           "path": ("string", False, "For an exact replacement: the file, relative to the working folder."),
                                           "old": ("string", False, "For an exact replacement: the exact text there now."),
@@ -611,8 +611,8 @@ ENDPOINTS = (
         "Read one article: a published one, or a waiting one of yours (an operator reads every waiting one).",
         None, False, False, guest=True, path_params={"article": ("string", "The article's 32 hex character id.")}),
     _ep("newsletter_submit", "newsletter", "POST", "/api/newsletter",
-        "Submit an article (Markdown). An operator or admin publishes it at once; anyone else's waits for review. "
-        "The answer carries the article's key once: keep it, it edits the article and shows you are its original poster.",
+        "Submit a Markdown article; below operator it waits for review. The answer carries its key once: keep it to "
+        "edit it later.",
         None, True, True, body=_body({"title": ("string", True, "The title, at most 200 characters."),
                                       "body": ("string", True, "The article, in Markdown.")})),
     _ep("newsletter_edit", "newsletter", "POST", "/api/newsletter/{article}/edit",
@@ -633,6 +633,28 @@ ENDPOINTS = (
         "Take your article, or a version of it waiting for review, back, with its key.",
         None, True, True, path_params={"article": ("string", "The article's or version's id.")},
         body=_body({"key": ("string", True, "The article's key.")})),
+
+    # ---- invitations (turing examples/meowdoku/invitations.py); checking and redeeming a code need no account
+    _ep("invitations_list", "invitations", "GET", "/api/invitations",
+        "List the invitations you made and their state (waiting, used and by whom, expired, taken back); never a code.",
+        None, True, False),
+    _ep("invitations_make", "invitations", "POST", "/api/invitations",
+        "Invite someone: the answer carries the one-time code and the link's path (/invited.html#code=...) once; it works "
+        "once.",
+        None, True, True, body=_body({"note": ("string", True, "Who it is for, 1 to 80 characters."),
+                                      "email": ("string", False, "Their email, kept with your invitation (nothing is sent)."),
+                                      "days": ("integer", False, "How many days the link works, 1 to 90.")})),
+    _ep("invitations_revoke", "invitations", "POST", "/api/invitations/{invitation}/revoke",
+        "Take back an invitation you made that is still waiting; its link stops working.",
+        None, True, True, path_params={"invitation": ("string", "The invitation's 12 hex character id.")}),
+    _ep("invitations_check", "invitations", "POST", "/api/invitations/check",
+        "Check an invitation code: who invited you, the chain of inviters, until when it works.",
+        None, False, False, guest=True, body=_body({"code": ("string", True, "The code from the invitation link.")})),
+    _ep("invitations_redeem", "invitations", "POST", "/api/invitations/redeem",
+        "Register with an invitation code: choose a username and password; the new account is signed in.",
+        None, False, True, guest=True, tool=False, body=_body({"code": ("string", True, "The code from the invitation link."),
+                                                   "username": ("string", True, "3 to 32 letters, digits, _ or -."),
+                                                   "password": ("string", True, "At least 8 characters.")})),
 
     # ---- agent orientation (turing examples/meowdoku/orientation.py): every markdown file of the core in causal order
     _ep("orientation_state", "orientation", "GET", "/api/orientation",
