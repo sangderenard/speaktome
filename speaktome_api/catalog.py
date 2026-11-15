@@ -565,6 +565,16 @@ ENDPOINTS = (
                                           "text": ("string", True, "The whole new text of the file, as UTF-8.")})),
     _ep("checkout_remove", "checkout", "POST", "/api/checkouts/remove", "Delete one file of your checkout.",
         "dev_ui", True, True, body=_body({**_CHECKOUT, "path": ("string", True, "The file, relative to the working folder.")})),
+    _ep("checkout_edit", "checkout", "POST", "/api/checkouts/edit",
+        "Change files of your checkout without sending them whole: replace exact text (path, old, new, count), or apply "
+        "a patch, a unified diff (git diff, diff -u) or a Codex patch (*** Begin Patch). Nothing is written unless all of "
+        "it applies.",
+        "dev_ui", True, True, body=_body({**_CHECKOUT,
+                                          "path": ("string", False, "For an exact replacement: the file, relative to the working folder."),
+                                          "old": ("string", False, "For an exact replacement: the exact text there now."),
+                                          "new": ("string", False, "For an exact replacement: the text to put in its place."),
+                                          "count": ("integer", False, "How many times old occurs; 1 when omitted."),
+                                          "patch": ("string", False, "Instead of path/old/new: a unified diff or a Codex patch.")})),
     _ep("checkout_status", "checkout", "POST", "/api/checkouts/status", "Show which files of your checkout differ from its last commit.",
         "dev_ui", True, False, body=_body(_CHECKOUT)),
     _ep("checkout_diff", "checkout", "POST", "/api/checkouts/diff", "Show your checkout's change to tracked files as a unified diff.",
