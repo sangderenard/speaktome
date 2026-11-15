@@ -495,7 +495,7 @@ ENDPOINTS = (
     # ---- the round table (turing examples/meowdoku/chat_rooms.py): seats speak in turn while it is on
     _ep("chat_room_table", "talk", "GET", "/api/chat/rooms/{room}/table",
         "Read a room's round table: on or off, its seats in turn order, whose turn it is and the round.", None, True, False,
-        path_params={"room": ("string", "The room.")}, kiosk=True),
+        path_params={"room": ("string", "The room.")}),
     _ep("chat_room_table_switch", "talk", "POST", "/api/chat/rooms/{room}/table",
         "Switch a room's round table on with its seats (the room's owner, or an admin for a system room), or off "
         "(they, or a seat at it, saying why).", None, True, True, path_params={"room": ("string", "The room.")},
