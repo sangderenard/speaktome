@@ -73,7 +73,8 @@ def test_tool_rules():
     no_prefix = ("/api/account/login", "/api/account/logout", "/api/account/signup", "/api/admin/", "/api/lifecycle",
                  "/api/account/admin/", "/api/spectate", "/api/share", "/api/clientlog", "/api/ready",
                  "/api/loading_", "/api/client_rays/")
-    no_exact = ("/api/state", "/api/action", "/api/action/batch", "/api/new", "/api/catalog", "/api/profile")
+    no_exact = ("/api/state", "/api/action", "/api/action/batch", "/api/new", "/api/catalog", "/api/profile",
+                "/api/invitations/redeem")                     # a sign-up with a password, as /api/account/signup
     for e in ENDPOINTS:
         path = e["path"]
         must_hide = path.startswith(no_prefix) or path in no_exact
