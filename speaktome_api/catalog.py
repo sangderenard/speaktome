@@ -48,6 +48,7 @@ GROUPS = {
     "newsletter": "The server's newsletter: published articles anyone reads; articles submitted for review; an author's key.",
     "orientation": "Agent orientation: every markdown file of the core in one causal order, with your filters and place.",
     "relay": "Datagrams and packages, address to address, in and out, for any signed-in account.",
+    "fortune": "fortune(): an I Ching style reading of a question; a repeated question waits, a new one is always read.",
     "mail": "Your mailbox at <username>@stichka.duckdns.org: the inbox, reading, sending and removing mail.",
     "files": "The flat index of every file in the core, kept by the cleanup account.",
     "compile": "Compile-side jobs: the source divider, the math lab and the lowering leases.",
@@ -668,6 +669,13 @@ ENDPOINTS = (
         None, True, False,
         query={"address": ("integer", "Your address's number."), "after": ("integer", "Only packages after this id."),
                "limit": ("integer", "At most this many, up to 500.")}),
+
+    # ---- fortune (turing examples/meowdoku/fortune.py)
+    _ep("fortune", "fortune", "POST", "/api/fortune",
+        "Ask the oracle a question: two hexagram fortunes, trigrams and super elements to weave into a story. A repeat waits; a new one is read.",
+        None, True, True, body=_body({"question": ("string", True, "The question to put to the oracle.")})),
+    _ep("fortune_readings", "fortune", "GET", "/api/fortune/readings", "Your past readings, newest first.",
+        None, True, False, query={"limit": ("integer", "At most this many, up to 200; 20 when omitted.")}),
 
     # ---- mail (turing examples/meowdoku/mail.py)
     _ep("mail_inbox", "mail", "GET", "/api/mail/inbox",
