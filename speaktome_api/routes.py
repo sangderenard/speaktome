@@ -398,7 +398,7 @@ def index_route(self, path, *, catalog):
 
     Every endpoint carries ``allowed``: whether this request, with the capabilities the host gave it, may use it. The
     answer is a description, never a grant; each handler still decides for itself. A host whose handler has ``_kiosk()``
-    returning True (a kiosk account, the read-only intern) is answering a caller allowed only the kiosk entries; one
+    returning True (an intern kiosk account) is answering a caller allowed only the kiosk entries; one
     whose ``_guest_gated()`` returns True (a visitor with no account) a caller allowed only the guest-reachable entries.
     """
     from urllib.parse import parse_qs

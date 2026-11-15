@@ -1,0 +1,3 @@
+# Activate the hosted Llama intern
+
+After the Turing and SpeakToMe changes receive review and land, deploy both repositories. In elevated PowerShell, create the isolated `agents-llama` Windows account with `Set-AgentBox.ps1 -Apply -CreateAgentAccount -AgentAccount agents-llama -AgentLogins llama`, then run `Start-HostedLlm.ps1 -GrantRead`, `-Register`, and `-Run`. Grant the `llama` intern's audited `message` capability modifier through the admin route. Enable the new `hosted.dispatch` cron entry only after the updated task worker is deployed. Verify the task reports a healthy process, room rotation, one DM reply, and a local positive-example LoRA publication.
