@@ -1,5 +1,36 @@
 # speaktome_mcp
 
+## Incoming OAuth over Streamable HTTP (coordinated Turing host change)
+
+The matching Turing host branch adds a protected `POST /mcp` endpoint. Its
+`GET /mcp` returns 405 because this implementation sends one JSON response per
+POST and does not initiate SSE; `DELETE /mcp` closes a client session. The host publishes protected-resource metadata
+at `/.well-known/oauth-protected-resource/mcp` and authorization-server metadata
+at `/.well-known/oauth-authorization-server`. Browser authorization uses an
+explicit consent form and the existing SpeakToMe account identity. Dynamic
+client registration, authorization code with PKCE S256, and one-hour opaque
+access tokens are supported. The resource URI and issuer come from the
+operator-set `SPEAKTOME_PUBLIC_ORIGIN` HTTPS origin, never a request Host header.
+
+The HTTP adapter reuses `ApiServer` and its REST catalog. Every forwarded REST
+request carries the token on a direct loopback hop and preserves the external
+request's origin and tier; the host still enforces each account's capabilities
+and endpoint-specific checks. A browser login cookie is not an MCP bearer token.
+The token only authorizes the MCP resource, and the internal REST bearer path
+is restricted to direct loopback connections. `Origin`, when present, must be
+the public origin or one of the explicitly configured
+`SPEAKTOME_MCP_ALLOWED_ORIGINS` (comma-separated HTTPS origins).
+Initialize returns a secure `MCP-Session-Id`; clients send it on later requests.
+The server and existing graph cursor are process-local, so a reverse proxy with
+multiple host processes must keep each MCP session on its original process.
+
+This source branch does not enable the endpoint by itself. Deploy the matching
+SpeakToMe and Turing revisions together, set `SPEAKTOME_PUBLIC_ORIGIN` on the
+host, and verify the reverse proxy forwards `/mcp`, `/oauth/*`, and both
+well-known documents over HTTPS. The example URL
+`https://stichka.duckdns.org:8766/mcp` remains proposed until that coordinated
+deployment is measured. The stdio server below remains available.
+
 A LOCAL Model Context Protocol server (stdio, JSON-RPC 2.0, one JSON object per line) that lets an agent hold the
 SpeakToMe vocabulary (`AGENTS/conceptual_flags/Person_Vocabulary.md`, section 7) as tools. It is a thin skin over the
 existing REST API described in `speaktome_api/README.md`. It adds no logic, and its only state is one signed-in HTTP
@@ -111,7 +142,8 @@ The report HTTP contract is `speaktome_api/reports.py` version 1, deployed with
 the matching Turing host/storage binding. This source capability is not a
 claim that the running service has been reloaded. See `man make` and `man report`.
 - One account per process; the cursor does not survive a server restart (a limit of the REST service).
-- Local stdio only; no remote transport yet.
+- The local stdio process remains one account per process; the coordinated host
+  branch provides the separate incoming HTTP transport described above.
 - No retries beyond one re-sign-in; a send whose outcome is uncertain is reported, never silently repeated.
 
 ## Tests

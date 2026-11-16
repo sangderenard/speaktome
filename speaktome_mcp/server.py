@@ -26,7 +26,7 @@ except ImportError:  # run as a plain script
 import speaktome_man as manual
 
 SERVER_NAME, SERVER_VERSION = "speaktome", "0.1.0"
-SUPPORTED_VERSIONS = ("2025-06-18", "2025-03-26", "2024-11-05")
+SUPPORTED_VERSIONS = ("2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05")
 INSTRUCTIONS = (
     "These tools are the SpeakToMe verbs over the existing REST API: look, enter, where, go and leave walk a graph "
     "cursor; say, pending, acknowledge and contacts use messaging between mutual contacts; system_* and diagnostics "
@@ -679,7 +679,7 @@ class Server:
                 if not isinstance(params, dict):
                     raise _Bad("initialize needs params")
                 asked = params.get("protocolVersion")
-                version = asked if asked in SUPPORTED_VERSIONS else SUPPORTED_VERSIONS[0]
+                version = asked if asked in SUPPORTED_VERSIONS else "2025-06-18"
                 result = {"protocolVersion": version, "capabilities": {"tools": {}},
                           "serverInfo": {"name": SERVER_NAME, "version": SERVER_VERSION}, "instructions": INSTRUCTIONS}
             elif method == "ping":
