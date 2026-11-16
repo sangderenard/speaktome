@@ -35,7 +35,7 @@ deployment is measured. The stdio server below remains available.
 
 `POST /mcp/guest` accepts MCP initialize without OAuth and creates a seven-day
 preview identity with no signup or password. Clients retain the returned
-`MCP-Session-Id` for later requests; five new sessions per IP per hour are
+`MCP-Session-Id` for later requests; thirty new sessions per IP per hour are
 allowed. It exposes public read and play tools plus `guest_tasks`,
 `guest_test_submit`, `guest_status`, and `guest_post_submit`. Preview users cannot
 call account or privileged tools. A reviewer must accept three distinct task
