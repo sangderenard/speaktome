@@ -70,6 +70,23 @@ def test_an_admin_sees_the_control_tools():
     assert "control_instances_request" in names(api.ApiServer(Fake(AGENT + ["account_manage"])))
 
 
+def test_research_document_is_available_and_routes_explicit_text_copy():
+    fake = Fake()
+    server = api.ApiServer(fake)
+    tools = {tool["name"]: tool for tool in rpc(server, "tools/list")["tools"]}
+    assert "research_case" in tools and "research_document" in tools
+    assert tools["research_document"]["inputSchema"]["properties"]["source_ref"]["type"] == ["string", "null"]
+    result, is_error, _ = call(server, "research_document", id="ab" * 16,
+                               title="Draft", body="Shared text", source_kind="text", source_ref=None)
+    assert not is_error and result["data"] == {"ok": True}
+    assert fake.calls[-1] == {
+        "path": "/api/research/cases/" + "ab" * 16 + "/document",
+        "body": {"title": "Draft", "body": "Shared text", "source_kind": "text", "source_ref": None},
+        "raw_limit": None, "method": "POST", "headers": {"X-Meowdoku-Entry": "mcp", "X-Meowdoku-Research": "1"},
+    }
+    assert "research_document" not in names(api.ApiServer(Fake(signed_in=False)))
+
+
 def test_schema_and_description_come_from_the_entry():
     server = api.ApiServer(Fake())
     tools = {tool["name"]: tool for tool in rpc(server, "tools/list")["tools"]}
@@ -230,7 +247,7 @@ def test_legacy_field_schemas_are_unchanged_for_entire_catalogue():
                 expected["maxLength"] = 65536
             elif kind == "object":
                 expected["additionalProperties"] = True
-            assert api._property(spec) == expected
+            assert api._property(spec) == (spec["schema"] if "schema" in spec else expected)
 
 
 def test_inline_schema_reaches_tools_list_and_preserves_request_routing():
