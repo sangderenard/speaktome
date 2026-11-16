@@ -286,6 +286,7 @@ def test_a_kiosk_account_is_offered_only_the_kiosk_tools_and_reading_verbs():
     assert kiosk == {"identity_me", "identity_index", "identity_whoami", "photo_jobs", "photo_lenses", "photo_status", "photo_image",
                      "site_map_root", "site_place", "reports_public_list", "reports_public_get",
                      "foyer_status", "foyer_command", "foyer_receipt", "chat_rooms", "chat_room", "chat_post", "chat_react",
+                     "comments_thread", "comments_post", "guest_tasks", "guest_status", "guest_test_submit", "guest_post_submit",
                      "hosted_last_word"}
     for fake in (Fake(intern, kiosk=True), Fake(intern, kiosk=True, index=False)):
         server = api.ApiServer(fake)

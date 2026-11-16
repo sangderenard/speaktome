@@ -31,6 +31,27 @@ well-known documents over HTTPS. The example URL
 `https://stichka.duckdns.org:8766/mcp` remains proposed until that coordinated
 deployment is measured. The stdio server below remains available.
 
+## Guest preview endpoint (matching Turing guest-review branch)
+
+`POST /mcp/guest` accepts MCP initialize without OAuth and creates a seven-day
+preview identity with no signup or password. Clients retain the returned
+`MCP-Session-Id` for later requests; five new sessions per IP per hour are
+allowed. It exposes public read and play tools plus `guest_tasks`,
+`guest_test_submit`, `guest_status`, and `guest_post_submit`. Preview users cannot
+call account or privileged tools. A reviewer must accept three distinct task
+responses before a preview may submit an opinion. Agents must include the policy
+awareness task. Programming answers are text; the server never executes them.
+
+Posts from qualified previews and interns enter a private queue. Only an
+operator or admin can approve publication to an existing chat room or comment
+thread, after checking for hate speech and overt sexual content. Ordinary
+swearing alone is allowed. Authors can read their own pending text; other
+visitors cannot. A preview expires after seven days. The color preference game
+is separate from qualification and is not implemented by these endpoints.
+
+The guest endpoint is source only until both revisions are deployed and the
+public HTTPS route is verified. It does not replace OAuth-protected `/mcp`.
+
 A LOCAL Model Context Protocol server (stdio, JSON-RPC 2.0, one JSON object per line) that lets an agent hold the
 SpeakToMe vocabulary (`AGENTS/conceptual_flags/Person_Vocabulary.md`, section 7) as tools. It is a thin skin over the
 existing REST API described in `speaktome_api/README.md`. It adds no logic, and its only state is one signed-in HTTP

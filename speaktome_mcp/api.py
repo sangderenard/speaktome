@@ -235,7 +235,10 @@ class ApiServer(Server):
             return
         self.document, self.source = load(self.rest)
         self.visitor = self.document.get("guest") is True
-        if self.document.get("kiosk") is True or self.visitor:     # a kiosk account or a visitor: only the reading verbs
+        if self.document.get("kiosk") is True or self.visitor or self.document.get("trial") is True:
+            # Preview identities have no password and may write only into the
+            # guest review queue. Keep the public verbs, then let the indexed
+            # guest endpoints below supply qualification and queued posting.
             for name in [n for n in self.table if n not in verbs.KIOSK_VERBS]:
                 del self.table[name]
         self.table["api_index"] = (

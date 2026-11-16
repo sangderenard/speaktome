@@ -43,6 +43,7 @@ GROUPS = {
     "research": "Collaborative Research cases and Development briefs, documents, invariants, votes and surveys.",
     "reviews": "Changes put up for peer review before they reach a default branch.",
     "talk": "Comments under a post (a change's thread) and the chat rooms your role may enter.",
+    "guest": "Preview and intern qualification, private submission status and human publication review.",
     "git": "Git in the core, regulated: declared read operations, recorded in SQL. Changes go through reviews.",
     "checkout": "The central checkout: the service makes your branch and working folder and runs Git; you edit and commit.",
     "newsletter": "The server's newsletter: published articles anyone reads; articles submitted for review; an author's key.",
@@ -92,6 +93,34 @@ _CHECKOUT = {"repository": ("string", True, "The repository's name in the branch
              "branch": ("string", True, "Your branch's name.")}
 
 ENDPOINTS = (
+    _ep("guest_tasks", "guest", "GET", "/api/guest/tasks", "Read the guest qualification tasks and publication policy.",
+        None, False, False, kiosk=True),
+    _ep("guest_status", "guest", "GET", "/api/guest/status", "Read your qualification evidence and pending or published submissions.",
+        None, True, False, kiosk=True),
+    _ep("guest_test_submit", "guest", "POST", "/api/guest/tests", "Submit one qualification answer for human review; nothing is executed.",
+        None, True, True, kiosk=True, body=_body({"task": ("string", True, "One task id from guest_tasks."),
+                                                "response": ("string", True, "Your answer or experience report."),
+                                                "actor_kind": ("string", True, "agent or human; fixed for this preview.")})),
+    _ep("guest_post_submit", "guest", "POST", "/api/guest/submissions", "Queue an opinion for private review before it appears in a chat room or comment thread.",
+        None, True, True, kiosk=True, body=_body({"target": ("string", True, "chat or comment."),
+                                                "room": ("string", False, "A chat room to write in."),
+                                                "kind": ("string", False, "A comment kind."),
+                                                "ref": ("string", False, "A comment thread reference."),
+                                                "reply_to": ("integer", False, "A comment in that thread."),
+                                                "body": ("string", True, "The text to review.")})),
+    _ep("guest_review_queue", "guest", "GET", "/api/guest/review", "Operator/admin: read pending tests and posts; text is untrusted.",
+        "dev_ui", True, False),
+    _ep("guest_review_test", "guest", "POST", "/api/guest/review/test", "Operator/admin: accept or reject one qualification answer.",
+        "dev_ui", True, True, body=_body({"id": ("integer", True, "Test evidence id."),
+                                         "decision": ("string", True, "accepted or rejected."),
+                                         "reason": ("string", False, "Short review reason.")})),
+    _ep("guest_review_qualify", "guest", "POST", "/api/guest/review/qualify", "Operator/admin: qualify a preview after at least three distinct accepted tests.",
+        "dev_ui", True, True, body=_body({"user_id": ("integer", True, "Preview user id.")})),
+    _ep("guest_review_post", "guest", "POST", "/api/guest/review/post", "Operator/admin: approve or reject one guest post; approval publishes it.",
+        "dev_ui", True, True, body=_body({"id": ("integer", True, "Queued post id."),
+                                         "decision": ("string", True, "approved or rejected."),
+                                         "policy_confirmed": ("boolean", False, "Confirm review for hate speech and overt sexual content."),
+                                         "reason": ("string", False, "Short review reason.")})),
     # ---- identity
     _ep("identity_login", "identity", "POST", "/api/account/login", "Sign in with a username and password.",
         None, False, True, tool=False, kiosk=True,
@@ -436,8 +465,7 @@ ENDPOINTS = (
 
     # ---- reviews (turing examples/meowdoku/branch_review.py)
     _ep("reviews_list", "reviews", "GET", "/api/reviews",
-        "List the changes under review and the recently settled ones; revoked changes marked read or revoked over a week "
-        "ago are left out and counted as hidden unless all is set.",
+        "List current and recent reviews; use all=1 to include older hidden revoked reviews.",
         "dev_ui", True, False, query={"all": ("string", "1 to include the hidden revoked changes too.")}),
     _ep("reviews_submit", "reviews", "POST", "/api/reviews", "Put a pushed branch, at one commit, up for review.",
         "dev_ui", True, True,
@@ -487,12 +515,12 @@ ENDPOINTS = (
         "Read a post's comment thread (kind review: a change's thread, ref its review id).", None, True, False,
         query={"kind": ("string", "The kind of post, such as review."), "ref": ("string", "The post, such as a review id."),
                "tail": ("string", "How many comments: a count, or all; 20 when omitted."),
-               "after": ("string", "Only the comments after this comment id.")}),
+               "after": ("string", "Only the comments after this comment id.")}, kiosk=True),
     _ep("comments_post", "talk", "POST", "/api/comments",
         "Write in a post's comment thread; the post's participants are told.", None, True, True,
         body=_body({"kind": ("string", True, "The kind of post, such as review."),
                     "ref": ("string", True, "The post, such as a review id."), "body": ("string", True, "The comment."),
-                    "reply_to": ("integer", False, "The comment of the same thread this answers.")})),
+                    "reply_to": ("integer", False, "The comment of the same thread this answers.")}), kiosk=True),
     _ep("chat_rooms", "talk", "GET", "/api/chat/rooms", "List the chat rooms your role may enter.", None, True, False, kiosk=True),
     _ep("chat_room", "talk", "GET", "/api/chat/rooms/{room}", "Read a chat room's latest messages.", None, True, False,
         path_params={"room": ("string", "The room, such as reviewers.")},
@@ -891,7 +919,7 @@ ENDPOINTS = (
                     "source":("object",True,"Artifact ref for local code/math, or HTTPS url for a remote API.")})),
     _ep("paper_presence", "markets", "GET", "/api/paper/presence", "List bots active in the last five minutes with their latest interaction path; clients fade them by age.", None, True, False,
         query={"offset":("integer","Page offset; follow next_offset until null.")}),
-    _ep("paper_qualification_live", "markets", "GET", "/api/paper/qualification/live", "Watch sanitized historical mock qualification progress from server training workers, including checkpoint validation and final admission status.", None, False, False,
+    _ep("paper_qualification_live", "markets", "GET", "/api/paper/qualification/live", "Watch sanitized mock qualification progress, checkpoint validation, and final admission status.", None, False, False,
         guest=True),
     _ep("paper_trainer_events", "markets", "GET", "/api/paper/trainer-events", "Read sanitized paper interaction events for server/admin network trainers.", "paper_train", True, False,
         query={"after":("integer","Last event cursor, or zero for the first page.")}),
@@ -911,7 +939,7 @@ ENDPOINTS = (
     _ep("paper_map", "markets", "GET", "/api/paper/map", "Read your live paper arena as a Living Data world map of monitored markets, strategies and orders.", None, True, False),
     _ep("paper_map_query", "markets", "GET", "/api/paper/map/query", "Examine a node and its declared market, strategy and order relationships.", None, True, False,
         query={"at":("string","Node identity, or the root when omitted."), "radius":("integer","Graph radius 0-4.")}),
-    _ep("paper_dm", "markets", "POST", "/api/paper/dm", "Paper Dungeon Master relay: inspect the paper arena, request the Nodus Living Data map picture, submit paper actions, or send authorized Nodus UI actions.", None, True, True,
+    _ep("paper_dm", "markets", "POST", "/api/paper/dm", "Inspect the paper arena, request its map, submit paper actions, or send authorized Nodus UI actions.", None, True, True,
         body=_body({"verb":("string",True,"look, examine, make or use."),
                     "target":("string",True,"Paper target or nodus_ui for an authorized canvas action."),
                     "input":("object",True,"Exact input for the selected command; empty object for look.")})),
@@ -1161,7 +1189,7 @@ def reachable_by_guest(endpoint) -> bool:
     return bool(endpoint.get("kiosk") or endpoint.get("guest") or endpoint.get("credential"))
 
 
-def allowed(endpoint, capabilities, signed_in, kiosk=False, guest=False) -> bool:
+def allowed(endpoint, capabilities, signed_in, kiosk=False, guest=False, trial=False) -> bool:
     """True when this caller may use the endpoint: signed in if it needs an account, and holding its capability.
 
     A kiosk caller may use only the entries declared kiosk; a gated guest only the entries ``reachable_by_guest``.
@@ -1169,6 +1197,8 @@ def allowed(endpoint, capabilities, signed_in, kiosk=False, guest=False) -> bool
     if kiosk and not endpoint.get("kiosk"):
         return False
     if guest and not reachable_by_guest(endpoint):
+        return False
+    if trial and endpoint["name"] not in ("guest_tasks", "guest_status", "guest_test_submit", "guest_post_submit") and not endpoint.get("guest"):
         return False
     if endpoint["account"] and not signed_in:
         return False
@@ -1181,22 +1211,23 @@ def allowed(endpoint, capabilities, signed_in, kiosk=False, guest=False) -> bool
     return need in have
 
 
-def public(endpoint, capabilities=None, signed_in=False, kiosk=False, guest=False) -> dict:
+def public(endpoint, capabilities=None, signed_in=False, kiosk=False, guest=False, trial=False) -> dict:
     """A JSON-serializable copy of an endpoint; with ``capabilities`` given it also carries ``allowed``."""
     out = _copy(endpoint)
     if capabilities is not None:
-        out["allowed"] = allowed(endpoint, capabilities, signed_in, kiosk, guest)
+        out["allowed"] = allowed(endpoint, capabilities, signed_in, kiosk, guest, trial)
     return out
 
 
-def index(capabilities=None, signed_in=False, group=None, kiosk=False, guest=False) -> dict:
+def index(capabilities=None, signed_in=False, group=None, kiosk=False, guest=False, trial=False) -> dict:
     """The whole catalog as one JSON document; with ``capabilities`` given every endpoint says whether it is allowed.
 
     ``kiosk`` is True for a kiosk caller: only the kiosk entries are allowed, and the document says so. ``guest`` is
     True for a gated caller with no account: only the entries ``reachable_by_guest`` are allowed.
     """
-    rows = [public(e, capabilities, signed_in, kiosk, guest) for e in ENDPOINTS if group is None or e["group"] == group]
+    rows = [public(e, capabilities, signed_in, kiosk, guest, trial) for e in ENDPOINTS if group is None or e["group"] == group]
     return {"catalog_version": CATALOG_VERSION, "groups": dict(GROUPS), "kiosk": bool(kiosk), "guest": bool(guest),
+            "trial": bool(trial),
             "endpoints": rows}
 
 
