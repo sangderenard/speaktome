@@ -108,12 +108,12 @@ def test_a_call_sends_exactly_the_declared_request():
     server = api.ApiServer(fake)
     result, is_error, _ = call(server, "reports_get", id="ab" * 16)
     assert not is_error and result == {"endpoint": "reports_get", "data": {"ok": True}}
-    assert fake.calls[-1] == {"path": "/api/reports/" + "ab" * 16, "body": None, "raw_limit": None, "method": "GET", "headers": {}}
+    assert fake.calls[-1] == {"path": "/api/reports/" + "ab" * 16, "body": None, "raw_limit": None, "method": "GET", "headers": {"X-Meowdoku-Entry": "mcp"}}
     call(server, "messages_ack", up_to=7)
     assert fake.calls[-1]["path"] == "/api/messages/ack" and fake.calls[-1]["body"] == {"up_to": 7}
     assert fake.calls[-1]["method"] == "POST"
     call(server, "reports_issue_create", title="t", description="d")
-    assert fake.calls[-1]["headers"] == {"X-Meowdoku-Issue": "1"}
+    assert fake.calls[-1]["headers"] == {"X-Meowdoku-Issue": "1", "X-Meowdoku-Entry": "mcp"}
     call(server, "nodus_graph", instance="a b&c")
     assert fake.calls[-1]["path"] == "/api/nodus/graph?instance=a+b%26c"
 
