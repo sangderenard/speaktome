@@ -7,6 +7,7 @@ tier, so a loopback hop cannot turn a remote caller into a LAN operator.
 from __future__ import annotations
 
 import ssl
+from http.cookiejar import CookieJar
 import urllib.parse
 import urllib.request
 
@@ -19,7 +20,8 @@ class BearerRest(Rest):
         if parsed.scheme != "https" or parsed.hostname != "127.0.0.1":
             raise RestError("internal MCP REST requires loopback HTTPS")
         opener = urllib.request.build_opener(
-            _NoRedirect(), urllib.request.HTTPSHandler(context=ssl.create_default_context(cafile=ca_file)))
+            _NoRedirect(), urllib.request.HTTPSHandler(context=ssl.create_default_context(cafile=ca_file)),
+            urllib.request.HTTPCookieProcessor(CookieJar()))
         super().__init__(base, "oauth", None, opener=opener)
         self.token = token
         self.origin = origin

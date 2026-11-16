@@ -1,5 +1,17 @@
 # speaktome_mcp
 
+## Operator workspace and scratch
+
+Operators and admins see `workspace_index`, `workspace_children`,
+`workspace_document`, and `workspace_documents` from the host REST catalog.
+Start with the index; read document bodies only as a task needs deeper context.
+Scenarios list document IDs in broad-to-specific order. Each permanent account
+also has private `scratch_files`, `scratch_file`, and `scratch_change` tools.
+Temporary preview accounts get the same scratch verbs backed by a small cookie
+that this MCP session retains; they do not receive durable server scratch.
+The matching host contract and limits are in Turing's
+`examples/meowdoku/AGENT_WORKSPACE.md`.
+
 ## Incoming OAuth over Streamable HTTP (coordinated Turing host change)
 
 The matching Turing host branch adds a protected `POST /mcp` endpoint. Its

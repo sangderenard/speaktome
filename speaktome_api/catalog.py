@@ -60,6 +60,8 @@ GROUPS = {
     "play": "The game table tied to a browser session, sharing and spectating, and page support calls.",
     "markets": "Alpaca paper market observation, strategy seats and attributed paper orders.",
     "foyer": "The one shared demo world anyone may walk and photograph; nothing in it is yours.",
+    "workspace": "Operator and admin documents: orientation, prompts, personality branches, guidance, trouble trees and scenarios.",
+    "scratch": "Your private scratch text files; permanent accounts retain them, temporary previews use a small cookie filesystem.",
 }
 
 
@@ -94,6 +96,38 @@ _CHECKOUT = {"repository": ("string", True, "The repository's name in the branch
              "branch": ("string", True, "Your branch's name.")}
 
 ENDPOINTS = (
+    _ep("workspace_index", "workspace", "GET", "/api/agent-workspace",
+        "Read only the roots and quotas of the shared operator document tree; open branches as needed.",
+        "operator_workspace", True, False),
+    _ep("workspace_children", "workspace", "GET", "/api/agent-workspace/children",
+        "List one document branch without reading its bodies.", "operator_workspace", True, False,
+        query={"parent": ("string", "Parent document id; omit for roots."),
+               "kind": ("string", "Optional orientation, prompt, personality, guidance, trouble or scenario filter.")}),
+    _ep("workspace_document", "workspace", "GET", "/api/agent-workspace/document/{id}",
+        "Read one shared operator document and its ordered scenario context ids.", "operator_workspace", True, False,
+        path_params=_ID32),
+    _ep("workspace_documents", "workspace", "POST", "/api/agent-workspace/documents",
+        "Save or delete a shared operator document; any operator or admin can edit any document.",
+        "operator_workspace", True, True, headers={"X-Meowdoku-Workspace": "1"},
+        body=_body({"action": ("string", True, "save or delete."),
+                    "id": ("string", False, "Document id for update or delete; omit to create."),
+                    "kind": ("string", False, "Document kind for save."),
+                    "parent_id": ("string", False, "Parent id for a more specific branch."),
+                    "title": ("string", False, "Document title."),
+                    "body": ("string", False, "Document text."),
+                    "contexts": ("array", False, "Scenario document ids in broad-to-specific consumption order.")})),
+    _ep("scratch_files", "scratch", "GET", "/api/scratch",
+        "List your scratch files and quota; temporary previews read their cookie filesystem.",
+        "agent_scratch", True, False, kiosk=True),
+    _ep("scratch_file", "scratch", "GET", "/api/scratch/file",
+        "Read one of your scratch files by name.", "agent_scratch", True, False, kiosk=True,
+        query={"name": ("string", "Your scratch file name.")}),
+    _ep("scratch_change", "scratch", "POST", "/api/scratch",
+        "Write or delete one of your scratch files. Permanent accounts persist; temporary previews use a cookie.",
+        "agent_scratch", True, True, kiosk=True, headers={"X-Meowdoku-Workspace": "1"},
+        body=_body({"action": ("string", True, "write or delete."),
+                    "name": ("string", True, "Your scratch file name."),
+                    "body": ("string", False, "Text for a write.")})),
     _ep("palette_state", "palette", "GET", "/api/palette", "Read your color swatches, ranking, proposed site palette and feedback counts.",
         None, False, False, kiosk=True),
     _ep("palette_rank", "palette", "POST", "/api/palette/rank", "Rank every swatch in preference order and apply a personal site palette.",
@@ -1211,7 +1245,8 @@ def allowed(endpoint, capabilities, signed_in, kiosk=False, guest=False, trial=F
     if guest and not reachable_by_guest(endpoint):
         return False
     if trial and endpoint["name"] not in ("guest_tasks", "guest_status", "guest_test_submit", "guest_post_submit",
-                                          "palette_state", "palette_rank", "palette_feedback") and not endpoint.get("guest"):
+                                          "palette_state", "palette_rank", "palette_feedback",
+                                          "scratch_files", "scratch_file", "scratch_change") and not endpoint.get("guest"):
         return False
     if endpoint["account"] and not signed_in:
         return False
