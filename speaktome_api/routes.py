@@ -411,4 +411,6 @@ def index_route(self, path, *, catalog):
         return self._json({"error": "unknown group"}, 404)
     kiosk = bool(getattr(self, "_kiosk", lambda: False)())
     guest = bool(getattr(self, "_guest_gated", lambda: False)())
-    return self._json(catalog.index(sorted(self._caps()), self._principal().user_id is not None, group, kiosk, guest))
+    principal = self._principal()
+    return self._json(catalog.index(sorted(self._caps()), principal.user_id is not None, group, kiosk, guest,
+                                    trial=getattr(principal, "role", None) == "trial"))

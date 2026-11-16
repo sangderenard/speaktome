@@ -34,3 +34,16 @@ class BearerRest(Rest):
                      "X-Speaktome-MCP-Origin": self.origin,
                      "X-Speaktome-MCP-Tier": self.tier})
         return super()._http(path, body, timeout, secret=self.token, raw_limit=raw_limit, method=method, headers=sent)
+
+
+class PreviewRest(BearerRest):
+    """A server-created seven-day preview; its token never reaches an MCP client."""
+
+    def _http(self, path, body=None, timeout=40, secret=None, raw_limit=None, method=None, headers=None):
+        if not path.startswith("/api/"):
+            raise RestError("only the host API may be called", 400)
+        sent = dict(headers or {})
+        sent.update({"Authorization": "Preview " + self.token,
+                     "X-Speaktome-MCP-Origin": self.origin,
+                     "X-Speaktome-MCP-Tier": self.tier})
+        return Rest._http(self, path, body, timeout, secret=self.token, raw_limit=raw_limit, method=method, headers=sent)
