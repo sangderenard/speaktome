@@ -71,7 +71,7 @@ def test_field_specs_and_get_has_no_body():
 
 def test_tool_rules():
     no_prefix = ("/api/account/login", "/api/account/logout", "/api/account/signup",
-                 "/api/account/preview", "/api/account/keep", "/api/admin/", "/api/lifecycle",
+                 "/api/account/preview", "/api/account/recover", "/api/account/keep", "/api/admin/", "/api/lifecycle",
                  "/api/account/admin/", "/api/spectate", "/api/share", "/api/clientlog", "/api/ready",
                  "/api/loading_", "/api/client_rays/")
     no_exact = ("/api/state", "/api/action", "/api/action/batch", "/api/new", "/api/catalog", "/api/profile",
@@ -88,11 +88,13 @@ def test_tool_rules():
 
 def test_temporary_preview_routes_are_declared_without_mcp_password_tools():
     preview = catalog.by_name()["identity_preview"]
+    recover = catalog.by_name()["identity_recover"]
     keep = catalog.by_name()["identity_keep"]
     assert catalog.guest_endpoint("POST", "/api/account/preview") is preview
+    assert catalog.guest_endpoint("POST", "/api/account/recover") is recover
     assert catalog.guest_endpoint("POST", "/api/account/keep") is None
-    assert preview["tool"] is False and keep["tool"] is False
-    assert preview["headers"] == keep["headers"] == {"X-Meowdoku-Preview": "1"}
+    assert preview["tool"] is False and recover["tool"] is False and keep["tool"] is False
+    assert preview["headers"] == recover["headers"] == keep["headers"] == {"X-Meowdoku-Preview": "1"}
 
 
 def test_allowed_truth_table():
