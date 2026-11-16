@@ -202,6 +202,7 @@ def test_kiosk_entries_and_their_paths():
                      "reports_public_get", "foyer_status", "foyer_command", "foyer_receipt",
                      "chat_rooms", "chat_room", "chat_post", "chat_react", "comments_thread", "comments_post",
                      "guest_tasks", "guest_status", "guest_test_submit", "guest_post_submit",
+                     "palette_state", "palette_rank", "palette_feedback",
                      "messages_conversations", "messages_contacts", "messages_contacts_update", "messages_images_status",
                      "messages_images_set", "messages_image", "messages_thread", "messages_since", "messages_inbox",
                      "messages_send", "messages_ack", "messages_read", "hosted_last_word"}
@@ -209,6 +210,7 @@ def test_kiosk_entries_and_their_paths():
     # every agent, guest agents and up, has a chat room) change anything
     assert {e["name"] for e in ENDPOINTS if e["kiosk"] and e["changes"]} == {"identity_login", "identity_logout", "foyer_command",
                                                                           "chat_post", "chat_react", "comments_post", "guest_test_submit", "guest_post_submit",
+                                                                          "palette_rank", "palette_feedback",
                                                                           "messages_contacts_update", "messages_images_set", "messages_send",
                                                                           "messages_ack", "messages_read"}
     found = catalog.kiosk_endpoint

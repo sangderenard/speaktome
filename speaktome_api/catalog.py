@@ -44,6 +44,7 @@ GROUPS = {
     "reviews": "Changes put up for peer review before they reach a default branch.",
     "talk": "Comments under a post (a change's thread) and the chat rooms your role may enter.",
     "guest": "Preview and intern qualification, private submission status and human publication review.",
+    "palette": "Order color swatches, see a personal site palette, and report good or bad feedback.",
     "git": "Git in the core, regulated: declared read operations, recorded in SQL. Changes go through reviews.",
     "checkout": "The central checkout: the service makes your branch and working folder and runs Git; you edit and commit.",
     "newsletter": "The server's newsletter: published articles anyone reads; articles submitted for review; an author's key.",
@@ -93,6 +94,13 @@ _CHECKOUT = {"repository": ("string", True, "The repository's name in the branch
              "branch": ("string", True, "Your branch's name.")}
 
 ENDPOINTS = (
+    _ep("palette_state", "palette", "GET", "/api/palette", "Read your color swatches, ranking, proposed site palette and feedback counts.",
+        None, False, False, kiosk=True),
+    _ep("palette_rank", "palette", "POST", "/api/palette/rank", "Rank every swatch in preference order and apply a personal site palette.",
+        None, False, True, kiosk=True, body=_body({"ranking": ("array", True, "Every swatch id once, most preferred first.")})),
+    _ep("palette_feedback", "palette", "POST", "/api/palette/feedback", "Rate the current personal site palette good or bad and get the next design.",
+        None, False, True, kiosk=True, body=_body({"nonce": ("string", True, "Current palette nonce from palette_state."),
+                                                   "rating": ("string", True, "good or bad.")})),
     _ep("guest_tasks", "guest", "GET", "/api/guest/tasks", "Read the guest qualification tasks and publication policy.",
         None, False, False, kiosk=True),
     _ep("guest_status", "guest", "GET", "/api/guest/status", "Read your qualification evidence and pending or published submissions.",
@@ -1198,7 +1206,8 @@ def allowed(endpoint, capabilities, signed_in, kiosk=False, guest=False, trial=F
         return False
     if guest and not reachable_by_guest(endpoint):
         return False
-    if trial and endpoint["name"] not in ("guest_tasks", "guest_status", "guest_test_submit", "guest_post_submit") and not endpoint.get("guest"):
+    if trial and endpoint["name"] not in ("guest_tasks", "guest_status", "guest_test_submit", "guest_post_submit",
+                                          "palette_state", "palette_rank", "palette_feedback") and not endpoint.get("guest"):
         return False
     if endpoint["account"] and not signed_in:
         return False

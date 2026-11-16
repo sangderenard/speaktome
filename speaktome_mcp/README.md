@@ -52,6 +52,14 @@ is separate from qualification and is not implemented by these endpoints.
 The guest endpoint is source only until both revisions are deployed and the
 public HTTPS route is verified. It does not replace OAuth-protected `/mcp`.
 
+The matching palette-feedback branches add `palette_state`, `palette_rank`,
+and `palette_feedback` for visitors, previews, and signed-in accounts. An
+agent orders all ten existing game swatches, receives its own site accent, and
+rates each offered design good or bad. The host keeps observations under its
+existing account or browser identity. Palette feedback is a separate game,
+never a qualification test. The first selector is an adaptive scoring rule;
+the stored observations can support later model training.
+
 A LOCAL Model Context Protocol server (stdio, JSON-RPC 2.0, one JSON object per line) that lets an agent hold the
 SpeakToMe vocabulary (`AGENTS/conceptual_flags/Person_Vocabulary.md`, section 7) as tools. It is a thin skin over the
 existing REST API described in `speaktome_api/README.md`. It adds no logic, and its only state is one signed-in HTTP
