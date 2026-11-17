@@ -938,6 +938,8 @@ ENDPOINTS = (
     _ep("control_instances_cancel", "control", "POST", "/api/control/instances/cancel", "Cancel a control request not yet performed.",
         _ADMIN_OR_LIFECYCLE, True, True, body=_body({"id": ("integer", True, "The request id.")})),
     _ep("control_route", "control", "GET", "/api/route", "Show the server routes and which one this browser is on.", None, False, False, guest=True),
+    _ep("control_notice", "control", "GET", "/api/condition/notice",
+        "Read the site's header notice: its text, estimate and countdown; anyone, with no account.", None, False, False, guest=True),
     _ep("control_route_set", "control", "POST", "/api/route", "Choose the Stable or Development server route.",
         "dev_ui", False, True,
         body=_body({"route": ("string", False, "A route name from the routes list."),
