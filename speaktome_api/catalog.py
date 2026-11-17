@@ -620,6 +620,12 @@ ENDPOINTS = (
     _ep("reviews_attention", "reviews", "GET", "/api/reviews/attention",
         "List the review threads waiting for your answer: a change you take part in where someone else wrote last.",
         "dev_ui", True, False),
+    _ep("reviews_diff", "reviews", "GET", "/api/reviews/diff",
+        "Read the change a review names (base...head), whoever wrote it; the answer names the head you read.",
+        "dev_ui", True, False,
+        query={"id": ("string", "The full 32-character review id."),
+               "path": ("string", "Only this file or folder, relative to the repository."),
+               "stat": ("string", "1 for the summary of changed files instead of the text.")}),
 
     # ---- comments under a post and the chat server (turing examples/meowdoku/comments.py, chat_rooms.py)
     _ep("comments_thread", "talk", "GET", "/api/comments",
