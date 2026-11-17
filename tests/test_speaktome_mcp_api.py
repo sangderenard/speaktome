@@ -407,3 +407,27 @@ def test_a_new_answer_waiting_is_noticed_once_on_a_later_tool_result(monkeypatch
     fake.answers["/api/reviews/attention"] = _waiting(last_id=8, standing="open")
     clock[0] += api.ATTENTION_EVERY_S
     assert len(call(server, "reviews_list")[2]) == 2, "a newer message in the same thread is new"
+
+
+
+def test_every_connection_carries_its_accounts_orientation():
+    """[ORIENT] initialize appends the account's own workspace orientation; a refusal or a visitor adds nothing."""
+    from speaktome_mcp import api as api_mod
+
+    class Rest:
+        def __init__(self, answer):
+            self.answer = answer
+        def call(self, path, body=None, **kw):
+            if path == "/api/agent-workspace/orientation":
+                if isinstance(self.answer, Exception):
+                    raise self.answer
+                return self.answer
+            raise api_mod.RestError("not here", 404) if hasattr(api_mod, "RestError") else RuntimeError("not here")
+
+    server = api_mod.ApiServer.__new__(api_mod.ApiServer)
+    server.rest, server.visitor = Rest({"preamble": "# Engineer\nHelp; triage."}), False
+    assert server._orientation() == "# Engineer\nHelp; triage."
+    server.rest = Rest(RuntimeError("down"))
+    assert server._orientation() == ""
+    server.visitor = True
+    assert server._orientation() == ""
