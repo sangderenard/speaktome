@@ -73,7 +73,7 @@ def test_tool_rules():
     no_prefix = ("/api/account/login", "/api/account/logout", "/api/account/signup",
                  "/api/account/preview", "/api/account/recover", "/api/account/keep", "/api/admin/", "/api/lifecycle",
                  "/api/account/admin/", "/api/spectate", "/api/share", "/api/clientlog", "/api/ready",
-                 "/api/loading_", "/api/client_rays/")
+                 "/api/loading_", "/api/client_rays/", "/api/link/ticket/")
     no_exact = ("/api/state", "/api/action", "/api/action/batch", "/api/new", "/api/catalog", "/api/profile",
                 "/api/invitations/redeem")                     # a sign-up with a password, as /api/account/signup
     for e in ENDPOINTS:
@@ -244,10 +244,12 @@ def test_guest_reachable_entries_and_credentials():
     assert {"play_state", "play_action", "play_new", "identity_signup", "control_route", "control_lifecycle", "play_radio"} <= guest
     assert not any(e["guest"] and e["kiosk"] for e in ENDPOINTS), "kiosk entries are reachable by guests already"
     assert {e["name"]: e["credential"] for e in ENDPOINTS if e["credential"]} == {
-        "identity_operator_grant": "admin_token", "control_lifecycle_admin": "admin_token", "play_client_rays_engine": "engine_secret"}
+        "identity_operator_grant": "admin_token", "control_lifecycle_admin": "admin_token", "play_client_rays_engine": "engine_secret",
+        "link_ticket": "peer_grant"}
     found = catalog.guest_endpoint
     assert found("POST", "/api/action")["name"] == "play_action"
     assert found("POST", "/api/admin/lifecycle")["name"] == "control_lifecycle_admin"
+    assert found("POST", "/api/link/ticket/lab")["name"] == "link_ticket"
     assert found("GET", "/api/whoami")["name"] == "identity_whoami"                     # kiosk entries too
     for method, path in (("POST", "/api/reports"), ("POST", "/api/tickets"), ("POST", "/api/obj_assets"), ("GET", "/api/log"),
                          ("POST", "/api/relay/send"), ("GET", "/api/user-files")):

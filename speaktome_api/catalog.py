@@ -52,6 +52,7 @@ GROUPS = {
     "connections": "Secured connections to outside services (Suno) that their owner shares with operator and admin accounts.",
     "orientation": "Agent orientation: every markdown file of the core in one causal order, with your filters and place.",
     "relay": "Datagrams and packages, address to address, in and out, for any signed-in account.",
+    "link": "Nodus links: a peer grant is exchanged for the two tickets of one four-FIFO link between Nodus instances.",
     "fortune": "fortune(): an I Ching style reading of a question; a repeated question waits, a new one is always read.",
     "mail": "Your mailbox at <username>@stichka.duckdns.org: the inbox, reading, sending and removing mail.",
     "files": "The flat index of every file in the core, kept by the cleanup account.",
@@ -906,6 +907,12 @@ ENDPOINTS = (
         query={"offset": ("integer", "Page offset; the page holding your place when omitted.")}),
 
     # ---- relay (turing examples/meowdoku/relay.py)
+    _ep("link_ticket", "link", "POST", "/api/link/ticket/{prefix}",
+        "Exchange a peer grant for the control and bulk tickets of one new Nodus link (HTTPS; the grant is the credential).",
+        "view_site", False, True, path_params={"prefix": ("string", "The canvas prefix the grant names.")},
+        body=_body({"grant_id": ("integer", True, "The peer grant's id."), "secret": ("string", True, "The grant's secret."),
+                    "direction": ("string", True, "host or engine, as the grant names it.")}),
+        tool=False, credential="peer_grant"),
     _ep("relay_addresses", "relay", "GET", "/api/relay/addresses", "List the relay addresses you hold open.", None, True, False),
     _ep("relay_open", "relay", "POST", "/api/relay/open",
         "Open an address: a UDP port of the service that anyone may send to and you may send from.",
