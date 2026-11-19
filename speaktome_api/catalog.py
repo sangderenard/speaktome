@@ -64,6 +64,8 @@ GROUPS = {
     "workspace": "Operator and admin documents: orientation, prompts, personality branches, guidance, trouble trees and scenarios.",
     "agent_execution": "Commands and Python jobs for server-owned agents in the separate execution group.",
     "scratch": "Your private scratch text files; permanent accounts retain them, temporary previews use a small cookie filesystem.",
+    "memory": "Durable memory files by transferable id: list, read, write or delete your own; operators may transfer one.",
+    "agent_runs": "Llama profile runs on the shared hosted model process: queue one, list recent runs, read a response.",
 }
 
 
