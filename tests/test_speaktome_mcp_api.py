@@ -76,6 +76,8 @@ def test_research_document_is_available_and_routes_explicit_text_copy():
     tools = {tool["name"]: tool for tool in rpc(server, "tools/list")["tools"]}
     assert "research_case" in tools and "research_document" in tools
     assert tools["research_document"]["inputSchema"]["properties"]["source_ref"]["type"] == ["string", "null"]
+    # An explicit field schema keeps the catalog's description, the agent's only guidance for the field.
+    assert tools["research_document"]["inputSchema"]["properties"]["source_ref"]["description"].startswith("Null for text")
     result, is_error, _ = call(server, "research_document", id="ab" * 16,
                                title="Draft", body="Shared text", source_kind="text", source_ref=None)
     assert not is_error and result["data"] == {"ok": True}
@@ -288,7 +290,7 @@ def test_a_kiosk_account_is_offered_only_the_kiosk_tools_and_reading_verbs():
                      "foyer_status", "foyer_command", "foyer_receipt", "chat_rooms", "chat_room", "chat_post", "chat_react",
                      "comments_thread", "comments_post", "guest_tasks", "guest_status", "guest_test_submit", "guest_post_submit",
                      "palette_state", "palette_rank", "palette_feedback",
-                     "hosted_last_word"}
+                     "hosted_last_word", "hosted_controls"}
     for fake in (Fake(intern, kiosk=True), Fake(intern, kiosk=True, index=False)):
         server = api.ApiServer(fake)
         assert names(server) == set(verbs.KIOSK_VERBS) | {"api_index"} | kiosk

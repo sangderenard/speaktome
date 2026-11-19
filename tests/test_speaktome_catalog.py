@@ -207,7 +207,7 @@ def test_kiosk_entries_and_their_paths():
                      "palette_state", "palette_rank", "palette_feedback",
                      "messages_conversations", "messages_contacts", "messages_contacts_update", "messages_images_status",
                      "messages_images_set", "messages_image", "messages_thread", "messages_since", "messages_inbox",
-                     "messages_send", "messages_ack", "messages_read", "hosted_last_word"}
+                     "messages_send", "messages_ack", "messages_read", "hosted_last_word", "hosted_controls"}
     # only the session boundary, a queued foyer picture and a message in a room the role may enter (the owner, 2026-11-14:
     # every agent, guest agents and up, has a chat room) change anything
     assert {e["name"] for e in ENDPOINTS if e["kiosk"] and e["changes"]} == {"identity_login", "identity_logout", "foyer_command",

@@ -326,6 +326,14 @@ ENDPOINTS = (
         "view_site", False, False, kiosk=True, path_params={"request_id": ("string", "Your request id.")}),
 
     # ---- hosted agent mode controls
+    _ep("hosted_controls", "talk", "GET", "/api/hosted-agents/{username}/controls",
+        "Read whether a hosted agent is enabled and its current conversation goal. The agent itself or an operator may read it.",
+        None, True, False, kiosk=True, path_params={"username": ("string", "The hosted agent account.")}),
+    _ep("hosted_controls_set", "talk", "POST", "/api/hosted-agents/{username}/controls",
+        "As an operator or admin, enable or pause a hosted agent and set its current conversation goal.",
+        None, True, True, path_params={"username": ("string", "The hosted agent account.")},
+        body=_body({"enabled": ("boolean", True, "Whether the runner should respond and consume queued work."),
+                    "goal": ("string", True, "Current conversation goal, at most 4000 characters; blank clears it.")})),
     _ep("hosted_last_word", "talk", "GET", "/api/hosted-agents/{username}/last-word",
         "Read the last-word mode for a hosted agent in the server, a room or a direct conversation.",
         None, True, False, kiosk=True, path_params={"username": ("string", "The hosted agent account.")},
@@ -1179,7 +1187,9 @@ ENDPOINTS = (
                                     "source_kind": ("string", True, "text, page or file_copy.")}),
                          "source_ref": {"type": "string", "required": True,
                                         "description": "Null for text; an owned 32-character page or encrypted-file ID otherwise.",
-                                        "schema": {"type": ["string", "null"]}}}, "open": False}),
+                                        "schema": {"type": ["string", "null"],
+                                                   "description": "Null for text; an owned 32-character page or "
+                                                                  "encrypted-file ID otherwise."}}}, "open": False}),
     _ep("research_invariants", "research", "POST", "/api/research/cases/{id}/invariants",
         "Replace the shared invariant list at the case revision you read.", "view_site", True, True,
         path_params=_ID32, headers={"X-Meowdoku-Research": "1"},
