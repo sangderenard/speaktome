@@ -1212,8 +1212,15 @@ ENDPOINTS = (
     _ep("research_brief", "research", "POST", "/api/research/cases/{id}/brief",
         "Set the ordered design-brief tabs from contributed documents.", "view_site", True, True,
         path_params=_ID32, headers={"X-Meowdoku-Research": "1"},
-        body=_body({"user_ids": ("array", True, "Up to 20 contributor account IDs with documents."),
-                    "revision": ("integer", True, "The case revision you read.")})),
+        # The REST validator (ticket_research.brief) accepts only JSON integers >= 1; an untyped array let
+        # clients send ["4"] and get "invalid brief tabs" (ticket 9b3f8ae3, case c0ee3969).
+        body={"fields": {"user_ids": {"type": "array", "required": True,
+                                      "description": "Up to 20 contributor account IDs (integers) with documents.",
+                                      "schema": {"type": "array", "maxItems": 20,
+                                                 "items": {"type": "integer", "minimum": 1},
+                                                 "description": "Up to 20 contributor account IDs (integers) "
+                                                                "with documents."}},
+                         **_fields({"revision": ("integer", True, "The case revision you read.")})}, "open": False}),
     _ep("research_promote", "research", "POST", "/api/research/cases/{id}/promote",
         "As case author or admin, promote a Research case with invariants and brief to Development.",
         "view_site", True, True, path_params=_ID32, headers={"X-Meowdoku-Research": "1"},

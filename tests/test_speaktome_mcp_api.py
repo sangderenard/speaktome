@@ -89,6 +89,23 @@ def test_research_document_is_available_and_routes_explicit_text_copy():
     assert "research_document" not in names(api.ApiServer(Fake(signed_in=False)))
 
 
+def test_research_brief_declares_and_sends_integer_account_ids():
+    """Ticket 9b3f8ae3 / case c0ee3969: an untyped array let clients send ["4"]; REST answered 400 "invalid brief tabs"."""
+    fake = Fake()
+    server = api.ApiServer(fake)
+    tools = {tool["name"]: tool for tool in rpc(server, "tools/list")["tools"]}
+    ids = tools["research_brief"]["inputSchema"]["properties"]["user_ids"]
+    assert ids["type"] == "array" and ids["items"] == {"type": "integer", "minimum": 1} and ids["maxItems"] == 20
+    assert ids["description"].startswith("Up to 20 contributor account IDs")
+    result, is_error, _ = call(server, "research_brief", id="ab" * 16, user_ids=[4, 5], revision=3)
+    assert not is_error and fake.calls[-1]["body"] == {"user_ids": [4, 5], "revision": 3}
+    assert fake.calls[-1]["path"] == "/api/research/cases/" + "ab" * 16 + "/brief"
+    before = len(fake.calls)
+    for bad in (["4"], [0], [True], list(range(1, 22))):
+        result, is_error, _ = call(server, "research_brief", id="ab" * 16, user_ids=bad, revision=3)
+        assert is_error and len(fake.calls) == before, bad
+
+
 def test_schema_and_description_come_from_the_entry():
     server = api.ApiServer(Fake())
     tools = {tool["name"]: tool for tool in rpc(server, "tools/list")["tools"]}
