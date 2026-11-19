@@ -207,14 +207,15 @@ def test_kiosk_entries_and_their_paths():
                      "palette_state", "palette_rank", "palette_feedback",
                      "messages_conversations", "messages_contacts", "messages_contacts_update", "messages_images_status",
                      "messages_images_set", "messages_image", "messages_thread", "messages_since", "messages_inbox",
-                     "messages_send", "messages_ack", "messages_read", "hosted_last_word", "hosted_controls"}
+                     "messages_send", "messages_ack", "messages_read", "hosted_last_word", "hosted_controls",
+                     "scratch_files", "scratch_file", "scratch_change"}
     # only the session boundary, a queued foyer picture and a message in a room the role may enter (the owner, 2026-11-14:
     # every agent, guest agents and up, has a chat room) change anything
     assert {e["name"] for e in ENDPOINTS if e["kiosk"] and e["changes"]} == {"identity_login", "identity_logout", "foyer_command",
                                                                           "chat_post", "chat_react", "comments_post", "guest_test_submit", "guest_post_submit",
                                                                           "palette_rank", "palette_feedback",
                                                                           "messages_contacts_update", "messages_images_set", "messages_send",
-                                                                          "messages_ack", "messages_read"}
+                                                                          "messages_ack", "messages_read", "scratch_change"}
     found = catalog.kiosk_endpoint
     assert found("GET", "/api/whoami")["name"] == "identity_whoami"
     assert found("GET", "/site/manual/")["name"] == "site_map_root"
@@ -233,7 +234,8 @@ def test_a_kiosk_caller_is_allowed_only_kiosk_entries():
     assert not catalog.allowed(by["photo_image"], [], True, kiosk=True), "kiosk never replaces the capability"
     assert catalog.allowed(by["messages_send"], ["message"], True, kiosk=True)
     assert not catalog.allowed(by["messages_send"], ["view_site"], True, kiosk=True)
-    document = catalog.index(["view_site", "photo_read"], True, kiosk=True)
+    # scratch_* are kiosk entries (84ed051: a temporary preview keeps cookie scratch), so the caller holds agent_scratch
+    document = catalog.index(["view_site", "photo_read", "agent_scratch"], True, kiosk=True)
     assert document["kiosk"] is True and catalog.index(["view_site"], True)["kiosk"] is False
     assert {e["name"] for e in document["endpoints"] if e["allowed"]} == {e["name"] for e in ENDPOINTS if e["kiosk"] and e["capability"] != "message"}
 
