@@ -239,6 +239,27 @@ def test_a_kiosk_caller_is_allowed_only_kiosk_entries():
 
 
 
+def test_trial_accounts_can_explore_only_selected_read_views():
+    by = catalog.by_name()
+    assert all(by[name]["method"] == "GET" and not by[name]["changes"]
+               for name in catalog.TRIAL_READ_ENDPOINTS)
+    for name in catalog.TRIAL_READ_ENDPOINTS:
+        assert catalog.allowed(by[name], ["view_site"], True, trial=True)
+        if by[name]["capability"]:
+            assert not catalog.allowed(by[name], [], True, trial=True)
+        if by[name]["account"]:
+            assert not catalog.allowed(by[name], ["view_site"], False, trial=True)
+    for name in ("reports_issue_create", "reports_issue_status", "research_create",
+                 "research_document", "comments_post", "chat_post"):
+        assert not catalog.allowed(by[name], ["view_site", "message"], True, trial=True)
+    assert catalog.allowed(by["reports_issue_create"], ["view_site"], True)
+    assert not catalog.allowed(by["reports_issue_get"], ["view_site"], True, kiosk=True)
+    document = catalog.index(["view_site"], True, trial=True)
+    allowed = {row["name"] for row in document["endpoints"] if row["allowed"]}
+    assert catalog.TRIAL_READ_ENDPOINTS <= allowed
+    assert "reports_issue_create" not in allowed
+
+
 def test_guest_reachable_entries_and_credentials():
     guest = {e["name"] for e in ENDPOINTS if e["guest"]}
     assert {"play_state", "play_action", "play_new", "identity_signup", "control_route", "control_lifecycle", "play_radio"} <= guest

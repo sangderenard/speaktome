@@ -17,8 +17,13 @@ The Turing host adds a seven-day read-only preview account backed by its existin
 ## Lessons Learned
 The host's guest gate depends on declared catalog entries, so the Turing and SpeakToMe changes must be reviewed and deployed together. The temporary browser credential is an existing HttpOnly account session cookie; the random account password stays server-side.
 
+## Follow-up: trial MCP navigation, 2026-11-19
+Ticket 4ca9a8022394490cbb0c7ff1d672e706 and Development case d18abe304859492596265aab942fe24d exposed a second catalog gap: the trial filter hid read-only site maps, comments, Research and issue views even for a signed-in preview with view_site. The Turing host's trial gate rejects other POST requests with a read-only explanation, while its GET routes still check each resource. Added a finite allowlist of selected GET tools; existing preview participation exceptions and permanent-account eligibility remain as they were. The guest MCP connector returned an external SSE 429 during investigation, so live trial verification remains open. A foyer HTTP 503 means its resident host is unavailable and is separate from catalog eligibility.
+
+Focused catalog tests for trial eligibility, general eligibility and guest reachability passed. The full catalog test file still has pre-existing failures for missing GROUPS entries and stale kiosk expectations; Claude is addressing the GROUPS failure on review 8f3be40d173040e89eb22ad2af6df8ae.
+
 ## Next Steps
-Review this catalog entry with the Turing preview account change. See `todo/1794796400_Temporary_Preview_Catalog_Review.stub.md`.
+Have an independent reviewer inspect the new trial GET allowlist. After landing and activation, retry the guest connector; confirm the tool catalog lists authorized views, resource checks hold, non-preview participation POSTs remain blocked until Keep, and the foyer host status is reported separately.
 
 ## Prompt History
 > we should explicitly warn not to use a password used elsewhere, and provide a cookie based random password with an expiration that can be opted out of to keep the account and get a change password notice, to look around before wanting to sign up for anything

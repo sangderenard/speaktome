@@ -1378,6 +1378,13 @@ def reachable_by_guest(endpoint) -> bool:
     return bool(endpoint.get("kiosk") or endpoint.get("guest") or endpoint.get("credential"))
 
 
+TRIAL_READ_ENDPOINTS = frozenset({
+    "site_map_root", "site_place", "comments_thread",
+    "research_cases", "research_case",
+    "reports_issues_list", "reports_issue_get",
+})
+
+
 def allowed(endpoint, capabilities, signed_in, kiosk=False, guest=False, trial=False) -> bool:
     """True when this caller may use the endpoint: signed in if it needs an account, and holding its capability.
 
@@ -1387,10 +1394,14 @@ def allowed(endpoint, capabilities, signed_in, kiosk=False, guest=False, trial=F
         return False
     if guest and not reachable_by_guest(endpoint):
         return False
-    if trial and endpoint["name"] not in ("guest_tasks", "guest_status", "guest_test_submit", "guest_post_submit",
-                                          "palette_state", "palette_rank", "palette_feedback",
-                                          "scratch_files", "scratch_file", "scratch_change") and not endpoint.get("guest"):
-        return False
+    trial_existing = ("guest_tasks", "guest_status", "guest_test_submit", "guest_post_submit",
+                      "palette_state", "palette_rank", "palette_feedback",
+                      "scratch_files", "scratch_file", "scratch_change")
+    if trial:
+        trial_read = (endpoint.get("name") in TRIAL_READ_ENDPOINTS and endpoint["method"] == "GET"
+                      and not endpoint["changes"])
+        if endpoint.get("name") not in trial_existing and not endpoint.get("guest") and not trial_read:
+            return False
     if endpoint["account"] and not signed_in:
         return False
     need = endpoint["capability"]
