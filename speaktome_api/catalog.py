@@ -1338,6 +1338,17 @@ ENDPOINTS = (
         None, False, False, tool=False, guest=True),
     _ep("play_radio", "play", "GET", "/api/radio", "Show the Nodus Radio snapshot the site navigation displays.",
         "view_site", False, False, guest=True),
+    _ep("play_radio_jukebox", "play", "GET", "/api/radio/jukebox",
+        "Read the shared Nodus Radio jukebox catalogue and request status.",
+        None, True, False),
+    _ep("play_radio_uploads", "play", "GET", "/api/radio/uploads",
+        "List your direct FLAC originals admitted to the Radio jukebox.",
+        None, True, False),
+    _ep("play_radio_upload_flac", "play", "POST", "/api/radio/uploads",
+        "Upload a FLAC original from the browser to the shared jukebox; binary body, Radio action header and title query required.",
+        None, True, True, request="binary",
+        headers={"Content-Type": "audio/flac", "X-Meowdoku-Radio": "1"},
+        query={"title": ("string", "Track title, 1 to 200 characters.")}),
     # The opt-in HLS stream behind the same view_site gate (turing server.py /api/radio/hls/, nodus_radio_hls.read checks the
     # file name). Declared guest-reachable like /api/radio: without this entry the visitor gate answers 401 before the handler.
     _ep("play_radio_hls", "play", "GET", "/api/radio/hls/{file}", "Read one file of the opt-in Nodus Radio HLS stream.",
