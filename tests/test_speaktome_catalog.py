@@ -280,3 +280,15 @@ def test_guest_reachable_entries_and_credentials():
     document = catalog.index(["view_site", "photo_read", "play"], False, guest=True)
     assert document["guest"] is True
     assert {e["name"] for e in document["endpoints"] if e["allowed"]} <= {e["name"] for e in ENDPOINTS if catalog.reachable_by_guest(e)}
+
+
+def test_outbound_presence_matches_the_authenticated_server_route():
+    entry = catalog.endpoint_for("POST", "/api/worldmap/presence/outbound")
+    assert entry["name"] == "living_data_worldmap_outbound"
+    assert entry["capability"] == "dev_ui" and entry["account"] and entry["changes"]
+    assert entry["headers"] == {"X-Meowdoku-Activity": "1"}
+    assert entry["body"]["fields"]["channel"]["required"]
+    assert catalog.allowed(entry, ["dev_ui"], True)
+    assert not catalog.allowed(entry, [], True)
+    assert not catalog.allowed(entry, ["dev_ui"], False)
+    assert not catalog.allowed(entry, ["dev_ui"], True, trial=True)

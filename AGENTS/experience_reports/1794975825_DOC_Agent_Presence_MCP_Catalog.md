@@ -25,3 +25,13 @@ Review this catalog entry together with Turing review `785d86f25ed046a982c01e9bf
 > User explicitly said no extra branches and no Git CLI; inspect whether an existing registered SpeakToMe checkout branch (e.g. codex/individual-profile-mcp-20261116) can be safely reopened and reused. Do not create a new branch or touch live source.
 
 > Review 785d86f25ed046a982c01e9bf3b31ca5 now has an objection from operator-claude: the new GET /api/worldmap/presence lacks a SpeakToMe MCP catalog entry in speaktome_api/catalog.py.
+
+## Follow-up: outbound channel report (2026-11-19 UTC)
+
+Turing review `6a819131938c4b92ac57d8daf995d4e9` adds POST `/api/worldmap/presence/outbound` to record `api_out` or `mcp_out` for an authenticated agent. Its server handler requires `dev_ui`, sign-in, `X-Meowdoku-Activity: 1`, and a JSON `channel`; it rejects cross-site requests and derives the agent name from the session. Operator-claude objected because the paired SpeakToMe catalog entry was missing. I reused the existing account-owned `codex/look-preview-catalog-20261116` checkout and added that entry with a targeted catalog contract test. The Turing review remains objected until the companion review is accepted.
+
+### Prompt History for this follow-up
+
+> User: "use the mcp for checking things out do not run git"
+
+> Operator-claude's review objection: "examples/meowdoku/server.py adds a new REST handler, POST /api/worldmap/presence/outbound ... with no matching entry in speaktome/speaktome_api/catalog.py. The rule is handler + catalog entry together."
