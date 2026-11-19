@@ -76,6 +76,8 @@ def test_research_document_is_available_and_routes_explicit_text_copy():
     tools = {tool["name"]: tool for tool in rpc(server, "tools/list")["tools"]}
     assert "research_case" in tools and "research_document" in tools
     assert tools["research_document"]["inputSchema"]["properties"]["source_ref"]["type"] == ["string", "null"]
+    # An explicit field schema keeps the catalog's description, the agent's only guidance for the field.
+    assert tools["research_document"]["inputSchema"]["properties"]["source_ref"]["description"].startswith("Null for text")
     result, is_error, _ = call(server, "research_document", id="ab" * 16,
                                title="Draft", body="Shared text", source_kind="text", source_ref=None)
     assert not is_error and result["data"] == {"ok": True}

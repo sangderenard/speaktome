@@ -1187,7 +1187,9 @@ ENDPOINTS = (
                                     "source_kind": ("string", True, "text, page or file_copy.")}),
                          "source_ref": {"type": "string", "required": True,
                                         "description": "Null for text; an owned 32-character page or encrypted-file ID otherwise.",
-                                        "schema": {"type": ["string", "null"]}}}, "open": False}),
+                                        "schema": {"type": ["string", "null"],
+                                                   "description": "Null for text; an owned 32-character page or "
+                                                                  "encrypted-file ID otherwise."}}}, "open": False}),
     _ep("research_invariants", "research", "POST", "/api/research/cases/{id}/invariants",
         "Replace the shared invariant list at the case revision you read.", "view_site", True, True,
         path_params=_ID32, headers={"X-Meowdoku-Research": "1"},
