@@ -10,6 +10,7 @@ becomes a tool by being declared there.
 When the service does not serve ``/api/index`` yet, the catalog packaged beside this module is used with the
 capabilities ``/api/whoami`` reports; when the service cannot be reached at all, the packaged catalog is offered whole
 and the server refuses what the account may not do. ``api_index`` says which of the three happened.
+A later ``tools/list`` or ``api_index`` retries a fallback and adopts the service index after recovery.
 
 This module adds no permission and holds no credential. A generated tool sends exactly the declared path, query,
 body fields and fixed headers; it cannot name another host, another path or a header of its own.
@@ -212,6 +213,7 @@ class ApiServer(Server):
         self.document = None
         self.source = None
         self.annotations = {}
+        self._verbs = dict(self.table)             # restore the original verb set when a recovered index changes account scope
         self.visitor = False                       # set by build(): the index answered a caller with no account
         self.attention_checked = time.monotonic()   # asked at initialize, then once a minute at most
         self.attention_seen = set()                # (review id, last message id) already put in front of the agent
@@ -243,10 +245,18 @@ class ApiServer(Server):
     def _seen(self, waiting) -> set:
         return {(str(w.get("id")), str((w.get("last") or {}).get("id"))) for w in waiting if isinstance(w, dict)}
 
-    def build(self) -> None:
+    def build(self, refresh: bool = False) -> None:
         if self.document is not None:
-            return
-        self.document, self.source = load(self.rest)
+            if not refresh or self.source == "the service index":
+                return
+            document, source = load(self.rest)
+            if document == self.document and source == self.source:
+                return
+        else:
+            document, source = load(self.rest)
+        self.document, self.source = document, source
+        self.table = dict(self._verbs)
+        self.annotations = {}
         self.visitor = self.document.get("guest") is True
         if self.document.get("kiosk") is True or self.visitor or self.document.get("trial") is True:
             # Preview identities have no password and may write only into the
@@ -270,6 +280,7 @@ class ApiServer(Server):
         return lambda arguments: perform(self.rest, endpoint, arguments)
 
     def api_index(self, arguments: dict) -> dict:
+        self.build(refresh=True)
         groups = self.document.get("groups", {})
         wanted = arguments.get("group")
         if wanted is not None and wanted not in groups:
@@ -298,7 +309,7 @@ class ApiServer(Server):
                 "say": f"{total} endpoints, {tools} of them tools for this account; read from {self.source}."}
 
     def _list(self):
-        self.build()
+        self.build(refresh=True)
         listed = super()._list()
         for tool in listed["tools"]:
             if tool["name"] in self.annotations:
