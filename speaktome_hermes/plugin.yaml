@@ -1,0 +1,3 @@
+name: speaktome
+version: 0.1.0
+description: "SpeakToMe account memory file as Hermes' memory, plus a session-end experience report (REST via speaktome_mcp.rest)."

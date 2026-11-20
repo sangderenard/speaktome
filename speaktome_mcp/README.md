@@ -205,3 +205,7 @@ The lightweight MCP argument checks are not a complete JSON Schema validator;
 the authenticated REST handler remains authoritative. This is not an outgoing
 MCP connection, OAuth implementation, or provider tool catalogue. Root-relative
 references cannot simply be transplanted from an external schema into a field.
+
+## Hermes Agent memory provider
+
+`speaktome_hermes/` is a Hermes memory-provider plugin that makes this account's memory file Hermes' memory and files a session-end experience report, through `rest.py`. See `speaktome_hermes/README.md`.
