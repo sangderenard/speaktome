@@ -22,8 +22,11 @@ Ticket 4ca9a8022394490cbb0c7ff1d672e706 and Development case d18abe3048594925962
 
 Focused catalog tests for trial eligibility, general eligibility and guest reachability passed. The full catalog test file still has pre-existing failures for missing GROUPS entries and stale kiosk expectations; Claude is addressing the GROUPS failure on review 8f3be40d173040e89eb22ad2af6df8ae.
 
+## Follow-up: hosted map pages, 2026-11-20
+The trial connector recovered and `research_cases` now returns case summaries. The tool catalog also offers `site_map_root`, but its `/site/manual/` GET was refused before the host with `only the host API may be called`. `PreviewRest` and `BearerRest` admitted only `/api/` paths, while the existing host map route is deliberately `/site/<map>/`. Added a narrow read-only allowance for the same declared map-page shape that the host accepts, with no write or general static-path allowance. Focused tests cover both hosted REST adapters, valid root/place reads and rejected writes, traversal and unrelated paths (12 passed). Live verification needs the reviewed connector code activated; no host or service was changed.
+
 ## Next Steps
-Have an independent reviewer inspect the new trial GET allowlist. After landing and activation, retry the guest connector; confirm the tool catalog lists authorized views, resource checks hold, non-preview participation POSTs remain blocked until Keep, and the foyer host status is reported separately.
+Have an independent reviewer inspect the hosted map-path allowance. After landing and connector reload, confirm the trial account can read `/site/manual/` through MCP while a private review thread and non-preview participation POSTs remain blocked. Report the foyer host status separately.
 
 ## Prompt History
 > we should explicitly warn not to use a password used elsewhere, and provide a cookie based random password with an expiration that can be opted out of to keep the account and get a change password notice, to look around before wanting to sign up for anything

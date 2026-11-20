@@ -6,12 +6,23 @@ tier, so a loopback hop cannot turn a remote caller into a LAN operator.
 """
 from __future__ import annotations
 
+import re
 import ssl
 from http.cookiejar import CookieJar
 import urllib.parse
 import urllib.request
 
 from .rest import Rest, RestError, _NoRedirect
+
+
+_SITE_PAGE = re.compile(r"/site/[a-z0-9][a-z0-9-]{0,31}/(?:[A-Za-z0-9._-]{1,128}\.html)?\Z")
+
+
+def _host_path_allowed(path, body, method):
+    # The host's declared map pages are read-only MCP tools outside /api/.
+    return path.startswith("/api/") or (
+        body is None and method in (None, "GET") and _SITE_PAGE.fullmatch(path) is not None
+    )
 
 
 class BearerRest(Rest):
@@ -35,7 +46,7 @@ class BearerRest(Rest):
         return message.replace(self.token, "[credential]")
 
     def _http(self, path, body=None, timeout=40, secret=None, raw_limit=None, method=None, headers=None):
-        if not path.startswith("/api/"):
+        if not _host_path_allowed(path, body, method):
             raise RestError("only the host API may be called", 400)
         sent = dict(headers or {})
         sent.update({"Authorization": "Bearer " + self.token,
@@ -48,7 +59,7 @@ class PreviewRest(BearerRest):
     """A server-created seven-day preview; its token never reaches an MCP client."""
 
     def _http(self, path, body=None, timeout=40, secret=None, raw_limit=None, method=None, headers=None):
-        if not path.startswith("/api/"):
+        if not _host_path_allowed(path, body, method):
             raise RestError("only the host API may be called", 400)
         sent = dict(headers or {})
         sent.update({"Authorization": "Preview " + self.token,
