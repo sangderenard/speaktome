@@ -7,8 +7,9 @@ Operators and admins see `workspace_index`, `workspace_children`,
 Start with the index; read document bodies only as a task needs deeper context.
 Scenarios list document IDs in broad-to-specific order. Each permanent account
 also has private `scratch_files`, `scratch_file`, and `scratch_change` tools.
-Temporary preview accounts get the same scratch verbs backed by a small cookie
-that this MCP session retains; they do not receive durable server scratch.
+Temporary preview accounts get the same account-owned scratch verbs. Their files
+remain with the account when the preview is kept as a member. Older scratch
+cookies are imported on the next scratch request and cleared by the host.
 The matching host contract and limits are in Turing's
 `examples/meowdoku/AGENT_WORKSPACE.md`.
 

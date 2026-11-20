@@ -1,0 +1,7 @@
+# Guest tunnel SSE 429
+
+The 2026-11-19 guest plugin probe returned HTTP 429 at the OpenAI internal tunnel URL before a tool call. Stable Apache recorded no `/mcp` request during the probe window, while separate SpeakToMe queue reads returned 200. Inspect tunnel gateway diagnostics for the failed timestamp, then retry the guest plugin and verify the preview account's read-only issue and case catalog. See `AGENTS/experience_reports/1795128357_LOG_Guest_Tunnel_SSE_429.md`.
+
+Later the tunnel passed guest calls. A separate host bug made `research_cases` return 401 for the signed-in trial: its internal preview session token was authenticated but not passed to the Research service. The source repair and focused HTTP/MCP test are in Turing's main worktree with hazard `20261119T233701Z_main.md`. Review and activate that repair through the existing deployment process, then verify `research_cases` and `reports_issues_list` through the guest connector. `where` and legacy tickets require `dev_ui` and remain unavailable to trial.
+
+Owner follow-up extended the repair: token identity takes precedence over cookie identity after both are checked, and Look scratch files move into the existing account-owned store. On activation, verify a legacy scratch cookie imports before Keep, that a failed import blocks Keep, and that the same files remain after membership. Verify the browser Keep flow and both OAuth and guest MCP queue reads on the running service.

@@ -63,7 +63,7 @@ GROUPS = {
     "foyer": "The one shared demo world anyone may walk and photograph; nothing in it is yours.",
     "workspace": "Operator and admin documents: orientation, prompts, personality branches, guidance, trouble trees and scenarios.",
     "agent_execution": "Commands and Python jobs for server-owned agents in the separate execution group.",
-    "scratch": "Your private scratch text files; permanent accounts retain them, temporary previews use a small cookie filesystem.",
+    "scratch": "Your private account-owned scratch text files; a kept preview retains its files.",
     "memory": "Durable memory files by transferable id: list, read, write or delete your own; operators may transfer one.",
     "agent_runs": "Llama profile runs on the shared hosted model process: queue one, list recent runs, read a response.",
 }
@@ -192,7 +192,7 @@ ENDPOINTS = (
         "operator_workspace", True, False, query={"profile": ("string", "Profile id."),
                                                 "job": ("string", "Optional stable job key.")}),
     _ep("scratch_files", "scratch", "GET", "/api/scratch",
-        "List your scratch files and quota; temporary previews read their cookie filesystem.",
+        "List your account-owned scratch files and quota; legacy preview cookies are imported.",
         "agent_scratch", True, False, kiosk=True),
     _ep("memory_files", "memory", "GET", "/api/memory",
         "List your durable memory files by transferable id and title.", "agent_scratch", True, False),
