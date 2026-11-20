@@ -199,6 +199,37 @@ def test_without_the_service_index_the_packaged_catalog_is_used():
     assert is_error
 
 
+def test_packaged_fallback_refreshes_when_service_recovers():
+    class Recovering(Fake):
+        def call(self, path, body=None, timeout=40, raw_limit=None, *, method=None, headers=None):
+            answer = super().call(path, body, timeout, raw_limit, method=method, headers=headers)
+            if path == api.INDEX:
+                extra = next(e for e in answer["endpoints"] if e["name"] == "messages_inbox").copy()
+                extra.update(name="future_read", path="/api/future/read", summary="New service route")
+                answer["endpoints"].append(extra)
+            return answer
+
+    fake = Recovering(reachable=False)
+    server = api.ApiServer(fake)
+    assert "future_read" not in names(server)
+    assert "unchecked" in call(server, "api_index")[0]["source"]
+    fake.reachable = True
+    assert "future_read" in names(server)
+    assert call(server, "api_index")[0]["source"] == "the service index"
+    result, is_error, _ = call(server, "future_read")
+    assert not is_error and result["endpoint"] == "future_read"
+    assert fake.calls[-1]["path"] == "/api/future/read"
+
+
+def test_recovered_index_narrows_a_previous_unchecked_tool_list():
+    fake = Fake(reachable=False, capabilities=AGENT)
+    server = api.ApiServer(fake)
+    assert "control_instances_request" in names(server)
+    fake.reachable = True
+    assert "control_instances_request" not in names(server)
+    assert call(server, "api_index")[0]["source"] == "the service index"
+
+
 def test_initialize_names_the_api_server_and_a_verb_still_works():
     server = api.ApiServer(Fake())
     hello = rpc(server, "initialize", {"protocolVersion": "2025-06-18"})
