@@ -219,6 +219,8 @@ def living_data_cursor_route(self, path, method, *, service, CursorError, QueryE
     try:
         match = re.fullmatch(r"/api/living-data/sessions/([0-9a-f]{32})(?:/(move|close))?", path)
         if method == "GET":
+            if path == "/api/living-data/sessions/current":
+                return self._json(service.current(account["id"]))
             if not match or match[2]:
                 return self._json({"error": "not found"}, 404)
             query = parse_qs(self.path.partition("?")[2], keep_blank_values=True)

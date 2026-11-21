@@ -297,10 +297,16 @@ class Tools:
         return isinstance(self.map, dict) and self.map.get("kind") == "orientation"
 
     def leave(self, a):
-        sid = self._need_cursor()
+        recovered = self.cursor_id is None
+        sid = self.cursor_id
         try:
-            cursor = self.rest.call(f"{SESSIONS}/{sid}")
-            done = self.rest.call(f"{SESSIONS}/{sid}/close", {"expected_revision": cursor["revision"]})
+            if recovered:
+                current = self.rest.call(f"{SESSIONS}/current")
+                sid, revision = current["session_id"], current["revision"]
+            else:
+                cursor = self.rest.call(f"{SESSIONS}/{sid}")
+                revision = cursor["revision"]
+            done = self.rest.call(f"{SESSIONS}/{sid}/close", {"expected_revision": revision})
         except RestError as error:
             if error.status == 404:
                 self.cursor_id = None
@@ -314,7 +320,9 @@ class Tools:
             except RestError as error:
                 if error.status != 404:  # already forgotten is the same outcome
                     raise
-        done["say"] = "You left; the cursor is closed."
+        done["recovered"] = recovered
+        done["say"] = ("You closed your account's cursor from another process." if recovered
+                       else "You left; the cursor is closed.")
         return done
 
     def _world(self) -> str:
