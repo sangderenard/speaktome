@@ -171,6 +171,19 @@ def test_the_index_tool_explains_what_is_not_offered():
     assert is_error and result["status"] == 404
 
 
+def test_trial_index_explains_read_only_write_refusal():
+    fake = Fake(capabilities=["view_site"])
+    trial_index = catalog.index(["view_site"], True, trial=True)
+    original_call = fake.call
+    fake.call = lambda path, *args, **kwargs: trial_index if path == api.INDEX else original_call(path, *args, **kwargs)
+    server = api.ApiServer(fake)
+    result, error, _ = call(server, "api_index", group="reports")
+    assert not error
+    rows = {row["tool"]: row for row in result["groups"]["reports"]["endpoints"]}
+    assert rows["reports_issue_create"]["not_a_tool"] == "read-only preview accounts cannot use this write endpoint"
+    assert "not_a_tool" not in rows["reports_issues_list"]
+
+
 def test_without_the_service_index_the_packaged_catalog_is_used():
     older = api.ApiServer(Fake(index=False))
     assert "messages_inbox" in names(older) and "control_instances" not in names(older)
