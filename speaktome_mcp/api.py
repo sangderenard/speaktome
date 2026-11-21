@@ -65,14 +65,18 @@ def needs(endpoint: dict) -> str:
 VISITOR = "for interns and members, not for a visitor: look, and ask for an intern account (man topic=foyer)"
 
 
-def offered(endpoint: dict, visitor: bool = False) -> str | None:
-    """None when the endpoint becomes a tool; otherwise the reason it does not. ``visitor``: the caller has no account."""
+def offered(endpoint: dict, visitor: bool = False, trial: bool = False) -> str | None:
+    """None when the endpoint becomes a tool; otherwise the reason it does not."""
     if not endpoint.get("tool"):
         return "not offered to tools"
     if endpoint.get("request", "json") != "json":
         return "takes a binary upload, which a tool cannot send"
     if endpoint.get("allowed") is False:
-        return VISITOR if visitor else f"this account lacks what it needs ({needs(endpoint)})"
+        if visitor:
+            return VISITOR
+        if trial and endpoint.get("changes"):
+            return "read-only preview accounts cannot use this write endpoint"
+        return f"this account lacks what it needs ({needs(endpoint)})"
     if not NAME.fullmatch(str(endpoint.get("name", ""))) or endpoint.get("method") not in ("GET", "POST"):
         return "its catalog entry is malformed"
     return None
@@ -271,7 +275,7 @@ class ApiServer(Server):
             self.api_index)
         self.annotations["api_index"] = {"readOnlyHint": True}
         for endpoint in self.document["endpoints"]:
-            if offered(endpoint, self.visitor) is not None or endpoint["name"] in self.table:
+            if offered(endpoint, self.visitor, self.document.get("trial") is True) is not None or endpoint["name"] in self.table:
                 continue
             self.table[endpoint["name"]] = (describe(endpoint), schema(endpoint), self._caller(endpoint))
             self.annotations[endpoint["name"]] = {"readOnlyHint": not endpoint.get("changes")}
@@ -289,7 +293,7 @@ class ApiServer(Server):
         for endpoint in self.document["endpoints"]:
             if wanted is not None and endpoint.get("group") != wanted:
                 continue
-            reason = offered(endpoint, self.visitor)
+            reason = offered(endpoint, self.visitor, self.document.get("trial") is True)
             if reason is None and self.table.get(endpoint["name"], (None,))[0] != describe(endpoint):
                 reason = "a verb of the same name already covers it"
             row = {"tool": endpoint.get("name"), "method": endpoint.get("method"), "path": endpoint.get("path"),
