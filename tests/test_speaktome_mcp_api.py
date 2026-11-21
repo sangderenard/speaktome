@@ -182,6 +182,10 @@ def test_trial_index_explains_read_only_write_refusal():
     rows = {row["tool"]: row for row in result["groups"]["reports"]["endpoints"]}
     assert rows["reports_issue_create"]["not_a_tool"] == "read-only preview accounts cannot use this write endpoint"
     assert "not_a_tool" not in rows["reports_issues_list"]
+    foyer, error, _ = call(server, "api_index", group="foyer")
+    assert not error
+    foyer_rows = {row["tool"]: row for row in foyer["groups"]["foyer"]["endpoints"]}
+    assert foyer_rows["foyer_status"]["not_a_tool"] == "not available to this preview account"
 
 
 def test_without_the_service_index_the_packaged_catalog_is_used():
