@@ -651,6 +651,7 @@ def _error(rid, code, text):
 class Server:
     def __init__(self, rest: Rest):
         self.tools = Tools(rest)
+        self.outbox: list = []                      # notifications serve() writes after the response being answered
         self.table = {name: (description, schema, fn) for name, description, schema, fn in self.tools.table()}
 
     def _list(self):
@@ -738,6 +739,10 @@ def serve(server: Server, stdin=None, stdout=None) -> None:
                             if isinstance(message, dict) and "id" in message else None)
         if response is not None:
             stdout.write((json.dumps(response, ensure_ascii=False) + "\n").encode("utf-8"))
+            stdout.flush()
+        outbox, server.outbox = getattr(server, "outbox", []), []
+        for note in outbox:                         # always after the response: a client matches its answer first
+            stdout.write((json.dumps(note, ensure_ascii=False) + "\n").encode("utf-8"))
             stdout.flush()
 
 
