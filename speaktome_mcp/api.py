@@ -74,8 +74,10 @@ def offered(endpoint: dict, visitor: bool = False, trial: bool = False) -> str |
     if endpoint.get("allowed") is False:
         if visitor:
             return VISITOR
-        if trial and endpoint.get("changes"):
-            return "read-only preview accounts cannot use this write endpoint"
+        if trial:
+            if endpoint.get("changes"):
+                return "read-only preview accounts cannot use this write endpoint"
+            return "not available to this preview account"
         return f"this account lacks what it needs ({needs(endpoint)})"
     if not NAME.fullmatch(str(endpoint.get("name", ""))) or endpoint.get("method") not in ("GET", "POST"):
         return "its catalog entry is malformed"
