@@ -612,6 +612,8 @@ ENDPOINTS = (
         ("dev_ui", "nodus_edit"), False, False, query={"instance": ("string", "The Nodus instance name; the default when omitted.")}),
     _ep("nodus_activity", "nodus", "GET", "/api/nodus/activity", "Show recent activity on a Nodus instance.",
         ("dev_ui", "nodus_edit"), False, False, query={"instance": ("string", "The Nodus instance name; the default when omitted.")}),
+    _ep("nodus_meta", "nodus", "GET", "/api/nodus/meta", "Show a Nodus instance's meta edge observations and link metrics.",
+        ("dev_ui", "nodus_edit"), False, False, query={"instance": ("string", "The Nodus instance name; the default when omitted.")}),
     _ep("nodus_abstract", "nodus", "GET", "/api/nodus/abstract", "Show a Nodus graph as generic nodes.",
         ("dev_ui", "nodus_edit"), False, False, query={"instance": ("string", "The Nodus instance name; the default when omitted.")}),
     _ep("nodus_map", "nodus", "GET", "/api/nodus/map", "Show a Nodus graph as a Living Data map.",
