@@ -70,6 +70,22 @@ def test_an_admin_sees_the_control_tools():
     assert "control_instances_request" in names(api.ApiServer(Fake(AGENT + ["account_manage"])))
 
 
+def test_inbound_delegation_filters_tools_and_implicit_private_context():
+    fake = Fake(capabilities=AGENT + ["agent_scratch"], answers={"/api/reviews/attention": {"attention": [{"id": "secret"}]},
+                         "/api/agent-workspace/orientation": {"preamble": "private orientation"}})
+    server = api.ApiServer(fake, allowed_tools=["whoami", "memory_files"], oauth_resource="https://example.test/mcp")
+    initialized = rpc(server, "initialize", {"protocolVersion": "2025-11-25", "capabilities": {},
+                                              "clientInfo": {"name": "test", "version": "1"}})
+    assert "private orientation" not in initialized["instructions"]
+    listed = rpc(server, "tools/list")["tools"]
+    assert {tool["name"] for tool in listed} == {"whoami", "memory_files"}
+    assert all(tool["securitySchemes"] == [{"type": "oauth2", "scopes": ["mcp"]}] for tool in listed)
+    forbidden = server.handle({"jsonrpc": "2.0", "id": 2, "method": "tools/call",
+                               "params": {"name": "newsletter_submit", "arguments": {}}})
+    assert "error" in forbidden and not any(c["path"] == "/api/newsletter" for c in fake.calls)
+    assert not any(c["path"] in ("/api/reviews/attention", "/api/agent-workspace/orientation") for c in fake.calls)
+
+
 def test_research_document_is_available_and_routes_explicit_text_copy():
     fake = Fake()
     server = api.ApiServer(fake)

@@ -213,9 +213,11 @@ def attention_lines(waiting: list) -> list:
 class ApiServer(Server):
     """The verbs' table, extended on first use with the generated tools."""
 
-    def __init__(self, rest):
+    def __init__(self, rest, allowed_tools=None, oauth_resource=None):
         super().__init__(rest)
         self.rest = rest
+        self.allowed_tools = frozenset(allowed_tools) if allowed_tools is not None else None
+        self.oauth_resource = oauth_resource
         self.document = None
         self.source = None
         self.annotations = {}
@@ -226,7 +228,8 @@ class ApiServer(Server):
 
     def _attention(self) -> list:
         """The review threads waiting for this account's answer; empty for a visitor, or when the server cannot say."""
-        if self.visitor:
+        allowed = getattr(self, "allowed_tools", None)
+        if self.visitor or (allowed is not None and "reviews_attention" not in allowed):
             return []
         try:
             answer = self.rest.call("/api/reviews/attention")
@@ -239,7 +242,8 @@ class ApiServer(Server):
         """[ORIENT] GET /api/agent-workspace/orientation: the shared basics and this account's own profile, chosen by the
         server's decision tree (first interaction today? the full text; later, a reminder). Empty for a visitor or when
         the server cannot say; a connection never fails for want of it."""
-        if self.visitor:
+        allowed = getattr(self, "allowed_tools", None)
+        if self.visitor or (allowed is not None and "workspace_orientation" not in allowed):
             return ""
         try:
             answer = self.rest.call("/api/agent-workspace/orientation")
@@ -281,6 +285,9 @@ class ApiServer(Server):
                 continue
             self.table[endpoint["name"]] = (describe(endpoint), schema(endpoint), self._caller(endpoint))
             self.annotations[endpoint["name"]] = {"readOnlyHint": not endpoint.get("changes")}
+        if self.allowed_tools is not None:
+            self.table = {name: tool for name, tool in self.table.items() if name in self.allowed_tools}
+            self.annotations = {name: value for name, value in self.annotations.items() if name in self.table}
 
     def _caller(self, endpoint: dict):
         return lambda arguments: perform(self.rest, endpoint, arguments)
@@ -296,6 +303,8 @@ class ApiServer(Server):
             if wanted is not None and endpoint.get("group") != wanted:
                 continue
             reason = offered(endpoint, self.visitor, self.document.get("trial") is True)
+            if self.allowed_tools is not None and endpoint["name"] not in self.allowed_tools:
+                reason = "not in this delegation"
             if reason is None and self.table.get(endpoint["name"], (None,))[0] != describe(endpoint):
                 reason = "a verb of the same name already covers it"
             row = {"tool": endpoint.get("name"), "method": endpoint.get("method"), "path": endpoint.get("path"),
@@ -320,6 +329,8 @@ class ApiServer(Server):
         for tool in listed["tools"]:
             if tool["name"] in self.annotations:
                 tool["annotations"] = self.annotations[tool["name"]]
+            if self.oauth_resource:
+                tool["securitySchemes"] = [{"type": "oauth2", "scopes": ["mcp"]}]
         return listed
 
     def _call(self, params):
@@ -341,8 +352,10 @@ class ApiServer(Server):
         response = super().handle(message)
         if (isinstance(response, dict) and isinstance(message, dict) and message.get("method") == "initialize"
                 and "result" in response):
-            instructions = INSTRUCTIONS
-            if self.document and any(e.get("name") == "workspace_index" and e.get("allowed") is True
+            instructions = ("This is an administrator-authorized inbound agent connection. Use only the tools listed "
+                            "for this connection; its identity and private memory persist after the authorization expires."
+                            if self.allowed_tools is not None else INSTRUCTIONS)
+            if self.allowed_tools is None and self.document and any(e.get("name") == "workspace_index" and e.get("allowed") is True
                                      for e in self.document.get("endpoints", [])):
                 instructions += (" For operator work, start with workspace_index. Its roots and orientation are an index; "
                                  "open only relevant branches with workspace_children, then read individual documents. "
