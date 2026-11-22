@@ -651,7 +651,9 @@ ENDPOINTS = (
                     "timeout_hours": ("number", False, "Hours until silence accepts it; the policy's default when omitted."),
                     "keep": ("boolean", False, "True to keep the branch after it lands."),
                     "together_with": ("array", False, "Your own open review ids, in any repository, that this change must "
-                                      "land with: none of them lands until all are accepted or approved.")})),
+                                      "land with: the lander lands none of them until all are accepted or approved, "
+                                      "then all in one run. Lander coordination, not a push guarantee: a push by hand "
+                                      "can still move one alone.")})),
     _ep("reviews_identity", "reviews", "GET", "/api/reviews/identity",
         "Show the Git author identity this account declared for its own commits.", "dev_ui", True, False),
     _ep("reviews_identity_set", "reviews", "POST", "/api/reviews/identity",
