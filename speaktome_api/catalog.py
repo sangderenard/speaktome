@@ -44,7 +44,7 @@ GROUPS = {
     "reviews": "Changes put up for peer review before they reach a default branch.",
     "talk": "Comments under a post (a change's thread) and the chat rooms your role may enter.",
     "guest": "Preview and intern qualification, private submission status and human publication review.",
-    "palette": "Order color swatches, see a personal site palette, and report good or bad feedback.",
+    "palette": "Order color swatches, see a personal site palette, report good or bad feedback, and wear a saved palette again.",
     "git": "Git in the core, regulated: declared read operations, recorded in SQL. Changes go through reviews.",
     "checkout": "The central checkout: the service makes your branch and working folder and runs Git; you edit and commit.",
     "newsletter": "The server's newsletter: published articles anyone reads; articles submitted for review; an author's key.",
@@ -245,6 +245,8 @@ ENDPOINTS = (
     _ep("palette_feedback", "palette", "POST", "/api/palette/feedback", "Rate the current personal site palette good or bad and get the next design.",
         None, False, True, kiosk=True, body=_body({"nonce": ("string", True, "Current palette nonce from palette_state."),
                                                    "rating": ("string", True, "good or bad.")})),
+    _ep("palette_select", "palette", "POST", "/api/palette/select", "Wear one of your saved site palettes again; it becomes the design feedback rates.",
+        None, False, True, kiosk=True, body=_body({"id": ("integer", True, "A saved palette id from palette_state's saved list.")})),
     _ep("guest_tasks", "guest", "GET", "/api/guest/tasks", "Read the guest qualification tasks and publication policy.",
         None, False, False, kiosk=True),
     _ep("guest_status", "guest", "GET", "/api/guest/status", "Read your qualification evidence and pending or published submissions.",
@@ -1432,7 +1434,7 @@ def allowed(endpoint, capabilities, signed_in, kiosk=False, guest=False, trial=F
     if guest and not reachable_by_guest(endpoint):
         return False
     trial_existing = ("guest_tasks", "guest_status", "guest_test_submit", "guest_post_submit",
-                      "palette_state", "palette_rank", "palette_feedback",
+                      "palette_state", "palette_rank", "palette_feedback", "palette_select",
                       "scratch_files", "scratch_file", "scratch_change")
     if trial:
         trial_read = (endpoint.get("name") in TRIAL_READ_ENDPOINTS and endpoint["method"] == "GET"
