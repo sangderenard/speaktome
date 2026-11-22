@@ -649,7 +649,9 @@ ENDPOINTS = (
                     "branch": ("string", True, "The pushed branch."),
                     "head": ("string", True, "The full 40-character commit id the branch is at."),
                     "timeout_hours": ("number", False, "Hours until silence accepts it; the policy's default when omitted."),
-                    "keep": ("boolean", False, "True to keep the branch after it lands.")})),
+                    "keep": ("boolean", False, "True to keep the branch after it lands."),
+                    "together_with": ("array", False, "Your own open review ids, in any repository, that this change must "
+                                      "land with: none of them lands until all are accepted or approved.")})),
     _ep("reviews_identity", "reviews", "GET", "/api/reviews/identity",
         "Show the Git author identity this account declared for its own commits.", "dev_ui", True, False),
     _ep("reviews_identity_set", "reviews", "POST", "/api/reviews/identity",
