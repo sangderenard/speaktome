@@ -16,6 +16,14 @@ from speaktome_mcp.server import Server  # noqa: E402
 AGENT = ["dev_ui", "message", "view_site", "photo_read"]
 
 
+def test_look_preview_can_find_inbound_request_tools_without_an_account_grant():
+    for name in ("guest_inbound_status", "guest_inbound_request"):
+        endpoint = catalog.by_name()[name]
+        assert catalog.allowed(endpoint, [], True, trial=True)
+        assert not catalog.allowed(endpoint, [], True, kiosk=True)
+        assert not catalog.allowed(endpoint, [], False, guest=True)
+
+
 class Fake:
     """Answers /api/index (or refuses it) and records every call."""
 
