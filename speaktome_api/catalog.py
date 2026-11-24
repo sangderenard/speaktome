@@ -238,13 +238,19 @@ ENDPOINTS = (
         body=_body({"action": ("string", True, "write or delete."),
                     "name": ("string", True, "Your scratch file name."),
                     "body": ("string", False, "Text for a write.")})),
-    _ep("palette_state", "palette", "GET", "/api/palette", "Read your color swatches, ranking, proposed site palette and feedback counts.",
+    _ep("palette_state", "palette", "GET", "/api/palette", "Read the current random round of designs, the site design the network proposes for you, "
+        "yours beside everyone's default, your saved palettes, your history and the network's state.",
         None, False, False, kiosk=True),
-    _ep("palette_rank", "palette", "POST", "/api/palette/rank", "Rank every swatch in preference order and apply a personal site palette.",
-        None, False, True, kiosk=True, body=_body({"ranking": ("array", True, "Every swatch id once, most preferred first.")})),
-    _ep("palette_feedback", "palette", "POST", "/api/palette/feedback", "Rate the current personal site palette good or bad and get the next design.",
-        None, False, True, kiosk=True, body=_body({"nonce": ("string", True, "Current palette nonce from palette_state."),
-                                                   "rating": ("string", True, "good or bad.")})),
+    _ep("palette_rank", "palette", "POST", "/api/palette/rank", "Rank every design of the current round, favorite first; the network learns from it.",
+        None, False, True, kiosk=True, body=_body({"ranking": ("array", True, "Every design id of the round once, most preferred first."),
+                                                   "nonce": ("string", False, "The round nonce from palette_state.")})),
+    _ep("palette_feedback", "palette", "POST", "/api/palette/feedback", "Score the proposed site design from 0 to 1; the network learns from it and proposes the next.",
+        None, False, True, kiosk=True, body=_body({"nonce": ("string", True, "Current design nonce from palette_state's candidate."),
+                                                   "rating": ("number", True, "Your score from 0 (dislike) to 1 (like).")})),
+    _ep("palette_round", "palette", "POST", "/api/palette/round", "Draw a new random round of designs to rank; nothing is recorded.",
+        None, False, True, kiosk=True),
+    _ep("palette_clear", "palette", "POST", "/api/palette/clear", "Forget your rankings, scores, saved palettes and personal layer; the shared network keeps what it learned.",
+        None, False, True, kiosk=True),
     _ep("palette_select", "palette", "POST", "/api/palette/select", "Wear one of your saved site palettes again; it becomes the design feedback rates.",
         None, False, True, kiosk=True, body=_body({"id": ("integer", True, "A saved palette id from palette_state's saved list.")})),
     _ep("guest_tasks", "guest", "GET", "/api/guest/tasks", "Read the guest qualification tasks and publication policy.",
@@ -1445,7 +1451,7 @@ def allowed(endpoint, capabilities, signed_in, kiosk=False, guest=False, trial=F
     if guest and not reachable_by_guest(endpoint):
         return False
     trial_existing = ("guest_tasks", "guest_status", "guest_test_submit", "guest_post_submit",
-                      "palette_state", "palette_rank", "palette_feedback", "palette_select",
+                      "palette_state", "palette_rank", "palette_feedback", "palette_select", "palette_round", "palette_clear",
                       "scratch_files", "scratch_file", "scratch_change")
     if trial:
         trial_read = (endpoint.get("name") in TRIAL_READ_ENDPOINTS and endpoint["method"] == "GET"
