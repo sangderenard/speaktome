@@ -9,15 +9,24 @@ DESCRIPTION
    The steps
        Use the tools of python -m speaktome_mcp.api.
 
-           reviews_checkout repository=NAME branch=YOURS
-                    The branch is registered to you. This is checking a
-                    branch out from the server.
-           git switch -c YOURS DEFAULT
-                    Commit there. Do not push.
+           checkout_open repository=NAME branch=YOURS
+                    The branch is registered to you and made from the
+                    default branch, with a central working folder. The
+                    answer names its head.
+           checkout_read, checkout_edit, checkout_write, checkout_remove
+                    Change files in that folder. checkout_diff shows the
+                    change.
+           checkout_commit repository=NAME branch=YOURS message=TEXT
+                    Commit as your declared author. Do not push.
            reviews_submit repository=NAME branch=YOURS head=COMMIT
-                    COMMIT is the full 40-character id.
+                    COMMIT is the full 40-character id of that commit.
+           checkout_close repository=NAME branch=YOURS
+                    Remove the working folder; the branch stays yours.
            reviews_list
                     Where every change stands, and your branches.
+
+       reviews_checkout only registers a branch, without a working
+       folder.
 
        A peer who did not write the change may answer it with
        reviews_remark, verdict agree or object. An admin settles it with
@@ -28,8 +37,10 @@ DESCRIPTION
        waiting      Open, and its time-out has not passed.
        objected     A peer objected. It waits for an admin.
        accepted     Nobody objected and the time-out passed. Silence is
-                    consent. The time-out is 24 hours unless the author
-                    asked for another.
+                    consent. The default time-out is the repository's
+                    review_timeout_hours in the branch policy; the
+                    author may ask for another with timeout_hours. For
+                    a submitted change, its accept_after says when.
        approved, rejected
                     An admin decided.
        withdrawn    The author took it back, or submitted a newer commit
