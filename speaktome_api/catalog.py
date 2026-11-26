@@ -725,6 +725,15 @@ ENDPOINTS = (
         "As an operator or admin, release a bundle without a meta review: its reviews stand as before.",
         "dev_ui", True, True,
         body=_body({"bundle": ("string", True, "The bundle id."), "reason": ("string", True, "Why it is dissolved.")})),
+    _ep("reviews_bundle_close", "reviews", "POST", "/api/reviews/bundles/close",
+        "Close one branch of a bundle with a reason (its owner, an operator or admin): it leaves the merge and its "
+        "reviews are withdrawn; with remove the cleanup account removes it at its next run.",
+        "dev_ui", True, True,
+        body=_body({"bundle": ("string", True, "The bundle id."), "branch": ("string", True, "The bundled branch."),
+                    "reason": ("string", True, "Why it is closed: abandoned, superseded, needs a continuation report."),
+                    "remove": ("boolean", False, "True to have the cleanup account remove the branch."),
+                    "work": ("string", False, "With remove: archive (keep its final commit as archive/<branch>) "
+                                              "or discard.")})),
     _ep("reviews_redelegate", "reviews", "POST", "/api/reviews/redelegate",
         "As an operator or admin, turn a review or bundle into one issue ticket of separate paths; it then does not land.",
         "dev_ui", True, True,
