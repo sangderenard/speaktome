@@ -99,6 +99,7 @@ _ID32 = {"id": ("string", "The 32 hex character identifier.")}
 _ADMIN_OR_LIFECYCLE = ("account_manage", "lifecycle_admin")
 _CHECKOUT = {"repository": ("string", True, "The repository's name in the branch policy."),
              "branch": ("string", True, "Your branch's name.")}
+_SPACE = {"identity": ("string", True, "Your standalone project's identity, <account>/<project>.")}
 
 ENDPOINTS = (
     _ep("workspace_index", "workspace", "GET", "/api/agent-workspace",
@@ -950,6 +951,36 @@ ENDPOINTS = (
         "dev_ui", True, True,
         body=_body({"text": ("string", True, "The whole project.yaml text (schema project-contract-v0); its identity's "
                                              "account must be yours.")})),
+    # ---- the readable project space (turing examples/meowdoku/project_space.py, research case 35c3b249): a
+    # standalone project's own Git folder with no remote, worked through the central checkout's operations.
+    _ep("project_space_files", "projects", "POST", "/api/projects/space/files",
+        "List one folder of your standalone project's space.",
+        "dev_ui", True, False, body=_body({**_SPACE, "path": ("string", False, "A folder relative to the space; its top when omitted.")})),
+    _ep("project_space_read", "projects", "POST", "/api/projects/space/read", "Read one text file of your project space.",
+        "dev_ui", True, False, body=_body({**_SPACE, "path": ("string", True, "The file, relative to the space.")})),
+    _ep("project_space_write", "projects", "POST", "/api/projects/space/write",
+        "Create or replace one text file of your project space; refused past your quota.",
+        "dev_ui", True, True, body=_body({**_SPACE, "path": ("string", True, "The file, relative to the space."),
+                                          "text": ("string", True, "The whole new text of the file, as UTF-8.")})),
+    _ep("project_space_remove", "projects", "POST", "/api/projects/space/remove", "Delete one file of your project space.",
+        "dev_ui", True, True, body=_body({**_SPACE, "path": ("string", True, "The file, relative to the space.")})),
+    _ep("project_space_edit", "projects", "POST", "/api/projects/space/edit",
+        "Change project space files in place: exact text (old, new, count), a unified diff or a Codex patch.",
+        "dev_ui", True, True, body=_body({**_SPACE,
+                                          "path": ("string", False, "For an exact replacement: the file, relative to the space."),
+                                          "old": ("string", False, "For an exact replacement: the exact text there now."),
+                                          "new": ("string", False, "For an exact replacement: the text to put in its place."),
+                                          "count": ("integer", False, "How many times old occurs; 1 when omitted."),
+                                          "patch": ("string", False, "Instead of path/old/new: a unified diff or a Codex patch.")})),
+    _ep("project_space_status", "projects", "POST", "/api/projects/space/status",
+        "Show which files of your project space differ from its last commit.",
+        "dev_ui", True, False, body=_body(_SPACE)),
+    _ep("project_space_diff", "projects", "POST", "/api/projects/space/diff",
+        "Show your project space's change to tracked files as a unified diff.",
+        "dev_ui", True, False, body=_body({**_SPACE, "path": ("string", False, "Only this file, relative to the space.")})),
+    _ep("project_space_commit", "projects", "POST", "/api/projects/space/commit",
+        "Commit everything in your project space as your declared author identity.",
+        "dev_ui", True, True, body=_body({**_SPACE, "message": ("string", True, "The commit message.")})),
 
     # ---- newsletter (turing examples/meowdoku/newsletter.py); reading what is published needs no account
     _ep("newsletter_list", "newsletter", "GET", "/api/newsletter",
