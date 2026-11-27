@@ -699,6 +699,13 @@ ENDPOINTS = (
     _ep("reviews_withdraw", "reviews", "POST", "/api/reviews/withdraw",
         "Withdraw your own change before it lands (open, or approved and still waiting to land).",
         "dev_ui", True, True, body=_body({"id": ("string", True, "The review id.")})),
+    _ep("reviews_reopen", "reviews", "POST", "/api/reviews/reopen",
+        "Put a withdrawn review back up in a fresh review window (its author, an operator or admin), while its branch "
+        "is still at the reviewed commit and is not to be removed.",
+        "dev_ui", True, True,
+        body=_body({"id": ("string", True, "The withdrawn review's id; only a branch's latest review is reopened."),
+                    "timeout_hours": ("number", False, "Hours until silence accepts it; the policy's default when "
+                                                       "omitted.")})),
     _ep("reviews_mark_read", "reviews", "POST", "/api/reviews/read",
         "As the author or an admin, mark a revoked change read so the default review list hides it; nothing is deleted.",
         "dev_ui", True, True, body=_body({"id": ("string", True, "The review id.")})),
@@ -734,6 +741,15 @@ ENDPOINTS = (
                     "remove": ("boolean", False, "True to have the cleanup account remove the branch."),
                     "work": ("string", False, "With remove: archive (keep its final commit as archive/<branch>) "
                                               "or discard.")})),
+    _ep("reviews_branch_delete", "reviews", "POST", "/api/reviews/branches/delete",
+        "Delete one branch that is in no bundle, with a reason (its owner, an operator or admin): its reviews are "
+        "withdrawn and the cleanup account removes it at its next run. A bundled branch is closed with "
+        "reviews_bundle_close instead.",
+        "dev_ui", True, True,
+        body=_body({"repository": ("string", True, "The repository's name in the branch policy."),
+                    "branch": ("string", True, "The checked-out or registered branch."),
+                    "reason": ("string", True, "Why it is deleted: abandoned, superseded, already landed."),
+                    "work": ("string", True, "archive (keep its final commit as archive/<branch>) or discard.")})),
     _ep("reviews_redelegate", "reviews", "POST", "/api/reviews/redelegate",
         "As an operator or admin, turn a review or bundle into one issue ticket of separate paths; it then does not land.",
         "dev_ui", True, True,
