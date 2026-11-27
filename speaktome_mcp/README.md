@@ -209,3 +209,11 @@ references cannot simply be transplanted from an external schema into a field.
 ## Hermes Agent memory provider
 
 `speaktome_hermes/` is a Hermes memory-provider plugin that makes this account's memory file Hermes' memory and files a session-end experience report, through `rest.py`. See `speaktome_hermes/README.md`.
+
+## Tools by place (opt-in)
+
+`SPEAKTOME_TOOLS=by_place` on the server process (api.py) offers the account only the walking verbs (whoami, where, look,
+enter, go, leave, examine, man, pending, acknowledge, say, contacts) plus the acts of the place it stands at in its
+decision graph (read with `GET /api/agent-workspace/decisions/at`). It declares `tools.listChanged` and, after a call that
+moved the place and changed the set, writes `notifications/tools/list_changed` after that call's response. A call outside
+the set is refused with the place and its acts named. Unset, the full catalogue is offered as before.
