@@ -928,6 +928,13 @@ ENDPOINTS = (
     _ep("checkout_commit", "checkout", "POST", "/api/checkouts/commit",
         "Commit everything in your checkout as your declared author identity; then submit it with reviews_submit.",
         "dev_ui", True, True, body=_body({**_CHECKOUT, "message": ("string", True, "The commit message.")})),
+    _ep("checkout_merge", "checkout", "POST", "/api/checkouts/merge",
+        "Merge the default branch or a registered branch into your checkout (how a bundle's meta review is made); a "
+        "conflict stays unfinished for edit or write, then commit, or abort.",
+        "dev_ui", True, True, body=_body({**_CHECKOUT,
+                                          "from": ("string", False, "The branch to bring in: the default branch or a registered branch."),
+                                          "message": ("string", False, "The merge commit's message; one is written when omitted."),
+                                          "abort": ("boolean", False, "True to give up an unfinished merge instead.")})),
     _ep("checkout_close", "checkout", "POST", "/api/checkouts/close",
         "Remove your checkout's working folder once everything is committed; the branch stays yours.",
         "dev_ui", True, True, body=_body(_CHECKOUT)),
