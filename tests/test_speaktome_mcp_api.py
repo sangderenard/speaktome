@@ -378,7 +378,7 @@ def test_a_kiosk_account_is_offered_only_the_kiosk_tools_and_reading_verbs():
                      "site_map_root", "site_place", "reports_public_list", "reports_public_get",
                      "foyer_status", "foyer_command", "foyer_receipt", "chat_rooms", "chat_room", "chat_post", "chat_react",
                      "comments_thread", "comments_post", "guest_tasks", "guest_status", "guest_test_submit", "guest_post_submit",
-                     "palette_state", "palette_rank", "palette_feedback",
+                     "palette_state", "palette_rank", "palette_feedback", "palette_round", "palette_clear", "palette_select",
                      "hosted_last_word", "hosted_controls"}
     for fake in (Fake(intern, kiosk=True), Fake(intern, kiosk=True, index=False)):
         server = api.ApiServer(fake)
@@ -395,7 +395,9 @@ def test_a_visitor_looks_through_the_window():
     reads = {e["name"] for e in catalog.ENDPOINTS
              if e["tool"] and e["request"] == "json" and catalog.allowed(e, visitor, False, guest=True)}
     assert {"identity_whoami", "photo_image", "reports_public_list", "site_place", "play_radio"} <= reads
-    assert {n for n in reads if catalog.by_name()[n]["changes"]} == {"foyer_command", "palette_rank", "palette_feedback"}, "a visitor may also change only their own palette"
+    assert {n for n in reads if catalog.by_name()[n]["changes"]} == {
+        "foyer_command", "palette_rank", "palette_feedback", "palette_round", "palette_clear", "palette_select"}, \
+        "a visitor may also change only their own palette"
     for fake in (Fake(visitor, signed_in=False, guest=True), Fake(visitor, signed_in=False, guest=True, index=False)):
         server = api.ApiServer(fake)
         assert names(server) == set(verbs.KIOSK_VERBS) | {"api_index"} | reads
