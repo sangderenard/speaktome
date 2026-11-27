@@ -47,6 +47,7 @@ GROUPS = {
     "palette": "Order color swatches, see a personal site palette, report good or bad feedback, and wear a saved palette again.",
     "git": "Git in the core, regulated: declared read operations, recorded in SQL. Changes go through reviews.",
     "checkout": "The central checkout: the service makes your branch and working folder and runs Git; you edit and commit.",
+    "projects": "Dev page projects: open a project from its project.yaml in its placement; branch work is the central checkout's.",
     "newsletter": "The server's newsletter: published articles anyone reads; articles submitted for review; an author's key.",
     "invitations": "Registration by invitation: a one-time code in a link registers someone; who invited whom is kept.",
     "connections": "Secured connections to outside services (Suno) that their owner shares with operator and admin accounts.",
@@ -938,6 +939,17 @@ ENDPOINTS = (
     _ep("checkout_close", "checkout", "POST", "/api/checkouts/close",
         "Remove your checkout's working folder once everything is committed; the branch stays yours.",
         "dev_ui", True, True, body=_body(_CHECKOUT)),
+
+    # ---- dev page projects (turing examples/meowdoku/project_open.py, research case d442be8d): the branch placement
+    # opens through the central checkout; standalone and branch-copy wait on the readable project space.
+    _ep("projects_list", "projects", "GET", "/api/projects", "List the projects you opened.",
+        "dev_ui", True, False),
+    _ep("projects_open", "projects", "POST", "/api/projects/open",
+        "Open a project from its project.yaml text: a central checkout of its branch, the file committed there; "
+        "then reviews_submit.",
+        "dev_ui", True, True,
+        body=_body({"text": ("string", True, "The whole project.yaml text (schema project-contract-v0); its identity's "
+                                             "account must be yours.")})),
 
     # ---- newsletter (turing examples/meowdoku/newsletter.py); reading what is published needs no account
     _ep("newsletter_list", "newsletter", "GET", "/api/newsletter",
