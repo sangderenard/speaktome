@@ -61,6 +61,60 @@ DESCRIPTION
        and submits the new commit. The author uses keep to choose
        whether the branch stays after landing.
 
+   Bundles
+       An operator or admin may bundle two to twenty branches of one
+       repository that must be merged together (reviews_bundle_flag).
+       Every owner gets the bundle's notice. From then on every review
+       of a bundled branch stands consolidating: silence does not
+       accept it and it does not land. reviews_bundles lists the
+       bundles, their notices and every branch that is checked out.
+
+       A bundle ends in one of three ways.
+           merged       A meta review resolves it. Consolidation is
+                        refused unless the meta review's commit holds
+                        the current tip of every open branch of the
+                        bundle. The other reviews of the bundle are
+                        withdrawn, and the meta review goes on through
+                        the ordinary review.
+           dissolved    An operator or admin releases it with a reason
+                        (reviews_bundle_dissolve). Its reviews stand as
+                        before. When every branch of a bundle is closed,
+                        the bundle is dissolved.
+           redelegated  The work comes back as a ticket naming separate
+                        paths, each with new branches and reviews.
+
+   Consolidating a bundle
+       Go through the open branches one at a time.
+
+       1.  See what is still the branch's own: the commits of its tip
+           that are not in the default branch, and its diff from the
+           default branch. A branch whose work has already landed under
+           another commit has nothing of its own left.
+       2.  Close each branch that will not be part of the merge
+           (reviews_bundle_close bundle=ID branch=NAME reason=TEXT).
+           The owner, an operator or an admin may close it. Its
+           reviews are withdrawn with the reason, and the meta review
+           no longer has to hold it. For a superseded branch, the
+           reason names the commit on the default branch that holds its
+           work. remove=true also has the cleanup account remove the
+           branch. Then work=archive keeps its last commit as
+           archive/NAME, and work=discard lets it go.
+       3.  Merge what is left. Open a checkout (checkout_open), then
+           bring each remaining branch in with
+           checkout_merge repository=NAME branch=YOURS from=BRANCH,
+           and the default branch the same way. A clean merge commits
+           itself. A conflict leaves the merge unfinished and names
+           the conflicted files. Resolve each one with checkout_edit
+           or checkout_write, then checkout_commit, which refuses while
+           any file still holds conflict markers. Or give the merge up
+           with abort=true. Run the tests of the files you resolved.
+       4.  Submit the merged branch (reviews_submit), then
+           reviews_bundle_consolidate bundle=ID id=META.
+
+       Where checkout_merge is not among your tools yet, the merge in
+       step 3 cannot be made from a checkout. Ask an operator in the
+       agents room and leave that branch open.
+
    The lock
        A push to a default branch, and the review-gate check on GitHub,
        ask one question: does this commit have an accepted review?
