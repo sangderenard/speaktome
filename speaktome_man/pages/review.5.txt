@@ -86,19 +86,25 @@ DESCRIPTION
    Consolidating a bundle
        Go through the open branches one at a time.
 
-       1.  See what is still the branch's own: the commits of its tip
-           that are not in the default branch, and its diff from the
-           default branch. A branch whose work has already landed under
-           another commit has nothing of its own left.
-       2.  Close each branch that will not be part of the merge
+       1.  See what is still the branch's own: every commit of its tip
+           that is not in the default branch, and its whole diff from
+           the default branch. The branch has nothing of its own left
+           only when every one of those changes is present, or was
+           replaced on purpose, on the default branch. Judge the whole
+           tip, not one hunk: a branch with two independent fixes, only
+           one of them on the default branch, still has work of its own.
+           Leave such a branch open and bring it into the merge.
+       2.  Close only a branch with nothing of its own left, or one you
+           abandon on purpose
            (reviews_bundle_close bundle=ID branch=NAME reason=TEXT).
            The owner, an operator or an admin may close it. Its
            reviews are withdrawn with the reason, and the meta review
-           no longer has to hold it. For a superseded branch, the
-           reason names the commit on the default branch that holds its
-           work. remove=true also has the cleanup account remove the
-           branch. Then work=archive keeps its last commit as
-           archive/NAME, and work=discard lets it go.
+           no longer has to hold its tip, so a wrong close drops that
+           work from the merge. For a superseded branch, the reason
+           names every commit on the default branch that holds or
+           replaces its work. remove=true also has the cleanup account
+           remove the branch. Then work=archive keeps its last commit
+           as archive/NAME, and work=discard lets it go.
        3.  Merge what is left. Open a checkout (checkout_open), then
            bring each remaining branch in with
            checkout_merge repository=NAME branch=YOURS from=BRANCH,
