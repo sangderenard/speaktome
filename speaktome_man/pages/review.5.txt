@@ -45,17 +45,21 @@ DESCRIPTION
                     An admin decided.
        withdrawn    The author took it back, or submitted a newer commit
                     of the same branch.
-       landed       The default branch is at this commit.
+       landed       The default branch contains the reviewed commit.
 
        A decision and a landing are about one commit. A branch that
        moved is a different change and is submitted again.
 
    Landing
-       The admin tool lands an accepted or approved change as a
-       fast-forward and never forces. A change that is not a descendant
-       of the default branch is held; its author merges the default
-       branch into it and submits the new commit. The author chooses,
-       with keep, whether the branch stays after it lands.
+       The admin tool lands an accepted or approved change without
+       forcing. If the default branch already contains the reviewed
+       commit, the tool records it as landed. If the default branch
+       can fast-forward to the reviewed commit, the tool advances it.
+       Otherwise the tool tries a merge with the unchanged reviewed
+       commit as its second parent. If Git cannot merge the two,
+       the author merges the default branch into the change branch
+       and submits the new commit. The author uses keep to choose
+       whether the branch stays after landing.
 
    The lock
        A push to a default branch, and the review-gate check on GitHub,
