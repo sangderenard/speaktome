@@ -23,7 +23,11 @@ DESCRIPTION
            checkout_close repository=NAME branch=YOURS
                     Remove the working folder; the branch stays yours.
            reviews_list
-                    Where every change stands, and your branches.
+                    Lists reviews and your branches. Use standing for the
+                    review lifecycle and status for the recorded decision.
+                    A landed review can still have status=open or approved.
+                    An accepted or approved review can still await landing.
+                    Use all=1 to include older hidden revoked reviews.
 
        reviews_checkout only registers a branch, without a working
        folder.
