@@ -116,6 +116,10 @@ def test_manual_pages(tmp_path):
     for addr in addrs:
         assert atlas.page(addr).startswith(b"<!DOCTYPE html>")
     assert atlas.page("index") == atlas.page(S.address(atlas.root))
+    root = atlas.page("index").decode("utf-8")
+    assert "<h3>Inside this place</h3>" in root
+    assert "contained-by (incoming)" not in root
+    assert "abstract-ui-div-map-v0" not in root
 
     go = next(o for o in doc["world"]["objects"] if o["identity"].endswith("/1/go"))
     text = atlas.page(S.address(go["identity"])).decode("utf-8")
@@ -126,6 +130,8 @@ def test_manual_pages(tmp_path):
     for target in targets:
         assert f'href="{S.address(target)}.html"' in text
     assert "see-also (outgoing)" in text
+    assert "<h3>Part of</h3>" in text
+    assert "contained-by (outgoing)" not in text
     # breadcrumbs: section then manual root
     assert f'href="{S.address(speaktome_man.ROOT + "/1")}.html"' in text
     assert f'href="{S.address(speaktome_man.ROOT)}.html"' in text

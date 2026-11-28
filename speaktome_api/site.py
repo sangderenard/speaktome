@@ -30,7 +30,9 @@ _STEPS = 32
 _MEMO = 4
 INDEX = "index"
 SENTENCE = "Generated from a graph: each place is a page, each edge is a link."
-_SKIP = {"identity", "name", "kind", "summary", "text"}
+_SKIP = {"identity", "name", "kind", "summary", "text", "schema"}
+# Containment reads as plain words; other relationships keep "<relationship> (<direction>)".
+_HEADINGS = {("contained-by", "incoming"): "Inside this place", ("contained-by", "outgoing"): "Part of"}
 
 
 def address(identity: str) -> str:
@@ -164,7 +166,8 @@ class Atlas:
         if groups:
             out.append("<h2>Exits</h2>")
         for (relationship, direction), edges in groups.items():
-            out.append(f"<h3>{_e(relationship)} ({direction})</h3>")
+            heading = _HEADINGS.get((relationship, direction)) or f"{relationship} ({direction})"
+            out.append(f"<h3>{_e(heading)}</h3>")
             out.append("<ul>")
             for edge in edges:
                 other = edge["target"] if edge["source"] == identity else edge["source"]
